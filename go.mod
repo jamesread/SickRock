@@ -1,3 +1,3 @@
-module github.com/jamesread/functions-test
+module github.com/jamesread/SickRock
 
 go 1.20

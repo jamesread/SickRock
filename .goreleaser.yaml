@@ -1,0 +1,31 @@
+---
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+dockers:
+  - image_templates:
+      - "ghcr.io/jamesread/sickrock:{{ .Tag }}"
+      - "ghcr.io/jamesread/sickrock:latest"
+
+    dockerfile: Dockerfile
+    skip_push: false
+    build_flag_templates:
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.version={{.Tag}}"
