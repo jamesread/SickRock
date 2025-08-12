@@ -1,2 +1,7 @@
 dist/
 /SickRock
+service/tmp
+proto/tmp
+**/.swp
+**/.swo
+frontend/node_modules

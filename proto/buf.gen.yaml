@@ -1,0 +1,27 @@
+version: v2
+
+managed:
+  enabled: true
+
+plugins:
+  - remote: buf.build/protocolbuffers/go
+    out: ../service/gen/proto
+    opt:
+      - paths=source_relative
+    
+  - remote: buf.build/connectrpc/go
+    out: ../service/gen
+    opt:
+      - paths=source_relative
+
+  - remote: buf.build/bufbuild/es
+    out: ../frontend/src/gen
+    opt:
+      - target=ts
+
+  - remote: buf.build/connectrpc/es
+    out: ../frontend/src/gen
+    opt:
+      - target=ts
+
+

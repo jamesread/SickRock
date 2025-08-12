@@ -1,0 +1,133 @@
+syntax = "proto3";
+
+package sickrock;
+
+option go_package = "github.com/jamesread/SickRock/gen/proto;sickrockpb";
+
+message PingRequest {
+  string message = 1;
+}
+
+message PingResponse {
+  string message = 1;
+  int64 timestamp_unix = 2; // UTC seconds since epoch
+}
+
+service SickRock {
+  rpc Ping(PingRequest) returns (PingResponse);
+
+  // Navigation for the UI
+  rpc GetNavigationLinks(GetNavigationLinksRequest) returns (GetNavigationLinksResponse);
+
+  // Pages available in the application
+  rpc GetPages(GetPagesRequest) returns (GetPagesResponse);
+
+  // Generic CRUD over items on a page
+  rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
+  rpc CreateItem(CreateItemRequest) returns (CreateItemResponse);
+  rpc GetItem(GetItemRequest) returns (GetItemResponse);
+  rpc EditItem(EditItemRequest) returns (EditItemResponse);
+  rpc DeleteItem(DeleteItemRequest) returns (DeleteItemResponse);
+
+  // Get structure/fields for a given page/table
+  rpc GetTableStructure(GetTableStructureRequest) returns (GetTableStructureResponse);
+
+  // Add a column to a table
+  rpc AddTableColumn(AddTableColumnRequest) returns (GetTableStructureResponse);
+}
+
+// Navigation
+message GetNavigationLinksRequest {}
+
+message NavigationLink {
+  string label = 1;
+  string path = 2;
+}
+
+message GetNavigationLinksResponse {
+  repeated NavigationLink links = 1;
+}
+
+// Pages
+message GetPagesRequest {}
+
+message Page {
+  string id = 1;
+  string title = 2;
+  string slug = 3;
+}
+
+message GetPagesResponse {
+  repeated Page pages = 1;
+}
+
+// Items
+message Item {
+  string id = 1;
+  string name = 2;
+  int64 created_at_unix = 3;
+}
+
+message ListItemsRequest {
+  string page_id = 1;
+}
+
+message ListItemsResponse {
+  repeated Item items = 1;
+}
+
+message CreateItemRequest {
+  string page_id = 1;
+  string name = 2;
+}
+
+message CreateItemResponse {
+  Item item = 1;
+}
+
+message GetItemRequest {
+  string id = 1;
+}
+
+message GetItemResponse {
+  Item item = 1;
+}
+
+message EditItemRequest {
+  string id = 1;
+  string name = 2;
+}
+
+message EditItemResponse {
+  Item item = 1;
+}
+
+message DeleteItemRequest {
+  string id = 1;
+}
+
+message DeleteItemResponse {
+  bool deleted = 1;
+}
+
+// Table Structure
+message GetTableStructureRequest {
+  string page_id = 1;
+}
+
+message Field {
+  string name = 1;
+  string type = 2;
+  bool required = 3;
+}
+
+message GetTableStructureResponse {
+  repeated Field fields = 1;
+}
+
+message AddTableColumnRequest {
+  string page_id = 1;
+  Field field = 2;
+}
+
+
