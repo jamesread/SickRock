@@ -1,6 +1,6 @@
 module github.com/jamesread/SickRock
 
-go 1.23.0
+go 1.23.8
 
 toolchain go1.24.4
 
@@ -28,6 +28,7 @@ require (
 	github.com/go-playground/validator/v10 v10.27.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/jamesread/golure v0.0.0-20250821142658-fa4de6860090 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect

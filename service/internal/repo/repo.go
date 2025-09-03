@@ -10,6 +10,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jamesread/golure/pkg/redact"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 )
@@ -346,9 +347,16 @@ func OpenFromEnv(defaultSQLiteDSN string) (*sqlx.DB, error) {
 		user := os.Getenv("DB_USER")
 		pass := os.Getenv("DB_PASS")
 		name := os.Getenv("DB_NAME")
+
+		log.Infof("DB_PORT: %s", port)
+		log.Infof("DB_USER: %s", user)
+		log.Infof("DB_PASS: %s", redact.RedactString(pass))
+		log.Infof("DB_NAME: %s", name)
+
 		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true", user, pass, host, port, name)
 		return sqlx.Open("mysql", dsn)
 	}
+
 	return sqlx.Open("sqlite", defaultSQLiteDSN)
 }
 

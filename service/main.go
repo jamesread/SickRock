@@ -13,21 +13,30 @@ import (
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
+	"github.com/jamesread/golure/pkg/dirs"
 	_ "modernc.org/sqlite"
 )
+
+func findFrontendDir() string {
+	possibleDirs := []string{
+		"../frontend/dist",
+		"/www",
+		"dist",
+	}
+
+	dir, err := dirs.GetFirstExistingDirectory("frontend", possibleDirs)
+
+	if err != nil {
+		log.Fatalf("Could not find frontend directory: %v", err)
+	}
+
+	return dir
+}
 
 func main() {
 	log.Info("SickRock is starting up...")
 
 	router := gin.Default()
-
-	// Serve built frontend (Vite dist)
-	distDir := filepath.Join("..", "frontend", "dist")
-	router.Static("/assets", filepath.Join(distDir, "assets"))
-	router.Static("/resources", filepath.Join(distDir, "resources"))
-	router.GET("/", func(c *gin.Context) {
-		c.File(filepath.Join(distDir, "index.html"))
-	})
 
 	// ConnectRPC service mounted under /api
 	db, err := repo.OpenFromEnv("file:../tmp/sickrock.db?_pragma=foreign_keys(1)")
@@ -79,8 +88,9 @@ func main() {
 			c.Status(http.StatusNotFound)
 			return
 		}
-		c.File(filepath.Join(distDir, "index.html"))
+		c.File(filepath.Join(findFrontendDir(), "index.html"))
 	})
 
+	router.Static("/", findFrontendDir())
 	router.Run(":8080")
 }

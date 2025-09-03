@@ -4,6 +4,10 @@ LABEL org.opencontainers.image.source https://github.com/jamesread/SickRock
 
 EXPOSE 8080
 
+ENV GIN_MODE=release
+
+COPY frontend/dist/ ./www/
+
 COPY SickRock /SickRock
 
 ENTRYPOINT [ "/SickRock" ]

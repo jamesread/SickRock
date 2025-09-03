@@ -1,6 +1,6 @@
-.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-clean frontend frontend-dev frontend-build frontend-preview
+.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-clean frontend frontend-build frontend-preview
 
-all: proto-generate service-build
+all: proto-generate frontend-build service-build
 
 proto:
 	$(MAKE) -wC proto
@@ -33,14 +33,10 @@ service-clean:
 
 # Frontend targets
 frontend:
-	$(MAKE) -wC frontend dev
-
-frontend-dev:
-	$(MAKE) -wC frontend dev
+	$(MAKE) -wC frontend
 
 frontend-build:
 	$(MAKE) -wC frontend build
 
 frontend-preview:
 	$(MAKE) -wC frontend preview
-
