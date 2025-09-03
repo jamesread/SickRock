@@ -162,6 +162,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item
 	}
 
 	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY created_at_unix DESC", strings.Join(columnNames, ", "), t)
+	log.Infof("Executing query: %s", query)
 
 	// Use QueryxContext to get raw rows and manually map them
 	rows, err := r.db.QueryxContext(ctx, query)
@@ -185,28 +186,50 @@ func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item
 
 		// Map known fields
 		if id, ok := rowMap["id"]; ok {
+			log.Infof("id field found: %v (type: %T)", id, id)
 			if idStr, ok := id.(string); ok {
 				item.ID = idStr
 			} else if idInt, ok := id.(int64); ok {
 				item.ID = strconv.FormatInt(idInt, 10)
 			}
+		} else {
+			log.Warnf("id field not found in rowMap")
 		}
 		if name, ok := rowMap["name"]; ok {
-			log.Infof("name: %v", name)
+			log.Infof("name field found: %v (type: %T)", name, name)
 			if nameStr, ok := name.(string); ok {
 				item.Name = nameStr
+			} else if nameBytes, ok := name.([]uint8); ok {
+				// Handle MySQL byte slice conversion
+				item.Name = string(nameBytes)
+				log.Infof("Converted name from []uint8 to string: %s", item.Name)
+			} else {
+				log.Warnf("name field is not a string or []uint8, got type: %T, value: %v", name, name)
 			}
+		} else {
+			log.Warnf("name field not found in rowMap")
 		}
 		if createdAt, ok := rowMap["created_at_unix"]; ok {
+			log.Infof("created_at_unix field found: %v (type: %T)", createdAt, createdAt)
 			if createdAtInt, ok := createdAt.(int64); ok {
 				item.CreatedAtUnix = createdAtInt
+			} else {
+				log.Warnf("created_at_unix field is not int64, got type: %T, value: %v", createdAt, createdAt)
 			}
+		} else {
+			log.Warnf("created_at_unix field not found in rowMap")
 		}
 
 		// Add all other fields to the dynamic Fields map
 		for colName, value := range rowMap {
 			if colName != "id" && colName != "name" && colName != "created_at_unix" {
-				item.Fields[colName] = value
+				// Handle MySQL byte slice conversion for additional fields
+				if valueBytes, ok := value.([]uint8); ok {
+					item.Fields[colName] = string(valueBytes)
+					log.Infof("Converted additional field %s from []uint8 to string: %s", colName, string(valueBytes))
+				} else {
+					item.Fields[colName] = value
+				}
 			}
 		}
 
@@ -222,12 +245,16 @@ func (r *Repository) CreateItemInTable(ctx context.Context, table string, name s
 	t := sanitizeTableName(table)
 	now := time.Now().Unix()
 	query := fmt.Sprintf("INSERT INTO %s (name, created_at_unix) VALUES (?, ?)", t)
+	log.Infof("Creating item in table %s with name: %s, query: %s", t, name, query)
 	res, err := r.db.ExecContext(ctx, query, name, now)
 	if err != nil {
+		log.Errorf("Failed to create item: %v", err)
 		return Item{}, err
 	}
 	lastID, _ := res.LastInsertId()
-	return Item{ID: strconv.FormatInt(lastID, 10), Name: name, CreatedAtUnix: now}, nil
+	item := Item{ID: strconv.FormatInt(lastID, 10), Name: name, CreatedAtUnix: now}
+	log.Infof("Created item: %+v", item)
+	return item, nil
 }
 
 func (r *Repository) GetItemInTable(ctx context.Context, table string, id string) (Item, error) {
@@ -280,6 +307,9 @@ func (r *Repository) GetItemInTable(ctx context.Context, table string, id string
 	if name, ok := rowMap["name"]; ok {
 		if nameStr, ok := name.(string); ok {
 			item.Name = nameStr
+		} else if nameBytes, ok := name.([]uint8); ok {
+			// Handle MySQL byte slice conversion
+			item.Name = string(nameBytes)
 		}
 	}
 	if createdAt, ok := rowMap["created_at_unix"]; ok {
@@ -291,7 +321,12 @@ func (r *Repository) GetItemInTable(ctx context.Context, table string, id string
 	// Add all other fields to the dynamic Fields map
 	for colName, value := range rowMap {
 		if colName != "id" && colName != "name" && colName != "created_at_unix" {
-			item.Fields[colName] = value
+			// Handle MySQL byte slice conversion for additional fields
+			if valueBytes, ok := value.([]uint8); ok {
+				item.Fields[colName] = string(valueBytes)
+			} else {
+				item.Fields[colName] = value
+			}
 		}
 	}
 
@@ -304,6 +339,33 @@ func (r *Repository) EditItemInTable(ctx context.Context, table string, id strin
 	if _, err := r.db.ExecContext(ctx, query, name, id); err != nil {
 		return Item{}, err
 	}
+	return r.GetItemInTable(ctx, t, id)
+}
+
+func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string, id string, name string, additionalFields map[string]string) (Item, error) {
+	t := sanitizeTableName(table)
+
+	// Build dynamic UPDATE query
+	setParts := []string{"name = ?"}
+	args := []interface{}{name}
+
+	for fieldName, fieldValue := range additionalFields {
+		// Sanitize field name to prevent SQL injection
+		sanitizedFieldName := sanitizeTableName(fieldName)
+		setParts = append(setParts, fmt.Sprintf("%s = ?", sanitizedFieldName))
+		args = append(args, fieldValue)
+	}
+
+	args = append(args, id) // Add id for WHERE clause
+
+	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", t, strings.Join(setParts, ", "))
+	log.Infof("Executing update query: %s with args: %v", query, args)
+
+	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
+		log.Errorf("Failed to update item: %v", err)
+		return Item{}, err
+	}
+
 	return r.GetItemInTable(ctx, t, id)
 }
 
@@ -383,7 +445,9 @@ func (r *Repository) ListColumns(ctx context.Context, table string) ([]FieldSpec
 		for _, r := range rows {
 			typ := "string"
 			dt := strings.ToLower(r.DataType)
-			if strings.Contains(dt, "int") {
+			if strings.Contains(dt, "tinyint") {
+				typ = "tinyint"
+			} else if strings.Contains(dt, "int") {
 				typ = "int64"
 			}
 			specs = append(specs, FieldSpec{Name: r.ColumnName, Type: typ, Required: strings.ToUpper(r.IsNullable) == "NO"})

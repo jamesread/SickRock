@@ -81,6 +81,12 @@ const pagedItems = computed(() => {
 
 const selectedKeys = ref<Set<string>>(new Set())
 
+// Inline editing state
+const editingCell = ref<{ rowId: string; column: string } | null>(null)
+const editingValue = ref<string>('')
+const saving = ref(false)
+const editInput = ref<HTMLInputElement | null>(null)
+
 // Helper function to get item value for a column, handling both standard and dynamic fields
 function getItemValue(item: any, column: string): any {
   // Check standard fields first
@@ -127,6 +133,102 @@ async function load() {
   }
 }
 
+// Inline editing functions
+function startEdit(item: any, column: string) {
+  // Don't allow editing of id or created_at_unix columns
+  if (column === 'id' || column === 'created_at_unix') {
+    return
+  }
+  
+  const currentValue = getItemValue(item, column)
+  editingCell.value = { rowId: String(item.id), column }
+  editingValue.value = currentValue == null ? '' : String(currentValue)
+  
+  // Focus the input after the DOM updates
+  setTimeout(() => {
+    if (editInput.value) {
+      editInput.value.focus()
+      editInput.value.select()
+    }
+  }, 0)
+}
+
+function cancelEdit() {
+  editingCell.value = null
+  editingValue.value = ''
+}
+
+async function saveEdit(item: any) {
+  if (!editingCell.value) return
+  
+  saving.value = true
+  try {
+    const { rowId, column } = editingCell.value
+    
+    // Prepare the update data
+    const additionalFields: Record<string, string> = {}
+    
+    // If editing the name field, it goes in the name parameter
+    // Otherwise, it goes in additionalFields
+    if (column === 'name') {
+      await client.editItem({
+        id: rowId,
+        name: editingValue.value,
+        additionalFields: {},
+        pageId: props.tableId
+      })
+    } else {
+      // For additional fields, we need to get all current values and update just this one
+      const currentItem = items.value.find(it => String(it.id) === rowId)
+      if (currentItem) {
+        // Get all additional fields from the current item
+        if (currentItem.additionalFields) {
+          Object.entries(currentItem.additionalFields).forEach(([key, value]) => {
+            additionalFields[key] = String(value)
+          })
+        }
+        // Update the specific field being edited
+        additionalFields[column] = editingValue.value
+        
+        await client.editItem({
+          id: rowId,
+          name: String(currentItem.name || ''),
+          additionalFields: additionalFields,
+          pageId: props.tableId
+        })
+      }
+    }
+    
+    // Reload the data to reflect changes
+    await load()
+    cancelEdit()
+  } catch (e) {
+    console.error('Failed to save edit:', e)
+    // You might want to show an error message to the user here
+  } finally {
+    saving.value = false
+  }
+}
+
+function isEditing(item: any, column: string): boolean {
+  return editingCell.value?.rowId === String(item.id) && editingCell.value?.column === column
+}
+
+// Helper function to check if a column is a tinyint (boolean) column
+function isTinyintColumn(column: string): boolean {
+  const field = localFieldDefs.value.find(f => f.name === column)
+  return field?.type.startsWith('tinyint')
+}
+
+// Helper function to get boolean value from tinyint column
+function getBooleanValue(item: any, column: string): boolean {
+  const value = getItemValue(item, column)
+  if (value === null || value === undefined) return false
+  // Convert to number first, then to boolean
+  const numValue = Number(value)
+  return numValue === 1
+}
+
 onMounted(load)
 onMounted(loadStructure)
 </script>
@@ -146,7 +248,7 @@ onMounted(loadStructure)
         <router-link class="button" :to="`/table/${props.tableId}/add-column`">Add column</router-link>
         <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
       </div>
-      <table class="table">
+      <table class="table row-hover">
         <thead>
           <tr>
             <th></th>
@@ -163,12 +265,43 @@ onMounted(loadStructure)
               <input type="checkbox" :checked="isSelected(it)" @change="(e) => toggleSelected(it, e)" />
             </td>
             <td v-for="col in visibleColumns" :key="col">
-              <span v-if="col === 'created_at_unix' && getItemValue(it, col) != null">{{ new Date(Number(getItemValue(it, col)) *
-                1000).toLocaleString() }}</span>
-              <span v-else-if="col === 'id'">
-                <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
-              </span>
-              <span v-else>{{ getItemValue(it, col) }}</span>
+              <!-- Inline editing input -->
+              <div v-if="isEditing(it, col)" class="inline-edit">
+                <!-- Checkbox for tinyint columns -->
+                <input
+                  v-if="isTinyintColumn(col)"
+                  type="checkbox"
+                  :checked="getBooleanValue(it, col)"
+                  @change="(e) => { editingValue = (e.target as HTMLInputElement).checked ? '1' : '0'; saveEdit(it); }"
+                  :disabled="saving"
+                  class="edit-checkbox"
+                />
+                <!-- Text input for other columns -->
+                <input
+                  v-else
+                  v-model="editingValue"
+                  @keyup.enter="saveEdit(it)"
+                  @keyup.escape="cancelEdit"
+                  @blur="saveEdit(it)"
+                  :disabled="saving"
+                  class="edit-input"
+                  ref="editInput"
+                />
+              </div>
+              <!-- Display values -->
+              <div v-else @click="startEdit(it, col)" class="cell-content" :class="{ 'editable': col !== 'id' && col !== 'created_at_unix' }">
+                <span v-if="col === 'created_at_unix' && getItemValue(it, col) != null">{{ new Date(Number(getItemValue(it, col)) *
+                  1000).toLocaleString() }}</span>
+                <span v-else-if="col === 'id'">
+                  <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
+                </span>
+                <span v-else-if="getItemValue(it, col) == null" class="subtle">NULL</span>
+                <span v-else-if="isTinyintColumn(col)" class="boolean-display">
+                  <span v-if="getBooleanValue(it, col)" class="boolean-true">✓</span>
+                  <span v-else class="boolean-false">✗</span>
+                </span>
+                <span v-else>{{ getItemValue(it, col) }}</span>
+              </div>
             </td>
             <td style = "width: 5%">
               <RowActionsDropdown :table-id="props.tableId" :row-id="getItemValue(it, 'id')" @deleted="load" />
@@ -187,6 +320,72 @@ onMounted(loadStructure)
 </template>
 
 <style scoped>
+.cell-content {
+  min-height: 1.5em;
+  padding: 0.25rem;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.cell-content.editable {
+  cursor: pointer;
+}
+
+.cell-content.editable:hover {
+  background-color: #f8f9fa;
+}
+
+.inline-edit {
+  padding: 0;
+}
+
+.edit-input {
+  width: 100%;
+  border: 2px solid #007bff;
+  border-radius: 3px;
+  padding: 0.25rem;
+  font-size: inherit;
+  background: white;
+  outline: none;
+}
+
+.edit-input:focus {
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.edit-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.boolean-display {
+  display: flex;
+  align-items: center;
+  min-height: 1.5em;
+}
+
+.boolean-true {
+  color: #28a745;
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+.boolean-false {
+  color: #dc3545;
+  font-weight: bold;
+  font-size: 1.2em;
+}
+
+.edit-checkbox {
+  transform: scale(1.2);
+  cursor: pointer;
+}
+
+.edit-checkbox:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .table-title {
   margin: 0;
 }

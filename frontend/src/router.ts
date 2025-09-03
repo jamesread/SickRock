@@ -3,6 +3,7 @@ import HomeView from './views/HomeView.vue'
 import AboutView from './views/AboutView.vue'
 import TableView from './views/TableView.vue'
 import RowView from './views/RowView.vue'
+import RowEdit from './views/RowEdit.vue'
 import AddColumnView from './views/AddColumnView.vue'
 import InsertRowView from './views/InsertRowView.vue'
 import TableCreate from './views/TableCreate.vue'
@@ -24,6 +25,15 @@ const router = createRouter({
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: `Row ${String(route.params.rowId)}` },
+        ],
+      },
+    },
+    { path: '/table/:tableName/:rowId/edit', name: 'row-edit', component: RowEdit, props: true,
+      meta: {
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: `Row ${String(route.params.rowId)}`, href: { name: 'row', params: { tableName: route.params.tableName, rowId: route.params.rowId } } },
+          { name: 'Edit' },
         ],
       },
     },

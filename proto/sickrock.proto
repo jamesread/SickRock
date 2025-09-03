@@ -97,6 +97,8 @@ message GetItemResponse {
 message EditItemRequest {
   string id = 1;
   string name = 2;
+  map<string, string> additional_fields = 3;
+  string page_id = 4;
 }
 
 message EditItemResponse {

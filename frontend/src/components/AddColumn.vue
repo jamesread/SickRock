@@ -8,7 +8,7 @@ const props = defineProps<{ tableId: string }>()
 const emit = defineEmits<{ added: [] }>()
 
 const name = ref('')
-const type = ref<'string' | 'int64'>('string')
+const type = ref<'string' | 'int64' | 'tinyint'>('string')
 const required = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -49,6 +49,7 @@ async function submit() {
                 <select id="addcol-type" v-model="type">
                     <option value="string">string</option>
                     <option value="int64">int64</option>
+                    <option value="tinyint">tinyint</option>
                 </select>
             </div>
 

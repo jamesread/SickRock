@@ -70,23 +70,28 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 
 	out := make([]*sickrockpb.Item, 0, len(items))
 	for _, it := range items {
+		log.Infof("Processing item: ID=%s, Name=%s, CreatedAtUnix=%d, Fields=%+v", it.ID, it.Name, it.CreatedAtUnix, it.Fields)
+
 		// Convert dynamic fields to string map for protobuf
 		additionalFields := make(map[string]string)
 		for key, value := range it.Fields {
-			log.Infof("key: %s, value: %v", key, value)
+			log.Infof("Additional field - key: %s, value: %v", key, value)
 			if value != nil {
 				additionalFields[key] = fmt.Sprintf("%v", value)
 			}
 		}
 
-		log.Infof("name: %s", it.Name)
-
-		out = append(out, &sickrockpb.Item{
+		item := &sickrockpb.Item{
 			Id:               it.ID,
 			Name:             it.Name,
 			CreatedAtUnix:    it.CreatedAtUnix,
 			AdditionalFields: additionalFields,
-		})
+		}
+
+		log.Infof("Created protobuf item: ID=%s, Name=%s, CreatedAtUnix=%d, AdditionalFields=%+v",
+			item.Id, item.Name, item.CreatedAtUnix, item.AdditionalFields)
+
+		out = append(out, item)
 	}
 	return connect.NewResponse(&sickrockpb.ListItemsResponse{Items: out}), nil
 }
@@ -142,15 +147,34 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 }
 
 func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sickrockpb.EditItemRequest]) (*connect.Response[sickrockpb.EditItemResponse], error) {
-	it, err := s.repo.EditItem(ctx, req.Msg.GetId(), req.Msg.GetName())
+	// Get table name from the request, default to "items" for backward compatibility
+	table := req.Msg.GetPageId()
+	if table == "" {
+		table = "items"
+	}
+
+	// Ensure table exists
+	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
+		return nil, err
+	}
+
+	// Get additional fields from the request
+	additionalFields := req.Msg.GetAdditionalFields()
+	if additionalFields == nil {
+		additionalFields = make(map[string]string)
+	}
+
+	// Use the new method that supports additional fields
+	it, err := s.repo.EditItemInTableWithFields(ctx, table, req.Msg.GetId(), req.Msg.GetName(), additionalFields)
 	if err != nil {
 		return nil, err
 	}
+
 	// Convert dynamic fields to string map for protobuf
-	additionalFields := make(map[string]string)
+	responseAdditionalFields := make(map[string]string)
 	for key, value := range it.Fields {
 		if value != nil {
-			additionalFields[key] = fmt.Sprintf("%v", value)
+			responseAdditionalFields[key] = fmt.Sprintf("%v", value)
 		}
 	}
 
@@ -158,7 +182,7 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 		Id:               it.ID,
 		Name:             it.Name,
 		CreatedAtUnix:    it.CreatedAtUnix,
-		AdditionalFields: additionalFields,
+		AdditionalFields: responseAdditionalFields,
 	}}), nil
 }
 

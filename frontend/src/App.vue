@@ -26,6 +26,7 @@ onMounted(async () => {
     pages.value.forEach(pg => {
         sidebar.value && sidebar.value.addNavigationLink({ id: pg.id, title: pg.title, path: `/table/${pg.slug}`, icon: Menu01Icon })
     })
+    sidebar.value && sidebar.value.addNavigationLink({ id: 'table-configurations', title: 'Table Configurations', path: '/table/table_configurations', icon: Menu01Icon })
     sidebar.value && sidebar.value.addNavigationLink({ id: 'admin-create-table', title: 'Create Table', path: '/admin/table/create', icon: Menu01Icon })
 })
 </script>

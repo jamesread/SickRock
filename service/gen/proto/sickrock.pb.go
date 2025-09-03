@@ -733,11 +733,13 @@ func (x *GetItemResponse) GetItem() *Item {
 }
 
 type EditItemRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	AdditionalFields map[string]string      `protobuf:"bytes,3,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	PageId           string                 `protobuf:"bytes,4,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *EditItemRequest) Reset() {
@@ -780,6 +782,20 @@ func (x *EditItemRequest) GetId() string {
 func (x *EditItemRequest) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *EditItemRequest) GetAdditionalFields() map[string]string {
+	if x != nil {
+		return x.AdditionalFields
+	}
+	return nil
+}
+
+func (x *EditItemRequest) GetPageId() string {
+	if x != nil {
+		return x.PageId
 	}
 	return ""
 }
@@ -1160,10 +1176,15 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x0eGetItemRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"5\n" +
 	"\x0fGetItemResponse\x12\"\n" +
-	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\"5\n" +
+	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\"\xf1\x01\n" +
 	"\x0fEditItemRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"6\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\\\n" +
+	"\x11additional_fields\x18\x03 \x03(\v2/.sickrock.EditItemRequest.AdditionalFieldsEntryR\x10additionalFields\x12\x17\n" +
+	"\apage_id\x18\x04 \x01(\tR\x06pageId\x1aC\n" +
+	"\x15AdditionalFieldsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"6\n" +
 	"\x10EditItemResponse\x12\"\n" +
 	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\"#\n" +
 	"\x11DeleteItemRequest\x12\x0e\n" +
@@ -1208,7 +1229,7 @@ func file_sickrock_proto_rawDescGZIP() []byte {
 	return file_sickrock_proto_rawDescData
 }
 
-var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_sickrock_proto_goTypes = []any{
 	(*PingRequest)(nil),                // 0: sickrock.PingRequest
 	(*PingResponse)(nil),               // 1: sickrock.PingResponse
@@ -1234,6 +1255,7 @@ var file_sickrock_proto_goTypes = []any{
 	(*GetTableStructureResponse)(nil),  // 21: sickrock.GetTableStructureResponse
 	(*AddTableColumnRequest)(nil),      // 22: sickrock.AddTableColumnRequest
 	nil,                                // 23: sickrock.Item.AdditionalFieldsEntry
+	nil,                                // 24: sickrock.EditItemRequest.AdditionalFieldsEntry
 }
 var file_sickrock_proto_depIdxs = []int32{
 	3,  // 0: sickrock.GetNavigationLinksResponse.links:type_name -> sickrock.NavigationLink
@@ -1242,34 +1264,35 @@ var file_sickrock_proto_depIdxs = []int32{
 	8,  // 3: sickrock.ListItemsResponse.items:type_name -> sickrock.Item
 	8,  // 4: sickrock.CreateItemResponse.item:type_name -> sickrock.Item
 	8,  // 5: sickrock.GetItemResponse.item:type_name -> sickrock.Item
-	8,  // 6: sickrock.EditItemResponse.item:type_name -> sickrock.Item
-	20, // 7: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
-	20, // 8: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
-	0,  // 9: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
-	2,  // 10: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
-	5,  // 11: sickrock.SickRock.GetPages:input_type -> sickrock.GetPagesRequest
-	9,  // 12: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
-	11, // 13: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
-	13, // 14: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
-	15, // 15: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
-	17, // 16: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
-	19, // 17: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
-	22, // 18: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
-	1,  // 19: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
-	4,  // 20: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
-	7,  // 21: sickrock.SickRock.GetPages:output_type -> sickrock.GetPagesResponse
-	10, // 22: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
-	12, // 23: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
-	14, // 24: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
-	16, // 25: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
-	18, // 26: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
-	21, // 27: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
-	21, // 28: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
-	19, // [19:29] is the sub-list for method output_type
-	9,  // [9:19] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	24, // 6: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
+	8,  // 7: sickrock.EditItemResponse.item:type_name -> sickrock.Item
+	20, // 8: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
+	20, // 9: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
+	0,  // 10: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
+	2,  // 11: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
+	5,  // 12: sickrock.SickRock.GetPages:input_type -> sickrock.GetPagesRequest
+	9,  // 13: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
+	11, // 14: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
+	13, // 15: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
+	15, // 16: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
+	17, // 17: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
+	19, // 18: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
+	22, // 19: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
+	1,  // 20: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
+	4,  // 21: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
+	7,  // 22: sickrock.SickRock.GetPages:output_type -> sickrock.GetPagesResponse
+	10, // 23: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
+	12, // 24: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
+	14, // 25: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
+	16, // 26: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
+	18, // 27: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
+	21, // 28: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
+	21, // 29: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
+	20, // [20:30] is the sub-list for method output_type
+	10, // [10:20] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_sickrock_proto_init() }
@@ -1283,7 +1306,7 @@ func file_sickrock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sickrock_proto_rawDesc), len(file_sickrock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

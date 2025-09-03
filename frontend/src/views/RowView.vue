@@ -35,8 +35,11 @@ const entries = computed(() => item.value ? Object.entries(item.value) : [])
 <template>
   <section class = "with-header-and-content">
     <div class = "section-header">
-    <h2>Row {{ rowId }}</h2>
+      <h2>Row {{ rowId }}</h2>
+      <div>
+        <router-link :to="`/table/${tableName}/${rowId}/edit`" class="button primary">Edit</router-link>
       </div>
+    </div>
       <div class = "section-content">
         <div v-if="error">{{ error }}</div>
         <div v-else-if="loading">Loading…</div>
