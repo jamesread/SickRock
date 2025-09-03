@@ -27,6 +27,8 @@ dockers:
       - "ghcr.io/jamesread/sickrock:latest"
 
     dockerfile: Dockerfile
+    extra_files:
+      - frontend/dist
     skip_push: false
     build_flag_templates:
       - "--platform=linux/amd64"
