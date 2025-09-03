@@ -31,6 +31,9 @@ service-test:
 service-clean:
 	$(MAKE) -wC service clean
 
+service-prep:
+	$(MAKE) -wC service prep
+
 # Frontend targets
 frontend:
 	$(MAKE) -wC frontend

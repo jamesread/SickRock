@@ -21,3 +21,6 @@ tidy:
 
 clean:
 	rm -rf ./tmp/$(BIN)
+
+prep:
+	go mod download
