@@ -5,6 +5,7 @@ import { createConnectTransport } from '@connectrpc/connect-web'
 import { createClient } from '@connectrpc/connect'
 import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from '../components/InsertRow.vue'
+import Section from 'picocrank/vue/components/Section.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,15 +25,7 @@ function handleCreated() {
 </script>
 
 <template>
-
-  <section class = "with-header-and-content">
-    <div class = "section-header">
-      <h1>Insert Row</h1>
-    </div>
-    <div class = "section-content">
+  <Section title = "Insert Row">
       <InsertRow :table-id="tableId" :field-defs="fieldDefs" @created="handleCreated" />
-    </div>
-  </section>
+  </Section>
 </template>
-
-

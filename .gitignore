@@ -5,3 +5,5 @@ proto/tmp
 **/.swp
 **/.swo
 frontend/node_modules
+**/*.log
+.vscode

@@ -80,8 +80,23 @@ const pagedItems = computed(() => {
 })
 
 const selectedKeys = ref<Set<string>>(new Set())
+
+// Helper function to get item value for a column, handling both standard and dynamic fields
+function getItemValue(item: any, column: string): any {
+  // Check standard fields first
+  if (column === 'id' || column === 'name' || column === 'created_at_unix') {
+    return item[column]
+  }
+  // Check additional fields from protobuf
+  if (item.additionalFields && item.additionalFields[column] !== undefined) {
+    return item.additionalFields[column]
+  }
+  // Fallback to direct property access
+  return item[column]
+}
+
 function keyOf(it: any): string {
-  const k = (it as any)?.id
+  const k = getItemValue(it, 'id')
   return k == null ? '' : String(k)
 }
 function isSelected(it: any): boolean {
@@ -125,11 +140,11 @@ onMounted(loadStructure)
     <div v-if="error" class="error">{{ error }}</div>
     <div v-else-if="loading">Loading…</div>
     <div v-else class="section-content">
-      <div role="toolbar">
-        <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
-        <router-link class="button" :to="`/table/${props.tableId}/add-column`">Add column</router-link>
-        |
+      <div role="toolbar" class = "padding">
         <router-link class="button" :to="`/table/${props.tableId}/insert-row`">Insert row</router-link>
+        |
+        <router-link class="button" :to="`/table/${props.tableId}/add-column`">Add column</router-link>
+        <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
       </div>
       <table class="table">
         <thead>
@@ -148,15 +163,15 @@ onMounted(loadStructure)
               <input type="checkbox" :checked="isSelected(it)" @change="(e) => toggleSelected(it, e)" />
             </td>
             <td v-for="col in visibleColumns" :key="col">
-              <span v-if="col === 'created_at_unix' && (it as any)[col] != null">{{ new Date(Number((it as any)[col]) *
+              <span v-if="col === 'created_at_unix' && getItemValue(it, col) != null">{{ new Date(Number(getItemValue(it, col)) *
                 1000).toLocaleString() }}</span>
               <span v-else-if="col === 'id'">
-                <router-link :to="`/table/${props.tableId}/${(it as any).id}`">{{ (it as any)[col] }}</router-link>
+                <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
               </span>
-              <span v-else>{{ (it as any)[col] }}</span>
+              <span v-else>{{ getItemValue(it, col) }}</span>
             </td>
             <td style = "width: 5%">
-              <RowActionsDropdown :table-id="props.tableId" :row-id="(it as any).id" @deleted="load" />
+              <RowActionsDropdown :table-id="props.tableId" :row-id="getItemValue(it, 'id')" @deleted="load" />
             </td>
           </tr>
           <tr v-if="items.length === 0">
@@ -164,7 +179,9 @@ onMounted(loadStructure)
           </tr>
         </tbody>
       </table>
-      <Pagination :total="total" v-model:page="page" v-model:page-size="pageSize" />
+	  <div class = "padding">
+		  <Pagination :total="total" v-model:page="page" v-model:page-size="pageSize" />
+	  </div>
     </div>
   </section>
 </template>

@@ -15,9 +15,10 @@ import (
 )
 
 type Item struct {
-	ID            string `db:"id"`
-	Name          string `db:"name"`
-	CreatedAtUnix int64  `db:"created_at_unix"`
+	ID            string                 `db:"id"`
+	Name          string                 `db:"name"`
+	CreatedAtUnix int64                  `db:"created_at_unix"`
+	Fields        map[string]interface{} `db:"-"` // Additional dynamic fields
 }
 
 type Repository struct {
@@ -146,12 +147,74 @@ type FieldSpec struct {
 
 func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item, error) {
 	t := sanitizeTableName(table)
-	var items []Item
-	query := fmt.Sprintf("SELECT id, name, created_at_unix FROM %s ORDER BY created_at_unix DESC", t)
-	if err := r.db.SelectContext(ctx, &items, query); err != nil {
+
+	// First get the column names for this table
+	columns, err := r.ListColumns(ctx, table)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+	}
+
+	// Build dynamic SELECT query with all columns
+	columnNames := make([]string, 0, len(columns))
+	for _, col := range columns {
+		columnNames = append(columnNames, col.Name)
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY created_at_unix DESC", strings.Join(columnNames, ", "), t)
+
+	// Use QueryxContext to get raw rows and manually map them
+	rows, err := r.db.QueryxContext(ctx, query)
+	if err != nil {
 		return nil, err
 	}
-	return items, nil
+	defer rows.Close()
+
+	var items []Item
+	for rows.Next() {
+		// Get the row as a map
+		rowMap := make(map[string]interface{})
+		if err := rows.MapScan(rowMap); err != nil {
+			return nil, err
+		}
+
+		// Create Item with dynamic fields
+		item := Item{
+			Fields: make(map[string]interface{}),
+		}
+
+		// Map known fields
+		if id, ok := rowMap["id"]; ok {
+			if idStr, ok := id.(string); ok {
+				item.ID = idStr
+			} else if idInt, ok := id.(int64); ok {
+				item.ID = strconv.FormatInt(idInt, 10)
+			}
+		}
+		if name, ok := rowMap["name"]; ok {
+			log.Infof("name: %v", name)
+			if nameStr, ok := name.(string); ok {
+				item.Name = nameStr
+			}
+		}
+		if createdAt, ok := rowMap["created_at_unix"]; ok {
+			if createdAtInt, ok := createdAt.(int64); ok {
+				item.CreatedAtUnix = createdAtInt
+			}
+		}
+
+		// Add all other fields to the dynamic Fields map
+		for colName, value := range rowMap {
+			if colName != "id" && colName != "name" && colName != "created_at_unix" {
+				item.Fields[colName] = value
+			}
+		}
+
+		log.Infof("sql item: %+v", rowMap)
+
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
 }
 
 func (r *Repository) CreateItemInTable(ctx context.Context, table string, name string) (Item, error) {
@@ -168,12 +231,70 @@ func (r *Repository) CreateItemInTable(ctx context.Context, table string, name s
 
 func (r *Repository) GetItemInTable(ctx context.Context, table string, id string) (Item, error) {
 	t := sanitizeTableName(table)
-	var it Item
-	query := fmt.Sprintf("SELECT id, name, created_at_unix FROM %s WHERE id = ?", t)
-	if err := r.db.GetContext(ctx, &it, query, id); err != nil {
+
+	// First get the column names for this table
+	columns, err := r.ListColumns(ctx, table)
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+	}
+
+	// Build dynamic SELECT query with all columns
+	columnNames := make([]string, 0, len(columns))
+	for _, col := range columns {
+		columnNames = append(columnNames, col.Name)
+	}
+
+	query := fmt.Sprintf("SELECT %s FROM %s WHERE id = ?", strings.Join(columnNames, ", "), t)
+
+	// Use QueryxContext to get raw row and manually map it
+	rows, err := r.db.QueryxContext(ctx, query, id)
+	if err != nil {
 		return Item{}, err
 	}
-	return it, nil
+	defer rows.Close()
+
+	if !rows.Next() {
+		return Item{}, fmt.Errorf("item not found")
+	}
+
+	// Get the row as a map
+	rowMap := make(map[string]interface{})
+	if err := rows.MapScan(rowMap); err != nil {
+		return Item{}, err
+	}
+
+	// Create Item with dynamic fields
+	item := Item{
+		Fields: make(map[string]interface{}),
+	}
+
+	// Map known fields
+	if idVal, ok := rowMap["id"]; ok {
+		if idStr, ok := idVal.(string); ok {
+			item.ID = idStr
+		} else if idInt, ok := idVal.(int64); ok {
+			item.ID = strconv.FormatInt(idInt, 10)
+		}
+	}
+	if name, ok := rowMap["name"]; ok {
+		if nameStr, ok := name.(string); ok {
+			item.Name = nameStr
+		}
+	}
+	if createdAt, ok := rowMap["created_at_unix"]; ok {
+		if createdAtInt, ok := createdAt.(int64); ok {
+			item.CreatedAtUnix = createdAtInt
+		}
+	}
+
+	// Add all other fields to the dynamic Fields map
+	for colName, value := range rowMap {
+		if colName != "id" && colName != "name" && colName != "created_at_unix" {
+			item.Fields[colName] = value
+		}
+	}
+
+	return item, nil
 }
 
 func (r *Repository) EditItemInTable(ctx context.Context, table string, id string, name string) (Item, error) {

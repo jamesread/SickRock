@@ -66,6 +66,7 @@ message Item {
   string id = 1;
   string name = 2;
   int64 created_at_unix = 3;
+  map<string, string> additional_fields = 4;
 }
 
 message ListItemsRequest {
@@ -129,5 +130,3 @@ message AddTableColumnRequest {
   string page_id = 1;
   Field field = 2;
 }
-
-

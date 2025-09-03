@@ -8,7 +8,7 @@ deps:
 	go mod tidy
 
 build:
-	go build -o ./tmp/$(BIN) ./...
+	go build -o ./tmp/$(BIN)
 
 run:
 	go run ./main.go
@@ -21,5 +21,3 @@ tidy:
 
 clean:
 	rm -rf ./tmp/$(BIN)
-
-

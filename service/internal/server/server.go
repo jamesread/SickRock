@@ -67,9 +67,26 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 	if err != nil {
 		return nil, err
 	}
+
 	out := make([]*sickrockpb.Item, 0, len(items))
 	for _, it := range items {
-		out = append(out, &sickrockpb.Item{Id: it.ID, Name: it.Name, CreatedAtUnix: it.CreatedAtUnix})
+		// Convert dynamic fields to string map for protobuf
+		additionalFields := make(map[string]string)
+		for key, value := range it.Fields {
+			log.Infof("key: %s, value: %v", key, value)
+			if value != nil {
+				additionalFields[key] = fmt.Sprintf("%v", value)
+			}
+		}
+
+		log.Infof("name: %s", it.Name)
+
+		out = append(out, &sickrockpb.Item{
+			Id:               it.ID,
+			Name:             it.Name,
+			CreatedAtUnix:    it.CreatedAtUnix,
+			AdditionalFields: additionalFields,
+		})
 	}
 	return connect.NewResponse(&sickrockpb.ListItemsResponse{Items: out}), nil
 }
@@ -86,7 +103,20 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&sickrockpb.CreateItemResponse{Item: &sickrockpb.Item{Id: it.ID, Name: it.Name, CreatedAtUnix: it.CreatedAtUnix}}), nil
+	// Convert dynamic fields to string map for protobuf
+	additionalFields := make(map[string]string)
+	for key, value := range it.Fields {
+		if value != nil {
+			additionalFields[key] = fmt.Sprintf("%v", value)
+		}
+	}
+
+	return connect.NewResponse(&sickrockpb.CreateItemResponse{Item: &sickrockpb.Item{
+		Id:               it.ID,
+		Name:             it.Name,
+		CreatedAtUnix:    it.CreatedAtUnix,
+		AdditionalFields: additionalFields,
+	}}), nil
 }
 
 func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickrockpb.GetItemRequest]) (*connect.Response[sickrockpb.GetItemResponse], error) {
@@ -95,7 +125,20 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&sickrockpb.GetItemResponse{Item: &sickrockpb.Item{Id: it.ID, Name: it.Name, CreatedAtUnix: it.CreatedAtUnix}}), nil
+	// Convert dynamic fields to string map for protobuf
+	additionalFields := make(map[string]string)
+	for key, value := range it.Fields {
+		if value != nil {
+			additionalFields[key] = fmt.Sprintf("%v", value)
+		}
+	}
+
+	return connect.NewResponse(&sickrockpb.GetItemResponse{Item: &sickrockpb.Item{
+		Id:               it.ID,
+		Name:             it.Name,
+		CreatedAtUnix:    it.CreatedAtUnix,
+		AdditionalFields: additionalFields,
+	}}), nil
 }
 
 func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sickrockpb.EditItemRequest]) (*connect.Response[sickrockpb.EditItemResponse], error) {
@@ -103,7 +146,20 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 	if err != nil {
 		return nil, err
 	}
-	return connect.NewResponse(&sickrockpb.EditItemResponse{Item: &sickrockpb.Item{Id: it.ID, Name: it.Name, CreatedAtUnix: it.CreatedAtUnix}}), nil
+	// Convert dynamic fields to string map for protobuf
+	additionalFields := make(map[string]string)
+	for key, value := range it.Fields {
+		if value != nil {
+			additionalFields[key] = fmt.Sprintf("%v", value)
+		}
+	}
+
+	return connect.NewResponse(&sickrockpb.EditItemResponse{Item: &sickrockpb.Item{
+		Id:               it.ID,
+		Name:             it.Name,
+		CreatedAtUnix:    it.CreatedAtUnix,
+		AdditionalFields: additionalFields,
+	}}), nil
 }
 
 func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[sickrockpb.DeleteItemRequest]) (*connect.Response[sickrockpb.DeleteItemResponse], error) {

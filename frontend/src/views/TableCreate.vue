@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { createClient } from '@connectrpc/connect'
 import { SickRock } from '../gen/sickrock_pb'
+import Section from 'picocrank/vue/components/Section.vue'
 
 const router = useRouter()
 const name = ref('')
@@ -29,12 +30,9 @@ async function submit() {
 </script>
 
 <template>
-  <section>
-    <h2>Create Table</h2>
+  <Section title = "Create Table">
     <input v-model="name" type="text" placeholder="Table name" @keyup.enter="submit" />
     <button @click="submit" :disabled="loading || !name">Create</button>
     <div v-if="error">{{ error }}</div>
-  </section>
+  </Section>
 </template>
-
-
