@@ -10,4 +10,6 @@ COPY frontend/dist/ ./www/
 
 COPY SickRock /SickRock
 
+VOLUME [ "/config" ]
+
 ENTRYPOINT [ "/SickRock" ]
