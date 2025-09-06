@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"regexp"
@@ -17,9 +18,8 @@ import (
 
 type Item struct {
 	ID            string                 `db:"id"`
-	Name          string                 `db:"name"`
 	CreatedAtUnix int64                  `db:"created_at_unix"`
-	Fields        map[string]interface{} `db:"-"` // Additional dynamic fields
+	Fields        map[string]interface{} `db:"-"` // All dynamic fields including name
 }
 
 type Repository struct {
@@ -42,21 +42,43 @@ func (r *Repository) InsertTableConfiguration(ctx context.Context, name string) 
 	}
 }
 
+type TableConfig struct {
+	Name             string
+	Title            string
+	Ordinal          int
+	Icon             sql.NullString
+	CreateButtonText sql.NullString
+}
+
 func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, error) {
-	rows, err := r.db.QueryxContext(ctx, "SELECT name FROM table_configurations ORDER BY name")
+	configs, err := r.ListTableConfigurationsWithDetails(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Extract just the names for backward compatibility
+	names := make([]string, len(configs))
+	for i, config := range configs {
+		names[i] = config.Name
+	}
+	return names, nil
+}
+
+func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]TableConfig, error) {
+	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon FROM table_configurations ORDER BY ordinal, name")
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var names []string
+	var configs []TableConfig
 	for rows.Next() {
-		var n string
-		if err := rows.Scan(&n); err != nil {
+		var config TableConfig
+		if err := rows.Scan(&config.Name, &config.Title, &config.Ordinal, &config.CreateButtonText, &config.Icon); err != nil {
 			return nil, err
 		}
-		names = append(names, n)
+		configs = append(configs, config)
 	}
-	return names, rows.Err()
+	return configs, rows.Err()
 }
 
 func (r *Repository) EnsureSchema(ctx context.Context) error {
@@ -67,19 +89,96 @@ func (r *Repository) EnsureSchema(ctx context.Context) error {
 		schema = `
 CREATE TABLE IF NOT EXISTS table_configurations (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(191) NOT NULL UNIQUE
+    name VARCHAR(191) NOT NULL UNIQUE,
+    title VARCHAR(191),
+    ordinal INT DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS table_conditional_formatting_rules (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(191) NOT NULL,
+    column_name VARCHAR(191) NOT NULL,
+    condition_type VARCHAR(50) NOT NULL,
+    condition_value TEXT,
+    format_type VARCHAR(50) NOT NULL,
+    format_value TEXT,
+    priority INT DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at_unix BIGINT DEFAULT (UNIX_TIMESTAMP()),
+    updated_at_unix BIGINT DEFAULT (UNIX_TIMESTAMP())
 );
 `
 	default:
 		schema = `
 CREATE TABLE IF NOT EXISTS table_configurations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE
+    name TEXT NOT NULL UNIQUE,
+    title TEXT,
+    ordinal INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS table_conditional_formatting_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name TEXT NOT NULL,
+    column_name TEXT NOT NULL,
+    condition_type TEXT NOT NULL,
+    condition_value TEXT,
+    format_type TEXT NOT NULL,
+    format_value TEXT,
+    priority INTEGER DEFAULT 0,
+    is_active INTEGER DEFAULT 1,
+    created_at_unix INTEGER DEFAULT (strftime('%s', 'now')),
+    updated_at_unix INTEGER DEFAULT (strftime('%s', 'now'))
 );
 `
 	}
 	_, err := r.db.ExecContext(ctx, schema)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Add ordinal column if it doesn't exist (migration)
+	return r.migrateTableConfigurations(ctx)
+}
+
+// migrateTableConfigurations adds the ordinal and title columns to existing table_configurations
+func (r *Repository) migrateTableConfigurations(ctx context.Context) error {
+	if r.db.DriverName() == "sqlite3" {
+		// SQLite doesn't have information_schema, so we'll try to add the columns and ignore errors
+		_, _ = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN ordinal INTEGER DEFAULT 0")
+		_, _ = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN title TEXT")
+		return nil // Ignore errors as columns might already exist
+	}
+
+	// For MySQL, check if columns exist before adding
+	var ordinalCount, titleCount int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'table_configurations' AND column_name = 'ordinal'").Scan(&ordinalCount)
+	if err != nil {
+		return err
+	}
+
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'table_configurations' AND column_name = 'title'").Scan(&titleCount)
+	if err != nil {
+		return err
+	}
+
+	if ordinalCount == 0 {
+		// Ordinal column doesn't exist, add it
+		_, err = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN ordinal INT DEFAULT 0")
+		if err != nil {
+			return err
+		}
+	}
+
+	if titleCount == 0 {
+		// Title column doesn't exist, add it
+		_, err = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN title VARCHAR(191)")
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // sanitizeTableName ensures the table name is a safe SQL identifier: [a-zA-Z0-9_]+
@@ -104,14 +203,12 @@ func (r *Repository) EnsureSchemaForTable(ctx context.Context, table string) err
 		schema = fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS %s (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name TEXT NOT NULL,
     created_at_unix BIGINT NOT NULL
 );`, t)
 	default:
 		schema = fmt.Sprintf(`
 CREATE TABLE IF NOT EXISTS %s (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
     created_at_unix BIGINT NOT NULL
 );`, t)
 	}
@@ -123,27 +220,44 @@ func (r *Repository) AddColumn(ctx context.Context, table string, field FieldSpe
 	t := sanitizeTableName(table)
 	col := sanitizeTableName(field.Name)
 	typ := "TEXT"
+	defaultClause := ""
+
 	switch field.Type {
 	case "int64":
 		typ = "BIGINT"
 	case "string":
 		typ = "TEXT"
+	case "datetime":
+		// Use BIGINT to store Unix timestamps for datetime columns
+		typ = "BIGINT"
+		if field.DefaultToCurrentTimestamp {
+			// Add default value for current timestamp
+			if r.db.DriverName() == "mysql" {
+				defaultClause = " DEFAULT (UNIX_TIMESTAMP())"
+			} else {
+				// SQLite doesn't support DEFAULT (UNIX_TIMESTAMP()), so we'll handle this in application logic
+				defaultClause = ""
+			}
+		}
 	default:
 		typ = "TEXT"
 	}
+
 	notNull := ""
 	if field.Required {
 		notNull = " NOT NULL"
 	}
-	query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s%s", t, col, typ, notNull)
+
+	query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s%s%s", t, col, typ, notNull, defaultClause)
 	_, err := r.db.ExecContext(ctx, query)
 	return err
 }
 
 type FieldSpec struct {
-	Name     string
-	Type     string
-	Required bool
+	Name                      string
+	Type                      string
+	Required                  bool
+	DefaultToCurrentTimestamp bool
 }
 
 func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item, error) {
@@ -157,6 +271,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item
 
 	// Build dynamic SELECT query with all columns
 	columnNames := make([]string, 0, len(columns))
+	columnNames = append(columnNames, "created_at_unix")
 	for _, col := range columns {
 		columnNames = append(columnNames, col.Name)
 	}
@@ -195,20 +310,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item
 		} else {
 			log.Warnf("id field not found in rowMap")
 		}
-		if name, ok := rowMap["name"]; ok {
-			log.Infof("name field found: %v (type: %T)", name, name)
-			if nameStr, ok := name.(string); ok {
-				item.Name = nameStr
-			} else if nameBytes, ok := name.([]uint8); ok {
-				// Handle MySQL byte slice conversion
-				item.Name = string(nameBytes)
-				log.Infof("Converted name from []uint8 to string: %s", item.Name)
-			} else {
-				log.Warnf("name field is not a string or []uint8, got type: %T, value: %v", name, name)
-			}
-		} else {
-			log.Warnf("name field not found in rowMap")
-		}
+		// name field is now handled as a dynamic field
 		if createdAt, ok := rowMap["created_at_unix"]; ok {
 			log.Infof("created_at_unix field found: %v (type: %T)", createdAt, createdAt)
 			if createdAtInt, ok := createdAt.(int64); ok {
@@ -220,13 +322,13 @@ func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item
 			log.Warnf("created_at_unix field not found in rowMap")
 		}
 
-		// Add all other fields to the dynamic Fields map
+		// Add all other fields to the dynamic Fields map (including name now)
 		for colName, value := range rowMap {
-			if colName != "id" && colName != "name" && colName != "created_at_unix" {
-				// Handle MySQL byte slice conversion for additional fields
+			if colName != "id" && colName != "created_at_unix" {
+				// Handle MySQL byte slice conversion for all fields
 				if valueBytes, ok := value.([]uint8); ok {
 					item.Fields[colName] = string(valueBytes)
-					log.Infof("Converted additional field %s from []uint8 to string: %s", colName, string(valueBytes))
+					log.Infof("Converted field %s from []uint8 to string: %s", colName, string(valueBytes))
 				} else {
 					item.Fields[colName] = value
 				}
@@ -241,18 +343,42 @@ func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item
 	return items, rows.Err()
 }
 
-func (r *Repository) CreateItemInTable(ctx context.Context, table string, name string) (Item, error) {
-	t := sanitizeTableName(table)
+func (r *Repository) CreateItemInTable(ctx context.Context, table string, additionalFields map[string]string) (Item, error) {
 	now := time.Now().Unix()
-	query := fmt.Sprintf("INSERT INTO %s (name, created_at_unix) VALUES (?, ?)", t)
-	log.Infof("Creating item in table %s with name: %s, query: %s", t, name, query)
-	res, err := r.db.ExecContext(ctx, query, name, now)
+	return r.CreateItemInTableWithTimestamp(ctx, table, additionalFields, now)
+}
+
+func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table string, additionalFields map[string]string, timestamp int64) (Item, error) {
+	t := sanitizeTableName(table)
+
+	// Build dynamic INSERT query
+	columns := []string{"created_at_unix"}
+	placeholders := []string{"?"}
+	values := []interface{}{timestamp}
+
+	for key, value := range additionalFields {
+		columns = append(columns, key)
+		placeholders = append(placeholders, "?")
+		values = append(values, value)
+	}
+
+	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", t, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	log.Infof("Creating item in table %s with fields: %+v, timestamp: %d, query: %s", t, additionalFields, timestamp, query)
+
+	res, err := r.db.ExecContext(ctx, query, values...)
 	if err != nil {
 		log.Errorf("Failed to create item: %v", err)
 		return Item{}, err
 	}
 	lastID, _ := res.LastInsertId()
-	item := Item{ID: strconv.FormatInt(lastID, 10), Name: name, CreatedAtUnix: now}
+
+	// Convert additionalFields to interface{} map for the Item
+	fields := make(map[string]interface{})
+	for key, value := range additionalFields {
+		fields[key] = value
+	}
+
+	item := Item{ID: strconv.FormatInt(lastID, 10), CreatedAtUnix: timestamp, Fields: fields}
 	log.Infof("Created item: %+v", item)
 	return item, nil
 }
@@ -304,24 +430,17 @@ func (r *Repository) GetItemInTable(ctx context.Context, table string, id string
 			item.ID = strconv.FormatInt(idInt, 10)
 		}
 	}
-	if name, ok := rowMap["name"]; ok {
-		if nameStr, ok := name.(string); ok {
-			item.Name = nameStr
-		} else if nameBytes, ok := name.([]uint8); ok {
-			// Handle MySQL byte slice conversion
-			item.Name = string(nameBytes)
-		}
-	}
+	// name field is now handled as a dynamic field
 	if createdAt, ok := rowMap["created_at_unix"]; ok {
 		if createdAtInt, ok := createdAt.(int64); ok {
 			item.CreatedAtUnix = createdAtInt
 		}
 	}
 
-	// Add all other fields to the dynamic Fields map
+	// Add all other fields to the dynamic Fields map (including name now)
 	for colName, value := range rowMap {
-		if colName != "id" && colName != "name" && colName != "created_at_unix" {
-			// Handle MySQL byte slice conversion for additional fields
+		if colName != "id" && colName != "created_at_unix" {
+			// Handle MySQL byte slice conversion for all fields
 			if valueBytes, ok := value.([]uint8); ok {
 				item.Fields[colName] = string(valueBytes)
 			} else {
@@ -384,14 +503,14 @@ func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id str
 func (r *Repository) ListItems(ctx context.Context, _ string) ([]Item, error) {
 	return r.ListItemsInTable(ctx, "items")
 }
-func (r *Repository) CreateItem(ctx context.Context, name string) (Item, error) {
-	return r.CreateItemInTable(ctx, "items", name)
+func (r *Repository) CreateItem(ctx context.Context, additionalFields map[string]string) (Item, error) {
+	return r.CreateItemInTable(ctx, "items", additionalFields)
 }
 func (r *Repository) GetItem(ctx context.Context, id string) (Item, error) {
 	return r.GetItemInTable(ctx, "items", id)
 }
-func (r *Repository) EditItem(ctx context.Context, id string, name string) (Item, error) {
-	return r.EditItemInTable(ctx, "items", id, name)
+func (r *Repository) EditItem(ctx context.Context, id string, additionalFields map[string]string) (Item, error) {
+	return r.EditItemInTableWithFields(ctx, "items", id, "", additionalFields)
 }
 func (r *Repository) DeleteItem(ctx context.Context, id string) (bool, error) {
 	return r.DeleteItemInTable(ctx, "items", id)
@@ -410,6 +529,7 @@ func OpenFromEnv(defaultSQLiteDSN string) (*sqlx.DB, error) {
 		pass := os.Getenv("DB_PASS")
 		name := os.Getenv("DB_NAME")
 
+		log.Infof("DB_HOST: %s", host)
 		log.Infof("DB_PORT: %s", port)
 		log.Infof("DB_USER: %s", user)
 		log.Infof("DB_PASS: %s", redact.RedactString(pass))
@@ -474,4 +594,19 @@ func (r *Repository) ListColumns(ctx context.Context, table string) ([]FieldSpec
 		}
 	}
 	return specs, nil
+}
+
+// TableStructure represents the structure of a table
+type TableStructure struct {
+	CreateButtonText string
+}
+
+// GetTableStructure returns the structure information for a table
+func (r *Repository) GetTableStructure(ctx context.Context, table string) (*TableStructure, error) {
+	// For now, return a default structure
+	// In the future, this could be enhanced to read from table_configurations
+	// or other metadata sources
+	return &TableStructure{
+		CreateButtonText: "Add Item",
+	}, nil
 }

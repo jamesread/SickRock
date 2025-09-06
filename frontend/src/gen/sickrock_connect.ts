@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, CreateItemRequest, CreateItemResponse, DeleteItemRequest, DeleteItemResponse, EditItemRequest, EditItemResponse, GetItemRequest, GetItemResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetPagesRequest, GetPagesResponse, GetTableStructureRequest, GetTableStructureResponse, ListItemsRequest, ListItemsResponse, PingRequest, PingResponse } from "./sickrock_pb.js";
+import { AddTableColumnRequest, CreateItemRequest, CreateItemResponse, DeleteItemRequest, DeleteItemResponse, EditItemRequest, EditItemResponse, GetItemRequest, GetItemResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetPagesRequest, GetPagesResponse, GetTableStructureRequest, GetTableStructureResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, PingRequest, PingResponse } from "./sickrock_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -12,6 +12,15 @@ import { MethodKind } from "@bufbuild/protobuf";
 export const SickRock = {
   typeName: "sickrock.SickRock",
   methods: {
+    /**
+     * @generated from rpc sickrock.SickRock.Init
+     */
+    init: {
+      name: "Init",
+      I: InitRequest,
+      O: InitResponse,
+      kind: MethodKind.Unary,
+    },
     /**
      * @generated from rpc sickrock.SickRock.Ping
      */
@@ -114,4 +123,3 @@ export const SickRock = {
     },
   }
 } as const;
-

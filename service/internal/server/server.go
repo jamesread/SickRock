@@ -8,6 +8,7 @@ import (
 	"connectrpc.com/connect"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
+	"github.com/jamesread/SickRock/internal/buildinfo"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	log "github.com/sirupsen/logrus"
 )
@@ -18,6 +19,15 @@ type SickRockServer struct {
 
 func NewSickRockServer(r *repo.Repository) *SickRockServer {
 	return &SickRockServer{repo: r}
+}
+
+func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
+	res := connect.NewResponse(&sickrockpb.InitResponse{
+		Version: buildinfo.Version,
+		Commit:  buildinfo.Commit,
+		Date:    buildinfo.Date,
+	})
+	return res, nil
 }
 
 func (s *SickRockServer) Ping(ctx context.Context, req *connect.Request[sickrockpb.PingRequest]) (*connect.Response[sickrockpb.PingResponse], error) {
@@ -41,13 +51,19 @@ func (s *SickRockServer) GetNavigationLinks(ctx context.Context, req *connect.Re
 }
 
 func (s *SickRockServer) GetPages(ctx context.Context, req *connect.Request[sickrockpb.GetPagesRequest]) (*connect.Response[sickrockpb.GetPagesResponse], error) {
-	names, err := s.repo.ListTableConfigurations(ctx)
+	configs, err := s.repo.ListTableConfigurationsWithDetails(ctx)
 	if err != nil {
 		return nil, err
 	}
-	pages := make([]*sickrockpb.Page, 0, len(names))
-	for _, n := range names {
-		pages = append(pages, &sickrockpb.Page{Id: n, Title: n, Slug: n})
+	pages := make([]*sickrockpb.Page, 0, len(configs))
+	for _, config := range configs {
+		pages = append(pages, &sickrockpb.Page{
+			Id:      config.Name,
+			Title:   config.Title,
+			Slug:    config.Name,
+			Ordinal: int32(config.Ordinal),
+			Icon:    config.Icon.String,
+		})
 	}
 	res := connect.NewResponse(&sickrockpb.GetPagesResponse{Pages: pages})
 	return res, nil
@@ -64,13 +80,14 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 		return nil, err
 	}
 	items, err := s.repo.ListItemsInTable(ctx, table)
+
 	if err != nil {
 		return nil, err
 	}
 
 	out := make([]*sickrockpb.Item, 0, len(items))
 	for _, it := range items {
-		log.Infof("Processing item: ID=%s, Name=%s, CreatedAtUnix=%d, Fields=%+v", it.ID, it.Name, it.CreatedAtUnix, it.Fields)
+		log.Infof("Processing item: ID=%s, CreatedAtUnix=%d, Fields=%+v", it.ID, it.CreatedAtUnix, it.Fields)
 
 		// Convert dynamic fields to string map for protobuf
 		additionalFields := make(map[string]string)
@@ -83,13 +100,12 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 
 		item := &sickrockpb.Item{
 			Id:               it.ID,
-			Name:             it.Name,
 			CreatedAtUnix:    it.CreatedAtUnix,
 			AdditionalFields: additionalFields,
 		}
 
-		log.Infof("Created protobuf item: ID=%s, Name=%s, CreatedAtUnix=%d, AdditionalFields=%+v",
-			item.Id, item.Name, item.CreatedAtUnix, item.AdditionalFields)
+		log.Infof("Created protobuf item: ID=%s, CreatedAtUnix=%d, AdditionalFields=%+v",
+			item.Id, item.CreatedAtUnix, item.AdditionalFields)
 
 		out = append(out, item)
 	}
@@ -104,7 +120,16 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
 		return nil, err
 	}
-	it, err := s.repo.CreateItemInTable(ctx, table, req.Msg.GetName())
+
+	// Use custom timestamp if provided, otherwise use current time
+	var timestamp int64
+	if req.Msg.GetCreatedAtUnix() != 0 {
+		timestamp = req.Msg.GetCreatedAtUnix()
+	} else {
+		timestamp = time.Now().Unix()
+	}
+
+	it, err := s.repo.CreateItemInTableWithTimestamp(ctx, table, req.Msg.GetAdditionalFields(), timestamp)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +143,6 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 
 	return connect.NewResponse(&sickrockpb.CreateItemResponse{Item: &sickrockpb.Item{
 		Id:               it.ID,
-		Name:             it.Name,
 		CreatedAtUnix:    it.CreatedAtUnix,
 		AdditionalFields: additionalFields,
 	}}), nil
@@ -140,7 +164,6 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 
 	return connect.NewResponse(&sickrockpb.GetItemResponse{Item: &sickrockpb.Item{
 		Id:               it.ID,
-		Name:             it.Name,
 		CreatedAtUnix:    it.CreatedAtUnix,
 		AdditionalFields: additionalFields,
 	}}), nil
@@ -165,7 +188,7 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 	}
 
 	// Use the new method that supports additional fields
-	it, err := s.repo.EditItemInTableWithFields(ctx, table, req.Msg.GetId(), req.Msg.GetName(), additionalFields)
+	it, err := s.repo.EditItemInTableWithFields(ctx, table, req.Msg.GetId(), "", additionalFields)
 	if err != nil {
 		return nil, err
 	}
@@ -180,14 +203,20 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 
 	return connect.NewResponse(&sickrockpb.EditItemResponse{Item: &sickrockpb.Item{
 		Id:               it.ID,
-		Name:             it.Name,
 		CreatedAtUnix:    it.CreatedAtUnix,
 		AdditionalFields: responseAdditionalFields,
 	}}), nil
 }
 
 func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[sickrockpb.DeleteItemRequest]) (*connect.Response[sickrockpb.DeleteItemResponse], error) {
-	ok, err := s.repo.DeleteItem(ctx, req.Msg.GetId())
+	table := req.Msg.GetPageId()
+	if table == "" {
+		table = "items"
+	}
+	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
+		return nil, err
+	}
+	ok, err := s.repo.DeleteItemInTable(ctx, table, req.Msg.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -202,6 +231,12 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
 		return nil, err
 	}
+
+	structure, err := s.repo.GetTableStructure(ctx, table)
+	if err != nil {
+		return nil, err
+	}
+
 	cols, err := s.repo.ListColumns(ctx, table)
 	if err != nil {
 		log.Errorf("list columns: %v, table: %s", err, table)
@@ -210,9 +245,14 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 	}
 	fields := make([]*sickrockpb.Field, 0, len(cols))
 	for _, c := range cols {
-		fields = append(fields, &sickrockpb.Field{Name: c.Name, Type: c.Type, Required: c.Required})
+		fields = append(fields, &sickrockpb.Field{
+			Name:                      c.Name,
+			Type:                      c.Type,
+			Required:                  c.Required,
+			DefaultToCurrentTimestamp: false, // This information is not stored in database metadata
+		})
 	}
-	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{Fields: fields}), nil
+	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{Fields: fields, CreateButtonText: structure.CreateButtonText}), nil
 }
 
 func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Request[sickrockpb.AddTableColumnRequest]) (*connect.Response[sickrockpb.GetTableStructureResponse], error) {
@@ -227,7 +267,12 @@ func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Reques
 	if f == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("field required"))
 	}
-	err := s.repo.AddColumn(ctx, table, repo.FieldSpec{Name: f.GetName(), Type: f.GetType(), Required: f.GetRequired()})
+	err := s.repo.AddColumn(ctx, table, repo.FieldSpec{
+		Name:                      f.GetName(),
+		Type:                      f.GetType(),
+		Required:                  f.GetRequired(),
+		DefaultToCurrentTimestamp: f.GetDefaultToCurrentTimestamp(),
+	})
 	if err != nil {
 		return nil, err
 	}

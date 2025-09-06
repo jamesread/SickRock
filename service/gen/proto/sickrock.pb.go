@@ -292,6 +292,8 @@ type Page struct {
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
 	Slug          string                 `protobuf:"bytes,3,opt,name=slug,proto3" json:"slug,omitempty"`
+	Ordinal       int32                  `protobuf:"varint,4,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
+	Icon          string                 `protobuf:"bytes,5,opt,name=icon,proto3" json:"icon,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -347,6 +349,20 @@ func (x *Page) GetSlug() string {
 	return ""
 }
 
+func (x *Page) GetOrdinal() int32 {
+	if x != nil {
+		return x.Ordinal
+	}
+	return 0
+}
+
+func (x *Page) GetIcon() string {
+	if x != nil {
+		return x.Icon
+	}
+	return ""
+}
+
 type GetPagesResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Pages         []*Page                `protobuf:"bytes,1,rep,name=pages,proto3" json:"pages,omitempty"`
@@ -395,9 +411,8 @@ func (x *GetPagesResponse) GetPages() []*Page {
 type Item struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	CreatedAtUnix    int64                  `protobuf:"varint,3,opt,name=created_at_unix,json=createdAtUnix,proto3" json:"created_at_unix,omitempty"`
-	AdditionalFields map[string]string      `protobuf:"bytes,4,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	CreatedAtUnix    int64                  `protobuf:"varint,2,opt,name=created_at_unix,json=createdAtUnix,proto3" json:"created_at_unix,omitempty"`
+	AdditionalFields map[string]string      `protobuf:"bytes,3,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -435,13 +450,6 @@ func (*Item) Descriptor() ([]byte, []int) {
 func (x *Item) GetId() string {
 	if x != nil {
 		return x.Id
-	}
-	return ""
-}
-
-func (x *Item) GetName() string {
-	if x != nil {
-		return x.Name
 	}
 	return ""
 }
@@ -549,11 +557,12 @@ func (x *ListItemsResponse) GetItems() []*Item {
 }
 
 type CreateItemRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageId        string                 `protobuf:"bytes,1,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	PageId           string                 `protobuf:"bytes,1,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	CreatedAtUnix    int64                  `protobuf:"varint,2,opt,name=created_at_unix,json=createdAtUnix,proto3" json:"created_at_unix,omitempty"` // Optional custom timestamp
+	AdditionalFields map[string]string      `protobuf:"bytes,3,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *CreateItemRequest) Reset() {
@@ -593,11 +602,18 @@ func (x *CreateItemRequest) GetPageId() string {
 	return ""
 }
 
-func (x *CreateItemRequest) GetName() string {
+func (x *CreateItemRequest) GetCreatedAtUnix() int64 {
 	if x != nil {
-		return x.Name
+		return x.CreatedAtUnix
 	}
-	return ""
+	return 0
+}
+
+func (x *CreateItemRequest) GetAdditionalFields() map[string]string {
+	if x != nil {
+		return x.AdditionalFields
+	}
+	return nil
 }
 
 type CreateItemResponse struct {
@@ -735,9 +751,8 @@ func (x *GetItemResponse) GetItem() *Item {
 type EditItemRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	AdditionalFields map[string]string      `protobuf:"bytes,3,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	PageId           string                 `protobuf:"bytes,4,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	AdditionalFields map[string]string      `protobuf:"bytes,2,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	PageId           string                 `protobuf:"bytes,3,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -775,13 +790,6 @@ func (*EditItemRequest) Descriptor() ([]byte, []int) {
 func (x *EditItemRequest) GetId() string {
 	if x != nil {
 		return x.Id
-	}
-	return ""
-}
-
-func (x *EditItemRequest) GetName() string {
-	if x != nil {
-		return x.Name
 	}
 	return ""
 }
@@ -846,7 +854,8 @@ func (x *EditItemResponse) GetItem() *Item {
 
 type DeleteItemRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	PageId        string                 `protobuf:"bytes,1,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -879,6 +888,13 @@ func (x *DeleteItemRequest) ProtoReflect() protoreflect.Message {
 // Deprecated: Use DeleteItemRequest.ProtoReflect.Descriptor instead.
 func (*DeleteItemRequest) Descriptor() ([]byte, []int) {
 	return file_sickrock_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *DeleteItemRequest) GetPageId() string {
+	if x != nil {
+		return x.PageId
+	}
+	return ""
 }
 
 func (x *DeleteItemRequest) GetId() string {
@@ -978,12 +994,13 @@ func (x *GetTableStructureRequest) GetPageId() string {
 }
 
 type Field struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	Required      bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                     protoimpl.MessageState `protogen:"open.v1"`
+	Name                      string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Type                      string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Required                  bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
+	DefaultToCurrentTimestamp bool                   `protobuf:"varint,4,opt,name=default_to_current_timestamp,json=defaultToCurrentTimestamp,proto3" json:"default_to_current_timestamp,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *Field) Reset() {
@@ -1037,11 +1054,19 @@ func (x *Field) GetRequired() bool {
 	return false
 }
 
+func (x *Field) GetDefaultToCurrentTimestamp() bool {
+	if x != nil {
+		return x.DefaultToCurrentTimestamp
+	}
+	return false
+}
+
 type GetTableStructureResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Fields        []*Field               `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Fields           []*Field               `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"`
+	CreateButtonText string                 `protobuf:"bytes,2,opt,name=CreateButtonText,proto3" json:"CreateButtonText,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *GetTableStructureResponse) Reset() {
@@ -1079,6 +1104,13 @@ func (x *GetTableStructureResponse) GetFields() []*Field {
 		return x.Fields
 	}
 	return nil
+}
+
+func (x *GetTableStructureResponse) GetCreateButtonText() string {
+	if x != nil {
+		return x.CreateButtonText
+	}
+	return ""
 }
 
 type AddTableColumnRequest struct {
@@ -1133,6 +1165,103 @@ func (x *AddTableColumnRequest) GetField() *Field {
 	return nil
 }
 
+// Build info
+type InitRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitRequest) Reset() {
+	*x = InitRequest{}
+	mi := &file_sickrock_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitRequest) ProtoMessage() {}
+
+func (x *InitRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitRequest.ProtoReflect.Descriptor instead.
+func (*InitRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{23}
+}
+
+type InitResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       string                 `protobuf:"bytes,1,opt,name=version,proto3" json:"version,omitempty"`
+	Commit        string                 `protobuf:"bytes,2,opt,name=commit,proto3" json:"commit,omitempty"`
+	Date          string                 `protobuf:"bytes,3,opt,name=date,proto3" json:"date,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InitResponse) Reset() {
+	*x = InitResponse{}
+	mi := &file_sickrock_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InitResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InitResponse) ProtoMessage() {}
+
+func (x *InitResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InitResponse.ProtoReflect.Descriptor instead.
+func (*InitResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *InitResponse) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *InitResponse) GetCommit() string {
+	if x != nil {
+		return x.Commit
+	}
+	return ""
+}
+
+func (x *InitResponse) GetDate() string {
+	if x != nil {
+		return x.Date
+	}
+	return ""
+}
+
 var File_sickrock_proto protoreflect.FileDescriptor
 
 const file_sickrock_proto_rawDesc = "" +
@@ -1149,60 +1278,73 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x04path\x18\x02 \x01(\tR\x04path\"L\n" +
 	"\x1aGetNavigationLinksResponse\x12.\n" +
 	"\x05links\x18\x01 \x03(\v2\x18.sickrock.NavigationLinkR\x05links\"\x11\n" +
-	"\x0fGetPagesRequest\"@\n" +
+	"\x0fGetPagesRequest\"n\n" +
 	"\x04Page\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
-	"\x04slug\x18\x03 \x01(\tR\x04slug\"8\n" +
+	"\x04slug\x18\x03 \x01(\tR\x04slug\x12\x18\n" +
+	"\aordinal\x18\x04 \x01(\x05R\aordinal\x12\x12\n" +
+	"\x04icon\x18\x05 \x01(\tR\x04icon\"8\n" +
 	"\x10GetPagesResponse\x12$\n" +
-	"\x05pages\x18\x01 \x03(\v2\x0e.sickrock.PageR\x05pages\"\xea\x01\n" +
+	"\x05pages\x18\x01 \x03(\v2\x0e.sickrock.PageR\x05pages\"\xd6\x01\n" +
 	"\x04Item\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12&\n" +
-	"\x0fcreated_at_unix\x18\x03 \x01(\x03R\rcreatedAtUnix\x12Q\n" +
-	"\x11additional_fields\x18\x04 \x03(\v2$.sickrock.Item.AdditionalFieldsEntryR\x10additionalFields\x1aC\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12&\n" +
+	"\x0fcreated_at_unix\x18\x02 \x01(\x03R\rcreatedAtUnix\x12Q\n" +
+	"\x11additional_fields\x18\x03 \x03(\v2$.sickrock.Item.AdditionalFieldsEntryR\x10additionalFields\x1aC\n" +
 	"\x15AdditionalFieldsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"+\n" +
 	"\x10ListItemsRequest\x12\x17\n" +
 	"\apage_id\x18\x01 \x01(\tR\x06pageId\"9\n" +
 	"\x11ListItemsResponse\x12$\n" +
-	"\x05items\x18\x01 \x03(\v2\x0e.sickrock.ItemR\x05items\"@\n" +
+	"\x05items\x18\x01 \x03(\v2\x0e.sickrock.ItemR\x05items\"\xf9\x01\n" +
 	"\x11CreateItemRequest\x12\x17\n" +
-	"\apage_id\x18\x01 \x01(\tR\x06pageId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"8\n" +
+	"\apage_id\x18\x01 \x01(\tR\x06pageId\x12&\n" +
+	"\x0fcreated_at_unix\x18\x02 \x01(\x03R\rcreatedAtUnix\x12^\n" +
+	"\x11additional_fields\x18\x03 \x03(\v21.sickrock.CreateItemRequest.AdditionalFieldsEntryR\x10additionalFields\x1aC\n" +
+	"\x15AdditionalFieldsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"8\n" +
 	"\x12CreateItemResponse\x12\"\n" +
 	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\" \n" +
 	"\x0eGetItemRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"5\n" +
 	"\x0fGetItemResponse\x12\"\n" +
-	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\"\xf1\x01\n" +
+	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\"\xdd\x01\n" +
 	"\x0fEditItemRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\\\n" +
-	"\x11additional_fields\x18\x03 \x03(\v2/.sickrock.EditItemRequest.AdditionalFieldsEntryR\x10additionalFields\x12\x17\n" +
-	"\apage_id\x18\x04 \x01(\tR\x06pageId\x1aC\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\\\n" +
+	"\x11additional_fields\x18\x02 \x03(\v2/.sickrock.EditItemRequest.AdditionalFieldsEntryR\x10additionalFields\x12\x17\n" +
+	"\apage_id\x18\x03 \x01(\tR\x06pageId\x1aC\n" +
 	"\x15AdditionalFieldsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"6\n" +
 	"\x10EditItemResponse\x12\"\n" +
-	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\"#\n" +
-	"\x11DeleteItemRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\".\n" +
+	"\x04item\x18\x01 \x01(\v2\x0e.sickrock.ItemR\x04item\"<\n" +
+	"\x11DeleteItemRequest\x12\x17\n" +
+	"\apage_id\x18\x01 \x01(\tR\x06pageId\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\".\n" +
 	"\x12DeleteItemResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\"3\n" +
 	"\x18GetTableStructureRequest\x12\x17\n" +
-	"\apage_id\x18\x01 \x01(\tR\x06pageId\"K\n" +
+	"\apage_id\x18\x01 \x01(\tR\x06pageId\"\x8c\x01\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
-	"\brequired\x18\x03 \x01(\bR\brequired\"D\n" +
+	"\brequired\x18\x03 \x01(\bR\brequired\x12?\n" +
+	"\x1cdefault_to_current_timestamp\x18\x04 \x01(\bR\x19defaultToCurrentTimestamp\"p\n" +
 	"\x19GetTableStructureResponse\x12'\n" +
-	"\x06fields\x18\x01 \x03(\v2\x0f.sickrock.FieldR\x06fields\"W\n" +
+	"\x06fields\x18\x01 \x03(\v2\x0f.sickrock.FieldR\x06fields\x12*\n" +
+	"\x10CreateButtonText\x18\x02 \x01(\tR\x10CreateButtonText\"W\n" +
 	"\x15AddTableColumnRequest\x12\x17\n" +
 	"\apage_id\x18\x01 \x01(\tR\x06pageId\x12%\n" +
-	"\x05field\x18\x02 \x01(\v2\x0f.sickrock.FieldR\x05field2\xf6\x05\n" +
+	"\x05field\x18\x02 \x01(\v2\x0f.sickrock.FieldR\x05field\"\r\n" +
+	"\vInitRequest\"T\n" +
+	"\fInitResponse\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\tR\aversion\x12\x16\n" +
+	"\x06commit\x18\x02 \x01(\tR\x06commit\x12\x12\n" +
+	"\x04date\x18\x03 \x01(\tR\x04date2\xad\x06\n" +
 	"\bSickRock\x125\n" +
+	"\x04Init\x12\x15.sickrock.InitRequest\x1a\x16.sickrock.InitResponse\x125\n" +
 	"\x04Ping\x12\x15.sickrock.PingRequest\x1a\x16.sickrock.PingResponse\x12_\n" +
 	"\x12GetNavigationLinks\x12#.sickrock.GetNavigationLinksRequest\x1a$.sickrock.GetNavigationLinksResponse\x12A\n" +
 	"\bGetPages\x12\x19.sickrock.GetPagesRequest\x1a\x1a.sickrock.GetPagesResponse\x12D\n" +
@@ -1229,7 +1371,7 @@ func file_sickrock_proto_rawDescGZIP() []byte {
 	return file_sickrock_proto_rawDescData
 }
 
-var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 28)
 var file_sickrock_proto_goTypes = []any{
 	(*PingRequest)(nil),                // 0: sickrock.PingRequest
 	(*PingResponse)(nil),               // 1: sickrock.PingResponse
@@ -1254,45 +1396,51 @@ var file_sickrock_proto_goTypes = []any{
 	(*Field)(nil),                      // 20: sickrock.Field
 	(*GetTableStructureResponse)(nil),  // 21: sickrock.GetTableStructureResponse
 	(*AddTableColumnRequest)(nil),      // 22: sickrock.AddTableColumnRequest
-	nil,                                // 23: sickrock.Item.AdditionalFieldsEntry
-	nil,                                // 24: sickrock.EditItemRequest.AdditionalFieldsEntry
+	(*InitRequest)(nil),                // 23: sickrock.InitRequest
+	(*InitResponse)(nil),               // 24: sickrock.InitResponse
+	nil,                                // 25: sickrock.Item.AdditionalFieldsEntry
+	nil,                                // 26: sickrock.CreateItemRequest.AdditionalFieldsEntry
+	nil,                                // 27: sickrock.EditItemRequest.AdditionalFieldsEntry
 }
 var file_sickrock_proto_depIdxs = []int32{
 	3,  // 0: sickrock.GetNavigationLinksResponse.links:type_name -> sickrock.NavigationLink
 	6,  // 1: sickrock.GetPagesResponse.pages:type_name -> sickrock.Page
-	23, // 2: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
+	25, // 2: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
 	8,  // 3: sickrock.ListItemsResponse.items:type_name -> sickrock.Item
-	8,  // 4: sickrock.CreateItemResponse.item:type_name -> sickrock.Item
-	8,  // 5: sickrock.GetItemResponse.item:type_name -> sickrock.Item
-	24, // 6: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
-	8,  // 7: sickrock.EditItemResponse.item:type_name -> sickrock.Item
-	20, // 8: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
-	20, // 9: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
-	0,  // 10: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
-	2,  // 11: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
-	5,  // 12: sickrock.SickRock.GetPages:input_type -> sickrock.GetPagesRequest
-	9,  // 13: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
-	11, // 14: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
-	13, // 15: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
-	15, // 16: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
-	17, // 17: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
-	19, // 18: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
-	22, // 19: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
-	1,  // 20: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
-	4,  // 21: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
-	7,  // 22: sickrock.SickRock.GetPages:output_type -> sickrock.GetPagesResponse
-	10, // 23: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
-	12, // 24: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
-	14, // 25: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
-	16, // 26: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
-	18, // 27: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
-	21, // 28: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
-	21, // 29: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
-	20, // [20:30] is the sub-list for method output_type
-	10, // [10:20] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	26, // 4: sickrock.CreateItemRequest.additional_fields:type_name -> sickrock.CreateItemRequest.AdditionalFieldsEntry
+	8,  // 5: sickrock.CreateItemResponse.item:type_name -> sickrock.Item
+	8,  // 6: sickrock.GetItemResponse.item:type_name -> sickrock.Item
+	27, // 7: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
+	8,  // 8: sickrock.EditItemResponse.item:type_name -> sickrock.Item
+	20, // 9: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
+	20, // 10: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
+	23, // 11: sickrock.SickRock.Init:input_type -> sickrock.InitRequest
+	0,  // 12: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
+	2,  // 13: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
+	5,  // 14: sickrock.SickRock.GetPages:input_type -> sickrock.GetPagesRequest
+	9,  // 15: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
+	11, // 16: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
+	13, // 17: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
+	15, // 18: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
+	17, // 19: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
+	19, // 20: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
+	22, // 21: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
+	24, // 22: sickrock.SickRock.Init:output_type -> sickrock.InitResponse
+	1,  // 23: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
+	4,  // 24: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
+	7,  // 25: sickrock.SickRock.GetPages:output_type -> sickrock.GetPagesResponse
+	10, // 26: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
+	12, // 27: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
+	14, // 28: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
+	16, // 29: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
+	18, // 30: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
+	21, // 31: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
+	21, // 32: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
+	22, // [22:33] is the sub-list for method output_type
+	11, // [11:22] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_sickrock_proto_init() }
@@ -1306,7 +1454,7 @@ func file_sickrock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sickrock_proto_rawDesc), len(file_sickrock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   28,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

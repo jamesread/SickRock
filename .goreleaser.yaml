@@ -12,6 +12,11 @@ builds:
     goarch:
       - amd64
     dir: service
+    ldflags:
+      - "-X github.com/jamesread/SickRock/internal/buildinfo.Version={{ .Version }}"
+      - "-X github.com/jamesread/SickRock/internal/buildinfo.Commit={{ .ShortCommit }}"
+      - "-X github.com/jamesread/SickRock/internal/buildinfo.Date={{ .Date }}"
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
 changelog:

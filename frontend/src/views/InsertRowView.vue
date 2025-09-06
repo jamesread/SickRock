@@ -11,21 +11,30 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableName as string
 const fieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const selectedDate = ref<string | null>(null)
 
 const transport = createConnectTransport({ baseUrl: '/api' })
 const client = createClient(SickRock, transport)
 
 onMounted(async () => {
   const res = await client.getTableStructure({ pageId: tableId })
-  fieldDefs.value = (res.fields ?? []).map(f => ({ name: f.name, type: f.type, required: !!f.required }))
+  fieldDefs.value = (res.fields ?? [])
+    .filter(f => f.name !== 'created_at_unix') // Hide created_at_unix field
+    .map(f => ({ name: f.name, type: f.type, required: !!f.required }))
+
+  // Get date parameter from URL
+  const dateParam = route.query.date as string
+  if (dateParam) {
+    selectedDate.value = dateParam
+  }
 })
 function handleCreated() {
-  router.push({ name: 'table', params: { tableName: tableId } })
+  router.push({ name: 'after-insert', params: { tableName: tableId } })
 }
 </script>
 
 <template>
   <Section title = "Insert Row">
-      <InsertRow :table-id="tableId" :field-defs="fieldDefs" @created="handleCreated" />
+      <InsertRow :table-id="tableId" :field-defs="fieldDefs" :selected-date="selectedDate" @created="handleCreated" />
   </Section>
 </template>

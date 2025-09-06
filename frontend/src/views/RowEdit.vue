@@ -41,19 +41,19 @@ onMounted(async () => {
     // Initialize form data with current values
     if (item.value) {
       const initialData: Record<string, string> = {}
-      
+
       // Handle standard fields
       if (item.value.name !== undefined) {
         initialData.name = String(item.value.name)
       }
-      
+
       // Handle additional fields
       if (item.value.additionalFields) {
         Object.entries(item.value.additionalFields).forEach(([key, value]) => {
           initialData[key] = String(value)
         })
       }
-      
+
       formData.value = initialData
     }
   } catch (e) {
@@ -65,7 +65,7 @@ onMounted(async () => {
 
 const editableFields = computed(() => {
   // Filter out non-editable fields like id and created_at_unix
-  return tableStructure.value.filter(field => 
+  return tableStructure.value.filter(field =>
     field.name !== 'id' && field.name !== 'created_at_unix'
   )
 })
@@ -73,23 +73,22 @@ const editableFields = computed(() => {
 async function saveChanges() {
   saving.value = true
   error.value = null
-  
+
   try {
     // Prepare additional fields (exclude name since it's handled separately)
     const additionalFields: Record<string, string> = {}
     Object.entries(formData.value).forEach(([key, value]) => {
-      if (key !== 'name' && value !== undefined && value !== null) {
+      if (value !== undefined && value !== null) {
         additionalFields[key] = String(value)
       }
     })
-    
+
     await client.editItem({
       id: rowId,
-      name: formData.value.name || '',
       additionalFields: additionalFields,
       pageId: tableName
     })
-    
+
     // Navigate back to the row view
     router.push(`/table/${tableName}/${rowId}`)
   } catch (e) {
@@ -126,7 +125,7 @@ function getInputType(fieldType: string): string {
         </button>
       </div>
     </div>
-    
+
     <div class="section-content">
       <div v-if="error" class="error">{{ error }}</div>
       <div v-else-if="loading">Loading…</div>
@@ -144,7 +143,7 @@ function getInputType(fieldType: string): string {
             :placeholder="field.required ? 'Required' : 'Optional'"
           />
         </div>
-        
+
         <div class="form-actions">
           <button type="button" @click="cancelEdit" :disabled="saving">Cancel</button>
           <button type="submit" :disabled="saving" class="primary">

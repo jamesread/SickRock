@@ -33,6 +33,8 @@ const (
 // reflection-formatted method names, remove the leading slash and convert the remaining slash to a
 // period.
 const (
+	// SickRockInitProcedure is the fully-qualified name of the SickRock's Init RPC.
+	SickRockInitProcedure = "/sickrock.SickRock/Init"
 	// SickRockPingProcedure is the fully-qualified name of the SickRock's Ping RPC.
 	SickRockPingProcedure = "/sickrock.SickRock/Ping"
 	// SickRockGetNavigationLinksProcedure is the fully-qualified name of the SickRock's
@@ -59,6 +61,7 @@ const (
 
 // SickRockClient is a client for the sickrock.SickRock service.
 type SickRockClient interface {
+	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
 	Ping(context.Context, *connect.Request[proto.PingRequest]) (*connect.Response[proto.PingResponse], error)
 	// Navigation for the UI
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
@@ -87,6 +90,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 	baseURL = strings.TrimRight(baseURL, "/")
 	sickRockMethods := proto.File_sickrock_proto.Services().ByName("SickRock").Methods()
 	return &sickRockClient{
+		init: connect.NewClient[proto.InitRequest, proto.InitResponse](
+			httpClient,
+			baseURL+SickRockInitProcedure,
+			connect.WithSchema(sickRockMethods.ByName("Init")),
+			connect.WithClientOptions(opts...),
+		),
 		ping: connect.NewClient[proto.PingRequest, proto.PingResponse](
 			httpClient,
 			baseURL+SickRockPingProcedure,
@@ -152,6 +161,7 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 
 // sickRockClient implements SickRockClient.
 type sickRockClient struct {
+	init               *connect.Client[proto.InitRequest, proto.InitResponse]
 	ping               *connect.Client[proto.PingRequest, proto.PingResponse]
 	getNavigationLinks *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
 	getPages           *connect.Client[proto.GetPagesRequest, proto.GetPagesResponse]
@@ -162,6 +172,11 @@ type sickRockClient struct {
 	deleteItem         *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
 	getTableStructure  *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
 	addTableColumn     *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
+}
+
+// Init calls sickrock.SickRock.Init.
+func (c *sickRockClient) Init(ctx context.Context, req *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error) {
+	return c.init.CallUnary(ctx, req)
 }
 
 // Ping calls sickrock.SickRock.Ping.
@@ -216,6 +231,7 @@ func (c *sickRockClient) AddTableColumn(ctx context.Context, req *connect.Reques
 
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
+	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
 	Ping(context.Context, *connect.Request[proto.PingRequest]) (*connect.Response[proto.PingResponse], error)
 	// Navigation for the UI
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
@@ -240,6 +256,12 @@ type SickRockHandler interface {
 // and JSON codecs. They also support gzip compression.
 func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (string, http.Handler) {
 	sickRockMethods := proto.File_sickrock_proto.Services().ByName("SickRock").Methods()
+	sickRockInitHandler := connect.NewUnaryHandler(
+		SickRockInitProcedure,
+		svc.Init,
+		connect.WithSchema(sickRockMethods.ByName("Init")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockPingHandler := connect.NewUnaryHandler(
 		SickRockPingProcedure,
 		svc.Ping,
@@ -302,6 +324,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
+		case SickRockInitProcedure:
+			sickRockInitHandler.ServeHTTP(w, r)
 		case SickRockPingProcedure:
 			sickRockPingHandler.ServeHTTP(w, r)
 		case SickRockGetNavigationLinksProcedure:
@@ -330,6 +354,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 
 // UnimplementedSickRockHandler returns CodeUnimplemented from all methods.
 type UnimplementedSickRockHandler struct{}
+
+func (UnimplementedSickRockHandler) Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.Init is not implemented"))
+}
 
 func (UnimplementedSickRockHandler) Ping(context.Context, *connect.Request[proto.PingRequest]) (*connect.Response[proto.PingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.Ping is not implemented"))

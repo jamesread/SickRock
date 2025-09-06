@@ -2,11 +2,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from './views/HomeView.vue'
 import AboutView from './views/AboutView.vue'
 import TableView from './views/TableView.vue'
+import CalendarView from './views/CalendarView.vue'
 import RowView from './views/RowView.vue'
 import RowEdit from './views/RowEdit.vue'
 import AddColumnView from './views/AddColumnView.vue'
 import InsertRowView from './views/InsertRowView.vue'
+import AfterInsertView from './views/AfterInsertView.vue'
 import TableCreate from './views/TableCreate.vue'
+import ControlPanel from './views/ControlPanel.vue'
+import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,6 +21,14 @@ const router = createRouter({
       meta: {
         breadcrumbs: (route: any) => [
           { name: 'Table: ' + String(route.params.tableName), to: { name: 'table', params: { tableName: route.params.tableName } } },
+        ],
+      },
+    },
+    { path: '/table/:tableName/calendar', name: 'calendar', component: CalendarView, props: true,
+      meta: {
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Calendar' },
         ],
       },
     },
@@ -45,10 +57,10 @@ const router = createRouter({
         ],
       },
     },
-    { 
-      path: '/table/:tableName/insert-row', 
-      name: 'insert-row', 
-      component: InsertRowView, 
+    {
+      path: '/table/:tableName/insert-row',
+      name: 'insert-row',
+      component: InsertRowView,
       props: true,
       meta: {
         breadcrumbs: (route: any) => [
@@ -57,10 +69,37 @@ const router = createRouter({
         ],
       },
     },
-    { path: '/admin/table/create', name: 'table-create', component: TableCreate },
+    {
+      path: '/table/:tableName/after-insert',
+      name: 'after-insert',
+      component: AfterInsertView,
+      props: true,
+      meta: {
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Row Added' },
+        ],
+      },
+    },
+    {
+      path: '/admin/table/create',
+      name: 'table-create',
+      component: TableCreate,
+      meta: {
+        title: 'Create Table',
+        icon: DatabaseAddIcon
+      },
+    },
+    {
+      path: '/admin/control-panel',
+      name: 'control-panel',
+      component: ControlPanel,
+      meta: {
+        title: 'Control Panel',
+        icon: DatabaseAddIcon
+      },
+    },
   ],
 })
 
 export default router
-
-

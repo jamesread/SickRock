@@ -10,11 +10,9 @@ const tableId = route.params.tableName as string
   <section class = "with-header-and-content">
     <div class = "section-header">
       <h2>Add Column</h2>
-    </div>  
-    <div class = "section-content">
+    </div>
+    <div class = "section-content padding">
       <AddColumn :table-id="tableId" />
     </div>
   </section>
 </template>
-
-

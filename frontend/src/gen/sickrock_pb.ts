@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sickrock.proto.
  */
 export const file_sickrock: GenFile = /*@__PURE__*/
-  fileDesc("Cg5zaWNrcm9jay5wcm90bxIIc2lja3JvY2siHgoLUGluZ1JlcXVlc3QSDwoHbWVzc2FnZRgBIAEoCSI3CgxQaW5nUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRIWCg50aW1lc3RhbXBfdW5peBgCIAEoAyIbChlHZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0Ii0KDk5hdmlnYXRpb25MaW5rEg0KBWxhYmVsGAEgASgJEgwKBHBhdGgYAiABKAkiRQoaR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USJwoFbGlua3MYASADKAsyGC5zaWNrcm9jay5OYXZpZ2F0aW9uTGluayIRCg9HZXRQYWdlc1JlcXVlc3QiLwoEUGFnZRIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRIMCgRzbHVnGAMgASgJIjEKEEdldFBhZ2VzUmVzcG9uc2USHQoFcGFnZXMYASADKAsyDi5zaWNrcm9jay5QYWdlIrMBCgRJdGVtEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSFwoPY3JlYXRlZF9hdF91bml4GAMgASgDEj8KEWFkZGl0aW9uYWxfZmllbGRzGAQgAygLMiQuc2lja3JvY2suSXRlbS5BZGRpdGlvbmFsRmllbGRzRW50cnkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiIwoQTGlzdEl0ZW1zUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJIjIKEUxpc3RJdGVtc1Jlc3BvbnNlEh0KBWl0ZW1zGAEgAygLMg4uc2lja3JvY2suSXRlbSIyChFDcmVhdGVJdGVtUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEgwKBG5hbWUYAiABKAkiMgoSQ3JlYXRlSXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIhwKDkdldEl0ZW1SZXF1ZXN0EgoKAmlkGAEgASgJIi8KD0dldEl0ZW1SZXNwb25zZRIcCgRpdGVtGAEgASgLMg4uc2lja3JvY2suSXRlbSLBAQoPRWRpdEl0ZW1SZXF1ZXN0EgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSSgoRYWRkaXRpb25hbF9maWVsZHMYAyADKAsyLy5zaWNrcm9jay5FZGl0SXRlbVJlcXVlc3QuQWRkaXRpb25hbEZpZWxkc0VudHJ5Eg8KB3BhZ2VfaWQYBCABKAkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiMAoQRWRpdEl0ZW1SZXNwb25zZRIcCgRpdGVtGAEgASgLMg4uc2lja3JvY2suSXRlbSIfChFEZWxldGVJdGVtUmVxdWVzdBIKCgJpZBgBIAEoCSIlChJEZWxldGVJdGVtUmVzcG9uc2USDwoHZGVsZXRlZBgBIAEoCCIrChhHZXRUYWJsZVN0cnVjdHVyZVJlcXVlc3QSDwoHcGFnZV9pZBgBIAEoCSI1CgVGaWVsZBIMCgRuYW1lGAEgASgJEgwKBHR5cGUYAiABKAkSEAoIcmVxdWlyZWQYAyABKAgiPAoZR2V0VGFibGVTdHJ1Y3R1cmVSZXNwb25zZRIfCgZmaWVsZHMYASADKAsyDy5zaWNrcm9jay5GaWVsZCJIChVBZGRUYWJsZUNvbHVtblJlcXVlc3QSDwoHcGFnZV9pZBgBIAEoCRIeCgVmaWVsZBgCIAEoCzIPLnNpY2tyb2NrLkZpZWxkMvYFCghTaWNrUm9jaxI1CgRQaW5nEhUuc2lja3JvY2suUGluZ1JlcXVlc3QaFi5zaWNrcm9jay5QaW5nUmVzcG9uc2USXwoSR2V0TmF2aWdhdGlvbkxpbmtzEiMuc2lja3JvY2suR2V0TmF2aWdhdGlvbkxpbmtzUmVxdWVzdBokLnNpY2tyb2NrLkdldE5hdmlnYXRpb25MaW5rc1Jlc3BvbnNlEkEKCEdldFBhZ2VzEhkuc2lja3JvY2suR2V0UGFnZXNSZXF1ZXN0Ghouc2lja3JvY2suR2V0UGFnZXNSZXNwb25zZRJECglMaXN0SXRlbXMSGi5zaWNrcm9jay5MaXN0SXRlbXNSZXF1ZXN0Ghsuc2lja3JvY2suTGlzdEl0ZW1zUmVzcG9uc2USRwoKQ3JlYXRlSXRlbRIbLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXF1ZXN0Ghwuc2lja3JvY2suQ3JlYXRlSXRlbVJlc3BvbnNlEj4KB0dldEl0ZW0SGC5zaWNrcm9jay5HZXRJdGVtUmVxdWVzdBoZLnNpY2tyb2NrLkdldEl0ZW1SZXNwb25zZRJBCghFZGl0SXRlbRIZLnNpY2tyb2NrLkVkaXRJdGVtUmVxdWVzdBoaLnNpY2tyb2NrLkVkaXRJdGVtUmVzcG9uc2USRwoKRGVsZXRlSXRlbRIbLnNpY2tyb2NrLkRlbGV0ZUl0ZW1SZXF1ZXN0Ghwuc2lja3JvY2suRGVsZXRlSXRlbVJlc3BvbnNlElwKEUdldFRhYmxlU3RydWN0dXJlEiIuc2lja3JvY2suR2V0VGFibGVTdHJ1Y3R1cmVSZXF1ZXN0GiMuc2lja3JvY2suR2V0VGFibGVTdHJ1Y3R1cmVSZXNwb25zZRJWCg5BZGRUYWJsZUNvbHVtbhIfLnNpY2tyb2NrLkFkZFRhYmxlQ29sdW1uUmVxdWVzdBojLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2VCkQEKDGNvbS5zaWNrcm9ja0INU2lja3JvY2tQcm90b1ABWjJnaXRodWIuY29tL2phbWVzcmVhZC9TaWNrUm9jay9nZW4vcHJvdG87c2lja3JvY2twYqICA1NYWKoCCFNpY2tyb2NrygIIU2lja3JvY2viAhRTaWNrcm9ja1xHUEJNZXRhZGF0YeoCCFNpY2tyb2NrYgZwcm90bzM");
+  fileDesc("Cg5zaWNrcm9jay5wcm90bxIIc2lja3JvY2siHgoLUGluZ1JlcXVlc3QSDwoHbWVzc2FnZRgBIAEoCSI3CgxQaW5nUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRIWCg50aW1lc3RhbXBfdW5peBgCIAEoAyIbChlHZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0Ii0KDk5hdmlnYXRpb25MaW5rEg0KBWxhYmVsGAEgASgJEgwKBHBhdGgYAiABKAkiRQoaR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USJwoFbGlua3MYASADKAsyGC5zaWNrcm9jay5OYXZpZ2F0aW9uTGluayIRCg9HZXRQYWdlc1JlcXVlc3QiTgoEUGFnZRIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRIMCgRzbHVnGAMgASgJEg8KB29yZGluYWwYBCABKAUSDAoEaWNvbhgFIAEoCSIxChBHZXRQYWdlc1Jlc3BvbnNlEh0KBXBhZ2VzGAEgAygLMg4uc2lja3JvY2suUGFnZSKlAQoESXRlbRIKCgJpZBgBIAEoCRIXCg9jcmVhdGVkX2F0X3VuaXgYAiABKAMSPwoRYWRkaXRpb25hbF9maWVsZHMYAyADKAsyJC5zaWNrcm9jay5JdGVtLkFkZGl0aW9uYWxGaWVsZHNFbnRyeRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIjChBMaXN0SXRlbXNSZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkiMgoRTGlzdEl0ZW1zUmVzcG9uc2USHQoFaXRlbXMYASADKAsyDi5zaWNrcm9jay5JdGVtIsQBChFDcmVhdGVJdGVtUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEhcKD2NyZWF0ZWRfYXRfdW5peBgCIAEoAxJMChFhZGRpdGlvbmFsX2ZpZWxkcxgDIAMoCzIxLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXF1ZXN0LkFkZGl0aW9uYWxGaWVsZHNFbnRyeRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIyChJDcmVhdGVJdGVtUmVzcG9uc2USHAoEaXRlbRgBIAEoCzIOLnNpY2tyb2NrLkl0ZW0iHAoOR2V0SXRlbVJlcXVlc3QSCgoCaWQYASABKAkiLwoPR2V0SXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIrMBCg9FZGl0SXRlbVJlcXVlc3QSCgoCaWQYASABKAkSSgoRYWRkaXRpb25hbF9maWVsZHMYAiADKAsyLy5zaWNrcm9jay5FZGl0SXRlbVJlcXVlc3QuQWRkaXRpb25hbEZpZWxkc0VudHJ5Eg8KB3BhZ2VfaWQYAyABKAkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiMAoQRWRpdEl0ZW1SZXNwb25zZRIcCgRpdGVtGAEgASgLMg4uc2lja3JvY2suSXRlbSIwChFEZWxldGVJdGVtUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEgoKAmlkGAIgASgJIiUKEkRlbGV0ZUl0ZW1SZXNwb25zZRIPCgdkZWxldGVkGAEgASgIIisKGEdldFRhYmxlU3RydWN0dXJlUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJIlsKBUZpZWxkEgwKBG5hbWUYASABKAkSDAoEdHlwZRgCIAEoCRIQCghyZXF1aXJlZBgDIAEoCBIkChxkZWZhdWx0X3RvX2N1cnJlbnRfdGltZXN0YW1wGAQgASgIIlYKGUdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USHwoGZmllbGRzGAEgAygLMg8uc2lja3JvY2suRmllbGQSGAoQQ3JlYXRlQnV0dG9uVGV4dBgCIAEoCSJIChVBZGRUYWJsZUNvbHVtblJlcXVlc3QSDwoHcGFnZV9pZBgBIAEoCRIeCgVmaWVsZBgCIAEoCzIPLnNpY2tyb2NrLkZpZWxkIg0KC0luaXRSZXF1ZXN0Ij0KDEluaXRSZXNwb25zZRIPCgd2ZXJzaW9uGAEgASgJEg4KBmNvbW1pdBgCIAEoCRIMCgRkYXRlGAMgASgJMq0GCghTaWNrUm9jaxI1CgRJbml0EhUuc2lja3JvY2suSW5pdFJlcXVlc3QaFi5zaWNrcm9jay5Jbml0UmVzcG9uc2USNQoEUGluZxIVLnNpY2tyb2NrLlBpbmdSZXF1ZXN0GhYuc2lja3JvY2suUGluZ1Jlc3BvbnNlEl8KEkdldE5hdmlnYXRpb25MaW5rcxIjLnNpY2tyb2NrLkdldE5hdmlnYXRpb25MaW5rc1JlcXVlc3QaJC5zaWNrcm9jay5HZXROYXZpZ2F0aW9uTGlua3NSZXNwb25zZRJBCghHZXRQYWdlcxIZLnNpY2tyb2NrLkdldFBhZ2VzUmVxdWVzdBoaLnNpY2tyb2NrLkdldFBhZ2VzUmVzcG9uc2USRAoJTGlzdEl0ZW1zEhouc2lja3JvY2suTGlzdEl0ZW1zUmVxdWVzdBobLnNpY2tyb2NrLkxpc3RJdGVtc1Jlc3BvbnNlEkcKCkNyZWF0ZUl0ZW0SGy5zaWNrcm9jay5DcmVhdGVJdGVtUmVxdWVzdBocLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXNwb25zZRI+CgdHZXRJdGVtEhguc2lja3JvY2suR2V0SXRlbVJlcXVlc3QaGS5zaWNrcm9jay5HZXRJdGVtUmVzcG9uc2USQQoIRWRpdEl0ZW0SGS5zaWNrcm9jay5FZGl0SXRlbVJlcXVlc3QaGi5zaWNrcm9jay5FZGl0SXRlbVJlc3BvbnNlEkcKCkRlbGV0ZUl0ZW0SGy5zaWNrcm9jay5EZWxldGVJdGVtUmVxdWVzdBocLnNpY2tyb2NrLkRlbGV0ZUl0ZW1SZXNwb25zZRJcChFHZXRUYWJsZVN0cnVjdHVyZRIiLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVxdWVzdBojLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USVgoOQWRkVGFibGVDb2x1bW4SHy5zaWNrcm9jay5BZGRUYWJsZUNvbHVtblJlcXVlc3QaIy5zaWNrcm9jay5HZXRUYWJsZVN0cnVjdHVyZVJlc3BvbnNlQpEBCgxjb20uc2lja3JvY2tCDVNpY2tyb2NrUHJvdG9QAVoyZ2l0aHViLmNvbS9qYW1lc3JlYWQvU2lja1JvY2svZ2VuL3Byb3RvO3NpY2tyb2NrcGKiAgNTWFiqAghTaWNrcm9ja8oCCFNpY2tyb2Nr4gIUU2lja3JvY2tcR1BCTWV0YWRhdGHqAghTaWNrcm9ja2IGcHJvdG8z");
 
 /**
  * @generated from message sickrock.PingRequest
@@ -140,6 +140,16 @@ export type Page = Message<"sickrock.Page"> & {
    * @generated from field: string slug = 3;
    */
   slug: string;
+
+  /**
+   * @generated from field: int32 ordinal = 4;
+   */
+  ordinal: number;
+
+  /**
+   * @generated from field: string icon = 5;
+   */
+  icon: string;
 };
 
 /**
@@ -178,17 +188,12 @@ export type Item = Message<"sickrock.Item"> & {
   id: string;
 
   /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
-
-  /**
-   * @generated from field: int64 created_at_unix = 3;
+   * @generated from field: int64 created_at_unix = 2;
    */
   createdAtUnix: bigint;
 
   /**
-   * @generated from field: map<string, string> additional_fields = 4;
+   * @generated from field: map<string, string> additional_fields = 3;
    */
   additionalFields: { [key: string]: string };
 };
@@ -244,9 +249,16 @@ export type CreateItemRequest = Message<"sickrock.CreateItemRequest"> & {
   pageId: string;
 
   /**
-   * @generated from field: string name = 2;
+   * Optional custom timestamp
+   *
+   * @generated from field: int64 created_at_unix = 2;
    */
-  name: string;
+  createdAtUnix: bigint;
+
+  /**
+   * @generated from field: map<string, string> additional_fields = 3;
+   */
+  additionalFields: { [key: string]: string };
 };
 
 /**
@@ -317,17 +329,12 @@ export type EditItemRequest = Message<"sickrock.EditItemRequest"> & {
   id: string;
 
   /**
-   * @generated from field: string name = 2;
-   */
-  name: string;
-
-  /**
-   * @generated from field: map<string, string> additional_fields = 3;
+   * @generated from field: map<string, string> additional_fields = 2;
    */
   additionalFields: { [key: string]: string };
 
   /**
-   * @generated from field: string page_id = 4;
+   * @generated from field: string page_id = 3;
    */
   pageId: string;
 };
@@ -361,7 +368,12 @@ export const EditItemResponseSchema: GenMessage<EditItemResponse> = /*@__PURE__*
  */
 export type DeleteItemRequest = Message<"sickrock.DeleteItemRequest"> & {
   /**
-   * @generated from field: string id = 1;
+   * @generated from field: string page_id = 1;
+   */
+  pageId: string;
+
+  /**
+   * @generated from field: string id = 2;
    */
   id: string;
 };
@@ -427,6 +439,11 @@ export type Field = Message<"sickrock.Field"> & {
    * @generated from field: bool required = 3;
    */
   required: boolean;
+
+  /**
+   * @generated from field: bool default_to_current_timestamp = 4;
+   */
+  defaultToCurrentTimestamp: boolean;
 };
 
 /**
@@ -444,6 +461,11 @@ export type GetTableStructureResponse = Message<"sickrock.GetTableStructureRespo
    * @generated from field: repeated sickrock.Field fields = 1;
    */
   fields: Field[];
+
+  /**
+   * @generated from field: string CreateButtonText = 2;
+   */
+  CreateButtonText: string;
 };
 
 /**
@@ -476,9 +498,59 @@ export const AddTableColumnRequestSchema: GenMessage<AddTableColumnRequest> = /*
   messageDesc(file_sickrock, 22);
 
 /**
+ * Build info
+ *
+ * @generated from message sickrock.InitRequest
+ */
+export type InitRequest = Message<"sickrock.InitRequest"> & {
+};
+
+/**
+ * Describes the message sickrock.InitRequest.
+ * Use `create(InitRequestSchema)` to create a new message.
+ */
+export const InitRequestSchema: GenMessage<InitRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 23);
+
+/**
+ * @generated from message sickrock.InitResponse
+ */
+export type InitResponse = Message<"sickrock.InitResponse"> & {
+  /**
+   * @generated from field: string version = 1;
+   */
+  version: string;
+
+  /**
+   * @generated from field: string commit = 2;
+   */
+  commit: string;
+
+  /**
+   * @generated from field: string date = 3;
+   */
+  date: string;
+};
+
+/**
+ * Describes the message sickrock.InitResponse.
+ * Use `create(InitResponseSchema)` to create a new message.
+ */
+export const InitResponseSchema: GenMessage<InitResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 24);
+
+/**
  * @generated from service sickrock.SickRock
  */
 export const SickRock: GenService<{
+  /**
+   * @generated from rpc sickrock.SickRock.Init
+   */
+  init: {
+    methodKind: "unary";
+    input: typeof InitRequestSchema;
+    output: typeof InitResponseSchema;
+  },
   /**
    * @generated from rpc sickrock.SickRock.Ping
    */
@@ -571,4 +643,3 @@ export const SickRock: GenService<{
   },
 }> = /*@__PURE__*/
   serviceDesc(file_sickrock, 0);
-

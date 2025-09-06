@@ -132,9 +132,10 @@ func findFrontendDir() string {
 }
 
 func main() {
+	log.Info("SickRock is starting up...")
+
 	loadEnvFile()
 	configureLogging()
-	log.Info("SickRock is starting up...")
 
 	router := gin.Default()
 
@@ -175,7 +176,8 @@ func main() {
 		}
 		if len(existing) == 0 {
 			for _, name := range names {
-				if _, err := r.CreateItemInTable(context.Background(), table, name); err != nil {
+				additionalFields := map[string]string{"name": name}
+				if _, err := r.CreateItemInTable(context.Background(), table, additionalFields); err != nil {
 					log.Warnf("seed %s: %v", table, err)
 				}
 			}
@@ -205,5 +207,12 @@ func main() {
 	router.Static("/images", filepath.Join(frontendDir, "images"))
 	router.StaticFile("/favicon.ico", filepath.Join(frontendDir, "favicon.ico"))
 
-	router.Run(":8080")
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Infof("Listening on port %s", port)
+
+	router.Run(":" + port)
 }

@@ -38,7 +38,15 @@ function toggle() {
   }
 }
 
-const items = ref<{ type: 'router-link' | 'callback'; path?: string; label: string; callback?: () => void }[]>([])
+interface DropdownItem {
+  type: 'router-link' | 'callback';
+  path?: string;
+  label: string;
+  callback?: () => void;
+  styleClass?: string;
+}
+
+const items = ref<DropdownItem[]>([])
 
 function addRouterLink(path: string, label: string) {
   items.value.push({ type: 'router-link', path, label })
