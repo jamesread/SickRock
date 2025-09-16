@@ -57,6 +57,33 @@ const (
 	SickRockGetTableStructureProcedure = "/sickrock.SickRock/GetTableStructure"
 	// SickRockAddTableColumnProcedure is the fully-qualified name of the SickRock's AddTableColumn RPC.
 	SickRockAddTableColumnProcedure = "/sickrock.SickRock/AddTableColumn"
+	// SickRockCreateTableViewProcedure is the fully-qualified name of the SickRock's CreateTableView
+	// RPC.
+	SickRockCreateTableViewProcedure = "/sickrock.SickRock/CreateTableView"
+	// SickRockUpdateTableViewProcedure is the fully-qualified name of the SickRock's UpdateTableView
+	// RPC.
+	SickRockUpdateTableViewProcedure = "/sickrock.SickRock/UpdateTableView"
+	// SickRockGetTableViewsProcedure is the fully-qualified name of the SickRock's GetTableViews RPC.
+	SickRockGetTableViewsProcedure = "/sickrock.SickRock/GetTableViews"
+	// SickRockDeleteTableViewProcedure is the fully-qualified name of the SickRock's DeleteTableView
+	// RPC.
+	SickRockDeleteTableViewProcedure = "/sickrock.SickRock/DeleteTableView"
+	// SickRockCreateForeignKeyProcedure is the fully-qualified name of the SickRock's CreateForeignKey
+	// RPC.
+	SickRockCreateForeignKeyProcedure = "/sickrock.SickRock/CreateForeignKey"
+	// SickRockGetForeignKeysProcedure is the fully-qualified name of the SickRock's GetForeignKeys RPC.
+	SickRockGetForeignKeysProcedure = "/sickrock.SickRock/GetForeignKeys"
+	// SickRockDeleteForeignKeyProcedure is the fully-qualified name of the SickRock's DeleteForeignKey
+	// RPC.
+	SickRockDeleteForeignKeyProcedure = "/sickrock.SickRock/DeleteForeignKey"
+	// SickRockChangeColumnTypeProcedure is the fully-qualified name of the SickRock's ChangeColumnType
+	// RPC.
+	SickRockChangeColumnTypeProcedure = "/sickrock.SickRock/ChangeColumnType"
+	// SickRockDropColumnProcedure is the fully-qualified name of the SickRock's DropColumn RPC.
+	SickRockDropColumnProcedure = "/sickrock.SickRock/DropColumn"
+	// SickRockChangeColumnNameProcedure is the fully-qualified name of the SickRock's ChangeColumnName
+	// RPC.
+	SickRockChangeColumnNameProcedure = "/sickrock.SickRock/ChangeColumnName"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -77,6 +104,19 @@ type SickRockClient interface {
 	GetTableStructure(context.Context, *connect.Request[proto.GetTableStructureRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
 	// Add a column to a table
 	AddTableColumn(context.Context, *connect.Request[proto.AddTableColumnRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
+	// Table Views
+	CreateTableView(context.Context, *connect.Request[proto.CreateTableViewRequest]) (*connect.Response[proto.CreateTableViewResponse], error)
+	UpdateTableView(context.Context, *connect.Request[proto.UpdateTableViewRequest]) (*connect.Response[proto.UpdateTableViewResponse], error)
+	GetTableViews(context.Context, *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error)
+	DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error)
+	// Foreign Key Management
+	CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error)
+	GetForeignKeys(context.Context, *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error)
+	DeleteForeignKey(context.Context, *connect.Request[proto.DeleteForeignKeyRequest]) (*connect.Response[proto.DeleteForeignKeyResponse], error)
+	// Column Type Management
+	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
+	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
+	ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -156,6 +196,66 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("AddTableColumn")),
 			connect.WithClientOptions(opts...),
 		),
+		createTableView: connect.NewClient[proto.CreateTableViewRequest, proto.CreateTableViewResponse](
+			httpClient,
+			baseURL+SickRockCreateTableViewProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateTableView")),
+			connect.WithClientOptions(opts...),
+		),
+		updateTableView: connect.NewClient[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse](
+			httpClient,
+			baseURL+SickRockUpdateTableViewProcedure,
+			connect.WithSchema(sickRockMethods.ByName("UpdateTableView")),
+			connect.WithClientOptions(opts...),
+		),
+		getTableViews: connect.NewClient[proto.GetTableViewsRequest, proto.GetTableViewsResponse](
+			httpClient,
+			baseURL+SickRockGetTableViewsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetTableViews")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteTableView: connect.NewClient[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse](
+			httpClient,
+			baseURL+SickRockDeleteTableViewProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteTableView")),
+			connect.WithClientOptions(opts...),
+		),
+		createForeignKey: connect.NewClient[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse](
+			httpClient,
+			baseURL+SickRockCreateForeignKeyProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateForeignKey")),
+			connect.WithClientOptions(opts...),
+		),
+		getForeignKeys: connect.NewClient[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse](
+			httpClient,
+			baseURL+SickRockGetForeignKeysProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetForeignKeys")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteForeignKey: connect.NewClient[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse](
+			httpClient,
+			baseURL+SickRockDeleteForeignKeyProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteForeignKey")),
+			connect.WithClientOptions(opts...),
+		),
+		changeColumnType: connect.NewClient[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse](
+			httpClient,
+			baseURL+SickRockChangeColumnTypeProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ChangeColumnType")),
+			connect.WithClientOptions(opts...),
+		),
+		dropColumn: connect.NewClient[proto.DropColumnRequest, proto.DropColumnResponse](
+			httpClient,
+			baseURL+SickRockDropColumnProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DropColumn")),
+			connect.WithClientOptions(opts...),
+		),
+		changeColumnName: connect.NewClient[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse](
+			httpClient,
+			baseURL+SickRockChangeColumnNameProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ChangeColumnName")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -172,6 +272,16 @@ type sickRockClient struct {
 	deleteItem         *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
 	getTableStructure  *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
 	addTableColumn     *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
+	createTableView    *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
+	updateTableView    *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
+	getTableViews      *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
+	deleteTableView    *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
+	createForeignKey   *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
+	getForeignKeys     *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
+	deleteForeignKey   *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
+	changeColumnType   *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
+	dropColumn         *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
+	changeColumnName   *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -229,6 +339,56 @@ func (c *sickRockClient) AddTableColumn(ctx context.Context, req *connect.Reques
 	return c.addTableColumn.CallUnary(ctx, req)
 }
 
+// CreateTableView calls sickrock.SickRock.CreateTableView.
+func (c *sickRockClient) CreateTableView(ctx context.Context, req *connect.Request[proto.CreateTableViewRequest]) (*connect.Response[proto.CreateTableViewResponse], error) {
+	return c.createTableView.CallUnary(ctx, req)
+}
+
+// UpdateTableView calls sickrock.SickRock.UpdateTableView.
+func (c *sickRockClient) UpdateTableView(ctx context.Context, req *connect.Request[proto.UpdateTableViewRequest]) (*connect.Response[proto.UpdateTableViewResponse], error) {
+	return c.updateTableView.CallUnary(ctx, req)
+}
+
+// GetTableViews calls sickrock.SickRock.GetTableViews.
+func (c *sickRockClient) GetTableViews(ctx context.Context, req *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error) {
+	return c.getTableViews.CallUnary(ctx, req)
+}
+
+// DeleteTableView calls sickrock.SickRock.DeleteTableView.
+func (c *sickRockClient) DeleteTableView(ctx context.Context, req *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error) {
+	return c.deleteTableView.CallUnary(ctx, req)
+}
+
+// CreateForeignKey calls sickrock.SickRock.CreateForeignKey.
+func (c *sickRockClient) CreateForeignKey(ctx context.Context, req *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error) {
+	return c.createForeignKey.CallUnary(ctx, req)
+}
+
+// GetForeignKeys calls sickrock.SickRock.GetForeignKeys.
+func (c *sickRockClient) GetForeignKeys(ctx context.Context, req *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error) {
+	return c.getForeignKeys.CallUnary(ctx, req)
+}
+
+// DeleteForeignKey calls sickrock.SickRock.DeleteForeignKey.
+func (c *sickRockClient) DeleteForeignKey(ctx context.Context, req *connect.Request[proto.DeleteForeignKeyRequest]) (*connect.Response[proto.DeleteForeignKeyResponse], error) {
+	return c.deleteForeignKey.CallUnary(ctx, req)
+}
+
+// ChangeColumnType calls sickrock.SickRock.ChangeColumnType.
+func (c *sickRockClient) ChangeColumnType(ctx context.Context, req *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error) {
+	return c.changeColumnType.CallUnary(ctx, req)
+}
+
+// DropColumn calls sickrock.SickRock.DropColumn.
+func (c *sickRockClient) DropColumn(ctx context.Context, req *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error) {
+	return c.dropColumn.CallUnary(ctx, req)
+}
+
+// ChangeColumnName calls sickrock.SickRock.ChangeColumnName.
+func (c *sickRockClient) ChangeColumnName(ctx context.Context, req *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error) {
+	return c.changeColumnName.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -247,6 +407,19 @@ type SickRockHandler interface {
 	GetTableStructure(context.Context, *connect.Request[proto.GetTableStructureRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
 	// Add a column to a table
 	AddTableColumn(context.Context, *connect.Request[proto.AddTableColumnRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
+	// Table Views
+	CreateTableView(context.Context, *connect.Request[proto.CreateTableViewRequest]) (*connect.Response[proto.CreateTableViewResponse], error)
+	UpdateTableView(context.Context, *connect.Request[proto.UpdateTableViewRequest]) (*connect.Response[proto.UpdateTableViewResponse], error)
+	GetTableViews(context.Context, *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error)
+	DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error)
+	// Foreign Key Management
+	CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error)
+	GetForeignKeys(context.Context, *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error)
+	DeleteForeignKey(context.Context, *connect.Request[proto.DeleteForeignKeyRequest]) (*connect.Response[proto.DeleteForeignKeyResponse], error)
+	// Column Type Management
+	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
+	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
+	ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -322,6 +495,66 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("AddTableColumn")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockCreateTableViewHandler := connect.NewUnaryHandler(
+		SickRockCreateTableViewProcedure,
+		svc.CreateTableView,
+		connect.WithSchema(sickRockMethods.ByName("CreateTableView")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockUpdateTableViewHandler := connect.NewUnaryHandler(
+		SickRockUpdateTableViewProcedure,
+		svc.UpdateTableView,
+		connect.WithSchema(sickRockMethods.ByName("UpdateTableView")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetTableViewsHandler := connect.NewUnaryHandler(
+		SickRockGetTableViewsProcedure,
+		svc.GetTableViews,
+		connect.WithSchema(sickRockMethods.ByName("GetTableViews")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteTableViewHandler := connect.NewUnaryHandler(
+		SickRockDeleteTableViewProcedure,
+		svc.DeleteTableView,
+		connect.WithSchema(sickRockMethods.ByName("DeleteTableView")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateForeignKeyHandler := connect.NewUnaryHandler(
+		SickRockCreateForeignKeyProcedure,
+		svc.CreateForeignKey,
+		connect.WithSchema(sickRockMethods.ByName("CreateForeignKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetForeignKeysHandler := connect.NewUnaryHandler(
+		SickRockGetForeignKeysProcedure,
+		svc.GetForeignKeys,
+		connect.WithSchema(sickRockMethods.ByName("GetForeignKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteForeignKeyHandler := connect.NewUnaryHandler(
+		SickRockDeleteForeignKeyProcedure,
+		svc.DeleteForeignKey,
+		connect.WithSchema(sickRockMethods.ByName("DeleteForeignKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockChangeColumnTypeHandler := connect.NewUnaryHandler(
+		SickRockChangeColumnTypeProcedure,
+		svc.ChangeColumnType,
+		connect.WithSchema(sickRockMethods.ByName("ChangeColumnType")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDropColumnHandler := connect.NewUnaryHandler(
+		SickRockDropColumnProcedure,
+		svc.DropColumn,
+		connect.WithSchema(sickRockMethods.ByName("DropColumn")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockChangeColumnNameHandler := connect.NewUnaryHandler(
+		SickRockChangeColumnNameProcedure,
+		svc.ChangeColumnName,
+		connect.WithSchema(sickRockMethods.ByName("ChangeColumnName")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -346,6 +579,26 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetTableStructureHandler.ServeHTTP(w, r)
 		case SickRockAddTableColumnProcedure:
 			sickRockAddTableColumnHandler.ServeHTTP(w, r)
+		case SickRockCreateTableViewProcedure:
+			sickRockCreateTableViewHandler.ServeHTTP(w, r)
+		case SickRockUpdateTableViewProcedure:
+			sickRockUpdateTableViewHandler.ServeHTTP(w, r)
+		case SickRockGetTableViewsProcedure:
+			sickRockGetTableViewsHandler.ServeHTTP(w, r)
+		case SickRockDeleteTableViewProcedure:
+			sickRockDeleteTableViewHandler.ServeHTTP(w, r)
+		case SickRockCreateForeignKeyProcedure:
+			sickRockCreateForeignKeyHandler.ServeHTTP(w, r)
+		case SickRockGetForeignKeysProcedure:
+			sickRockGetForeignKeysHandler.ServeHTTP(w, r)
+		case SickRockDeleteForeignKeyProcedure:
+			sickRockDeleteForeignKeyHandler.ServeHTTP(w, r)
+		case SickRockChangeColumnTypeProcedure:
+			sickRockChangeColumnTypeHandler.ServeHTTP(w, r)
+		case SickRockDropColumnProcedure:
+			sickRockDropColumnHandler.ServeHTTP(w, r)
+		case SickRockChangeColumnNameProcedure:
+			sickRockChangeColumnNameHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -397,4 +650,44 @@ func (UnimplementedSickRockHandler) GetTableStructure(context.Context, *connect.
 
 func (UnimplementedSickRockHandler) AddTableColumn(context.Context, *connect.Request[proto.AddTableColumnRequest]) (*connect.Response[proto.GetTableStructureResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.AddTableColumn is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateTableView(context.Context, *connect.Request[proto.CreateTableViewRequest]) (*connect.Response[proto.CreateTableViewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateTableView is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) UpdateTableView(context.Context, *connect.Request[proto.UpdateTableViewRequest]) (*connect.Response[proto.UpdateTableViewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateTableView is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetTableViews(context.Context, *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetTableViews is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteTableView is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateForeignKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetForeignKeys(context.Context, *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetForeignKeys is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteForeignKey(context.Context, *connect.Request[proto.DeleteForeignKeyRequest]) (*connect.Response[proto.DeleteForeignKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteForeignKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ChangeColumnType is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DropColumn is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ChangeColumnName is not implemented"))
 }

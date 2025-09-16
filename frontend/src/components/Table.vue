@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import Pagination from 'picocrank/vue/components/Pagination.vue'
 import ColumnVisibilityDropdown from './ColumnVisibilityDropdown.vue'
 import RowActionsDropdown from './RowActionsDropdown.vue'
@@ -8,10 +9,72 @@ import { createClient } from '@connectrpc/connect'
 import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from './InsertRow.vue'
 import { GetTableStructureResponse } from '../gen/sickrock_pb'
+import Section from 'picocrank/vue/components/Section.vue'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon } from '@hugeicons/core-free-icons'
 
+const router = useRouter()
 const tableStructure = ref<GetTableStructureResponse | null>(null)
 
-const props = defineProps<{ tableId: string; fields?: Array<{ name: string; type: string }>; createButtonText?: string }>()
+// Foreign key lookup state
+const foreignKeys = ref<Array<{
+  constraintName: string
+  tableName: string
+  columnName: string
+  referencedTable: string
+  referencedColumn: string
+  onDeleteAction: string
+  onUpdateAction: string
+}>>([])
+
+const referencedTableData = ref<Record<string, any[]>>({})
+const loadingForeignKeys = ref(false)
+
+const props = defineProps<{
+  tableId: string;
+  fields?: Array<{ name: string; type: string }>;
+  createButtonText?: string;
+  items?: any[];
+  showToolbar?: boolean;
+  showPagination?: boolean;
+  title?: string;
+}>()
+
+const emit = defineEmits<{
+  'view-created': []
+}>()
+
+// View management state
+const tableViews = ref<Array<{ id: number; tableName: string; viewName: string; isDefault: boolean; columns: Array<{ columnName: string; isVisible: boolean; columnOrder: number; sortOrder: string }> }>>([])
+const selectedViewId = ref<number | null>(null)
+
+// Computed property for the current view
+const currentView = computed(() => {
+  return tableViews.value.find(view => view.id === selectedViewId.value) || null
+})
+// Find default view for this table, if any
+const defaultView = computed(() => tableViews.value.find(v => v.isDefault) || null)
+
+// Computed property for the section title
+const sectionTitle = computed(() => {
+  return props.title || `Table: ${props.tableId}`
+})
+
+// Computed property for view options (including default)
+const viewOptions = computed(() => {
+  const options = [...tableViews.value]
+  // Add a default option if no views exist or if we want to show "All Columns"
+  if (options.length === 0 || !options.some(v => v.isDefault)) {
+    options.unshift({
+      id: -1,
+      tableName: props.tableId,
+      viewName: 'All Columns',
+      isDefault: true,
+      columns: []
+    })
+  }
+  return options
+})
 
 type Item = Record<string, unknown>
 
@@ -21,10 +84,58 @@ const error = ref<string | null>(null)
 
 const localFields = ref<string[]>([])
 const localFieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
+
+// Watch for changes in currentView to update column configuration
+watch(
+  () => currentView.value,
+  (view) => {
+    if (view && view.columns.length > 0) {
+      // Use view configuration - include all visible columns as specified in the view
+      console.log('[Table] Applying view columns:', view.viewName, view.columns
+        .slice()
+        .sort((a, b) => a.columnOrder - b.columnOrder)
+        .map(c => ({ column: c.columnName, order: c.columnOrder, isVisible: c.isVisible, sort: c.sortOrder }))
+      )
+      const visibleColumns = view.columns
+        .filter(col => col.isVisible)
+        .sort((a, b) => a.columnOrder - b.columnOrder)
+        .map(col => col.columnName)
+
+      localFields.value = visibleColumns
+
+      // Apply initial sort from view if provided
+      const sortColumn = view.columns.find(c => c.sortOrder === 'asc' || c.sortOrder === 'desc')
+      if (sortColumn) {
+        sortBy.value = sortColumn.columnName
+        sortDir.value = (sortColumn.sortOrder === 'desc' ? 'desc' : 'asc')
+        console.log('[Table] Applied initial sort from view:', sortBy.value, sortDir.value)
+      } else {
+        // No sort specified by the view; leave any existing sort as-is
+        console.log('[Table] View provides no initial sort order')
+      }
+    } else if (props.fields && props.fields.length) {
+      // Fallback to all fields (default view) - include sr_created in default view
+      localFields.value = props.fields.map(x => x.name)
+    }
+  },
+  { immediate: true }
+)
+
 watch(
   () => props.fields,
   (f) => {
-    if (f && f.length) localFields.value = f.map(x => x.name)
+    if (f && f.length) {
+      localFieldDefs.value = f.map(field => ({
+        name: field.name,
+        type: field.type,
+        required: false
+      }))
+
+      // Only update localFields if no view is active
+      if (!currentView.value || currentView.value.columns.length === 0) {
+        localFields.value = f.map(x => x.name)
+      }
+    }
   },
   { immediate: true }
 )
@@ -34,14 +145,92 @@ async function loadStructure() {
   const names = defs.map(d => d.name)
   if (names.length) {
     localFieldDefs.value = defs
-    localFields.value = names
-    selectedColumns.value = [...names]
+
+    // Only set localFields if no view is active
+    if (!currentView.value || currentView.value.columns.length === 0) {
+      localFields.value = names
+      selectedColumns.value = [...names]
+    }
   }
 }
-const columns = computed(() => localFields.value.length ? localFields.value : ['id', 'created_at_unix'])
+
+async function loadTableViews() {
+  try {
+    const response = await client.getTableViews({ tableName: props.tableId })
+    tableViews.value = response.views.map(view => ({
+      id: view.id,
+      tableName: view.tableName,
+      viewName: view.viewName,
+      isDefault: view.isDefault,
+      columns: view.columns.map(col => ({
+        columnName: col.columnName,
+        isVisible: col.isVisible,
+        columnOrder: col.columnOrder,
+        sortOrder: col.sortOrder
+      }))
+    }))
+
+    // Select the default view or first view
+    const defaultView = tableViews.value.find(v => v.isDefault)
+    if (defaultView) {
+      selectedViewId.value = defaultView.id
+    } else if (tableViews.value.length > 0) {
+      selectedViewId.value = tableViews.value[0].id
+    } else {
+      // No views exist, use the default "All Columns" view
+      selectedViewId.value = -1
+    }
+  } catch (error) {
+    console.error('Failed to load table views:', error)
+    // Fallback to default view
+    selectedViewId.value = -1
+  }
+}
+
+function onViewChange() {
+  // This will trigger reactivity in the column configuration
+  const view = currentView.value
+  console.log('[Table] View changed to:', selectedViewId.value, view?.viewName)
+  if (view) {
+    const ordered = view.columns
+      .slice()
+      .sort((a, b) => a.columnOrder - b.columnOrder)
+      .map(c => ({ column: c.columnName, order: c.columnOrder, isVisible: c.isVisible, sort: c.sortOrder }))
+    console.log('[Table] View column order:', ordered)
+
+    // Apply sort from the selected view on change
+    const sortColumn = view.columns.find(c => c.sortOrder === 'asc' || c.sortOrder === 'desc')
+    if (sortColumn) {
+      sortBy.value = sortColumn.columnName
+      sortDir.value = (sortColumn.sortOrder === 'desc' ? 'desc' : 'asc')
+      console.log('[Table] Applied sort from changed view:', sortBy.value, sortDir.value)
+    }
+  }
+}
+
+function createTableView() {
+  router.push({ name: 'create-table-view', params: { tableName: props.tableId } })
+}
+
+function editTableView() {
+  if (currentView.value && currentView.value.id !== -1) {
+    router.push({
+      name: 'edit-table-view',
+      params: {
+        tableName: props.tableId,
+        viewId: currentView.value.id.toString()
+      }
+    })
+  }
+}
+const columns = computed(() => localFields.value.length ? localFields.value : ['id'])
 const selectedColumns = ref<string[]>([])
 watch(columns, (cols) => { selectedColumns.value = [...cols] }, { immediate: true })
-const visibleColumns = computed(() => selectedColumns.value.filter(c => columns.value.includes(c)))
+const visibleColumns = computed(() =>
+  columns.value
+    .filter(c => selectedColumns.value.includes(c))
+    .filter(c => getColumnType(c) !== 'unknown')
+)
 
 const sortBy = ref<string | null>(null)
 const sortDir = ref<'asc' | 'desc'>('asc')
@@ -55,19 +244,27 @@ function toggleSort(col: string) {
 }
 const sortedItems = computed(() => {
   const col = sortBy.value
-  if (!col) return items.value
+  const source = (props.items || items.value)
+  if (!col) return source
   const dir = sortDir.value === 'asc' ? 1 : -1
-  return [...items.value].sort((a, b) => {
-    const av = (a as any)[col]
-    const bv = (b as any)[col]
-    if (av == null && bv == null) return 0
-    if (av == null) return 1
-    if (bv == null) return -1
-    const an = typeof av === 'bigint' ? Number(av) : av
-    const bn = typeof bv === 'bigint' ? Number(bv) : bv
-    if (typeof an === 'number' && typeof bn === 'number') return (an - bn) * dir
-    const as = String(an)
-    const bs = String(bn)
+  return [...source].sort((a, b) => {
+    const avRaw = getItemValue(a, col)
+    const bvRaw = getItemValue(b, col)
+    if (avRaw == null && bvRaw == null) return 0
+    if (avRaw == null) return 1
+    if (bvRaw == null) return -1
+    // Normalize values for comparison
+    const av = typeof avRaw === 'bigint' ? Number(avRaw) : avRaw
+    const bv = typeof bvRaw === 'bigint' ? Number(bvRaw) : bvRaw
+    // Datetime: attempt numeric comparison if both numbers or parseable dates
+    if (isDatetimeColumn(col)) {
+      const an = typeof av === 'number' ? av : Date.parse(String(av))
+      const bn = typeof bv === 'number' ? bv : Date.parse(String(bv))
+      if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir
+    }
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
+    const as = String(av)
+    const bs = String(bv)
     return as.localeCompare(bs) * dir
   })
 })
@@ -80,6 +277,20 @@ watch([sortedItems, pageSize], () => { page.value = 1 })
 const pagedItems = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return sortedItems.value.slice(start, start + pageSize.value)
+})
+
+// Use passed items or load from API
+const displayItems = computed(() => {
+  return props.items || items.value
+})
+
+// Show toolbar and pagination based on props
+const showToolbar = computed(() => {
+  return props.showToolbar !== false // Default to true unless explicitly false
+})
+
+const showPagination = computed(() => {
+  return props.showPagination !== false // Default to true unless explicitly false
 })
 
 const selectedKeys = ref<Set<string>>(new Set())
@@ -96,9 +307,13 @@ const deleting = ref(false)
 
 // Helper function to get item value for a column, handling both standard and dynamic fields
 function getItemValue(item: any, column: string): any {
-  // Check standard fields first (only id and created_at_unix are static now)
-  if (column === 'id' || column === 'created_at_unix') {
+  // Check standard fields first (only id and sr_created are static now)
+  if (column === 'id') {
     return item[column]
+  }
+  if (column === 'sr_created') {
+    // The protobuf field sr_created becomes srCreated in TypeScript
+    return item.srCreated
   }
   // Check additional fields from protobuf (all other fields including name are dynamic)
   if (item.additionalFields && item.additionalFields[column] !== undefined) {
@@ -127,6 +342,89 @@ function toggleSelected(it: any, ev: Event) {
 const transport = createConnectTransport({ baseUrl: '/api' })
 const client = createClient(SickRock, transport)
 
+// Load foreign key information for the current table
+async function loadForeignKeys() {
+  try {
+    loadingForeignKeys.value = true
+    const response = await client.getForeignKeys({ tableName: props.tableId })
+    foreignKeys.value = response.foreignKeys.map(fk => ({
+      constraintName: fk.constraintName,
+      tableName: fk.tableName,
+      columnName: fk.columnName,
+      referencedTable: fk.referencedTable,
+      referencedColumn: fk.referencedColumn,
+      onDeleteAction: fk.onDeleteAction,
+      onUpdateAction: fk.onUpdateAction
+    }))
+
+    // Load referenced table data for each foreign key
+    await loadReferencedTableData()
+  } catch (err) {
+    console.error('Error loading foreign keys:', err)
+  } finally {
+    loadingForeignKeys.value = false
+  }
+}
+
+// Load data from referenced tables
+async function loadReferencedTableData() {
+  const data: Record<string, any[]> = {}
+
+  for (const fk of foreignKeys.value) {
+    try {
+      const response = await client.listItems({ pageId: fk.referencedTable })
+      data[fk.columnName] = response.items || []
+    } catch (err) {
+      console.error(`Error loading data for table ${fk.referencedTable}:`, err)
+      data[fk.columnName] = []
+    }
+  }
+
+  referencedTableData.value = data
+}
+
+// Check if a column is a foreign key
+function isForeignKey(columnName: string): boolean {
+  return foreignKeys.value.some(fk => fk.columnName === columnName)
+}
+
+// Get the foreign key info for a column
+function getForeignKeyInfo(columnName: string) {
+  return foreignKeys.value.find(fk => fk.columnName === columnName)
+}
+
+// Get the name field from a referenced item
+function getReferencedItemName(item: any): string {
+  if (!item) {
+    return 'Unknown'
+  }
+  if (item.name) {
+    return item.name
+  }
+  if (item.additionalFields && item.additionalFields.name) {
+    return item.additionalFields.name
+  }
+  return `ID: ${item.id}`
+}
+
+// Get the referenced item for a foreign key value
+function getReferencedItem(columnName: string, foreignKeyValue: any) {
+  const fkInfo = getForeignKeyInfo(columnName)
+  if (!fkInfo) {
+    console.log(`No foreign key info found for column: ${columnName}`)
+    return null
+  }
+
+  const referencedItems = referencedTableData.value[columnName] || []
+  const foundItem = referencedItems.find(item => String(item.id) === String(foreignKeyValue))
+
+  if (!foundItem) {
+    console.log(`Referenced item not found for column: ${columnName}, value: ${foreignKeyValue}, available items:`, referencedItems.map(item => ({ id: item.id, name: item.name || item.additionalFields?.name })))
+  }
+
+  return foundItem
+}
+
 async function load() {
   loading.value = true
   error.value = null
@@ -142,14 +440,30 @@ async function load() {
 
 // Inline editing functions
 function startEdit(item: any, column: string) {
-  // Don't allow editing of id or created_at_unix columns
-  if (column === 'id' || column === 'created_at_unix') {
+  // Don't allow editing of id, name, sr_created, or foreign key columns
+  if (column === 'id' || column === 'name' || column === 'sr_created' || isForeignKey(column)) {
     return
   }
 
   const currentValue = getItemValue(item, column)
   editingCell.value = { rowId: String(item.id), column }
-  editingValue.value = currentValue == null ? '' : String(currentValue)
+
+  // Handle datetime fields - convert ISO8601 to datetime-local format
+  if (isDatetimeColumn(column) && currentValue != null) {
+    try {
+      const date = new Date(currentValue)
+      if (!isNaN(date.getTime())) {
+        // Convert to YYYY-MM-DDTHH:MM format for datetime-local input
+        editingValue.value = date.toISOString().slice(0, 16)
+      } else {
+        editingValue.value = ''
+      }
+    } catch {
+      editingValue.value = ''
+    }
+  } else {
+    editingValue.value = currentValue == null ? '' : String(currentValue)
+  }
 
   // Focus the input after the DOM updates
   setTimeout(() => {
@@ -185,7 +499,28 @@ async function saveEdit(item: any) {
         })
       }
       // Update the specific field being edited
-      additionalFields[column] = editingValue.value
+      if (isDatetimeColumn(column)) {
+        // Convert datetime-local input to MySQL datetime format
+        try {
+          const date = new Date(editingValue.value)
+          if (!isNaN(date.getTime())) {
+            // Convert to MySQL datetime format: YYYY-MM-DD HH:MM:SS
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            const day = String(date.getDate()).padStart(2, '0')
+            const hours = String(date.getHours()).padStart(2, '0')
+            const minutes = String(date.getMinutes()).padStart(2, '0')
+            const seconds = String(date.getSeconds()).padStart(2, '0')
+            additionalFields[column] = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+          } else {
+            additionalFields[column] = editingValue.value
+          }
+        } catch {
+          additionalFields[column] = editingValue.value
+        }
+      } else {
+        additionalFields[column] = editingValue.value
+      }
 
       await client.editItem({
         id: rowId,
@@ -215,6 +550,26 @@ function isTinyintColumn(column: string): boolean {
   return field?.type.startsWith('tinyint')
 }
 
+// Helper function to check if a column is a datetime column
+function isDatetimeColumn(column: string): boolean {
+  const field = localFieldDefs.value.find(f => f.name === column)
+  return field?.type === 'datetime'
+}
+
+// Helper function to get the SQL datatype for a column
+function getColumnType(column: string): string {
+  const field = localFieldDefs.value.find(f => f.name === column)
+  if (field) {
+    return field.type
+  }
+
+  // Fallback for standard columns
+  if (column === 'id') return 'string'
+  if (column === 'sr_created') return 'datetime'
+
+  return 'unknown'
+}
+
 // Helper function to get boolean value from tinyint column
 function getBooleanValue(item: any, column: string): boolean {
   const value = getItemValue(item, column)
@@ -233,6 +588,8 @@ const selectedItems = computed(() => {
 })
 
 const hasSelectedItems = computed(() => selectedKeys.value.size > 0)
+const isAllSelected = computed(() => pagedItems.value.length > 0 && selectedKeys.value.size === pagedItems.value.length)
+const isIndeterminate = computed(() => selectedKeys.value.size > 0 && selectedKeys.value.size < pagedItems.value.length)
 
 async function deleteSelectedItems() {
   if (selectedItems.value.length === 0) return
@@ -283,16 +640,59 @@ function selectNone() {
   selectedKeys.value.clear()
 }
 
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectNone()
+  } else {
+    selectAll()
+  }
+}
+
 onMounted(load)
 onMounted(loadStructure)
+onMounted(loadTableViews)
+onMounted(loadForeignKeys)
 </script>
 
 <template>
-  <section class="with-header-and-content">
-    <div class="section-header">
-      <h2 class="table-title">{{ tableId }}</h2>
-      <button @click="load" :disabled="loading">Reload</button>
-    </div>
+  <Section :title="sectionTitle" :padding="false">
+    <template v-if="showToolbar" #toolbar>
+      <div class="toolbar-group">
+        <div class="view-selector">
+          <label for="view-select">View:</label>
+          <select
+            id="view-select"
+            v-model="selectedViewId"
+            @change="onViewChange"
+            class="view-dropdown"
+          >
+            <option
+              v-for="view in viewOptions"
+              :key="view.id"
+              :value="view.id"
+            >
+              {{ view.viewName }}
+            </option>
+          </select>
+        </div>
+        <button
+          v-if="currentView && currentView.id !== -1"
+          @click="editTableView"
+          class="button neutral"
+        >
+          <HugeiconsIcon :icon="Edit03Icon" />
+          Edit View
+        </button>
+        <button @click="createTableView" class="button neutral">
+          <HugeiconsIcon :icon="ViewIcon" />
+          Create View
+        </button>
+        <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
+        <router-link :to="`/table/${props.tableId}/insert-row`" class="button neutral">
+          {{ tableStructure?.CreateButtonText ?? 'Insert row' }}
+        </router-link>
+      </div>
+    </template>
     <div v-if="error" class="error">{{ error }}</div>
     <div v-else-if="loading">Loading…</div>
     <div v-else-if="items.length === 0" class="empty-state">
@@ -300,54 +700,50 @@ onMounted(loadStructure)
         <div class="empty-state-icon">📋</div>
         <h3>No items in this table</h3>
         <p>This table is empty. Get started by adding your first item.</p>
-        <router-link class="button primary" :to="`/table/${props.tableId}/insert-row`">
+        <router-link class="button" :to="`/table/${props.tableId}/insert-row`">
           ➕ Insert First Item
         </router-link>
         <div class="empty-state-actions">
-          <router-link class="button secondary" :to="`/table/${props.tableId}/add-column`">
+          <router-link class="button" :to="`/table/${props.tableId}/add-column`">
             Add Column
-          </router-link>
-          <router-link class="button secondary" :to="`/table/${props.tableId}/calendar`">
-            Calendar View
           </router-link>
         </div>
       </div>
     </div>
     <div v-else class="section-content">
-      <div role="toolbar" class = "padding" v-if = "tableStructure">
-        <router-link class="button" :to="`/table/${props.tableId}/insert-row`">{{ tableStructure.CreateButtonText ?? 'Insert row' }}</router-link>
-        <router-link class="button" :to="`/table/${props.tableId}/add-column`">Add column</router-link>
-        <router-link class="button" :to="`/table/${props.tableId}/calendar`">Calendar view</router-link>
-        <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
-
-        <!-- Selection controls -->
-        <div v-if="pagedItems.length > 0" class="selection-controls">
-          <button @click="selectAll" class="button small">Select All</button>
-          <button @click="selectNone" class="button small">Select None</button>
-          <button
-            v-if="hasSelectedItems"
-            @click="confirmDeleteSelected"
-            class="button small delete-button"
-            :disabled="deleting"
-          >
-            🗑️ Delete Selected ({{ selectedKeys.size }})
-          </button>
-        </div>
+      <!-- Selection controls -->
+      <div v-if="pagedItems.length > 0 && hasSelectedItems" class="selection-controls padding">
+        <button
+          @click="confirmDeleteSelected"
+          class="button delete-button"
+          :disabled="deleting"
+        >
+          🗑️ Delete Selected ({{ selectedKeys.size }})
+        </button>
       </div>
       <table class="table row-hover">
         <thead>
           <tr>
-            <th></th>
-            <th v-for="col in visibleColumns" :key="col" @click="toggleSort(col)">
+            <th class="small">
+              <input
+                type="checkbox"
+                :checked="isAllSelected"
+                :indeterminate="isIndeterminate"
+                @change="toggleSelectAll"
+              />
+            </th>
+            <th v-for="col in visibleColumns" :key="col" @click="toggleSort(col)" :title="getColumnType(col)" :class="{ small: col === 'id' }">
               {{ col }}<span v-if="sortBy === col"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
-            <th></th>
+            <th>
+              <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
+            </th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="it in pagedItems" :key="String((it as any).id ?? Math.random())"
             :class="{ selected: isSelected(it) }">
-            <td>
+            <td class = "small">
               <input type="checkbox" :checked="isSelected(it)" @change="(e) => toggleSelected(it, e)" />
             </td>
             <td v-for="col in visibleColumns" :key="col">
@@ -362,6 +758,18 @@ onMounted(loadStructure)
                   :disabled="saving"
                   class="edit-checkbox"
                 />
+                <!-- Datetime input for datetime columns -->
+                <input
+                  v-else-if="isDatetimeColumn(col)"
+                  type="datetime-local"
+                  v-model="editingValue"
+                  @keyup.enter="saveEdit(it)"
+                  @keyup.escape="cancelEdit"
+                  @blur="saveEdit(it)"
+                  :disabled="saving"
+                  class="edit-input"
+                  ref="editInput"
+                />
                 <!-- Text input for other columns -->
                 <input
                   v-else
@@ -375,16 +783,31 @@ onMounted(loadStructure)
                 />
               </div>
               <!-- Display values -->
-              <div v-else @click="startEdit(it, col)" class="cell-content" :class="{ 'editable': col !== 'id' && col !== 'created_at_unix' }">
-                <span v-if="col === 'created_at_unix' && getItemValue(it, col) != null">{{ new Date(Number(getItemValue(it, col)) *
-                  1000).toLocaleString() }}</span>
+              <div v-else @click="startEdit(it, col)" class="cell-content" :class="{ 'editable': col !== 'id' && col !== 'name' && col !== 'sr_created' && !isForeignKey(col) }">
+                <span v-if="col === 'sr_created' && getItemValue(it, col) != null">{{ new Date(Number(getItemValue(it, col)) * 1000).toLocaleString() }}</span>
                 <span v-else-if="col === 'id'">
                   <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
+                </span>
+                <span v-else-if="col === 'name'">
+                  <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
+                </span>
+                <span v-else-if="isForeignKey(col) && getItemValue(it, col) != null">
+                  <template v-if="getReferencedItem(col, getItemValue(it, col))">
+                    <router-link :to="`/table/${getForeignKeyInfo(col)?.referencedTable}/${getItemValue(it, col)}`">
+                      {{ getReferencedItemName(getReferencedItem(col, getItemValue(it, col))) }}
+                    </router-link>
+                  </template>
+                  <template v-else>
+                    {{ getItemValue(it, col) }}
+                  </template>
                 </span>
                 <span v-else-if="getItemValue(it, col) == null" class="subtle">NULL</span>
                 <span v-else-if="isTinyintColumn(col)" class="boolean-display">
                   <span v-if="getBooleanValue(it, col)" class="boolean-true">✓</span>
                   <span v-else class="boolean-false">✗</span>
+                </span>
+                <span v-else-if="isDatetimeColumn(col) && getItemValue(it, col) != null">
+                  {{ new Date(getItemValue(it, col)).toLocaleString() }}
                 </span>
                 <span v-else>{{ getItemValue(it, col) }}</span>
               </div>
@@ -395,7 +818,7 @@ onMounted(loadStructure)
           </tr>
         </tbody>
       </table>
-	  <div class = "padding">
+	  <div v-if="showPagination" class = "padding">
 		  <Pagination :total="total" v-model:page="page" v-model:page-size="pageSize" />
 	  </div>
     </div>
@@ -415,10 +838,51 @@ onMounted(loadStructure)
         </div>
       </div>
     </div>
-  </section>
+  </Section>
 </template>
 
 <style scoped>
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.view-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.view-selector label {
+  font-weight: 600;
+  color: #333;
+}
+
+.view-dropdown {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 1rem;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.view-dropdown:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.section-header .button {
+  background: #fff;
+}
+
+.section-header .button:hover {
+  background: #c9ccd4;
+}
+
 .cell-content {
   min-height: 1.5em;
   padding: 0.25rem;
@@ -697,52 +1161,16 @@ onMounted(loadStructure)
   margin-top: 1.5rem;
 }
 
-.button.primary {
-  background: #007bff;
-  color: white;
-  text-decoration: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.button.primary:hover {
-  background: #0056b3;
-  color: white;
-  text-decoration: none;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-}
-
-.button.secondary {
-  background: #6c757d;
-  color: white;
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.button.secondary:hover {
-  background: #545b62;
-  color: white;
-  text-decoration: none;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(108, 117, 125, 0.3);
-}
-
 .button:active {
   transform: translateY(0);
+}
+
+.small {
+  width: 1rem;
+}
+
+.small input {
+  width: 1rem;
 }
 
 /* Responsive design for selection controls */
@@ -785,4 +1213,12 @@ onMounted(loadStructure)
     max-width: 250px;
   }
 }
+
+.insert-toolbar {
+  display: flex;
+  align-items: center;
+}
+
+.fg1 { flex-grow: 1 }
+
 </style>

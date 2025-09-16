@@ -34,6 +34,7 @@ message Page {
   string slug = 3;
   int32 ordinal = 4;
   string icon = 5;
+  string view = 6;
 }
 
 message GetPagesResponse {
@@ -43,7 +44,7 @@ message GetPagesResponse {
 // Items
 message Item {
   string id = 1;
-  int64 created_at_unix = 2;
+  int64 sr_created = 2;
   map<string, string> additional_fields = 3;
 }
 
@@ -57,7 +58,7 @@ message ListItemsResponse {
 
 message CreateItemRequest {
   string page_id = 1;
-  int64 created_at_unix = 2; // Optional custom timestamp
+  int64 sr_created = 2; // Optional custom timestamp
   map<string, string> additional_fields = 3;
 }
 
@@ -107,11 +108,145 @@ message Field {
 message GetTableStructureResponse {
   repeated Field fields = 1;
   string CreateButtonText = 2;
+  string view = 3;
 }
 
 message AddTableColumnRequest {
   string page_id = 1;
   Field field = 2;
+}
+
+// Table Views
+message TableViewColumn {
+  string column_name = 1;
+  bool is_visible = 2;
+  int32 column_order = 3;
+  string sort_order = 4; // "asc", "desc", or empty
+}
+
+message CreateTableViewRequest {
+  string table_name = 1;
+  string view_name = 2;
+  repeated TableViewColumn columns = 3;
+}
+
+message CreateTableViewResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UpdateTableViewRequest {
+  int32 view_id = 1;
+  string table_name = 2;
+  string view_name = 3;
+  repeated TableViewColumn columns = 4;
+}
+
+message UpdateTableViewResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetTableViewsRequest {
+  string table_name = 1;
+}
+
+message TableView {
+  int32 id = 1;
+  string table_name = 2;
+  string view_name = 3;
+  bool is_default = 4;
+  repeated TableViewColumn columns = 5;
+}
+
+message GetTableViewsResponse {
+  repeated TableView views = 1;
+}
+
+message DeleteTableViewRequest {
+  int32 view_id = 1;
+}
+
+message DeleteTableViewResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Foreign Key Management
+message ForeignKey {
+  string constraint_name = 1;
+  string table_name = 2;
+  string column_name = 3;
+  string referenced_table = 4;
+  string referenced_column = 5;
+  string on_delete_action = 6;
+  string on_update_action = 7;
+}
+
+message CreateForeignKeyRequest {
+  string table_name = 1;
+  string column_name = 2;
+  string referenced_table = 3;
+  string referenced_column = 4;
+  string on_delete_action = 5; // "CASCADE", "SET NULL", "RESTRICT", "NO ACTION"
+  string on_update_action = 6; // "CASCADE", "SET NULL", "RESTRICT", "NO ACTION"
+}
+
+message CreateForeignKeyResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetForeignKeysRequest {
+  string table_name = 1;
+}
+
+message GetForeignKeysResponse {
+  repeated ForeignKey foreign_keys = 1;
+}
+
+message DeleteForeignKeyRequest {
+  string constraint_name = 1;
+}
+
+message DeleteForeignKeyResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Column Type Management
+message ChangeColumnTypeRequest {
+  string table_name = 1;
+  string column_name = 2;
+  string new_type = 3;
+}
+
+message ChangeColumnTypeResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Drop Column Management
+message DropColumnRequest {
+  string table_name = 1;
+  string column_name = 2;
+}
+
+message DropColumnResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Rename Column Management
+message ChangeColumnNameRequest {
+  string table_name = 1;
+  string old_column_name = 2;
+  string new_column_name = 3;
+}
+
+message ChangeColumnNameResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 // Build info
@@ -145,4 +280,20 @@ service SickRock {
 
   // Add a column to a table
   rpc AddTableColumn(AddTableColumnRequest) returns (GetTableStructureResponse);
+
+  // Table Views
+  rpc CreateTableView(CreateTableViewRequest) returns (CreateTableViewResponse);
+  rpc UpdateTableView(UpdateTableViewRequest) returns (UpdateTableViewResponse);
+  rpc GetTableViews(GetTableViewsRequest) returns (GetTableViewsResponse);
+  rpc DeleteTableView(DeleteTableViewRequest) returns (DeleteTableViewResponse);
+
+  // Foreign Key Management
+  rpc CreateForeignKey(CreateForeignKeyRequest) returns (CreateForeignKeyResponse);
+  rpc GetForeignKeys(GetForeignKeysRequest) returns (GetForeignKeysResponse);
+  rpc DeleteForeignKey(DeleteForeignKeyRequest) returns (DeleteForeignKeyResponse);
+
+  // Column Type Management
+  rpc ChangeColumnType(ChangeColumnTypeRequest) returns (ChangeColumnTypeResponse);
+  rpc DropColumn(DropColumnRequest) returns (DropColumnResponse);
+  rpc ChangeColumnName(ChangeColumnNameRequest) returns (ChangeColumnNameResponse);
 }

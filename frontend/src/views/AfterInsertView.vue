@@ -7,9 +7,24 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableName as string
 
+// Check if this is from column addition or row insertion based on the referrer
+const isFromColumnAddition = ref(false)
+
+onMounted(() => {
+  // Check if we came from add-column route
+  if (document.referrer.includes('/add-column')) {
+    isFromColumnAddition.value = true
+  }
+})
+
 function insertAnother() {
-  // Navigate to insert row view with the same table
-  router.push({ name: 'insert-row', params: { tableName: tableId } })
+  if (isFromColumnAddition.value) {
+    // Navigate to add column view
+    router.push({ name: 'add-column', params: { tableName: tableId } })
+  } else {
+    // Navigate to insert row view with the same table
+    router.push({ name: 'insert-row', params: { tableName: tableId } })
+  }
 }
 
 function returnToTable() {
@@ -19,18 +34,18 @@ function returnToTable() {
 </script>
 
 <template>
-  <Section title="Row Added Successfully">
+  <Section :title="isFromColumnAddition ? 'Column Added Successfully' : 'Row Added Successfully'">
     <div class="success-message">
-      <h3>✅ Row added successfully!</h3>
+      <h3>{{ isFromColumnAddition ? '✅ Column added successfully!' : '✅ Row added successfully!' }}</h3>
       <p>What would you like to do next?</p>
     </div>
 
     <div class="action-buttons">
-      <button @click="insertAnother" class="button primary">
-        ➕ Insert Another Row
-      </button>
-      <button @click="returnToTable" class="button secondary">
+      <button @click="returnToTable" class="button neutral">
         📋 Return to Table
+      </button>
+      <button @click="insertAnother" class="button neutral">
+        {{ isFromColumnAddition ? '➕ Add Another Column' : '➕ Insert Another Row' }}
       </button>
     </div>
   </Section>
@@ -59,48 +74,6 @@ function returnToTable() {
   gap: 1rem;
   justify-content: center;
   flex-wrap: wrap;
-}
-
-.button {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-width: 180px;
-  justify-content: center;
-}
-
-.button.primary {
-  background-color: #007bff;
-  color: white;
-}
-
-.button.primary:hover {
-  background-color: #0056b3;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.3);
-}
-
-.button.secondary {
-  background-color: #6c757d;
-  color: white;
-}
-
-.button.secondary:hover {
-  background-color: #545b62;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(108, 117, 125, 0.3);
-}
-
-.button:active {
-  transform: translateY(0);
 }
 
 @media (max-width: 768px) {

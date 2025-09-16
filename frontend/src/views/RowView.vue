@@ -4,6 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { createClient } from '@connectrpc/connect'
 import { SickRock } from '../gen/sickrock_pb'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ArrowLeft01Icon, Edit01Icon, Delete01Icon } from '@hugeicons/core-free-icons'
+import Table from '../components/Table.vue'
+import Section from 'picocrank/vue/components/Section.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,12 +23,136 @@ const error = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
 
+// Foreign key and related rows state
+const foreignKeys = ref<Array<{
+  constraintName: string
+  tableName: string
+  columnName: string
+  referencedTable: string
+  referencedColumn: string
+  onDeleteAction: string
+  onUpdateAction: string
+}>>([])
+const relatedRows = ref<Record<string, any[]>>({})
+const loadingRelated = ref(false)
+
+// Load foreign keys for the current table
+async function loadForeignKeys() {
+  try {
+    const response = await client.getForeignKeys({ tableName })
+    foreignKeys.value = response.foreignKeys.map(fk => ({
+      constraintName: fk.constraintName,
+      tableName: fk.tableName,
+      columnName: fk.columnName,
+      referencedTable: fk.referencedTable,
+      referencedColumn: fk.referencedColumn,
+      onDeleteAction: fk.onDeleteAction,
+      onUpdateAction: fk.onUpdateAction
+    }))
+    console.log('Loaded foreign keys for table:', tableName, foreignKeys.value)
+  } catch (err) {
+    console.error('Error loading foreign keys:', err)
+  }
+}
+
+// Load related rows based on foreign key relationships (bidirectional)
+async function loadRelatedRows() {
+  if (!item.value || foreignKeys.value.length === 0) {
+    console.log('No item or foreign keys:', { item: item.value, foreignKeys: foreignKeys.value })
+    return
+  }
+
+  loadingRelated.value = true
+  try {
+    const relatedData: Record<string, any[]> = {}
+    console.log('Loading related rows for item:', item.value)
+    console.log('Item value keys:', Object.keys(item.value))
+
+    for (const fk of foreignKeys.value) {
+      console.log('Processing foreign key:', fk)
+      // Direction 1: Find rows in the referencing table that point to the current row
+      // (e.g., tasks that reference this task_list)
+      const referencedValue = item.value[fk.referencedColumn]
+      console.log(`Direction 1 - Looking for ${fk.referencedColumn} = ${referencedValue} in table ${fk.tableName}`)
+
+      try {
+        // Get all items from the referencing table
+        const response = await client.listItems({ pageId: fk.tableName })
+        const allItems = response.items || []
+        console.log(`Loaded ${allItems.length} items from ${fk.tableName}`)
+        if (allItems.length > 0) {
+          console.log('Sample item structure:', allItems[0])
+        }
+
+        // Filter items where the foreign key column matches the referenced value
+        const matchingItems = referencedValue !== null && referencedValue !== undefined
+          ? allItems.filter((row: any) => {
+              // Check both top-level fields and additionalFields
+              const fkValue = row[fk.columnName] || (row.additionalFields && row.additionalFields[fk.columnName])
+              return fkValue !== null && fkValue !== undefined && String(fkValue) === String(referencedValue)
+            })
+          : []
+        console.log(`Found ${matchingItems.length} matching items in ${fk.tableName}`)
+
+        // Always include the table, even if it has 0 matching rows
+        relatedData[`${fk.tableName}.${fk.columnName}`] = matchingItems
+      } catch (err) {
+        console.error(`Error loading related rows for ${fk.tableName}:`, err)
+        relatedData[`${fk.tableName}.${fk.columnName}`] = []
+      }
+
+      // Direction 2: Find rows in the referenced table that this row points to
+      // (e.g., task_list that this task references)
+      // Only process if the current table is the referencing table (has the foreign key column)
+      const currentValue = item.value[fk.columnName] || (item.value.additionalFields && item.value.additionalFields[fk.columnName])
+      console.log(`Direction 2 - Looking for ${fk.columnName} = ${currentValue} in table ${fk.referencedTable}`)
+
+      if (currentValue !== null && currentValue !== undefined) {
+        try {
+          // Get all items from the referenced table
+          const response = await client.listItems({ pageId: fk.referencedTable })
+          const allItems = response.items || []
+
+          // Filter items where the referenced column matches the current value
+          const matchingItems = allItems.filter((row: any) => {
+            // Check both top-level fields and additionalFields
+            const refValue = row[fk.referencedColumn] || (row.additionalFields && row.additionalFields[fk.referencedColumn])
+            return refValue !== null && refValue !== undefined && String(refValue) === String(currentValue)
+          })
+
+          // Add the referenced table with matching rows
+          relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = matchingItems
+        } catch (err) {
+          console.error(`Error loading referenced rows for ${fk.referencedTable}:`, err)
+          relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = []
+        }
+      } else {
+        // Include empty array for referenced table even if current value is null
+        relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = []
+      }
+    }
+
+    console.log('Final related data:', relatedData)
+    relatedRows.value = relatedData
+  } catch (err) {
+    console.error('Error loading related rows:', err)
+  } finally {
+    loadingRelated.value = false
+  }
+}
+
 onMounted(async () => {
   loading.value = true
   try {
     const res = await client.listItems({ pageId: tableName })
     const found = (res.items as any[] | undefined)?.find((it) => String(it.id) === String(rowId))
     item.value = found ?? null
+
+    // Load foreign keys and related rows after getting the main item
+    if (item.value) {
+      await loadForeignKeys()
+      await loadRelatedRows()
+    }
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -35,7 +163,15 @@ onMounted(async () => {
 const entries = computed(() => {
   if (!item.value) return []
 
-  return Object.entries(item.value).map(([key, value]) => {
+  const entries: Array<[string, any, string]> = []
+
+  // Handle regular fields (id, srCreated, etc.)
+  for (const [key, value] of Object.entries(item.value)) {
+    // Skip additionalFields - we'll handle it separately
+    if (key === 'additionalFields') continue
+    // Remove internal/system fields
+    if (key === '$typeName') continue
+
     let displayValue = value
     let valueClass = ''
 
@@ -53,9 +189,93 @@ const entries = computed(() => {
       valueClass = value ? 'boolean-true' : 'boolean-false'
     }
 
-    return [key, displayValue, valueClass]
-  })
+    entries.push([key, displayValue, valueClass])
+  }
+
+  // Handle additionalFields by flattening them
+  if (item.value.additionalFields && typeof item.value.additionalFields === 'object') {
+    for (const [key, value] of Object.entries(item.value.additionalFields)) {
+      // Remove internal/system fields
+      if (key === '$typeName') continue
+      let displayValue = value
+      let valueClass = ''
+
+      // Handle different data types for additional fields
+      if (value === null || value === undefined || value === '') {
+        displayValue = '(empty)'
+        valueClass = 'empty'
+      } else if (typeof value === 'string') {
+        // Try to detect if it's a JSON string
+        try {
+          const parsed = JSON.parse(value)
+          if (typeof parsed === 'object' && parsed !== null) {
+            displayValue = JSON.stringify(parsed, null, 2)
+            valueClass = 'json'
+          } else {
+            displayValue = value
+          }
+        } catch {
+          // Not JSON, treat as regular string
+          displayValue = value
+        }
+      } else {
+        displayValue = String(value)
+      }
+
+      entries.push([key, displayValue, valueClass])
+    }
+  }
+
+  return entries
 })
+
+// Computed property to format related tables data for display
+const relatedTables = computed(() => {
+  const tables: Array<{
+    tableName: string
+    columnName: string
+    rows: any[]
+    title: string
+    direction: 'referencing' | 'referenced'
+  }> = []
+
+  for (const [key, rows] of Object.entries(relatedRows.value)) {
+    const [tableName, columnName] = key.split('.')
+
+    // Determine the direction based on the foreign key relationship
+    const fk = foreignKeys.value.find(fk =>
+      (fk.tableName === tableName && fk.columnName === columnName) ||
+      (fk.referencedTable === tableName && fk.referencedColumn === columnName)
+    )
+
+    const direction = fk && fk.tableName === tableName ? 'referencing' : 'referenced'
+
+    // Create a descriptive title based on direction
+    const rowCount = `${rows.length} related row${rows.length !== 1 ? 's' : ''}`
+    let title = `${tableName} (${rowCount})`
+
+    if (direction === 'referencing') {
+      // Rows in this table that reference the current row
+      title = `${tableName} (${rowCount})`
+    } else {
+      // Rows in this table that the current row references
+      title = `${tableName} (${rowCount})`
+    }
+
+    tables.push({
+      tableName,
+      columnName,
+      rows,
+      title,
+      direction
+    })
+  }
+
+  return tables
+})
+
+// Section title matching Table component style
+const sectionTitle = computed(() => `Table: ${tableName}`)
 
 async function deleteItem() {
   deleting.value = true
@@ -82,44 +302,72 @@ function cancelDelete() {
 </script>
 
 <template>
-  <section class="with-header-and-content">
-    <div class="section-header">
-      <h2>Row {{ rowId }}</h2>
-      <div class="header-actions">
-        <router-link
-          :to="`/table/${tableName}`"
-          class="button back-button"
-        >
-          ← Back to Table
-        </router-link>
-        <router-link
-          :to="`/table/${tableName}/${rowId}/edit`"
-          class="button edit-button"
-        >
-          ✏️ Edit Row
-        </router-link>
-        <button
-          @click="confirmDelete"
-          class="button delete-button"
-          :disabled="deleting"
-        >
-          🗑️ Delete Row
-        </button>
+  <div>
+    <!-- Main Row Section -->
+    <section class="with-header-and-content">
+      <div class="section-header">
+        <h2>{{ sectionTitle }}</h2>
+        <div class="header-actions">
+          <router-link
+            :to="`/table/${tableName}`"
+            class="button back-button"
+          >
+            <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
+            Back to Table
+          </router-link>
+          <router-link
+            :to="`/table/${tableName}/${rowId}/edit`"
+            class="button neutral"
+          >
+            <HugeiconsIcon :icon="Edit01Icon" width="16" height="16" />
+            Edit Row
+          </router-link>
+          <button
+            @click="confirmDelete"
+            class="button bad"
+            :disabled="deleting"
+          >
+            <HugeiconsIcon :icon="Delete01Icon" width="16" height="16" />
+            Delete Row
+          </button>
+        </div>
       </div>
-    </div>
-    <div class="section-content padding">
-      <div v-if="error">{{ error }}</div>
-      <div v-else-if="loading">Loading…</div>
-      <dl v-else-if="entries.length > 0">
-        <template v-for="[k, v, valueClass] in entries" :key="k">
-          <dt>{{ k }}</dt>
-          <dd :class="valueClass">{{ v }}</dd>
-        </template>
-      </dl>
-      <div v-else class="no-data">
-        <p>No data available for this row.</p>
+      <div class="section-content padding">
+        <div v-if="error">{{ error }}</div>
+        <div v-else-if="loading">Loading…</div>
+        <dl v-else-if="entries.length > 0">
+          <template v-for="[k, v, valueClass] in entries" :key="k">
+            <dt>{{ k }}</dt>
+            <dd :class="valueClass">{{ v }}</dd>
+          </template>
+        </dl>
+        <div v-else class="no-data">
+          <p>No data available for this row.</p>
+        </div>
       </div>
-    </div>
+    </section>
+
+    <!-- Related Tables as Top-Level Sections -->
+    <template v-if="foreignKeys.length > 0">
+      <template v-for="table in relatedTables" :key="`${table.tableName}.${table.columnName}`">
+          <Section v-if="loadingRelated" class="loading-related">
+            Loading related rows...
+          </Section>
+          <div v-else-if="table.rows.length > 0">
+            <Table
+              :title="table.title"
+              :table-id="table.tableName"
+              :items="table.rows"
+              :show-toolbar="false"
+              :show-pagination="false"
+
+            />
+          </div>
+          <Section v-else :title="table.title">
+            <p>No related rows found in this table.</p>
+          </Section>
+      </template>
+    </template>
 
     <!-- Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDelete">
@@ -130,13 +378,13 @@ function cancelDelete() {
           <button @click="cancelDelete" class="button cancel-button" :disabled="deleting">
             Cancel
           </button>
-          <button @click="deleteItem" class="button confirm-delete-button" :disabled="deleting">
+          <button @click="deleteItem" class="button bad" :disabled="deleting">
             {{ deleting ? 'Deleting...' : 'Delete' }}
           </button>
         </div>
       </div>
     </div>
-  </section>
+  </div>
 </template>
 
 <style scoped>
@@ -155,83 +403,6 @@ function cancelDelete() {
   display: flex;
   gap: 0.5rem;
   align-items: center;
-}
-
-.edit-button {
-  background: #007bff;
-  color: white;
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
-  border: none;
-  cursor: pointer;
-}
-
-.edit-button:hover {
-  background: #0056b3;
-  color: white;
-  text-decoration: none;
-}
-
-.edit-button:focus {
-  outline: 2px solid #007bff;
-  outline-offset: 2px;
-}
-
-.back-button {
-  background: #6c757d;
-  color: white;
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
-  border: none;
-  cursor: pointer;
-}
-
-.back-button:hover {
-  background: #545b62;
-  color: white;
-  text-decoration: none;
-}
-
-.back-button:focus {
-  outline: 2px solid #6c757d;
-  outline-offset: 2px;
-}
-
-.delete-button {
-  background: #dc3545;
-  color: white;
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: background-color 0.2s;
-  border: none;
-  cursor: pointer;
-}
-
-.delete-button:hover:not(:disabled) {
-  background: #c82333;
-  color: white;
-}
-
-.delete-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.delete-button:focus {
-  outline: 2px solid #dc3545;
-  outline-offset: 2px;
 }
 
 /* Responsive design */
@@ -310,28 +481,6 @@ function cancelDelete() {
   cursor: not-allowed;
 }
 
-.confirm-delete-button {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.confirm-delete-button:hover:not(:disabled) {
-  background: #c82333;
-}
-
-.confirm-delete-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 @media (max-width: 768px) {
   .modal-actions {
     flex-direction: column;
@@ -341,4 +490,19 @@ function cancelDelete() {
     width: 100%;
   }
 }
+
+.loading-related {
+  text-align: center;
+  padding: 2rem;
+  color: #666;
+  font-style: italic;
+}
+
+.empty-related-table {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+}
+
 </style>

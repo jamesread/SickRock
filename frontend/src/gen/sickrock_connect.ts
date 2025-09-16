@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, CreateItemRequest, CreateItemResponse, DeleteItemRequest, DeleteItemResponse, EditItemRequest, EditItemResponse, GetItemRequest, GetItemResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetPagesRequest, GetPagesResponse, GetTableStructureRequest, GetTableStructureResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, PingRequest, PingResponse } from "./sickrock_pb.js";
+import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableViewRequest, CreateTableViewResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetPagesRequest, GetPagesResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, PingRequest, PingResponse, UpdateTableViewRequest, UpdateTableViewResponse } from "./sickrock_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -119,6 +119,102 @@ export const SickRock = {
       name: "AddTableColumn",
       I: AddTableColumnRequest,
       O: GetTableStructureResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Table Views
+     *
+     * @generated from rpc sickrock.SickRock.CreateTableView
+     */
+    createTableView: {
+      name: "CreateTableView",
+      I: CreateTableViewRequest,
+      O: CreateTableViewResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.UpdateTableView
+     */
+    updateTableView: {
+      name: "UpdateTableView",
+      I: UpdateTableViewRequest,
+      O: UpdateTableViewResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetTableViews
+     */
+    getTableViews: {
+      name: "GetTableViews",
+      I: GetTableViewsRequest,
+      O: GetTableViewsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.DeleteTableView
+     */
+    deleteTableView: {
+      name: "DeleteTableView",
+      I: DeleteTableViewRequest,
+      O: DeleteTableViewResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Foreign Key Management
+     *
+     * @generated from rpc sickrock.SickRock.CreateForeignKey
+     */
+    createForeignKey: {
+      name: "CreateForeignKey",
+      I: CreateForeignKeyRequest,
+      O: CreateForeignKeyResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetForeignKeys
+     */
+    getForeignKeys: {
+      name: "GetForeignKeys",
+      I: GetForeignKeysRequest,
+      O: GetForeignKeysResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.DeleteForeignKey
+     */
+    deleteForeignKey: {
+      name: "DeleteForeignKey",
+      I: DeleteForeignKeyRequest,
+      O: DeleteForeignKeyResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Column Type Management
+     *
+     * @generated from rpc sickrock.SickRock.ChangeColumnType
+     */
+    changeColumnType: {
+      name: "ChangeColumnType",
+      I: ChangeColumnTypeRequest,
+      O: ChangeColumnTypeResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.DropColumn
+     */
+    dropColumn: {
+      name: "DropColumn",
+      I: DropColumnRequest,
+      O: DropColumnResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ChangeColumnName
+     */
+    changeColumnName: {
+      name: "ChangeColumnName",
+      I: ChangeColumnNameRequest,
+      O: ChangeColumnNameResponse,
       kind: MethodKind.Unary,
     },
   }

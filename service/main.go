@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"time"
 
 	"net/http"
 	"path/filepath"
@@ -131,13 +132,41 @@ func findFrontendDir() string {
 	return dir
 }
 
+// Custom Gin logger middleware that uses logrus
+func ginLogrusLogger() gin.HandlerFunc {
+	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		// Use logrus to log the request
+		log.WithFields(log.Fields{
+			"status":     param.StatusCode,
+			"method":     param.Method,
+			"path":       param.Path,
+			"ip":         param.ClientIP,
+			"user_agent": param.Request.UserAgent(),
+			"latency":    param.Latency,
+			"time":       param.TimeStamp.Format(time.RFC3339),
+		}).Debug("HTTP Request")
+
+		// Return empty string since we're using logrus directly
+		return ""
+	})
+}
+
 func main() {
 	log.Info("SickRock is starting up...")
 
 	loadEnvFile()
 	configureLogging()
 
-	router := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+
+	// Create router without default middleware
+	router := gin.New()
+
+	// Add custom logrus logger middleware
+	router.Use(ginLogrusLogger())
+
+	// Add recovery middleware
+	router.Use(gin.Recovery())
 
 	// ConnectRPC service mounted under /api
 	db, err := repo.OpenFromEnv("file:../tmp/sickrock.db?_pragma=foreign_keys(1)")
@@ -150,38 +179,6 @@ func main() {
 	r := repo.NewRepository(db)
 	if err := r.EnsureSchema(context.Background()); err != nil {
 		log.Fatalf("schema: %v", err)
-	}
-
-	_ = r.InsertTableConfiguration(context.Background(), "computers")
-	_ = r.InsertTableConfiguration(context.Background(), "contacts")
-
-	// Seed dummy data for demo tables if empty
-	seed := map[string][]string{
-		"computers": {"MacBook Pro", "ThinkPad X1"},
-		"contacts":  {"Alice Johnson", "Bob Smith"},
-	}
-	for table, names := range seed {
-		if err := r.EnsureSchemaForTable(context.Background(), table); err != nil {
-			log.Fatalf("ensure schema %s: %v", table, err)
-		}
-
-		// Add a test column to demonstrate additional fields
-		if err := r.AddColumn(context.Background(), table, repo.FieldSpec{Name: "description", Type: "string", Required: false}); err != nil {
-			log.Warnf("failed to add description column to %s: %v", table, err)
-		}
-
-		existing, err := r.ListItemsInTable(context.Background(), table)
-		if err != nil {
-			log.Fatalf("list %s: %v", table, err)
-		}
-		if len(existing) == 0 {
-			for _, name := range names {
-				additionalFields := map[string]string{"name": name}
-				if _, err := r.CreateItemInTable(context.Background(), table, additionalFields); err != nil {
-					log.Warnf("seed %s: %v", table, err)
-				}
-			}
-		}
 	}
 
 	srv := srvpkg.NewSickRockServer(r)

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { createClient } from '@connectrpc/connect'
 import { SickRock } from '../gen/sickrock_pb'
+import Section from 'picocrank/vue/components/Section.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,7 +51,13 @@ onMounted(async () => {
       // Handle additional fields
       if (item.value.additionalFields) {
         Object.entries(item.value.additionalFields).forEach(([key, value]) => {
-          initialData[key] = String(value)
+          const fieldDef = tableStructure.value.find(f => f.name === key)
+          if (fieldDef && isDatetimeField(fieldDef.type)) {
+            // Convert ISO8601 to datetime-local format for datetime fields
+            initialData[key] = isoToDatetimeLocal(String(value))
+          } else {
+            initialData[key] = String(value)
+          }
         })
       }
 
@@ -64,9 +71,9 @@ onMounted(async () => {
 })
 
 const editableFields = computed(() => {
-  // Filter out non-editable fields like id and created_at_unix
+  // Filter out non-editable fields like id and sr_created
   return tableStructure.value.filter(field =>
-    field.name !== 'id' && field.name !== 'created_at_unix'
+    field.name !== 'id' && field.name !== 'sr_created'
   )
 })
 
@@ -79,7 +86,13 @@ async function saveChanges() {
     const additionalFields: Record<string, string> = {}
     Object.entries(formData.value).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
-        additionalFields[key] = String(value)
+        const fieldDef = tableStructure.value.find(f => f.name === key)
+        if (fieldDef && isDatetimeField(fieldDef.type)) {
+          // Convert datetime-local to MySQL datetime format for datetime fields
+          additionalFields[key] = datetimeLocalToMysql(String(value))
+        } else {
+          additionalFields[key] = String(value)
+        }
       }
     })
 
@@ -107,52 +120,89 @@ function getInputType(fieldType: string): string {
   switch (fieldType) {
     case 'int64':
       return 'number'
+    case 'datetime':
+      return 'datetime-local'
     case 'string':
     default:
       return 'text'
   }
 }
+
+// Helper function to check if a field is datetime type
+function isDatetimeField(fieldType: string): boolean {
+  return fieldType === 'datetime'
+}
+
+// Helper function to convert ISO8601 to datetime-local format
+function isoToDatetimeLocal(isoString: string): string {
+  try {
+    const date = new Date(isoString)
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 16)
+    }
+  } catch {
+    // Invalid date
+  }
+  return ''
+}
+
+// Helper function to convert datetime-local to MySQL datetime format
+function datetimeLocalToMysql(datetimeLocal: string): string {
+  try {
+    const date = new Date(datetimeLocal)
+    if (!isNaN(date.getTime())) {
+      // Convert to MySQL datetime format: YYYY-MM-DD HH:MM:SS
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      const seconds = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    }
+  } catch {
+    // Invalid date
+  }
+  return datetimeLocal
+}
 </script>
 
 <template>
-  <section class="with-header-and-content">
-    <div class="section-header">
-      <h2>Edit Row {{ rowId }}</h2>
-      <div>
-        <button @click="cancelEdit" :disabled="saving">Cancel</button>
-        <button @click="saveChanges" :disabled="saving" class="primary">
+  <Section :title="`Edit Row ${rowId}`">
+    <template #toolbar>
+      <button @click="cancelEdit" :disabled="saving">Cancel</button>
+      <button @click="saveChanges" :disabled="saving" class="primary">
+        {{ saving ? 'Saving...' : 'Save Changes' }}
+      </button>
+    </template>
+
+    <div class="section-content padding">
+    <div v-if="error" class="error">{{ error }}</div>
+    <div v-else-if="loading">Loading…</div>
+    <form v-else @submit.prevent="saveChanges">
+      <template v-for="field in editableFields" :key="field.name">
+        <label :for="field.name">
+          {{ field.name }}
+          <span v-if="field.required" class="required">*</span>
+        </label>
+        <input
+          :id="field.name"
+          v-model="formData[field.name]"
+          :type="getInputType(field.type)"
+          :required="field.required"
+          :placeholder="field.required ? 'Required' : 'Optional'"
+        />
+      </template>
+
+      <div class="form-actions">
+        <button type="button" @click="cancelEdit" :disabled="saving">Cancel</button>
+        <button type="submit" :disabled="saving" class="primary">
           {{ saving ? 'Saving...' : 'Save Changes' }}
-        </button>
-      </div>
-    </div>
-
-    <div class="section-content">
-      <div v-if="error" class="error">{{ error }}</div>
-      <div v-else-if="loading">Loading…</div>
-      <form v-else @submit.prevent="saveChanges">
-        <div class="form-group" v-for="field in editableFields" :key="field.name">
-          <label :for="field.name">
-            {{ field.name }}
-            <span v-if="field.required" class="required">*</span>
-          </label>
-          <input
-            :id="field.name"
-            v-model="formData[field.name]"
-            :type="getInputType(field.type)"
-            :required="field.required"
-            :placeholder="field.required ? 'Required' : 'Optional'"
-          />
-        </div>
-
-        <div class="form-actions">
-          <button type="button" @click="cancelEdit" :disabled="saving">Cancel</button>
-          <button type="submit" :disabled="saving" class="primary">
-            {{ saving ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
       </form>
     </div>
-  </section>
+  </Section>
 </template>
 
 <style scoped>

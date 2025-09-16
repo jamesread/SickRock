@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { createClient } from '@connectrpc/connect'
 import { SickRock } from '../gen/sickrock_pb'
 
 const props = defineProps<{ tableId: string }>()
 const emit = defineEmits<{ added: [] }>()
+
+const router = useRouter()
 
 const name = ref('')
 const type = ref<'string' | 'int64' | 'tinyint' | 'datetime'>('string')
@@ -31,11 +34,8 @@ async function submit() {
                 defaultToCurrentTimestamp: defaultToCurrentTimestamp.value
             }
         })
-        name.value = ''
-        required.value = false
-        defaultToCurrentTimestamp.value = false
-        type.value = 'string'
-        emit('added')
+        // Navigate to AfterInsertView after successful column addition
+        router.push({ name: 'after-insert', params: { tableName: props.tableId } })
     } catch (e) {
         error.value = String(e)
     } finally {

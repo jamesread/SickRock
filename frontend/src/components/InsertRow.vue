@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { createConnectTransport } from '@connectrpc/connect-web'
 import { createClient } from '@connectrpc/connect'
 import { SickRock } from '../gen/sickrock_pb'
@@ -7,13 +7,45 @@ import { SickRock } from '../gen/sickrock_pb'
 const props = defineProps<{
   tableId: string,
   fieldDefs: Array<{ name: string; type: string; required: boolean }>,
-  selectedDate?: string | null
+  selectedDate?: string | null,
+  // Edit mode props
+  editMode?: boolean,
+  itemId?: string,
+  existingItem?: Record<string, unknown> | null
 }>()
-const emit = defineEmits<{ created: [] }>()
+const emit = defineEmits<{
+  created: [],
+  updated: [],
+  cancelled: []
+}>()
+
 
 const form = ref<Record<string, any>>({})
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+// Edit mode state
+const isEditMode = computed(() => props.editMode || false)
+const saving = ref(false)
+
+// Foreign key lookup state
+const foreignKeys = ref<Array<{
+  constraintName: string
+  tableName: string
+  columnName: string
+  referencedTable: string
+  referencedColumn: string
+  onDeleteAction: string
+  onUpdateAction: string
+}>>([])
+
+const referencedTableData = ref<Record<string, any[]>>({})
+const loadingForeignKeys = ref(false)
+
+// Search state for each foreign key field
+const searchQueries = ref<Record<string, string>>({})
+const filteredData = ref<Record<string, any[]>>({})
+const showDropdowns = ref<Record<string, boolean>>({})
 
 // Watch for changes to selectedDate prop and update form
 watch(() => props.selectedDate, (newDate) => {
@@ -27,8 +59,17 @@ watch(() => props.selectedDate, (newDate) => {
         const day = String(date.getDate()).padStart(2, '0')
         const hours = String(date.getHours()).padStart(2, '0')
         const minutes = String(date.getMinutes()).padStart(2, '0')
-        form.value.datetime_local = `${year}-${month}-${day}T${hours}:${minutes}`
-        form.value.created_at_unix = Math.floor(date.getTime() / 1000)
+        const datetimeLocalValue = `${year}-${month}-${day}T${hours}:${minutes}`
+
+        // Check if there's a 'starts' field in the field definitions
+        const startsField = props.fieldDefs.find(f => f.name === 'starts' && f.type === 'datetime')
+        if (startsField) {
+          // Use the 'starts' field if it exists and is datetime type
+          form.value.starts = datetimeLocalValue
+        } else {
+          // Fallback to sr_created for backward compatibility
+          form.value.sr_created = Math.floor(date.getTime() / 1000)
+        }
       }
     } catch {
       // Ignore invalid dates
@@ -41,7 +82,7 @@ watch(() => props.selectedDate, (newDate) => {
 watch(() => {
   const datetimeFields: Record<string, any> = {}
   for (const field of props.fieldDefs) {
-    if (field.type === 'datetime' && form.value[field.name]) {
+    if ((field.type === 'datetime' || field.type === 'timestamp') && form.value[field.name]) {
       datetimeFields[field.name] = form.value[field.name]
     }
   }
@@ -81,6 +122,201 @@ const formattedDate = computed(() => {
 const transport = createConnectTransport({ baseUrl: '/api' })
 const client = createClient(SickRock, transport)
 
+// Load foreign key information for the current table
+async function loadForeignKeys() {
+  try {
+    loadingForeignKeys.value = true
+    const response = await client.getForeignKeys({ tableName: props.tableId })
+    foreignKeys.value = response.foreignKeys.map(fk => ({
+      constraintName: fk.constraintName,
+      tableName: fk.tableName,
+      columnName: fk.columnName,
+      referencedTable: fk.referencedTable,
+      referencedColumn: fk.referencedColumn,
+      onDeleteAction: fk.onDeleteAction,
+      onUpdateAction: fk.onUpdateAction
+    }))
+
+    // Load referenced table data for each foreign key
+    await loadReferencedTableData()
+  } catch (err) {
+    console.error('Error loading foreign keys:', err)
+  } finally {
+    loadingForeignKeys.value = false
+  }
+}
+
+// Load data from referenced tables
+async function loadReferencedTableData() {
+  const data: Record<string, any[]> = {}
+
+  for (const fk of foreignKeys.value) {
+    try {
+      const response = await client.listItems({ pageId: fk.referencedTable })
+      data[fk.columnName] = response.items || []
+    } catch (err) {
+      console.error(`Error loading data for table ${fk.referencedTable}:`, err)
+      data[fk.columnName] = []
+    }
+  }
+
+  referencedTableData.value = data
+}
+
+// Check if a field is a foreign key
+function isForeignKey(fieldName: string): boolean {
+  return foreignKeys.value.some(fk => fk.columnName === fieldName)
+}
+
+// Get the foreign key info for a field
+function getForeignKeyInfo(fieldName: string) {
+  return foreignKeys.value.find(fk => fk.columnName === fieldName)
+}
+
+// Get display text for a referenced table item
+function getDisplayText(item: any, fkInfo: any): string {
+  // Check if the item has a name field at top level
+  if (item.name) {
+    return `${item.name} (ID: ${item.id})`
+  }
+
+  // Check if the item has a name field in additionalFields
+  if (item.additionalFields && item.additionalFields.name) {
+    return `${item.additionalFields.name} (ID: ${item.id})`
+  }
+
+  // Fallback to other meaningful display fields at top level
+  const displayFields = ['title', 'label', 'description']
+  for (const field of displayFields) {
+    if (item[field]) {
+      return `${item[field]} (ID: ${item.id})`
+    }
+  }
+
+  // Fallback to other meaningful display fields in additionalFields
+  for (const field of displayFields) {
+    if (item.additionalFields && item.additionalFields[field]) {
+      return `${item.additionalFields[field]} (ID: ${item.id})`
+    }
+  }
+
+  // Final fallback to just the ID
+  return `ID: ${item.id}`
+}
+
+// Get the name field from an item (checks both top level and additionalFields)
+function getItemName(item: any): string {
+  if (item.name) {
+    return item.name
+  }
+  if (item.additionalFields && item.additionalFields.name) {
+    return item.additionalFields.name
+  }
+  return ''
+}
+
+// Filter items based on search query
+function filterItems(fieldName: string, query: string) {
+  const allItems = referencedTableData.value[fieldName] || []
+  if (!query.trim()) {
+    filteredData.value[fieldName] = allItems
+    return
+  }
+
+  const searchTerm = query.toLowerCase()
+  filteredData.value[fieldName] = allItems.filter(item => {
+    const name = getItemName(item).toLowerCase()
+    return name.includes(searchTerm)
+  })
+}
+
+// Handle search input
+function onSearchInput(fieldName: string, query: string) {
+  searchQueries.value[fieldName] = query
+  filterItems(fieldName, query)
+}
+
+// Handle dropdown toggle
+function toggleDropdown(fieldName: string) {
+  showDropdowns.value[fieldName] = !showDropdowns.value[fieldName]
+  if (showDropdowns.value[fieldName]) {
+    // Initialize filtered data when opening dropdown
+    filterItems(fieldName, searchQueries.value[fieldName] || '')
+  }
+}
+
+// Handle item selection
+function selectItem(fieldName: string, item: any) {
+  form.value[fieldName] = item.id
+  searchQueries.value[fieldName] = getItemName(item)
+  showDropdowns.value[fieldName] = false
+}
+
+// Clear selection
+function clearSelection(fieldName: string) {
+  form.value[fieldName] = ''
+  searchQueries.value[fieldName] = ''
+  showDropdowns.value[fieldName] = false
+}
+
+// Handle blur with delay
+function handleBlur(fieldName: string) {
+  setTimeout(() => {
+    showDropdowns.value[fieldName] = false
+  }, 200)
+}
+
+// Initialize form with existing data for edit mode
+function initializeFormWithExistingData() {
+  if (!isEditMode.value || !props.existingItem) return
+
+  const initialData: Record<string, any> = {}
+
+  // Handle standard fields
+  if (props.existingItem.name !== undefined) {
+    initialData.name = String(props.existingItem.name)
+  }
+
+  // Handle additional fields
+  if (props.existingItem.additionalFields) {
+    Object.entries(props.existingItem.additionalFields).forEach(([key, value]) => {
+      const fieldDef = props.fieldDefs.find(f => f.name === key)
+      if (fieldDef && isDatetimeField(fieldDef.type)) {
+        // Convert ISO8601 to datetime-local format for datetime fields
+        initialData[key] = isoToDatetimeLocal(String(value))
+      } else {
+        initialData[key] = String(value)
+      }
+    })
+  }
+
+  form.value = initialData
+}
+
+// Helper function to check if a field is datetime type
+function isDatetimeField(fieldType: string): boolean {
+  return fieldType === 'datetime' || fieldType === 'timestamp'
+}
+
+// Helper function to convert ISO8601 to datetime-local format
+function isoToDatetimeLocal(isoString: string): string {
+  try {
+    const date = new Date(isoString)
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().slice(0, 16)
+    }
+  } catch {
+    // Invalid date
+  }
+  return ''
+}
+
+// Load foreign keys when component is mounted
+onMounted(() => {
+  loadForeignKeys()
+  initializeFormWithExistingData()
+})
+
 async function submit() {
   const payload: Record<string, any> = {}
   for (const f of props.fieldDefs) {
@@ -88,101 +324,188 @@ async function submit() {
     const v = form.value[f.name]
     if (v == null || v === '') continue
 
-    if (f.type === 'datetime') {
-      // For datetime fields, convert to unix timestamp
+    if (f.type === 'datetime' || f.type === 'timestamp') {
+      // For datetime fields, convert to MySQL-compatible format (YYYY-MM-DD HH:MM:SS)
       try {
         const date = new Date(v)
         if (!isNaN(date.getTime())) {
-          payload[f.name] = String(Math.floor(date.getTime() / 1000))
+          // Convert to MySQL datetime format: YYYY-MM-DD HH:MM:SS
+          const year = date.getFullYear()
+          const month = String(date.getMonth() + 1).padStart(2, '0')
+          const day = String(date.getDate()).padStart(2, '0')
+          const hours = String(date.getHours()).padStart(2, '0')
+          const minutes = String(date.getMinutes()).padStart(2, '0')
+          const seconds = String(date.getSeconds()).padStart(2, '0')
+          payload[f.name] = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
         }
       } catch {
         // Skip invalid dates
         continue
       }
-    } else if (f.type === 'int64') {
+    } else if (f.type === 'int64' || f.type === 'int' || f.type === 'bigint' || f.type === 'integer') {
       payload[f.name] = String(Number(v))
     } else {
       payload[f.name] = String(v)
     }
   }
-  // No specific validation needed since all fields are dynamic
+
   loading.value = true
+  saving.value = true
   error.value = null
+
   try {
-    // Use selected date if available, otherwise use current timestamp
-    let unixTimestamp: number | undefined
-    if (props.selectedDate) {
-      try {
-        const date = new Date(props.selectedDate)
-        if (!isNaN(date.getTime())) {
-          unixTimestamp = Math.floor(date.getTime() / 1000)
-        }
-      } catch {
-        // Fall back to current timestamp if selected date is invalid
-        unixTimestamp = Math.floor(Date.now() / 1000)
-      }
+    if (isEditMode.value) {
+      // Edit mode - update existing item
+      await client.editItem({
+        id: props.itemId!,
+        additionalFields: payload,
+        pageId: props.tableId
+      })
+      emit('updated')
     } else {
-      // Use current timestamp if no selected date
-      unixTimestamp = Math.floor(Date.now() / 1000)
-    }
-
+      // Create mode - create new item
       const createRequest: any = {
-    pageId: props.tableId,
-    createdAtUnix: BigInt(unixTimestamp),
-    additionalFields: payload
-  }
-
-    await client.createItem(createRequest)
-    form.value = {}
-    emit('created')
+        pageId: props.tableId,
+        additionalFields: payload
+      }
+      await client.createItem(createRequest)
+      form.value = {}
+      emit('created')
+    }
   } catch (e) {
     error.value = String(e)
   } finally {
     loading.value = false
+    saving.value = false
   }
+}
+
+// Cancel function for edit mode
+function cancel() {
+  emit('cancelled')
 }
 </script>
 
 <template>
   <div>
-    <div v-if="formattedDate" class="selected-date-info">
-      <h3>Adding item for {{ formattedDate }}</h3>
-      <p class="date-note">This item will be created with the selected date's timestamp.</p>
-    </div>
     <form @submit.prevent="submit">
       <template v-for="f in fieldDefs" :key="f.name">
         <template v-if="f.name !== 'id'">
             <label :for="'field-' + f.name">{{ f.name }}<span v-if="f.required" aria-label="required" title="required">*</span></label>
+
+            <!-- Foreign key searchable dropdown -->
+            <div v-if="isForeignKey(f.name)" class="foreign-key-dropdown">
+              <div class="search-input-container">
+                <input
+                  :id="'field-' + f.name"
+                  v-model="searchQueries[f.name]"
+                  @input="onSearchInput(f.name, ($event.target as HTMLInputElement).value)"
+                  @focus="toggleDropdown(f.name)"
+                  @blur="handleBlur(f.name)"
+                  :placeholder="`Search ${f.name}...`"
+                  :disabled="loadingForeignKeys"
+                  class="search-input"
+                />
+                <button
+                  v-if="form[f.name]"
+                  @click="clearSelection(f.name)"
+                  type="button"
+                  class="clear-button"
+                  title="Clear selection"
+                >
+                  ×
+                </button>
+                <button
+                  @click="toggleDropdown(f.name)"
+                  type="button"
+                  class="dropdown-toggle"
+                  :class="{ 'open': showDropdowns[f.name] }"
+                >
+                  ▼
+                </button>
+              </div>
+
+              <!-- Dropdown results -->
+              <div
+                v-if="showDropdowns[f.name]"
+                class="dropdown-results"
+              >
+                <div
+                  v-if="(filteredData[f.name] || []).length === 0"
+                  class="no-results"
+                >
+                  {{ searchQueries[f.name] ? 'No results found' : 'No items available' }}
+                </div>
+                <div
+                  v-for="item in filteredData[f.name] || []"
+                  :key="item.id"
+                  @click="selectItem(f.name, item)"
+                  class="dropdown-item"
+                  :class="{ 'selected': form[f.name] === item.id }"
+                >
+                  {{ getDisplayText(item, getForeignKeyInfo(f.name)) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Regular text input -->
             <input
-              v-if="f.type === 'string'"
+              v-else-if="f.type === 'string' || f.type === 'varchar' || f.type === 'text'"
               v-model="form[f.name]"
               :placeholder="f.name"
               :id="'field-' + f.name"
               type="text"
               @keyup.enter="submit"
             />
+            <!-- Number input -->
             <input
-              v-else-if="f.type === 'int64'"
+              v-else-if="f.type === 'int64' || f.type === 'int' || f.type === 'bigint' || f.type === 'integer'"
               v-model.number="form[f.name]"
               :placeholder="f.name"
               :id="'field-' + f.name"
               type="number"
               @keyup.enter="submit"
             />
+            <!-- DateTime input -->
             <input
-              v-else-if="f.type === 'datetime'"
+              v-else-if="f.type === 'datetime' || f.type === 'timestamp'"
               v-model="form[f.name]"
               :placeholder="f.name"
               :id="'field-' + f.name"
               type="datetime-local"
               @keyup.enter="submit"
             />
+            <!-- Fallback text input -->
+            <input
+              v-else
+              v-model="form[f.name]"
+              :placeholder="f.name"
+              :id="'field-' + f.name"
+              type="text"
+              @keyup.enter="submit"
+            />
         </template>
       </template>
 
-      <button type="submit" :disabled="loading">Add</button>
+      <div class="form-actions">
+        <button
+          v-if="isEditMode"
+          type="button"
+          @click="cancel"
+          :disabled="loading || saving"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          :disabled="loading || saving"
+          class="primary"
+        >
+          {{ isEditMode ? (saving ? 'Saving...' : 'Save Changes') : (loading ? 'Adding...' : 'Add') }}
+        </button>
+      </div>
     </form>
-    <div v-if="error">{{ error }}</div>
+    <div v-if="error" class="error">{{ error }}</div>
   </div>
 </template>
 
@@ -248,6 +571,166 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
 }
 
+/* Foreign key searchable dropdown styling */
+.foreign-key-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 0.5rem 2.5rem 0.5rem 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: white;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: text;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.search-input:hover {
+  border-color: #999;
+}
+
+.search-input:disabled {
+  background-color: #f5f5f5;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.clear-button {
+  position: absolute;
+  right: 2rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.clear-button:hover {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+.dropdown-toggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  font-size: 0.8rem;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.dropdown-toggle.open {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.dropdown-toggle:hover {
+  color: #333;
+}
+
+.dropdown-results {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #ddd;
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+  padding: 0.5rem;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.dropdown-item.selected {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.no-results {
+  padding: 0.5rem;
+  color: #666;
+  font-style: italic;
+  text-align: center;
+}
+
+/* Select dropdown styling (fallback) */
+select {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: white;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+select:hover {
+  border-color: #999;
+}
+
+select:disabled {
+  background-color: #f5f5f5;
+  color: #666;
+  cursor: not-allowed;
+}
+
 .readonly-field {
   background-color: #f5f5f5;
   color: #666;
@@ -260,6 +743,53 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
   color: #666;
   font-size: 0.85rem;
   font-style: italic;
+}
+
+/* Form actions styling */
+.form-actions {
+  margin-top: 2rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.form-actions button {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: white;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.form-actions button.primary {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.form-actions button:hover:not(:disabled) {
+  background: #f8f9fa;
+}
+
+.form-actions button.primary:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.form-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error styling */
+.error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 0.75rem;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  margin-top: 1rem;
 }
 
 </style>

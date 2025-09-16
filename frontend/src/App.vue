@@ -18,7 +18,7 @@ function toggleSidebar() {
 
 const transport = createConnectTransport({ baseUrl: '/api' })
 const client = createClient(SickRock, transport)
-const pages = ref<Array<{ id: string; title: string; slug: string }>>([])
+const pages = ref<Array<{ id: string; title: string; slug: string; view: string; icon: string }>>([])
 const version = ref<string>('')
 const quickSearch = ref(null)
 
@@ -33,15 +33,16 @@ onMounted(async () => {
     }
 
     const p = await client.getPages({})
-    pages.value = p.pages.map(pg => ({ id: pg.id, name: pg.id, title: pg.title, slug: pg.slug, icon: pg.icon }))
+    pages.value = p.pages.map(pg => ({ id: pg.id, name: pg.id, title: pg.title, slug: pg.slug, icon: pg.icon, view: pg.view }))
     pages.value.forEach(pg => {
         const icon = Hugeicons[pg.icon] || DatabaseIcon
+        const path = `/table/${pg.slug}`
 
         sidebar.value.addNavigationLink({
             id: pg.id,
             name: pg.id,
             title: pg.title,
-            path: `/table/${pg.slug}`,
+            path: path,
             icon: icon
         })
 
@@ -51,7 +52,7 @@ onMounted(async () => {
             title: pg.title,
             description: 'Table: ' + pg.title,
             category: 'Navigation',
-            path: `/table/${pg.slug}`,
+            path: path,
             type: 'route',
             icon: icon
         })
