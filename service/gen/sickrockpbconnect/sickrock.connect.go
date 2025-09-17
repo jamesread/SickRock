@@ -37,6 +37,12 @@ const (
 	SickRockInitProcedure = "/sickrock.SickRock/Init"
 	// SickRockPingProcedure is the fully-qualified name of the SickRock's Ping RPC.
 	SickRockPingProcedure = "/sickrock.SickRock/Ping"
+	// SickRockLoginProcedure is the fully-qualified name of the SickRock's Login RPC.
+	SickRockLoginProcedure = "/sickrock.SickRock/Login"
+	// SickRockLogoutProcedure is the fully-qualified name of the SickRock's Logout RPC.
+	SickRockLogoutProcedure = "/sickrock.SickRock/Logout"
+	// SickRockValidateTokenProcedure is the fully-qualified name of the SickRock's ValidateToken RPC.
+	SickRockValidateTokenProcedure = "/sickrock.SickRock/ValidateToken"
 	// SickRockGetNavigationLinksProcedure is the fully-qualified name of the SickRock's
 	// GetNavigationLinks RPC.
 	SickRockGetNavigationLinksProcedure = "/sickrock.SickRock/GetNavigationLinks"
@@ -90,6 +96,10 @@ const (
 type SickRockClient interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
 	Ping(context.Context, *connect.Request[proto.PingRequest]) (*connect.Response[proto.PingResponse], error)
+	// Authentication
+	Login(context.Context, *connect.Request[proto.LoginRequest]) (*connect.Response[proto.LoginResponse], error)
+	Logout(context.Context, *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error)
+	ValidateToken(context.Context, *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error)
 	// Navigation for the UI
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
 	// Pages available in the application
@@ -140,6 +150,24 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockPingProcedure,
 			connect.WithSchema(sickRockMethods.ByName("Ping")),
+			connect.WithClientOptions(opts...),
+		),
+		login: connect.NewClient[proto.LoginRequest, proto.LoginResponse](
+			httpClient,
+			baseURL+SickRockLoginProcedure,
+			connect.WithSchema(sickRockMethods.ByName("Login")),
+			connect.WithClientOptions(opts...),
+		),
+		logout: connect.NewClient[proto.LogoutRequest, proto.LogoutResponse](
+			httpClient,
+			baseURL+SickRockLogoutProcedure,
+			connect.WithSchema(sickRockMethods.ByName("Logout")),
+			connect.WithClientOptions(opts...),
+		),
+		validateToken: connect.NewClient[proto.ValidateTokenRequest, proto.ValidateTokenResponse](
+			httpClient,
+			baseURL+SickRockValidateTokenProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ValidateToken")),
 			connect.WithClientOptions(opts...),
 		),
 		getNavigationLinks: connect.NewClient[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse](
@@ -263,6 +291,9 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 type sickRockClient struct {
 	init               *connect.Client[proto.InitRequest, proto.InitResponse]
 	ping               *connect.Client[proto.PingRequest, proto.PingResponse]
+	login              *connect.Client[proto.LoginRequest, proto.LoginResponse]
+	logout             *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
+	validateToken      *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
 	getNavigationLinks *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
 	getPages           *connect.Client[proto.GetPagesRequest, proto.GetPagesResponse]
 	listItems          *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
@@ -292,6 +323,21 @@ func (c *sickRockClient) Init(ctx context.Context, req *connect.Request[proto.In
 // Ping calls sickrock.SickRock.Ping.
 func (c *sickRockClient) Ping(ctx context.Context, req *connect.Request[proto.PingRequest]) (*connect.Response[proto.PingResponse], error) {
 	return c.ping.CallUnary(ctx, req)
+}
+
+// Login calls sickrock.SickRock.Login.
+func (c *sickRockClient) Login(ctx context.Context, req *connect.Request[proto.LoginRequest]) (*connect.Response[proto.LoginResponse], error) {
+	return c.login.CallUnary(ctx, req)
+}
+
+// Logout calls sickrock.SickRock.Logout.
+func (c *sickRockClient) Logout(ctx context.Context, req *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error) {
+	return c.logout.CallUnary(ctx, req)
+}
+
+// ValidateToken calls sickrock.SickRock.ValidateToken.
+func (c *sickRockClient) ValidateToken(ctx context.Context, req *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error) {
+	return c.validateToken.CallUnary(ctx, req)
 }
 
 // GetNavigationLinks calls sickrock.SickRock.GetNavigationLinks.
@@ -393,6 +439,10 @@ func (c *sickRockClient) ChangeColumnName(ctx context.Context, req *connect.Requ
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
 	Ping(context.Context, *connect.Request[proto.PingRequest]) (*connect.Response[proto.PingResponse], error)
+	// Authentication
+	Login(context.Context, *connect.Request[proto.LoginRequest]) (*connect.Response[proto.LoginResponse], error)
+	Logout(context.Context, *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error)
+	ValidateToken(context.Context, *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error)
 	// Navigation for the UI
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
 	// Pages available in the application
@@ -439,6 +489,24 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockPingProcedure,
 		svc.Ping,
 		connect.WithSchema(sickRockMethods.ByName("Ping")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockLoginHandler := connect.NewUnaryHandler(
+		SickRockLoginProcedure,
+		svc.Login,
+		connect.WithSchema(sickRockMethods.ByName("Login")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockLogoutHandler := connect.NewUnaryHandler(
+		SickRockLogoutProcedure,
+		svc.Logout,
+		connect.WithSchema(sickRockMethods.ByName("Logout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockValidateTokenHandler := connect.NewUnaryHandler(
+		SickRockValidateTokenProcedure,
+		svc.ValidateToken,
+		connect.WithSchema(sickRockMethods.ByName("ValidateToken")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockGetNavigationLinksHandler := connect.NewUnaryHandler(
@@ -561,6 +629,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockInitHandler.ServeHTTP(w, r)
 		case SickRockPingProcedure:
 			sickRockPingHandler.ServeHTTP(w, r)
+		case SickRockLoginProcedure:
+			sickRockLoginHandler.ServeHTTP(w, r)
+		case SickRockLogoutProcedure:
+			sickRockLogoutHandler.ServeHTTP(w, r)
+		case SickRockValidateTokenProcedure:
+			sickRockValidateTokenHandler.ServeHTTP(w, r)
 		case SickRockGetNavigationLinksProcedure:
 			sickRockGetNavigationLinksHandler.ServeHTTP(w, r)
 		case SickRockGetPagesProcedure:
@@ -614,6 +688,18 @@ func (UnimplementedSickRockHandler) Init(context.Context, *connect.Request[proto
 
 func (UnimplementedSickRockHandler) Ping(context.Context, *connect.Request[proto.PingRequest]) (*connect.Response[proto.PingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.Ping is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) Login(context.Context, *connect.Request[proto.LoginRequest]) (*connect.Response[proto.LoginResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.Login is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) Logout(context.Context, *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.Logout is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ValidateToken(context.Context, *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ValidateToken is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error) {

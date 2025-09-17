@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import Pagination from 'picocrank/vue/components/Pagination.vue'
 import ColumnVisibilityDropdown from './ColumnVisibilityDropdown.vue'
 import RowActionsDropdown from './RowActionsDropdown.vue'
-import { createConnectTransport } from '@connectrpc/connect-web'
-import { createClient } from '@connectrpc/connect'
+
+import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from './InsertRow.vue'
 import { GetTableStructureResponse } from '../gen/sickrock_pb'
@@ -339,8 +339,8 @@ function toggleSelected(it: any, ev: Event) {
   else selectedKeys.value.delete(k)
 }
 
-const transport = createConnectTransport({ baseUrl: '/api' })
-const client = createClient(SickRock, transport)
+// Transport handled by authenticated client
+const client = createApiClient()
 
 // Load foreign key information for the current table
 async function loadForeignKeys() {
@@ -688,7 +688,7 @@ onMounted(loadForeignKeys)
           Create View
         </button>
         <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
-        <router-link :to="`/table/${props.tableId}/insert-row`" class="button neutral">
+        <router-link :to="`/table/${props.tableId}/insert-row`" class="button neutral" accesskey="n" title="Insert row" >
           {{ tableStructure?.CreateButtonText ?? 'Insert row' }}
         </router-link>
       </div>

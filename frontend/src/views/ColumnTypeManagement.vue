@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { createConnectTransport } from '@connectrpc/connect-web'
-import { createClient } from '@connectrpc/connect'
+
+import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon, ArrowLeft01Icon, Edit03Icon, CheckmarkSquare03Icon, Delete01Icon } from '@hugeicons/core-free-icons'
@@ -11,8 +11,8 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableName as string
 
-const transport = createConnectTransport({ baseUrl: '/api' })
-const client = createClient(SickRock, transport)
+// Transport handled by authenticated client
+const client = createApiClient()
 
 // State
 const columns = ref<Array<{ name: string; type: string; required: boolean }>>([])

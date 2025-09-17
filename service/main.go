@@ -3,152 +3,101 @@ package main
 import (
 	"bufio"
 	"context"
-	"os"
-	"strings"
-	"time"
-
+	"fmt"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 
+	"connectrpc.com/connect"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
-	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
-	"github.com/jamesread/golure/pkg/dirs"
-	_ "modernc.org/sqlite"
+	"github.com/jamesread/SickRock/internal/auth"
+	repo "github.com/jamesread/SickRock/internal/repo"
 )
 
-func getConfigDirectory() string {
-	dir, _ := dirs.GetFirstExistingDirectory("config", []string{
-		"~/.config/SickRock",
-		"/config",
+func ginLogrusLogger() gin.HandlerFunc {
+	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		return fmt.Sprintf("%s [%s] %s %s %d %s %s %s\n",
+			param.TimeStamp.Format("2006/01/02 - 15:04:05"),
+			param.Method,
+			param.Path,
+			param.Request.Proto,
+			param.StatusCode,
+			param.Latency,
+			param.ClientIP,
+			param.ErrorMessage,
+		)
 	})
-
-	return dir
 }
 
 func loadEnvFile() {
-	envFile := filepath.Join(getConfigDirectory(), "SickRock.env")
-
-	// Check if the file exists
-	if _, err := os.Stat(envFile); os.IsNotExist(err) {
-		log.Debugf("Environment file %s not found, skipping", envFile)
-		return
-	}
-
-	file, err := os.Open(envFile)
-	if err != nil {
-		log.Warnf("Failed to open environment file %s: %v", envFile, err)
-		return
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	lineNum := 0
-
-	for scanner.Scan() {
-		lineNum++
-		line := strings.TrimSpace(scanner.Text())
-
-		// Skip empty lines and comments
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
+	envFile := ".env"
+	if _, err := os.Stat(envFile); err == nil {
+		file, err := os.Open(envFile)
+		if err != nil {
+			log.Warnf("Could not open .env file: %v", err)
+			return
 		}
+		defer file.Close()
 
-		// Parse KEY=VALUE format
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			log.Warnf("Invalid environment variable format in %s line %d: %s", envFile, lineNum, line)
-			continue
-		}
-
-		key := strings.TrimSpace(parts[0])
-		value := strings.TrimSpace(parts[1])
-
-		// Remove quotes if present
-		if len(value) >= 2 && ((value[0] == '"' && value[len(value)-1] == '"') || (value[0] == '\'' && value[len(value)-1] == '\'')) {
-			value = value[1 : len(value)-1]
-		}
-
-		// Only set if not already set (environment variables take precedence)
-		if os.Getenv(key) == "" {
-			os.Setenv(key, value)
-			log.Debugf("Loaded environment variable: %s", key)
-		} else {
-			log.Debugf("Environment variable %s already set, skipping", key)
+		// Simple env file parser
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "=", 2)
+			if len(parts) == 2 {
+				os.Setenv(parts[0], parts[1])
+			}
 		}
 	}
-
-	if err := scanner.Err(); err != nil {
-		log.Warnf("Error reading environment file %s: %v", envFile, err)
-		return
-	}
-
-	log.Infof("Loaded environment variables from %s", envFile)
 }
 
 func configureLogging() {
-	// Set default log level to debug
-	log.SetLevel(log.DebugLevel)
-
-	// Allow override via environment variable
-	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
-		switch strings.ToLower(logLevel) {
-		case "debug":
-			log.SetLevel(log.DebugLevel)
-		case "info":
-			log.SetLevel(log.InfoLevel)
-		case "warn", "warning":
-			log.SetLevel(log.WarnLevel)
-		case "error":
-			log.SetLevel(log.ErrorLevel)
-		case "fatal":
-			log.SetLevel(log.FatalLevel)
-		case "panic":
-			log.SetLevel(log.PanicLevel)
-		default:
-			log.Warnf("Unknown log level '%s', using debug level", logLevel)
-		}
+	level := os.Getenv("LOG_LEVEL")
+	if level == "" {
+		level = "info"
 	}
+	logLevel, err := log.ParseLevel(level)
+	if err != nil {
+		logLevel = log.InfoLevel
+	}
+	log.SetLevel(logLevel)
 
-	log.Debug("Logging configured")
+	// Set log format
+	format := os.Getenv("LOG_FORMAT")
+	if format == "json" {
+		log.SetFormatter(&log.JSONFormatter{})
+	} else {
+		log.SetFormatter(&log.TextFormatter{
+			FullTimestamp: true,
+		})
+	}
 }
 
 func findFrontendDir() string {
-	possibleDirs := []string{
-		"../frontend/dist",
-		"/www",
-		"dist",
+	// Try to find the frontend directory
+	possiblePaths := []string{
+		"../frontend",
+		"frontend",
+		"./frontend",
+		"../../frontend",
 	}
 
-	dir, err := dirs.GetFirstExistingDirectory("frontend", possibleDirs)
-
-	if err != nil {
-		log.Fatalf("Could not find frontend directory: %v", err)
+	for _, path := range possiblePaths {
+		if _, err := os.Stat(filepath.Join(path, "index.html")); err == nil {
+			return path
+		}
 	}
 
-	return dir
-}
-
-// Custom Gin logger middleware that uses logrus
-func ginLogrusLogger() gin.HandlerFunc {
-	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		// Use logrus to log the request
-		log.WithFields(log.Fields{
-			"status":     param.StatusCode,
-			"method":     param.Method,
-			"path":       param.Path,
-			"ip":         param.ClientIP,
-			"user_agent": param.Request.UserAgent(),
-			"latency":    param.Latency,
-			"time":       param.TimeStamp.Format(time.RFC3339),
-		}).Debug("HTTP Request")
-
-		// Return empty string since we're using logrus directly
-		return ""
-	})
+	// Fallback to current directory
+	return "."
 }
 
 func main() {
@@ -182,7 +131,14 @@ func main() {
 	}
 
 	srv := srvpkg.NewSickRockServer(r)
-	path, handler := sickrockpbconnect.NewSickRockHandler(srv)
+	
+	// Create auth service
+	authService := auth.NewAuthService()
+	
+	// Create ConnectRPC handler with auth interceptor
+	interceptors := connect.WithInterceptors(auth.ConnectAuthMiddleware(authService))
+	path, handler := sickrockpbconnect.NewSickRockHandler(srv, interceptors)
+	
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
 	router.Any("/api/*any", gin.WrapH(http.StripPrefix("/api", mux)))

@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { createConnectTransport } from '@connectrpc/connect-web'
-import { createClient } from '@connectrpc/connect'
+
+import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 
 const props = defineProps<{ tableId: string }>()
@@ -17,8 +17,8 @@ const defaultToCurrentTimestamp = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-const transport = createConnectTransport({ baseUrl: '/api' })
-const client = createClient(SickRock, transport)
+// Transport handled by authenticated client
+const client = createApiClient()
 
 async function submit() {
     if (!name.value || loading.value) return

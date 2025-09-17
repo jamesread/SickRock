@@ -14,6 +14,7 @@ import (
 	"github.com/jamesread/golure/pkg/redact"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+	_ "modernc.org/sqlite"
 )
 
 type Item struct {
@@ -66,7 +67,7 @@ func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, err
 }
 
 func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]TableConfig, error) {
-	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon, view FROM table_configurations ORDER BY ordinal, name")
+	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(name) as title, 0 as ordinal, create_button_text, icon, view FROM table_configurations ORDER BY ordinal, name")
 	if err != nil {
 		return nil, err
 	}

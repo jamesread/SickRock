@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { createConnectTransport } from '@connectrpc/connect-web'
-import { createClient } from '@connectrpc/connect'
+
+import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 
 const message = ref('Loading...')
-const transport = createConnectTransport({ baseUrl: '/api' })
-const client = createClient(SickRock, transport)
+// Transport handled by authenticated client
+const client = createApiClient()
 
 async function ping() {
   try {

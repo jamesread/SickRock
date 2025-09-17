@@ -2583,6 +2583,319 @@ func (x *InitResponse) GetDate() string {
 	return ""
 }
 
+// Authentication
+type LoginRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Password      string                 `protobuf:"bytes,2,opt,name=password,proto3" json:"password,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginRequest) Reset() {
+	*x = LoginRequest{}
+	mi := &file_sickrock_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginRequest) ProtoMessage() {}
+
+func (x *LoginRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
+func (*LoginRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *LoginRequest) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *LoginRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
+type LoginResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Token         string                 `protobuf:"bytes,3,opt,name=token,proto3" json:"token,omitempty"`
+	ExpiresAt     int64                  `protobuf:"varint,4,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"` // Unix timestamp
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoginResponse) Reset() {
+	*x = LoginResponse{}
+	mi := &file_sickrock_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoginResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoginResponse) ProtoMessage() {}
+
+func (x *LoginResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
+func (*LoginResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *LoginResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *LoginResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *LoginResponse) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
+type LogoutRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutRequest) Reset() {
+	*x = LogoutRequest{}
+	mi := &file_sickrock_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutRequest) ProtoMessage() {}
+
+func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutRequest.ProtoReflect.Descriptor instead.
+func (*LogoutRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{50}
+}
+
+type LogoutResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LogoutResponse) Reset() {
+	*x = LogoutResponse{}
+	mi := &file_sickrock_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LogoutResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LogoutResponse) ProtoMessage() {}
+
+func (x *LogoutResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LogoutResponse.ProtoReflect.Descriptor instead.
+func (*LogoutResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *LogoutResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *LogoutResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type ValidateTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateTokenRequest) Reset() {
+	*x = ValidateTokenRequest{}
+	mi := &file_sickrock_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateTokenRequest) ProtoMessage() {}
+
+func (x *ValidateTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateTokenRequest.ProtoReflect.Descriptor instead.
+func (*ValidateTokenRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *ValidateTokenRequest) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+type ValidateTokenResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Valid         bool                   `protobuf:"varint,1,opt,name=valid,proto3" json:"valid,omitempty"`
+	Username      string                 `protobuf:"bytes,2,opt,name=username,proto3" json:"username,omitempty"`
+	ExpiresAt     int64                  `protobuf:"varint,3,opt,name=expires_at,json=expiresAt,proto3" json:"expires_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ValidateTokenResponse) Reset() {
+	*x = ValidateTokenResponse{}
+	mi := &file_sickrock_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ValidateTokenResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ValidateTokenResponse) ProtoMessage() {}
+
+func (x *ValidateTokenResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ValidateTokenResponse.ProtoReflect.Descriptor instead.
+func (*ValidateTokenResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *ValidateTokenResponse) GetValid() bool {
+	if x != nil {
+		return x.Valid
+	}
+	return false
+}
+
+func (x *ValidateTokenResponse) GetUsername() string {
+	if x != nil {
+		return x.Username
+	}
+	return ""
+}
+
+func (x *ValidateTokenResponse) GetExpiresAt() int64 {
+	if x != nil {
+		return x.ExpiresAt
+	}
+	return 0
+}
+
 var File_sickrock_proto protoreflect.FileDescriptor
 
 const file_sickrock_proto_rawDesc = "" +
@@ -2768,10 +3081,33 @@ const file_sickrock_proto_rawDesc = "" +
 	"\fInitResponse\x12\x18\n" +
 	"\aversion\x18\x01 \x01(\tR\aversion\x12\x16\n" +
 	"\x06commit\x18\x02 \x01(\tR\x06commit\x12\x12\n" +
-	"\x04date\x18\x03 \x01(\tR\x04date2\x91\r\n" +
+	"\x04date\x18\x03 \x01(\tR\x04date\"F\n" +
+	"\fLoginRequest\x12\x1a\n" +
+	"\busername\x18\x01 \x01(\tR\busername\x12\x1a\n" +
+	"\bpassword\x18\x02 \x01(\tR\bpassword\"x\n" +
+	"\rLoginResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x14\n" +
+	"\x05token\x18\x03 \x01(\tR\x05token\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x04 \x01(\x03R\texpiresAt\"\x0f\n" +
+	"\rLogoutRequest\"D\n" +
+	"\x0eLogoutResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\",\n" +
+	"\x14ValidateTokenRequest\x12\x14\n" +
+	"\x05token\x18\x01 \x01(\tR\x05token\"h\n" +
+	"\x15ValidateTokenResponse\x12\x14\n" +
+	"\x05valid\x18\x01 \x01(\bR\x05valid\x12\x1a\n" +
+	"\busername\x18\x02 \x01(\tR\busername\x12\x1d\n" +
+	"\n" +
+	"expires_at\x18\x03 \x01(\x03R\texpiresAt2\xda\x0e\n" +
 	"\bSickRock\x125\n" +
 	"\x04Init\x12\x15.sickrock.InitRequest\x1a\x16.sickrock.InitResponse\x125\n" +
-	"\x04Ping\x12\x15.sickrock.PingRequest\x1a\x16.sickrock.PingResponse\x12_\n" +
+	"\x04Ping\x12\x15.sickrock.PingRequest\x1a\x16.sickrock.PingResponse\x128\n" +
+	"\x05Login\x12\x16.sickrock.LoginRequest\x1a\x17.sickrock.LoginResponse\x12;\n" +
+	"\x06Logout\x12\x17.sickrock.LogoutRequest\x1a\x18.sickrock.LogoutResponse\x12P\n" +
+	"\rValidateToken\x12\x1e.sickrock.ValidateTokenRequest\x1a\x1f.sickrock.ValidateTokenResponse\x12_\n" +
 	"\x12GetNavigationLinks\x12#.sickrock.GetNavigationLinksRequest\x1a$.sickrock.GetNavigationLinksResponse\x12A\n" +
 	"\bGetPages\x12\x19.sickrock.GetPagesRequest\x1a\x1a.sickrock.GetPagesResponse\x12D\n" +
 	"\tListItems\x12\x1a.sickrock.ListItemsRequest\x1a\x1b.sickrock.ListItemsResponse\x12G\n" +
@@ -2808,7 +3144,7 @@ func file_sickrock_proto_rawDescGZIP() []byte {
 	return file_sickrock_proto_rawDescData
 }
 
-var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 51)
+var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 57)
 var file_sickrock_proto_goTypes = []any{
 	(*PingRequest)(nil),                // 0: sickrock.PingRequest
 	(*PingResponse)(nil),               // 1: sickrock.PingResponse
@@ -2858,19 +3194,25 @@ var file_sickrock_proto_goTypes = []any{
 	(*ChangeColumnNameResponse)(nil),   // 45: sickrock.ChangeColumnNameResponse
 	(*InitRequest)(nil),                // 46: sickrock.InitRequest
 	(*InitResponse)(nil),               // 47: sickrock.InitResponse
-	nil,                                // 48: sickrock.Item.AdditionalFieldsEntry
-	nil,                                // 49: sickrock.CreateItemRequest.AdditionalFieldsEntry
-	nil,                                // 50: sickrock.EditItemRequest.AdditionalFieldsEntry
+	(*LoginRequest)(nil),               // 48: sickrock.LoginRequest
+	(*LoginResponse)(nil),              // 49: sickrock.LoginResponse
+	(*LogoutRequest)(nil),              // 50: sickrock.LogoutRequest
+	(*LogoutResponse)(nil),             // 51: sickrock.LogoutResponse
+	(*ValidateTokenRequest)(nil),       // 52: sickrock.ValidateTokenRequest
+	(*ValidateTokenResponse)(nil),      // 53: sickrock.ValidateTokenResponse
+	nil,                                // 54: sickrock.Item.AdditionalFieldsEntry
+	nil,                                // 55: sickrock.CreateItemRequest.AdditionalFieldsEntry
+	nil,                                // 56: sickrock.EditItemRequest.AdditionalFieldsEntry
 }
 var file_sickrock_proto_depIdxs = []int32{
 	3,  // 0: sickrock.GetNavigationLinksResponse.links:type_name -> sickrock.NavigationLink
 	6,  // 1: sickrock.GetPagesResponse.pages:type_name -> sickrock.Page
-	48, // 2: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
+	54, // 2: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
 	8,  // 3: sickrock.ListItemsResponse.items:type_name -> sickrock.Item
-	49, // 4: sickrock.CreateItemRequest.additional_fields:type_name -> sickrock.CreateItemRequest.AdditionalFieldsEntry
+	55, // 4: sickrock.CreateItemRequest.additional_fields:type_name -> sickrock.CreateItemRequest.AdditionalFieldsEntry
 	8,  // 5: sickrock.CreateItemResponse.item:type_name -> sickrock.Item
 	8,  // 6: sickrock.GetItemResponse.item:type_name -> sickrock.Item
-	50, // 7: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
+	56, // 7: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
 	8,  // 8: sickrock.EditItemResponse.item:type_name -> sickrock.Item
 	20, // 9: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
 	20, // 10: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
@@ -2881,48 +3223,54 @@ var file_sickrock_proto_depIdxs = []int32{
 	33, // 15: sickrock.GetForeignKeysResponse.foreign_keys:type_name -> sickrock.ForeignKey
 	46, // 16: sickrock.SickRock.Init:input_type -> sickrock.InitRequest
 	0,  // 17: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
-	2,  // 18: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
-	5,  // 19: sickrock.SickRock.GetPages:input_type -> sickrock.GetPagesRequest
-	9,  // 20: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
-	11, // 21: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
-	13, // 22: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
-	15, // 23: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
-	17, // 24: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
-	19, // 25: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
-	22, // 26: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
-	24, // 27: sickrock.SickRock.CreateTableView:input_type -> sickrock.CreateTableViewRequest
-	26, // 28: sickrock.SickRock.UpdateTableView:input_type -> sickrock.UpdateTableViewRequest
-	28, // 29: sickrock.SickRock.GetTableViews:input_type -> sickrock.GetTableViewsRequest
-	31, // 30: sickrock.SickRock.DeleteTableView:input_type -> sickrock.DeleteTableViewRequest
-	34, // 31: sickrock.SickRock.CreateForeignKey:input_type -> sickrock.CreateForeignKeyRequest
-	36, // 32: sickrock.SickRock.GetForeignKeys:input_type -> sickrock.GetForeignKeysRequest
-	38, // 33: sickrock.SickRock.DeleteForeignKey:input_type -> sickrock.DeleteForeignKeyRequest
-	40, // 34: sickrock.SickRock.ChangeColumnType:input_type -> sickrock.ChangeColumnTypeRequest
-	42, // 35: sickrock.SickRock.DropColumn:input_type -> sickrock.DropColumnRequest
-	44, // 36: sickrock.SickRock.ChangeColumnName:input_type -> sickrock.ChangeColumnNameRequest
-	47, // 37: sickrock.SickRock.Init:output_type -> sickrock.InitResponse
-	1,  // 38: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
-	4,  // 39: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
-	7,  // 40: sickrock.SickRock.GetPages:output_type -> sickrock.GetPagesResponse
-	10, // 41: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
-	12, // 42: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
-	14, // 43: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
-	16, // 44: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
-	18, // 45: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
-	21, // 46: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
-	21, // 47: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
-	25, // 48: sickrock.SickRock.CreateTableView:output_type -> sickrock.CreateTableViewResponse
-	27, // 49: sickrock.SickRock.UpdateTableView:output_type -> sickrock.UpdateTableViewResponse
-	30, // 50: sickrock.SickRock.GetTableViews:output_type -> sickrock.GetTableViewsResponse
-	32, // 51: sickrock.SickRock.DeleteTableView:output_type -> sickrock.DeleteTableViewResponse
-	35, // 52: sickrock.SickRock.CreateForeignKey:output_type -> sickrock.CreateForeignKeyResponse
-	37, // 53: sickrock.SickRock.GetForeignKeys:output_type -> sickrock.GetForeignKeysResponse
-	39, // 54: sickrock.SickRock.DeleteForeignKey:output_type -> sickrock.DeleteForeignKeyResponse
-	41, // 55: sickrock.SickRock.ChangeColumnType:output_type -> sickrock.ChangeColumnTypeResponse
-	43, // 56: sickrock.SickRock.DropColumn:output_type -> sickrock.DropColumnResponse
-	45, // 57: sickrock.SickRock.ChangeColumnName:output_type -> sickrock.ChangeColumnNameResponse
-	37, // [37:58] is the sub-list for method output_type
-	16, // [16:37] is the sub-list for method input_type
+	48, // 18: sickrock.SickRock.Login:input_type -> sickrock.LoginRequest
+	50, // 19: sickrock.SickRock.Logout:input_type -> sickrock.LogoutRequest
+	52, // 20: sickrock.SickRock.ValidateToken:input_type -> sickrock.ValidateTokenRequest
+	2,  // 21: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
+	5,  // 22: sickrock.SickRock.GetPages:input_type -> sickrock.GetPagesRequest
+	9,  // 23: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
+	11, // 24: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
+	13, // 25: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
+	15, // 26: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
+	17, // 27: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
+	19, // 28: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
+	22, // 29: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
+	24, // 30: sickrock.SickRock.CreateTableView:input_type -> sickrock.CreateTableViewRequest
+	26, // 31: sickrock.SickRock.UpdateTableView:input_type -> sickrock.UpdateTableViewRequest
+	28, // 32: sickrock.SickRock.GetTableViews:input_type -> sickrock.GetTableViewsRequest
+	31, // 33: sickrock.SickRock.DeleteTableView:input_type -> sickrock.DeleteTableViewRequest
+	34, // 34: sickrock.SickRock.CreateForeignKey:input_type -> sickrock.CreateForeignKeyRequest
+	36, // 35: sickrock.SickRock.GetForeignKeys:input_type -> sickrock.GetForeignKeysRequest
+	38, // 36: sickrock.SickRock.DeleteForeignKey:input_type -> sickrock.DeleteForeignKeyRequest
+	40, // 37: sickrock.SickRock.ChangeColumnType:input_type -> sickrock.ChangeColumnTypeRequest
+	42, // 38: sickrock.SickRock.DropColumn:input_type -> sickrock.DropColumnRequest
+	44, // 39: sickrock.SickRock.ChangeColumnName:input_type -> sickrock.ChangeColumnNameRequest
+	47, // 40: sickrock.SickRock.Init:output_type -> sickrock.InitResponse
+	1,  // 41: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
+	49, // 42: sickrock.SickRock.Login:output_type -> sickrock.LoginResponse
+	51, // 43: sickrock.SickRock.Logout:output_type -> sickrock.LogoutResponse
+	53, // 44: sickrock.SickRock.ValidateToken:output_type -> sickrock.ValidateTokenResponse
+	4,  // 45: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
+	7,  // 46: sickrock.SickRock.GetPages:output_type -> sickrock.GetPagesResponse
+	10, // 47: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
+	12, // 48: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
+	14, // 49: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
+	16, // 50: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
+	18, // 51: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
+	21, // 52: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
+	21, // 53: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
+	25, // 54: sickrock.SickRock.CreateTableView:output_type -> sickrock.CreateTableViewResponse
+	27, // 55: sickrock.SickRock.UpdateTableView:output_type -> sickrock.UpdateTableViewResponse
+	30, // 56: sickrock.SickRock.GetTableViews:output_type -> sickrock.GetTableViewsResponse
+	32, // 57: sickrock.SickRock.DeleteTableView:output_type -> sickrock.DeleteTableViewResponse
+	35, // 58: sickrock.SickRock.CreateForeignKey:output_type -> sickrock.CreateForeignKeyResponse
+	37, // 59: sickrock.SickRock.GetForeignKeys:output_type -> sickrock.GetForeignKeysResponse
+	39, // 60: sickrock.SickRock.DeleteForeignKey:output_type -> sickrock.DeleteForeignKeyResponse
+	41, // 61: sickrock.SickRock.ChangeColumnType:output_type -> sickrock.ChangeColumnTypeResponse
+	43, // 62: sickrock.SickRock.DropColumn:output_type -> sickrock.DropColumnResponse
+	45, // 63: sickrock.SickRock.ChangeColumnName:output_type -> sickrock.ChangeColumnNameResponse
+	40, // [40:64] is the sub-list for method output_type
+	16, // [16:40] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
 	16, // [16:16] is the sub-list for extension extendee
 	0,  // [0:16] is the sub-list for field type_name
@@ -2939,7 +3287,7 @@ func file_sickrock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sickrock_proto_rawDesc), len(file_sickrock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   51,
+			NumMessages:   57,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -12,31 +12,64 @@ import ForeignKeyManagement from './views/ForeignKeyManagement.vue'
 import ColumnTypeManagement from './views/ColumnTypeManagement.vue'
 import TableCreate from './views/TableCreate.vue'
 import ControlPanel from './views/ControlPanel.vue'
+import LoginView from './views/LoginView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
+import { useAuthStore } from './stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'home', component: HomeView },
-    { path: '/about', name: 'about', component: AboutView },
-    { path: '/table/:tableName', name: 'table', component: TableView, props: true,
-      meta: {
+    { 
+      path: '/login', 
+      name: 'login', 
+      component: LoginView,
+      meta: { requiresAuth: false }
+    },
+    { 
+      path: '/', 
+      name: 'home', 
+      component: HomeView,
+      meta: { requiresAuth: true }
+    },
+    { 
+      path: '/about', 
+      name: 'about', 
+      component: AboutView,
+      meta: { requiresAuth: true }
+    },
+    { 
+      path: '/table/:tableName', 
+      name: 'table', 
+      component: TableView, 
+      props: true,
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: 'Table: ' + String(route.params.tableName), to: { name: 'table', params: { tableName: route.params.tableName } } },
         ],
       },
     },
-    { path: '/table/:tableName/:rowId', name: 'row', component: RowView, props: true,
-      meta: {
+    { 
+      path: '/table/:tableName/:rowId', 
+      name: 'row', 
+      component: RowView, 
+      props: true,
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: `Row ${String(route.params.rowId)}` },
         ],
       },
     },
-    { path: '/table/:tableName/:rowId/edit', name: 'row-edit', component: RowEditView, props: true,
-      meta: {
+    { 
+      path: '/table/:tableName/:rowId/edit', 
+      name: 'row-edit', 
+      component: RowEditView, 
+      props: true,
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: `Row ${String(route.params.rowId)}`, href: { name: 'row', params: { tableName: route.params.tableName, rowId: route.params.rowId } } },
@@ -44,8 +77,13 @@ const router = createRouter({
         ],
       },
     },
-    { path: '/table/:tableName/add-column', name: 'add-column', component: AddColumnView, props: true,
-      meta: {
+    { 
+      path: '/table/:tableName/add-column', 
+      name: 'add-column', 
+      component: AddColumnView, 
+      props: true,
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Add Column' },
@@ -57,7 +95,8 @@ const router = createRouter({
       name: 'insert-row',
       component: InsertRowView,
       props: true,
-      meta: {
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Insert Row' },
@@ -69,7 +108,8 @@ const router = createRouter({
       name: 'after-insert',
       component: AfterInsertView,
       props: true,
-      meta: {
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Row Added' },
@@ -81,7 +121,8 @@ const router = createRouter({
       name: 'create-table-view',
       component: CreateTableView,
       props: true,
-      meta: {
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Create View' },
@@ -93,42 +134,46 @@ const router = createRouter({
       name: 'edit-table-view',
       component: CreateTableView,
       props: true,
-      meta: {
+      meta: { 
+        requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Edit View' },
         ],
       },
     },
-        {
-          path: '/table/:tableName/foreign-keys',
-          name: 'foreign-keys',
-          component: ForeignKeyManagement,
-          props: true,
-          meta: {
-            breadcrumbs: (route: any) => [
-              { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
-              { name: 'Foreign Keys' },
-            ],
-          },
-        },
-        {
-          path: '/table/:tableName/column-types',
-          name: 'column-types',
-          component: ColumnTypeManagement,
-          props: true,
-          meta: {
-            breadcrumbs: (route: any) => [
-              { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
-              { name: 'Column Types' },
-            ],
-          },
-        },
+    {
+      path: '/table/:tableName/foreign-keys',
+      name: 'foreign-keys',
+      component: ForeignKeyManagement,
+      props: true,
+      meta: { 
+        requiresAuth: true,
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Foreign Keys' },
+        ],
+      },
+    },
+    {
+      path: '/table/:tableName/column-types',
+      name: 'column-types',
+      component: ColumnTypeManagement,
+      props: true,
+      meta: { 
+        requiresAuth: true,
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Column Types' },
+        ],
+      },
+    },
     {
       path: '/admin/table/create',
       name: 'table-create',
       component: TableCreate,
-      meta: {
+      meta: { 
+        requiresAuth: true,
         title: 'Create Table',
         icon: DatabaseAddIcon
       },
@@ -137,7 +182,8 @@ const router = createRouter({
       path: '/admin/control-panel',
       name: 'control-panel',
       component: ControlPanel,
-      meta: {
+      meta: { 
+        requiresAuth: true,
         title: 'Control Panel',
         icon: DatabaseAddIcon
       },
@@ -146,8 +192,29 @@ const router = createRouter({
       path: '/:pathMatch(.*)*',
       name: 'not-found',
       component: NotFoundView,
+      meta: { requiresAuth: false }
     },
   ],
+})
+
+// Navigation guard
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore()
+  
+  // If route doesn't require auth, allow access
+  if (to.meta.requiresAuth === false) {
+    next()
+    return
+  }
+  
+  // If user is authenticated, allow access
+  if (authStore.isAuthenticated) {
+    next()
+    return
+  }
+  
+  // If not authenticated, redirect to login
+  next('/login')
 })
 
 export default router

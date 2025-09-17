@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { createConnectTransport } from '@connectrpc/connect-web'
-import { createClient } from '@connectrpc/connect'
+
+import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from '../components/InsertRow.vue'
 import Section from 'picocrank/vue/components/Section.vue'
@@ -17,8 +17,8 @@ const displayFieldDefs = ref<Array<{ name: string; type: string; required: boole
 const selectedDate = ref<string | null>(null)
 const createButtonText = ref<string>('Insert Row')
 
-const transport = createConnectTransport({ baseUrl: '/api' })
-const client = createClient(SickRock, transport)
+// Transport handled by authenticated client
+const client = createApiClient()
 
 // Views state for controlling insert form ordering/visibility
 const tableViews = ref<Array<{ id: number; tableName: string; viewName: string; isDefault: boolean; columns: Array<{ columnName: string; isVisible: boolean; columnOrder: number; sortOrder: string }> }>>([])

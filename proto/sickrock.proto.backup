@@ -258,44 +258,9 @@ message InitResponse {
   string date = 3;
 }
 
-// Authentication
-message LoginRequest {
-  string username = 1;
-  string password = 2;
-}
-
-message LoginResponse {
-  bool success = 1;
-  string message = 2;
-  string token = 3;
-  int64 expires_at = 4; // Unix timestamp
-}
-
-message LogoutRequest {}
-
-message LogoutResponse {
-  bool success = 1;
-  string message = 2;
-}
-
-message ValidateTokenRequest {
-  string token = 1;
-}
-
-message ValidateTokenResponse {
-  bool valid = 1;
-  string username = 2;
-  int64 expires_at = 3;
-}
-
 service SickRock {
   rpc Init(InitRequest) returns (InitResponse);
   rpc Ping(PingRequest) returns (PingResponse);
-
-  // Authentication
-  rpc Login(LoginRequest) returns (LoginResponse);
-  rpc Logout(LogoutRequest) returns (LogoutResponse);
-  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
 
   // Navigation for the UI
   rpc GetNavigationLinks(GetNavigationLinksRequest) returns (GetNavigationLinksResponse);

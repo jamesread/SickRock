@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { createConnectTransport } from '@connectrpc/connect-web'
-import { createClient } from '@connectrpc/connect'
+
+import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Table from '../components/Table.vue'
 import CalendarView from '../components/CalendarView.vue'
@@ -11,8 +11,8 @@ const route = useRoute()
 const props = defineProps<{ tableName?: string }>()
 const tableId = computed(() => (props.tableName ?? (route.params.tableName as string)))
 
-const transport = createConnectTransport({ baseUrl: '/api' })
-const client = createClient(SickRock, transport)
+// Transport handled by authenticated client
+const client = createApiClient()
 
 const tableStructure = ref<{ view: string } | null>(null)
 const loading = ref(true)

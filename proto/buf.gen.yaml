@@ -18,10 +18,10 @@ plugins:
     out: ../frontend/src/gen
     opt:
       - target=ts
+      - import_extension=none
 
   - remote: buf.build/connectrpc/es
     out: ../frontend/src/gen
     opt:
       - target=ts
-
-
+      - import_extension=none
