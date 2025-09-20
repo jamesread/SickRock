@@ -21,6 +21,7 @@ const client = createApiClient()
 const version = ref<string>('')
 const commit = ref<string>('')
 const buildDate = ref<string>('')
+const dbName = ref<string>('')
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -54,6 +55,7 @@ async function loadBuildInfo() {
     version.value = response.version
     commit.value = response.commit
     buildDate.value = response.date
+    dbName.value = response.dbName || ''
   } catch (err) {
     console.error('Failed to load build info:', err)
   }
@@ -64,17 +66,9 @@ async function loadDatabaseStats() {
     const pages = await client.getPages({})
     totalTables.value = pages.pages.length
 
-    // Count total items across all tables
-    let total = 0
-    for (const page of pages.pages) {
-      try {
-        const items = await client.listItems({ pageId: page.slug })
-        total += items.items.length
-      } catch (err) {
-        console.warn(`Failed to count items for table ${page.slug}:`, err)
-      }
-    }
-    totalItems.value = total
+    // Use efficient system info endpoint for approximate total rows
+    const sys = await client.getSystemInfo({})
+    totalItems.value = Number(sys.approxTotalRows || 0)
   } catch (err) {
     console.error('Failed to load database stats:', err)
   }
@@ -160,18 +154,22 @@ function refreshData() {
     <div class="control-sections">
       <!-- System Information -->
       <Section title = "System Information">
-        <div class="grid-boxed">
-          <div class = "stat-display">
-            <span class = "subtle">Version</span>
-            <span class = "stat">{{ version || 'Loading...' }}</span>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number">{{ version || '—' }}</div>
+            <div class="stat-label">Version</div>
           </div>
-          <div class="stat-display">
-            <span class = "subtle">Commit</span>
-            <span class = "stat">{{ commit || 'Loading...' }}</span>
+          <div class="stat-card">
+            <div class="stat-number">{{ commit || '—' }}</div>
+            <div class="stat-label">Commit</div>
           </div>
-          <div class="stat-display">
-            <span class = "subtle">Build Date</span>
-            <span class = "stat">{{ buildDate || 'Loading...' }}</span>
+          <div class="stat-card">
+            <div class="stat-number">{{ buildDate || '—' }}</div>
+            <div class="stat-label">Build Date</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-number">{{ dbName || 'Unknown' }}</div>
+            <div class="stat-label">Database</div>
           </div>
         </div>
       </Section>

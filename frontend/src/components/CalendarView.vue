@@ -252,7 +252,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await client.listItems({ pageId: props.tableId })
+    const res = await client.listItems({ tcName: props.tableId })
     items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
   } catch (e) {
     error.value = String(e)
@@ -516,21 +516,18 @@ onMounted(load)
 <template>
   <section class="with-header-and-content">
     <div class="section-header">
-      <h2 class="calendar-title">{{ props.tableId }} Calendar</h2>
-      <button @click="load" :disabled="loading">Reload</button>
+      <h2 class="calendar-title">{{ monthNames[currentMonth] }} {{ currentYear }}</h2>
+
+      <div class = "toolbar">
+        <button @click="previousMonth" class="button neutral">‹</button>
+        <button @click="goToToday" class="button neutral">Today</button>
+        <button @click="nextMonth" class="button neutral">›</button>
+      </div>
     </div>
 
     <div v-if="error" class="error">{{ error }}</div>
     <div v-else-if="loading">Loading…</div>
     <div v-else class="section-content padding">
-      <!-- Calendar Navigation -->
-      <div class="calendar-nav">
-        <button @click="previousMonth" class="nav-button">‹</button>
-        <h3 class="month-year">{{ monthNames[currentMonth] }} {{ currentYear }}</h3>
-        <button @click="nextMonth" class="nav-button">›</button>
-        <button @click="goToToday" class="today-button">Today</button>
-      </div>
-
       <div class="calendar-container">
         <div class="calendar-grid">
           <div v-for="day in dayNames" :key="day" class="day-header">{{ day }}</div>
@@ -690,6 +687,12 @@ onMounted(load)
 </template>
 
 <style scoped>
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
 .calendar-title {
   margin: 0;
 }
@@ -710,33 +713,12 @@ onMounted(load)
   border-radius: 8px;
 }
 
-.nav-button {
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-size: 1.2rem;
-  transition: background-color 0.2s;
+.section-header .button {
+  background: #fff;
 }
 
-.nav-button:hover {
-  background: #0056b3;
-}
-
-.today-button {
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.today-button:hover {
-  background: #545b62;
+.section-header .button:hover {
+  background: #c9ccd4;
 }
 
 .month-year {

@@ -27,7 +27,7 @@ onMounted(async () => {
   loading.value = true
   try {
     // Load the item data
-    const res = await client.listItems({ pageId: tableName })
+    const res = await client.listItems({ tcName: tableName })
     const found = (res.items as any[] | undefined)?.find((it) => String(it.id) === String(rowId))
     item.value = found ?? null
 

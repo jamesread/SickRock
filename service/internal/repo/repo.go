@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -35,10 +36,10 @@ func (r *Repository) InsertTableConfiguration(ctx context.Context, name string) 
 	n := sanitizeTableName(name)
 	switch r.db.DriverName() {
 	case "mysql":
-		_, err := r.db.ExecContext(ctx, "INSERT IGNORE INTO table_configurations (name, create_button_text) VALUES (?, ?)", n, "Add Row")
+		_, err := r.db.ExecContext(ctx, "INSERT IGNORE INTO table_configurations (name, title, ordinal, db) VALUES (?, ?, 0, DATABASE())", n, n)
 		return err
 	default:
-		_, err := r.db.ExecContext(ctx, "INSERT OR IGNORE INTO table_configurations (name, create_button_text) VALUES (?, ?)", n, "Add Row")
+		_, err := r.db.ExecContext(ctx, "INSERT OR IGNORE INTO table_configurations (name, title, ordinal, db) VALUES (?, ?, 0, '')", n, n)
 		return err
 	}
 }
@@ -49,7 +50,9 @@ type TableConfig struct {
 	Ordinal          int
 	Icon             sql.NullString
 	CreateButtonText sql.NullString `db:"create_button_text"`
-	View             sql.NullString
+	View             sql.NullString `db:"view"`
+	Table            sql.NullString `db:"table"`
+	Db               sql.NullString `db:"db"`
 }
 
 func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, error) {
@@ -67,7 +70,7 @@ func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, err
 }
 
 func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]TableConfig, error) {
-	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(name) as title, 0 as ordinal, create_button_text, icon, view FROM table_configurations ORDER BY ordinal, name")
+	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal,0) as ordinal, icon, view, db FROM table_configurations ORDER BY name, ordinal ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -84,6 +87,7 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 }
 
 func (r *Repository) EnsureSchema(ctx context.Context) error {
+	log.Infof("Using database driver: %s", r.db.DriverName())
 	log.Infof("Ensuring schema")
 	var schema string
 	switch r.db.DriverName() {
@@ -93,7 +97,8 @@ CREATE TABLE IF NOT EXISTS table_configurations (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(191) NOT NULL UNIQUE,
     title VARCHAR(191),
-    ordinal INT DEFAULT 0
+    ordinal INT DEFAULT 0,
+    db VARCHAR(191)
 );
 
 CREATE TABLE IF NOT EXISTS table_conditional_formatting_rules (
@@ -133,6 +138,14 @@ CREATE TABLE IF NOT EXISTS table_view_columns (
     FOREIGN KEY (view_id) REFERENCES table_views(id) ON DELETE CASCADE,
     UNIQUE KEY unique_view_column (view_id, column_name)
 );
+
+CREATE TABLE IF NOT EXISTS table_recently_viewed (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    table_id BIGINT NOT NULL,
+    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at_unix BIGINT DEFAULT (UNIX_TIMESTAMP())
+);
 `
 	default:
 		schema = `
@@ -140,7 +153,8 @@ CREATE TABLE IF NOT EXISTS table_configurations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL UNIQUE,
     title TEXT,
-    ordinal INTEGER DEFAULT 0
+    ordinal INTEGER DEFAULT 0,
+    db TEXT
 );
 
 CREATE TABLE IF NOT EXISTS table_conditional_formatting_rules (
@@ -180,6 +194,14 @@ CREATE TABLE IF NOT EXISTS table_view_columns (
     FOREIGN KEY (view_id) REFERENCES table_views(id) ON DELETE CASCADE,
     UNIQUE(view_id, column_name)
 );
+
+CREATE TABLE IF NOT EXISTS table_recently_viewed (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    table_id INTEGER NOT NULL,
+    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at_unix INTEGER DEFAULT (strftime('%s', 'now'))
+);
 `
 	}
 	_, err := r.db.ExecContext(ctx, schema)
@@ -201,7 +223,7 @@ func (r *Repository) migrateTableConfigurations(ctx context.Context) error {
 	}
 
 	// For MySQL, check if columns exist before adding
-	var ordinalCount, titleCount int
+	var ordinalCount, titleCount, dbColCount int
 	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'table_configurations' AND column_name = 'ordinal'").Scan(&ordinalCount)
 	if err != nil {
 		return err
@@ -223,6 +245,17 @@ func (r *Repository) migrateTableConfigurations(ctx context.Context) error {
 	if titleCount == 0 {
 		// Title column doesn't exist, add it
 		_, err = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN title VARCHAR(191)")
+		if err != nil {
+			return err
+		}
+	}
+
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'table_configurations' AND column_name = 'db'").Scan(&dbColCount)
+	if err != nil {
+		return err
+	}
+	if dbColCount == 0 {
+		_, err = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN db VARCHAR(191)")
 		if err != nil {
 			return err
 		}
@@ -338,37 +371,55 @@ type FieldSpec struct {
 	DefaultToCurrentTimestamp bool
 }
 
-func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item, error) {
-	t := sanitizeTableName(table)
+func (r *Repository) ListItemsInTable(ctx context.Context, tcName string) ([]Item, error) {
+	tc, err := r.GetTableConfiguration(ctx, tcName)
+
+	if err != nil {
+		log.Errorf("failed to get table structure for table %s: %v", tcName, err)
+		return nil, fmt.Errorf("failed to get table structure for table %s: %w", tcName, err)
+	}
 
 	// First get the column names for this table
-	columns, err := r.ListColumns(ctx, table)
+	columns, err := r.ListColumns(ctx, tc)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+		log.Errorf("failed to get columns for table %s: %v", tcName, err)
+		return nil, fmt.Errorf("failed to get columns for table %s: %w", tcName, err)
 	}
 
 	// Build dynamic SELECT query with all columns
 	columnNames := make([]string, 0, len(columns))
-	columnNames = append(columnNames, "sr_created")
 	for _, col := range columns {
 		columnNames = append(columnNames, col.Name)
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s ORDER BY sr_created DESC", strings.Join(columnNames, ", "), t)
-	log.Infof("Executing query: %s", query)
+	log.Infof("ListItems columnNames: %v", columnNames)
+
+	sortColumn := "sr_created"
+
+	if !slices.Contains(columnNames, sortColumn) {
+		sortColumn = "id"
+	}
+
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `%s` DESC", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, sortColumn)
+	log.Infof("ListItems SQL Query: %s db:%v tbl:%v", query, tc.Db, tc.Table)
 
 	// Use QueryxContext to get raw rows and manually map them
 	rows, err := r.db.QueryxContext(ctx, query)
 	if err != nil {
+		log.Errorf("Failed to list items in table %s: %v", tcName, err)
 		return nil, err
 	}
 	defer rows.Close()
 
+	// rows iteration follows
+
 	var items []Item
 	for rows.Next() {
+		log.Infof("Row iteration")
 		// Get the row as a map
 		rowMap := make(map[string]interface{})
 		if err := rows.MapScan(rowMap); err != nil {
+			log.Errorf("Failed to map scan row: %v", err)
 			return nil, err
 		}
 
@@ -422,6 +473,8 @@ func (r *Repository) ListItemsInTable(ctx context.Context, table string) ([]Item
 		items = append(items, item)
 	}
 
+	log.Infof("ListItems: %d items found", len(items))
+
 	return items, rows.Err()
 }
 
@@ -466,10 +519,14 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 }
 
 func (r *Repository) GetItemInTable(ctx context.Context, table string, id string) (Item, error) {
-	t := sanitizeTableName(table)
+	tc, err := r.GetTableConfiguration(ctx, table)
+
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
+	}
 
 	// First get the column names for this table
-	columns, err := r.ListColumns(ctx, table)
+	columns, err := r.ListColumns(ctx, tc)
 	if err != nil {
 		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
 	}
@@ -480,7 +537,7 @@ func (r *Repository) GetItemInTable(ctx context.Context, table string, id string
 		columnNames = append(columnNames, col.Name)
 	}
 
-	query := fmt.Sprintf("SELECT %s FROM %s WHERE id = ?", strings.Join(columnNames, ", "), t)
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` WHERE `id` = ?", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String)
 
 	// Use QueryxContext to get raw row and manually map it
 	rows, err := r.db.QueryxContext(ctx, query, id)
@@ -539,15 +596,6 @@ func (r *Repository) GetItemInTable(ctx context.Context, table string, id string
 	return item, nil
 }
 
-func (r *Repository) EditItemInTable(ctx context.Context, table string, id string, name string) (Item, error) {
-	t := sanitizeTableName(table)
-	query := fmt.Sprintf("UPDATE %s SET name = ? WHERE id = ?", t)
-	if _, err := r.db.ExecContext(ctx, query, name, id); err != nil {
-		return Item{}, err
-	}
-	return r.GetItemInTable(ctx, t, id)
-}
-
 func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string, id string, name string, additionalFields map[string]string) (Item, error) {
 	t := sanitizeTableName(table)
 
@@ -558,13 +606,13 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 	for fieldName, fieldValue := range additionalFields {
 		// Sanitize field name to prevent SQL injection
 		sanitizedFieldName := sanitizeTableName(fieldName)
-		setParts = append(setParts, fmt.Sprintf("%s = ?", sanitizedFieldName))
+		setParts = append(setParts, fmt.Sprintf("`%s` = ?", sanitizedFieldName))
 		args = append(args, fieldValue)
 	}
 
 	args = append(args, id) // Add id for WHERE clause
 
-	query := fmt.Sprintf("UPDATE %s SET %s WHERE id = ?", t, strings.Join(setParts, ", "))
+	query := fmt.Sprintf("UPDATE `%s` SET %s WHERE `id` = ?", t, strings.Join(setParts, ", "))
 	log.Infof("Executing update query: %s with args: %v", query, args)
 
 	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
@@ -586,26 +634,9 @@ func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id str
 	return n > 0, nil
 }
 
-// Backwards-compatible wrappers defaulting to "items" table
-func (r *Repository) ListItems(ctx context.Context, _ string) ([]Item, error) {
-	return r.ListItemsInTable(ctx, "items")
-}
-func (r *Repository) CreateItem(ctx context.Context, additionalFields map[string]string) (Item, error) {
-	return r.CreateItemInTable(ctx, "items", additionalFields)
-}
-func (r *Repository) GetItem(ctx context.Context, id string) (Item, error) {
-	return r.GetItemInTable(ctx, "items", id)
-}
-func (r *Repository) EditItem(ctx context.Context, id string, additionalFields map[string]string) (Item, error) {
-	return r.EditItemInTableWithFields(ctx, "items", id, "", additionalFields)
-}
-func (r *Repository) DeleteItem(ctx context.Context, id string) (bool, error) {
-	return r.DeleteItemInTable(ctx, "items", id)
-}
-
-// OpenFromEnv returns a database connection using MySQL if DB_HOST is set,
+// ConnectDatabase returns a database connection using MySQL if DB_HOST is set,
 // otherwise falls back to sqlite using the provided defaultSQLiteDSN.
-func OpenFromEnv(defaultSQLiteDSN string) (*sqlx.DB, error) {
+func ConnectDatabase(defaultSQLiteDSN string) (*sqlx.DB, error) {
 	host := os.Getenv("DB_HOST")
 	if host != "" {
 		port := os.Getenv("DB_PORT")
@@ -629,16 +660,11 @@ func OpenFromEnv(defaultSQLiteDSN string) (*sqlx.DB, error) {
 	return sqlx.Open("sqlite", defaultSQLiteDSN)
 }
 
-func (r *Repository) ListColumns(ctx context.Context, table string) ([]FieldSpec, error) {
-	t := sanitizeTableName(table)
+func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldSpec, error) {
 	driver := r.db.DriverName()
 	specs := make([]FieldSpec, 0, 8)
 	switch driver {
 	case "mysql":
-		var dbName string
-		if err := r.db.GetContext(ctx, &dbName, "SELECT DATABASE()"); err != nil {
-			return nil, err
-		}
 		type row struct {
 			ColumnName string `db:"COLUMN_NAME"`
 			DataType   string `db:"DATA_TYPE"`
@@ -646,7 +672,7 @@ func (r *Repository) ListColumns(ctx context.Context, table string) ([]FieldSpec
 		}
 		rows := []row{}
 		q := `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
-		if err := r.db.SelectContext(ctx, &rows, q, dbName, t); err != nil {
+		if err := r.db.SelectContext(ctx, &rows, q, tc.Db, tc.Table); err != nil {
 			return nil, err
 		}
 		for _, r := range rows {
@@ -663,7 +689,7 @@ func (r *Repository) ListColumns(ctx context.Context, table string) ([]FieldSpec
 			DfltValue *string `db:"dflt_value"`
 		}
 		var rows []srow
-		q := fmt.Sprintf("PRAGMA table_info(%s)", t)
+		q := fmt.Sprintf("PRAGMA table_info(%s)", tc.Table)
 		if err := r.db.SelectContext(ctx, &rows, q); err != nil {
 			return nil, err
 		}
@@ -676,47 +702,36 @@ func (r *Repository) ListColumns(ctx context.Context, table string) ([]FieldSpec
 	return specs, nil
 }
 
-// TableStructure represents the structure of a table
-type TableStructure struct {
-	CreateButtonText string
-	View             string
-}
+// GetTableConfiguration returns the structure information for a table
+func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (*TableConfig, error) {
+	t := sanitizeTableName(tcName)
 
-// GetTableStructure returns the structure information for a table
-func (r *Repository) GetTableStructure(ctx context.Context, table string) (*TableStructure, error) {
-	t := sanitizeTableName(table)
+	log.WithFields(log.Fields{
+		"tcName": tcName,
+	}).Infof("Getting TableConfiguration")
 
-	log.Infof("Returning TableStructure: table='%s'", table)
 	// Query table_configurations for this table's metadata
 	var config TableConfig
-	query := "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon, view FROM table_configurations WHERE name = ?"
+	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon, view FROM table_configurations WHERE name = ?"
 	err := r.db.GetContext(ctx, &config, query, t)
+
 	if err != nil {
+		log.Errorf("Failed to get table configuration for table %s: %v", t, err)
+
 		if err == sql.ErrNoRows {
 			// Table not found in configurations, return default structure
-			return &TableStructure{
-				CreateButtonText: "Add Row",
-				View:             "",
-			}, nil
+			return nil, fmt.Errorf("table not found in configurations")
 		}
 		return nil, err
 	}
 
-	// Return structure with configuration data
-	createButtonText := "Add Row"
-	if config.CreateButtonText.Valid {
-		createButtonText = config.CreateButtonText.String
+	log.Infof("TableConfiguration: %+v", config)
+
+	if !config.View.Valid || !config.Table.Valid || !config.Db.Valid {
+		return nil, fmt.Errorf("table structure is invalid, missing view, table or db: %+v", config)
 	}
 
-	view := ""
-	if config.View.Valid {
-		view = config.View.String
-	}
-
-	return &TableStructure{
-		CreateButtonText: createButtonText,
-		View:             view,
-	}, nil
+	return &config, nil
 }
 
 // TableViewColumn represents a column configuration in a table view
@@ -988,7 +1003,7 @@ func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]Fo
 			AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
 			ORDER BY kcu.CONSTRAINT_NAME`
 
-		log.Infof("Query: %v", query)
+		log.Tracef("GetForeignKeys Query: %v", query)
 
 		var dbName string
 		if err := r.db.GetContext(ctx, &dbName, "SELECT DATABASE()"); err != nil {
@@ -1115,4 +1130,149 @@ func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnN
 
 	_, err := r.db.ExecContext(ctx, alterQuery)
 	return err
+}
+
+// InsertRecentlyViewed adds a table and item ID to the recently viewed tracking table
+func (r *Repository) InsertRecentlyViewed(ctx context.Context, tableName, itemID string) error {
+	// First, try to update existing record if it exists
+	var updateQuery string
+	switch r.db.DriverName() {
+	case "mysql":
+		updateQuery = `UPDATE table_recently_viewed
+			SET updated_at_unix = UNIX_TIMESTAMP()
+			WHERE name = ? AND table_id = ?`
+	default: // SQLite
+		updateQuery = `UPDATE table_recently_viewed
+			SET updated_at_unix = strftime('%s', 'now')
+			WHERE name = ? AND table_id = ?`
+	}
+
+	result, err := r.db.ExecContext(ctx, updateQuery, tableName, itemID)
+	if err != nil {
+		return err
+	}
+
+	// Check if any rows were updated
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	// If no rows were updated, insert a new record
+	if rowsAffected == 0 {
+		var insertQuery string
+		switch r.db.DriverName() {
+		case "mysql":
+			insertQuery = `INSERT INTO table_recently_viewed (name, table_id, sr_created, updated_at_unix)
+				VALUES (?, ?, NOW(), UNIX_TIMESTAMP())`
+		default: // SQLite
+			insertQuery = `INSERT INTO table_recently_viewed (name, table_id, sr_created, updated_at_unix)
+				VALUES (?, ?, datetime('now'), strftime('%s', 'now'))`
+		}
+
+		_, err = r.db.ExecContext(ctx, insertQuery, tableName, itemID)
+		return err
+	}
+
+	return nil
+}
+
+// RecentlyViewedItem represents a recently viewed item with table configuration
+type RecentlyViewedItem struct {
+	Name          string `db:"name"`
+	TableID       string `db:"table_id"`
+	Icon          string `db:"icon"`
+	UpdatedAtUnix int64  `db:"updated_at_unix"`
+	ItemName      string // The actual name/title of the item from the table
+	TableTitle    string `db:"title"`
+}
+
+// GetMostRecentlyViewed returns the most recently viewed items with table configuration details
+func (r *Repository) GetMostRecentlyViewed(ctx context.Context, limit int) ([]RecentlyViewedItem, error) {
+	if limit <= 0 {
+		limit = 10 // Default limit
+	}
+
+	query := `
+		SELECT
+			rv.name,
+			rv.table_id,
+			COALESCE(tc.icon, 'DatabaseIcon') as icon,
+            rv.updated_at_unix,
+            COALESCE(tc.title, rv.name) as title
+		FROM table_recently_viewed rv
+		LEFT JOIN table_configurations tc ON rv.name = tc.name
+		ORDER BY rv.updated_at_unix DESC
+		LIMIT ?
+	`
+
+	var items []RecentlyViewedItem
+	err := r.db.SelectContext(ctx, &items, query, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Now fetch the item names for each item
+	for i := range items {
+		itemName, err := r.getItemName(ctx, items[i].Name, items[i].TableID)
+		if err != nil {
+			// If we can't get the item name, use the table ID as fallback
+			items[i].ItemName = items[i].TableID
+			log.WithError(err).WithFields(log.Fields{
+				"table": items[i].Name,
+				"id":    items[i].TableID,
+			}).Warn("Failed to get item name for recently viewed item")
+		} else {
+			items[i].ItemName = itemName
+		}
+	}
+
+	return items, nil
+}
+
+// getItemName fetches the name field from a specific item in a table
+func (r *Repository) getItemName(ctx context.Context, tableName, itemID string) (string, error) {
+	t := sanitizeTableName(tableName)
+
+	// Try to get the 'name' field first, fallback to 'title' if it doesn't exist
+	var name string
+	err := r.db.GetContext(ctx, &name, fmt.Sprintf("SELECT name FROM %s WHERE id = ?", t), itemID)
+	if err != nil {
+		// If 'name' doesn't exist, try 'title'
+		err = r.db.GetContext(ctx, &name, fmt.Sprintf("SELECT title FROM %s WHERE id = ?", t), itemID)
+		if err != nil {
+			// If neither exists, return the ID as fallback
+			return itemID, fmt.Errorf("no name or title field found")
+		}
+	}
+
+	return name, nil
+}
+
+// GetApproxTotalRows returns an approximate total row count across all user tables
+func (r *Repository) GetApproxTotalRows(ctx context.Context) (int64, error) {
+	switch r.db.DriverName() {
+	case "mysql":
+		// Use information_schema for approximate row counts
+		var total sql.NullInt64
+		// If DB name is available via connection, prefer DATABASE() to match current schema
+		err := r.db.GetContext(ctx, &total, `
+            SELECT COALESCE(SUM(table_rows), 0) AS total_rows
+            FROM information_schema.tables
+            WHERE table_schema = DATABASE()
+              AND table_type = 'BASE TABLE'
+        `)
+		if err != nil {
+			return 0, err
+		}
+		if total.Valid {
+			return total.Int64, nil
+		}
+		return 0, nil
+	default:
+		// SQLite (or others): fall back to summing counts from sqlite_master
+		// This is more expensive; keep it simple and approximate with 0 if not supported.
+		// Optional: Could iterate tables and SUM COUNT(*) but that would be heavy.
+		return 0, nil
+	}
 }

@@ -39,7 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
         const userData: User = {
           username,
           token: response.token,
-          expiresAt: response.expiresAt
+          expiresAt: Number(response.expiresAt)
         }
         user.value = userData
         localStorage.setItem('auth_token', response.token)
@@ -78,12 +78,12 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const client = createApiClient()
       const response = await client.validateToken({ token })
-      
+
       if (response.valid) {
         user.value = {
           username: response.username,
           token,
-          expiresAt: response.expiresAt
+          expiresAt: Number(response.expiresAt)
         }
         return true
       } else {

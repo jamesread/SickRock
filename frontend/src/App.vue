@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
-import { ref, onMounted, computed, watch } from 'vue'
-import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon } from '@hugeicons/core-free-icons'
+import { ref, onMounted, computed, watch, provide } from 'vue'
+import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon } from '@hugeicons/core-free-icons'
 import { createApiClient } from './stores/api'
 import Header from 'picocrank/vue/components/Header.vue'
 import logo from './resources/images/logo.png'
@@ -9,6 +9,8 @@ import QuickSearch from 'picocrank/vue/components/QuickSearch.vue'
 import * as Hugeicons from '@hugeicons/core-free-icons'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
+import { create } from '@bufbuild/protobuf'
+import { InitRequestSchema } from './gen/sickrock_pb'
 
 const sidebar = ref(null)
 const router = useRouter()
@@ -16,6 +18,10 @@ const authStore = useAuthStore()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const user = computed(() => authStore.user)
+
+// Create global API client once and provide it to all components
+const apiClient = createApiClient()
+provide('apiClient', apiClient)
 
 function toggleSidebar() {
     sidebar.value.toggle()
@@ -33,22 +39,41 @@ const quickSearch = ref(null)
 async function loadAppData() {
     // Only load data if authenticated
     if (!authStore.isAuthenticated) {
+        sidebar.value.close();
         return
     }
 
     try {
-        const client = createApiClient()
-        
         // Get build info
-        const initResponse = await client.init({})
+        const initResponse = await apiClient.init(create(InitRequestSchema , {}))
         version.value = initResponse.version
 
-        const p = await client.getPages({})
+        const p = await apiClient.getPages({})
         pages.value = p.pages.map(pg => ({ id: pg.id, name: pg.id, title: pg.title, slug: pg.slug, icon: pg.icon, view: pg.view }))
-        
+
         sidebar.value.clearNavigationLinks()
         quickSearch.value.clearItems()
-    
+
+        // Add home link
+        sidebar.value.addNavigationLink({
+            id: 'home',
+            name: 'Home',
+            title: 'Home',
+            path: '/',
+            icon: HomeIcon
+        })
+
+        quickSearch.value.addItem({
+            id: 'home',
+            name: 'Home',
+            title: 'Home',
+            description: 'Dashboard with recently viewed items',
+            category: 'Navigation',
+            path: '/',
+            type: 'route',
+            icon: HomeIcon
+        })
+
         pages.value.forEach(pg => {
             const icon = Hugeicons[pg.icon] || DatabaseIcon
             const path = `/table/${pg.slug}`
@@ -72,7 +97,7 @@ async function loadAppData() {
                 icon: icon
             })
         })
-        
+
         if (sidebar.value) {
             sidebar.value.addSeparator()
             sidebar.value.addNavigationLink({
@@ -80,6 +105,7 @@ async function loadAppData() {
                 name: 'Table Configurations', title: 'Table Configurations', path: '/table/table_configurations', icon: DatabaseSettingIcon })
             sidebar.value.addRouterLink('table-create')
             sidebar.value.addRouterLink('control-panel')
+            sidebar.value.addCallback('Logout', async () => { await handleLogout() }, LogoutIcon)
             sidebar.value.stick()
             sidebar.value.open()
         }
@@ -115,72 +141,31 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div v-if="!isAuthenticated" class="login-container">
-        <router-view />
-    </div>
-    
-    <div v-else>
-        <Header title = "SickRock" :logoUrl = "logo" @toggleSidebar = "toggleSidebar" :username = "user?.username">
-            <template #toolbar>
-                <QuickSearch
-                    ref="quickSearch"
-                    :search-fields="['title']"
-                />
-            </template>
-        </Header>
+    <Header
+        title = "SickRock"
+        :logoUrl = "logo"
+        :username = "user?.username"
+        @toggleSidebar = "toggleSidebar"
+        v-if="isAuthenticated">
 
-        <div id="layout">
-            <Sidebar ref="sidebar" />
-            <div id="content">
-                <main>
-                    <router-view :key="$route.path" />
-                </main>
-                <footer>
-                    <span>SickRock</span>
-                    <span>{{ version }}</span>
-                </footer>
-            </div>
+        <template #toolbar>
+            <QuickSearch
+                ref="quickSearch"
+                :search-fields="['title']"
+            />
+        </template>
+    </Header>
+
+    <div id="layout">
+        <Sidebar ref="sidebar" />
+        <div id="content">
+            <main>
+                <router-view :key="$route.path" />
+            </main>
+            <footer v-if="version">
+                <span>SickRock</span>
+                <span>{{ version }}</span>
+            </footer>
         </div>
     </div>
 </template>
-
-<style scoped>
-.login-container {
-    min-height: 100vh;
-}
-
-.user-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-right: 16px;
-}
-
-.username {
-    font-weight: 500;
-    color: #333;
-}
-
-.logout-button {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 8px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #666;
-    transition: background-color 0.2s ease;
-}
-
-.logout-button:hover {
-    background-color: #f0f0f0;
-    color: #333;
-}
-
-.logout-button svg {
-    width: 16px;
-    height: 16px;
-}
-</style>

@@ -20,42 +20,42 @@ import { useAuthStore } from './stores/auth'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { 
-      path: '/login', 
-      name: 'login', 
+    {
+      path: '/login',
+      name: 'login',
       component: LoginView,
       meta: { requiresAuth: false }
     },
-    { 
-      path: '/', 
-      name: 'home', 
+    {
+      path: '/',
+      name: 'home',
       component: HomeView,
       meta: { requiresAuth: true }
     },
-    { 
-      path: '/about', 
-      name: 'about', 
+    {
+      path: '/about',
+      name: 'about',
       component: AboutView,
       meta: { requiresAuth: true }
     },
-    { 
-      path: '/table/:tableName', 
-      name: 'table', 
-      component: TableView, 
+    {
+      path: '/table/:tableName',
+      name: 'table',
+      component: TableView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: 'Table: ' + String(route.params.tableName), to: { name: 'table', params: { tableName: route.params.tableName } } },
         ],
       },
     },
-    { 
-      path: '/table/:tableName/:rowId', 
-      name: 'row', 
-      component: RowView, 
+    {
+      path: '/table/:tableName/:rowId',
+      name: 'row',
+      component: RowView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -63,12 +63,12 @@ const router = createRouter({
         ],
       },
     },
-    { 
-      path: '/table/:tableName/:rowId/edit', 
-      name: 'row-edit', 
-      component: RowEditView, 
+    {
+      path: '/table/:tableName/:rowId/edit',
+      name: 'row-edit',
+      component: RowEditView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -77,12 +77,12 @@ const router = createRouter({
         ],
       },
     },
-    { 
-      path: '/table/:tableName/add-column', 
-      name: 'add-column', 
-      component: AddColumnView, 
+    {
+      path: '/table/:tableName/add-column',
+      name: 'add-column',
+      component: AddColumnView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -95,7 +95,7 @@ const router = createRouter({
       name: 'insert-row',
       component: InsertRowView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -108,7 +108,7 @@ const router = createRouter({
       name: 'after-insert',
       component: AfterInsertView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -121,7 +121,7 @@ const router = createRouter({
       name: 'create-table-view',
       component: CreateTableView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -134,7 +134,7 @@ const router = createRouter({
       name: 'edit-table-view',
       component: CreateTableView,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -147,7 +147,7 @@ const router = createRouter({
       name: 'foreign-keys',
       component: ForeignKeyManagement,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -160,7 +160,7 @@ const router = createRouter({
       name: 'column-types',
       component: ColumnTypeManagement,
       props: true,
-      meta: { 
+      meta: {
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
@@ -172,7 +172,7 @@ const router = createRouter({
       path: '/admin/table/create',
       name: 'table-create',
       component: TableCreate,
-      meta: { 
+      meta: {
         requiresAuth: true,
         title: 'Create Table',
         icon: DatabaseAddIcon
@@ -182,12 +182,13 @@ const router = createRouter({
       path: '/admin/control-panel',
       name: 'control-panel',
       component: ControlPanel,
-      meta: { 
+      meta: {
         requiresAuth: true,
         title: 'Control Panel',
         icon: DatabaseAddIcon
       },
     },
+    // Logout handled by sidebar link with programmatic action
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
@@ -200,19 +201,25 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-  
+
+  // If navigating to login but already authenticated, redirect to home
+  if (to.name === 'login' && authStore.isAuthenticated) {
+    next('/')
+    return
+  }
+
   // If route doesn't require auth, allow access
   if (to.meta.requiresAuth === false) {
     next()
     return
   }
-  
+
   // If user is authenticated, allow access
   if (authStore.isAuthenticated) {
     next()
     return
   }
-  
+
   // If not authenticated, redirect to login
   next('/login')
 })

@@ -372,7 +372,7 @@ async function loadReferencedTableData() {
 
   for (const fk of foreignKeys.value) {
     try {
-      const response = await client.listItems({ pageId: fk.referencedTable })
+      const response = await client.listItems({ tcName: fk.referencedTable })
       data[fk.columnName] = response.items || []
     } catch (err) {
       console.error(`Error loading data for table ${fk.referencedTable}:`, err)
@@ -429,7 +429,7 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await client.listItems({ pageId: props.tableId })
+    const res = await client.listItems({ tcName: props.tableId })
     items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
   } catch (e) {
     error.value = String(e)

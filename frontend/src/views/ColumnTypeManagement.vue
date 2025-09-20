@@ -104,7 +104,7 @@ const canChangeType = computed(() => {
 
 const canDropColumn = (columnName: string) => {
   // Prevent dropping system columns
-  return columnName !== 'id' && columnName !== 'sr_created'
+  return columnName !== 'id' && columnName !== 'name' && columnName !== 'sr_created'
 }
 
 // Methods
@@ -290,7 +290,6 @@ onMounted(async () => {
     </div>
 
     <div v-else class="columns-list">
-      <h3>Column Types</h3>
       <div class="column-item" v-for="column in sortedColumns" :key="column.name">
         <div class="column-info">
           <div class="column-name">
@@ -387,7 +386,7 @@ onMounted(async () => {
             Change Type
           </button>
           <button
-            v-if="!column.required && canDropColumn(column.name)"
+            v-if="canDropColumn(column.name)"
             @click="showDropConfirm = column.name"
             class="button small bad"
           >

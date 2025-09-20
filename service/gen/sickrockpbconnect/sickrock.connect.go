@@ -90,6 +90,11 @@ const (
 	// SickRockChangeColumnNameProcedure is the fully-qualified name of the SickRock's ChangeColumnName
 	// RPC.
 	SickRockChangeColumnNameProcedure = "/sickrock.SickRock/ChangeColumnName"
+	// SickRockGetMostRecentlyViewedProcedure is the fully-qualified name of the SickRock's
+	// GetMostRecentlyViewed RPC.
+	SickRockGetMostRecentlyViewedProcedure = "/sickrock.SickRock/GetMostRecentlyViewed"
+	// SickRockGetSystemInfoProcedure is the fully-qualified name of the SickRock's GetSystemInfo RPC.
+	SickRockGetSystemInfoProcedure = "/sickrock.SickRock/GetSystemInfo"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -127,6 +132,10 @@ type SickRockClient interface {
 	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
 	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
 	ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error)
+	// Recently Viewed Items
+	GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error)
+	// System Info
+	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -284,35 +293,49 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("ChangeColumnName")),
 			connect.WithClientOptions(opts...),
 		),
+		getMostRecentlyViewed: connect.NewClient[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse](
+			httpClient,
+			baseURL+SickRockGetMostRecentlyViewedProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetMostRecentlyViewed")),
+			connect.WithClientOptions(opts...),
+		),
+		getSystemInfo: connect.NewClient[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse](
+			httpClient,
+			baseURL+SickRockGetSystemInfoProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetSystemInfo")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // sickRockClient implements SickRockClient.
 type sickRockClient struct {
-	init               *connect.Client[proto.InitRequest, proto.InitResponse]
-	ping               *connect.Client[proto.PingRequest, proto.PingResponse]
-	login              *connect.Client[proto.LoginRequest, proto.LoginResponse]
-	logout             *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
-	validateToken      *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
-	getNavigationLinks *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
-	getPages           *connect.Client[proto.GetPagesRequest, proto.GetPagesResponse]
-	listItems          *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
-	createItem         *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
-	getItem            *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
-	editItem           *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
-	deleteItem         *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
-	getTableStructure  *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
-	addTableColumn     *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
-	createTableView    *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
-	updateTableView    *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
-	getTableViews      *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
-	deleteTableView    *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
-	createForeignKey   *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
-	getForeignKeys     *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
-	deleteForeignKey   *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
-	changeColumnType   *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
-	dropColumn         *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
-	changeColumnName   *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
+	init                  *connect.Client[proto.InitRequest, proto.InitResponse]
+	ping                  *connect.Client[proto.PingRequest, proto.PingResponse]
+	login                 *connect.Client[proto.LoginRequest, proto.LoginResponse]
+	logout                *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
+	validateToken         *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
+	getNavigationLinks    *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
+	getPages              *connect.Client[proto.GetPagesRequest, proto.GetPagesResponse]
+	listItems             *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
+	createItem            *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
+	getItem               *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
+	editItem              *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
+	deleteItem            *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
+	getTableStructure     *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
+	addTableColumn        *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
+	createTableView       *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
+	updateTableView       *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
+	getTableViews         *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
+	deleteTableView       *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
+	createForeignKey      *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
+	getForeignKeys        *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
+	deleteForeignKey      *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
+	changeColumnType      *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
+	dropColumn            *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
+	changeColumnName      *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
+	getMostRecentlyViewed *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
+	getSystemInfo         *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -435,6 +458,16 @@ func (c *sickRockClient) ChangeColumnName(ctx context.Context, req *connect.Requ
 	return c.changeColumnName.CallUnary(ctx, req)
 }
 
+// GetMostRecentlyViewed calls sickrock.SickRock.GetMostRecentlyViewed.
+func (c *sickRockClient) GetMostRecentlyViewed(ctx context.Context, req *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error) {
+	return c.getMostRecentlyViewed.CallUnary(ctx, req)
+}
+
+// GetSystemInfo calls sickrock.SickRock.GetSystemInfo.
+func (c *sickRockClient) GetSystemInfo(ctx context.Context, req *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error) {
+	return c.getSystemInfo.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -470,6 +503,10 @@ type SickRockHandler interface {
 	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
 	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
 	ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error)
+	// Recently Viewed Items
+	GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error)
+	// System Info
+	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -623,6 +660,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("ChangeColumnName")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetMostRecentlyViewedHandler := connect.NewUnaryHandler(
+		SickRockGetMostRecentlyViewedProcedure,
+		svc.GetMostRecentlyViewed,
+		connect.WithSchema(sickRockMethods.ByName("GetMostRecentlyViewed")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetSystemInfoHandler := connect.NewUnaryHandler(
+		SickRockGetSystemInfoProcedure,
+		svc.GetSystemInfo,
+		connect.WithSchema(sickRockMethods.ByName("GetSystemInfo")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -673,6 +722,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockDropColumnHandler.ServeHTTP(w, r)
 		case SickRockChangeColumnNameProcedure:
 			sickRockChangeColumnNameHandler.ServeHTTP(w, r)
+		case SickRockGetMostRecentlyViewedProcedure:
+			sickRockGetMostRecentlyViewedHandler.ServeHTTP(w, r)
+		case SickRockGetSystemInfoProcedure:
+			sickRockGetSystemInfoHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -776,4 +829,12 @@ func (UnimplementedSickRockHandler) DropColumn(context.Context, *connect.Request
 
 func (UnimplementedSickRockHandler) ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ChangeColumnName is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetMostRecentlyViewed is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetSystemInfo is not implemented"))
 }

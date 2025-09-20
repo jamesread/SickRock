@@ -8,7 +8,7 @@ require (
 	connectrpc.com/connect v1.18.1
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-sql-driver/mysql v1.9.3
-	github.com/jamesread/golure v0.0.0-20250821142658-fa4de6860090
+	github.com/jamesread/golure v0.0.0-20250919212919-976d085a100c
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/sirupsen/logrus v1.9.3
 	google.golang.org/protobuf v1.36.7

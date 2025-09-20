@@ -152,7 +152,7 @@ async function loadReferencedTableData() {
 
   for (const fk of foreignKeys.value) {
     try {
-      const response = await client.listItems({ pageId: fk.referencedTable })
+      const response = await client.listItems({ tcName: fk.referencedTable })
       data[fk.columnName] = response.items || []
     } catch (err) {
       console.error(`Error loading data for table ${fk.referencedTable}:`, err)
@@ -751,30 +751,6 @@ select:disabled {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-}
-
-.form-actions button {
-  padding: 0.75rem 1.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s;
-}
-
-.form-actions button.primary {
-  background: #007bff;
-  color: white;
-  border-color: #007bff;
-}
-
-.form-actions button:hover:not(:disabled) {
-  background: #f8f9fa;
-}
-
-.form-actions button.primary:hover:not(:disabled) {
-  background: #0056b3;
 }
 
 .form-actions button:disabled {

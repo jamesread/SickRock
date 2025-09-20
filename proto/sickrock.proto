@@ -49,7 +49,7 @@ message Item {
 }
 
 message ListItemsRequest {
-  string page_id = 1;
+  string tc_name = 1;
 }
 
 message ListItemsResponse {
@@ -67,7 +67,8 @@ message CreateItemResponse {
 }
 
 message GetItemRequest {
-  string id = 1;
+  string page_id = 1;
+  string id = 2;
 }
 
 message GetItemResponse {
@@ -249,6 +250,24 @@ message ChangeColumnNameResponse {
   string message = 2;
 }
 
+// Recently Viewed Items
+message GetMostRecentlyViewedRequest {
+  int32 limit = 1; // Maximum number of items to return (default: 10)
+}
+
+message RecentlyViewedItem {
+  string name = 1;           // Table name
+  string table_id = 2;        // Item ID
+  string icon = 3;           // Icon from table_configurations
+  int64 updated_at_unix = 4; // When it was last viewed
+  string item_name = 5;      // The actual name/title of the item
+  string table_title = 6;    // Human title from table_configurations
+}
+
+message GetMostRecentlyViewedResponse {
+  repeated RecentlyViewedItem items = 1;
+}
+
 // Build info
 message InitRequest {}
 
@@ -256,6 +275,7 @@ message InitResponse {
   string version = 1;
   string commit = 2;
   string date = 3;
+  string db_name = 4;
 }
 
 // Authentication
@@ -286,6 +306,12 @@ message ValidateTokenResponse {
   bool valid = 1;
   string username = 2;
   int64 expires_at = 3;
+}
+
+// System Info
+message GetSystemInfoRequest {}
+message GetSystemInfoResponse {
+  int64 approx_total_rows = 1;
 }
 
 service SickRock {
@@ -331,4 +357,10 @@ service SickRock {
   rpc ChangeColumnType(ChangeColumnTypeRequest) returns (ChangeColumnTypeResponse);
   rpc DropColumn(DropColumnRequest) returns (DropColumnResponse);
   rpc ChangeColumnName(ChangeColumnNameRequest) returns (ChangeColumnNameResponse);
+
+  // Recently Viewed Items
+  rpc GetMostRecentlyViewed(GetMostRecentlyViewedRequest) returns (GetMostRecentlyViewedResponse);
+
+  // System Info
+  rpc GetSystemInfo(GetSystemInfoRequest) returns (GetSystemInfoResponse);
 }

@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -23,10 +24,12 @@ func NewSickRockServer(r *repo.Repository) *SickRockServer {
 }
 
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
+	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 	res := connect.NewResponse(&sickrockpb.InitResponse{
 		Version: buildinfo.Version,
 		Commit:  buildinfo.Commit,
 		Date:    buildinfo.Date,
+		DbName:  dbName,
 	})
 	return res, nil
 }
@@ -73,7 +76,7 @@ func (s *SickRockServer) GetPages(ctx context.Context, req *connect.Request[sick
 
 func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sickrockpb.ListItemsRequest]) (*connect.Response[sickrockpb.ListItemsResponse], error) {
 	// Use page_id as table name for this simple mapping
-	table := req.Msg.GetPageId()
+	table := req.Msg.GetTcName()
 	if table == "" {
 		table = "items"
 	}
@@ -140,11 +143,31 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 }
 
 func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickrockpb.GetItemRequest]) (*connect.Response[sickrockpb.GetItemResponse], error) {
-	// For demo, items are stored in default table
-	it, err := s.repo.GetItem(ctx, req.Msg.GetId())
+	// Get table name from the request, default to "items" for backward compatibility
+	table := req.Msg.GetPageId()
+	if table == "" {
+		table = "items"
+	}
+
+	// Ensure table exists
+	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
+		return nil, err
+	}
+
+	it, err := s.repo.GetItemInTable(ctx, table, req.Msg.GetId())
 	if err != nil {
 		return nil, err
 	}
+
+	// Track this item as recently viewed
+	if err := s.repo.InsertRecentlyViewed(ctx, table, req.Msg.GetId()); err != nil {
+		// Log the error but don't fail the request
+		log.WithError(err).WithFields(log.Fields{
+			"table": table,
+			"id":    req.Msg.GetId(),
+		}).Warn("Failed to track recently viewed item")
+	}
+
 	// Convert dynamic fields to string map for protobuf
 	additionalFields := make(map[string]string)
 	for key, value := range it.Fields {
@@ -215,24 +238,18 @@ func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[si
 }
 
 func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Request[sickrockpb.GetTableStructureRequest]) (*connect.Response[sickrockpb.GetTableStructureResponse], error) {
-	table := req.Msg.GetPageId()
-	if table == "" {
-		table = "items"
-	}
-	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
-		return nil, err
-	}
+	tcName := req.Msg.GetPageId()
 
-	structure, err := s.repo.GetTableStructure(ctx, table)
+	tc, err := s.repo.GetTableConfiguration(ctx, tcName)
 	if err != nil {
 		return nil, err
 	}
 
-	cols, err := s.repo.ListColumns(ctx, table)
+	cols, err := s.repo.ListColumns(ctx, tc)
 	if err != nil {
-		log.Errorf("list columns: %v, table: %s", err, table)
+		log.Errorf("list columns: %v, table: %s", err, tcName)
 	} else {
-		log.Infof("list columns: %v, table: %s", cols, table)
+		log.Infof("list columns: %v, table: %s", cols, tcName)
 	}
 	fields := make([]*sickrockpb.Field, 0, len(cols))
 	for _, c := range cols {
@@ -244,12 +261,12 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		})
 	}
 
-	log.Infof("GetTableStructureResponse: %+v", structure)
+	log.Infof("GetTableStructureResponse: %+v", tc)
 
 	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
 		Fields:           fields,
-		CreateButtonText: structure.CreateButtonText,
-		View:             structure.View,
+		CreateButtonText: tc.CreateButtonText.String,
+		View:             tc.View.String,
 	}), nil
 }
 
@@ -629,4 +646,41 @@ func (s *SickRockServer) ChangeColumnName(ctx context.Context, req *connect.Requ
 		Success: true,
 		Message: "Column renamed successfully",
 	}), nil
+}
+
+func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect.Request[sickrockpb.GetMostRecentlyViewedRequest]) (*connect.Response[sickrockpb.GetMostRecentlyViewedResponse], error) {
+	limit := int(req.Msg.GetLimit())
+	if limit <= 0 {
+		limit = 10 // Default limit
+	}
+
+	items, err := s.repo.GetMostRecentlyViewed(ctx, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert repository items to protobuf items
+	var pbItems []*sickrockpb.RecentlyViewedItem
+	for _, item := range items {
+		pbItems = append(pbItems, &sickrockpb.RecentlyViewedItem{
+			Name:          item.Name,
+			TableId:       item.TableID,
+			Icon:          item.Icon,
+			UpdatedAtUnix: item.UpdatedAtUnix,
+			ItemName:      item.ItemName,
+			TableTitle:    item.TableTitle,
+		})
+	}
+
+	return connect.NewResponse(&sickrockpb.GetMostRecentlyViewedResponse{
+		Items: pbItems,
+	}), nil
+}
+
+func (s *SickRockServer) GetSystemInfo(ctx context.Context, req *connect.Request[sickrockpb.GetSystemInfoRequest]) (*connect.Response[sickrockpb.GetSystemInfoResponse], error) {
+	total, err := s.repo.GetApproxTotalRows(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&sickrockpb.GetSystemInfoResponse{ApproxTotalRows: total}), nil
 }

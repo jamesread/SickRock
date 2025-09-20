@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Edit01Icon, Delete01Icon } from '@hugeicons/core-free-icons'
 import Table from '../components/Table.vue'
 import Section from 'picocrank/vue/components/Section.vue'
+import type { createApiClient } from '../stores/api'
 
 const route = useRoute()
 const router = useRouter()
 const tableName = route.params.tableName as string
 const rowId = route.params.rowId as string
 
-// Transport handled by authenticated client
-const client = createApiClient()
+// Use global API client
+const client = inject<ReturnType<typeof createApiClient>>('apiClient')
 
 const item = ref<Record<string, unknown> | null>(null)
 const loading = ref(false)
@@ -35,6 +35,58 @@ const foreignKeys = ref<Array<{
 }>>([])
 const relatedRows = ref<Record<string, any[]>>({})
 const loadingRelated = ref(false)
+
+// Index of referenced item names for quick lookup: table -> id -> name
+const referencedNameIndex = computed(() => {
+  const index: Record<string, Record<string, string>> = {}
+  for (const [key, rows] of Object.entries(relatedRows.value)) {
+    // Only build index for referenced tables (Direction 2 keys use referencedTable.referencedColumn)
+    const [table] = key.split('.')
+    if (!index[table]) index[table] = {}
+    for (const row of rows) {
+      const id = String((row && (row.id || (row.additionalFields && row.additionalFields.id))) ?? '')
+      if (!id) continue
+      const nameCandidate = (row && (row.name || (row.additionalFields && (row.additionalFields.name || row.additionalFields.title))))
+      const name = String(nameCandidate ?? id)
+      index[table][id] = name
+    }
+  }
+  return index
+})
+
+// Quick FK map: columnName -> { referencedTable, referencedColumn }
+const foreignKeyByColumn = computed(() => {
+  const map: Record<string, { referencedTable: string; referencedColumn: string }> = {}
+  for (const fk of foreignKeys.value) {
+    map[fk.columnName] = { referencedTable: fk.referencedTable, referencedColumn: fk.referencedColumn }
+  }
+  return map
+})
+
+function resolveRawFieldValue(key: string): any {
+  if (!item.value) return undefined
+  // check top-level first
+  if (Object.prototype.hasOwnProperty.call(item.value, key)) {
+    return (item.value as any)[key]
+  }
+  // then additionalFields
+  const af = (item.value as any).additionalFields
+  if (af && Object.prototype.hasOwnProperty.call(af, key)) {
+    return af[key]
+  }
+  return undefined
+}
+
+function getFkDisplay(key: string): { to?: string; label?: string } {
+  const fk = foreignKeyByColumn.value[key]
+  if (!fk) return {}
+  const raw = resolveRawFieldValue(key)
+  if (raw === null || raw === undefined || raw === '') return {}
+  const id = String(raw)
+  const table = fk.referencedTable
+  const label = (referencedNameIndex.value[table] && referencedNameIndex.value[table][id]) || id
+  return { to: `/table/${table}/${id}`, label }
+}
 
 // Load foreign keys for the current table
 async function loadForeignKeys() {
@@ -77,7 +129,7 @@ async function loadRelatedRows() {
 
       try {
         // Get all items from the referencing table
-        const response = await client.listItems({ pageId: fk.tableName })
+        const response = await client.listItems({ tcName: fk.tableName })
         const allItems = response.items || []
         console.log(`Loaded ${allItems.length} items from ${fk.tableName}`)
         if (allItems.length > 0) {
@@ -110,7 +162,7 @@ async function loadRelatedRows() {
       if (currentValue !== null && currentValue !== undefined) {
         try {
           // Get all items from the referenced table
-          const response = await client.listItems({ pageId: fk.referencedTable })
+          const response = await client.listItems({ tcName: fk.referencedTable })
           const allItems = response.items || []
 
           // Filter items where the referenced column matches the current value
@@ -144,9 +196,8 @@ async function loadRelatedRows() {
 onMounted(async () => {
   loading.value = true
   try {
-    const res = await client.listItems({ pageId: tableName })
-    const found = (res.items as any[] | undefined)?.find((it) => String(it.id) === String(rowId))
-    item.value = found ?? null
+    const res = await client.getItem({ pageId: tableName, id: rowId })
+    item.value = res.item as any ?? null
 
     // Load foreign keys and related rows after getting the main item
     if (item.value) {
@@ -277,6 +328,12 @@ const relatedTables = computed(() => {
 // Section title matching Table component style
 const sectionTitle = computed(() => `Table: ${tableName}`)
 
+function displayFieldLabel(key: string): string {
+  if (key === 'id') return 'ID'
+  if (key === 'srCreated') return 'Created'
+  return key
+}
+
 async function deleteItem() {
   deleting.value = true
   error.value = null
@@ -337,8 +394,15 @@ function cancelDelete() {
         <div v-else-if="loading">Loading…</div>
         <dl v-else-if="entries.length > 0">
           <template v-for="[k, v, valueClass] in entries" :key="k">
-            <dt>{{ k }}</dt>
-            <dd :class="valueClass">{{ v }}</dd>
+            <dt>{{ displayFieldLabel(k) }}</dt>
+            <dd :class="valueClass">
+              <template v-if="getFkDisplay(k).to">
+                <router-link :to="getFkDisplay(k).to">{{ getFkDisplay(k).label }}</router-link>
+              </template>
+              <template v-else>
+                {{ v }}
+              </template>
+            </dd>
           </template>
         </dl>
         <div v-else class="no-data">

@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableViewRequest, CreateTableViewResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetPagesRequest, GetPagesResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
+import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableViewRequest, CreateTableViewResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetPagesRequest, GetPagesResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -246,6 +246,27 @@ export const SickRock = {
       O: ChangeColumnNameResponse,
       kind: MethodKind.Unary,
     },
+    /**
+     * Recently Viewed Items
+     *
+     * @generated from rpc sickrock.SickRock.GetMostRecentlyViewed
+     */
+    getMostRecentlyViewed: {
+      name: "GetMostRecentlyViewed",
+      I: GetMostRecentlyViewedRequest,
+      O: GetMostRecentlyViewedResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * System Info
+     *
+     * @generated from rpc sickrock.SickRock.GetSystemInfo
+     */
+    getSystemInfo: {
+      name: "GetSystemInfo",
+      I: GetSystemInfoRequest,
+      O: GetSystemInfoResponse,
+      kind: MethodKind.Unary,
+    },
   }
 } as const;
-
