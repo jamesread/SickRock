@@ -15,6 +15,7 @@ import (
 
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	"github.com/jamesread/SickRock/internal/auth"
+	"github.com/jamesread/SickRock/internal/buildinfo"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
 )
@@ -110,6 +111,11 @@ func findFrontendDir() string {
 
 func main() {
 	log.Info("SickRock is starting up...")
+	log.WithFields(log.Fields{
+		"version": buildinfo.Version,
+		"commit":  buildinfo.Commit,
+		"date":    buildinfo.Date,
+	}).Info("Build info")
 
 	loadEnvFile()
 
