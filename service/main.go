@@ -92,20 +92,20 @@ func configureLogging() {
 func findFrontendDir() string {
 	// Try to find the frontend directory
 	possiblePaths := []string{
-		"../frontend",
-		"frontend",
-		"./frontend",
-		"../../frontend",
+		"../frontend/",
+		"frontend/",
+		"/www/",
+		"/usr/share/SickRock/frontend/",
+		"/var/www/html/SickRock/frontend/",
 	}
 
-	for _, path := range possiblePaths {
-		if _, err := os.Stat(filepath.Join(path, "index.html")); err == nil {
-			return path
-		}
-	}
+	indexHtml, _ := dirs.GetFirstExistingFileFromDirs("frontend", possiblePaths, "index.html")
 
-	// Fallback to current directory
-	return "."
+	frontendDir := filepath.Dir(indexHtml)
+
+	log.Infof("Using frontend directory: %s", frontendDir)
+
+	return frontendDir
 }
 
 func main() {
