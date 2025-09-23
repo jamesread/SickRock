@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableViewRequest, CreateTableViewResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetPagesRequest, GetPagesResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
+import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableViewRequest, CreateTableViewResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -60,6 +60,53 @@ export const SickRock = {
       kind: MethodKind.Unary,
     },
     /**
+     * @generated from rpc sickrock.SickRock.ResetUserPassword
+     */
+    resetUserPassword: {
+      name: "ResetUserPassword",
+      I: ResetUserPasswordRequest,
+      O: ResetUserPasswordResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Device Code Authentication
+     *
+     * @generated from rpc sickrock.SickRock.GenerateDeviceCode
+     */
+    generateDeviceCode: {
+      name: "GenerateDeviceCode",
+      I: GenerateDeviceCodeRequest,
+      O: GenerateDeviceCodeResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ClaimDeviceCode
+     */
+    claimDeviceCode: {
+      name: "ClaimDeviceCode",
+      I: ClaimDeviceCodeRequest,
+      O: ClaimDeviceCodeResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.CheckDeviceCode
+     */
+    checkDeviceCode: {
+      name: "CheckDeviceCode",
+      I: CheckDeviceCodeRequest,
+      O: CheckDeviceCodeResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetDeviceCodeSession
+     */
+    getDeviceCodeSession: {
+      name: "GetDeviceCodeSession",
+      I: GetDeviceCodeSessionRequest,
+      O: GetDeviceCodeSessionResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
      * Navigation for the UI
      *
      * @generated from rpc sickrock.SickRock.GetNavigationLinks
@@ -71,14 +118,25 @@ export const SickRock = {
       kind: MethodKind.Unary,
     },
     /**
-     * Pages available in the application
+     * Table configurations available in the application
      *
-     * @generated from rpc sickrock.SickRock.GetPages
+     * @generated from rpc sickrock.SickRock.GetTableConfigurations
      */
-    getPages: {
-      name: "GetPages",
-      I: GetPagesRequest,
-      O: GetPagesResponse,
+    getTableConfigurations: {
+      name: "GetTableConfigurations",
+      I: GetTableConfigurationsRequest,
+      O: GetTableConfigurationsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Navigation items from table_navigation
+     *
+     * @generated from rpc sickrock.SickRock.GetNavigation
+     */
+    getNavigation: {
+      name: "GetNavigation",
+      I: GetNavigationRequest,
+      O: GetNavigationResponse,
       kind: MethodKind.Unary,
     },
     /**

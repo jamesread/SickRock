@@ -13,6 +13,8 @@ import { create } from '@bufbuild/protobuf'
 import { InitRequestSchema } from './gen/sickrock_pb'
 
 const sidebar = ref(null)
+const isSidebarOpen = ref(true)
+const SIDEBAR_STATE_KEY = 'sickrock_sidebar_open'
 const router = useRouter()
 const authStore = useAuthStore()
 
@@ -23,8 +25,15 @@ const user = computed(() => authStore.user)
 const apiClient = createApiClient()
 provide('apiClient', apiClient)
 
+function persistSidebarState() {
+    try { localStorage.setItem(SIDEBAR_STATE_KEY, isSidebarOpen.value ? '1' : '0') } catch {}
+}
+
 function toggleSidebar() {
-    sidebar.value.toggle()
+    isSidebarOpen.value = !isSidebarOpen.value
+    if (isSidebarOpen.value) sidebar.value.open()
+    else sidebar.value.close()
+    persistSidebarState()
 }
 
 async function handleLogout() {
@@ -39,7 +48,9 @@ const quickSearch = ref(null)
 async function loadAppData() {
     // Only load data if authenticated
     if (!authStore.isAuthenticated) {
-        sidebar.value.close();
+        if (sidebar.value) sidebar.value.close();
+        isSidebarOpen.value = false
+        persistSidebarState()
         return
     }
 
@@ -48,8 +59,16 @@ async function loadAppData() {
         const initResponse = await apiClient.init(create(InitRequestSchema , {}))
         version.value = initResponse.version
 
-        const p = await apiClient.getPages({})
-        pages.value = p.pages.map(pg => ({ id: pg.id, name: pg.id, title: pg.title, slug: pg.slug, icon: pg.icon, view: pg.view }))
+        const navResponse = await apiClient.getNavigation({})
+        const sortedItems = [...(navResponse.items || [])].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+        pages.value = sortedItems.map(item => ({
+            id: item.tableName,
+            name: item.tableName,
+            title: item.tableTitle,
+            slug: item.tableName,
+            icon: item.tableIcon,
+            view: item.tableView
+        }))
 
         sidebar.value.clearNavigationLinks()
         quickSearch.value.clearItems()
@@ -103,11 +122,21 @@ async function loadAppData() {
             sidebar.value.addNavigationLink({
                 id: 'table-configurations',
                 name: 'Table Configurations', title: 'Table Configurations', path: '/table/table_configurations', icon: DatabaseSettingIcon })
+            sidebar.value.addNavigationLink({
+                id: 'nav-items',
+                name: 'Navigation', title: 'Navigation', path: '/table/table_navigation', icon: DatabaseSettingIcon })
             sidebar.value.addRouterLink('table-create')
             sidebar.value.addRouterLink('control-panel')
+            sidebar.value.addRouterLink('device-code-claimer')
             sidebar.value.addCallback('Logout', async () => { await handleLogout() }, LogoutIcon)
             sidebar.value.stick()
-            sidebar.value.open()
+            // Restore sidebar state from localStorage (default open)
+            try {
+                const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
+                isSidebarOpen.value = (stored == null ? true : stored === '1')
+            } catch { isSidebarOpen.value = true }
+            if (isSidebarOpen.value) sidebar.value.open()
+            else sidebar.value.close()
         }
     } catch (error) {
         console.error('Failed to load data:', error)
@@ -157,7 +186,7 @@ onMounted(async () => {
     </Header>
 
     <div id="layout">
-        <Sidebar ref="sidebar" />
+        <Sidebar v-if="isAuthenticated" ref="sidebar" />
         <div id="content">
             <main>
                 <router-view :key="$route.path" />

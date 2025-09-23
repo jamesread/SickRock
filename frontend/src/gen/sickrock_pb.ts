@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sickrock.proto.
  */
 export const file_sickrock: GenFile = /*@__PURE__*/
-  fileDesc("Cg5zaWNrcm9jay5wcm90bxIIc2lja3JvY2siHgoLUGluZ1JlcXVlc3QSDwoHbWVzc2FnZRgBIAEoCSI3CgxQaW5nUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRIWCg50aW1lc3RhbXBfdW5peBgCIAEoAyIbChlHZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0Ii0KDk5hdmlnYXRpb25MaW5rEg0KBWxhYmVsGAEgASgJEgwKBHBhdGgYAiABKAkiRQoaR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USJwoFbGlua3MYASADKAsyGC5zaWNrcm9jay5OYXZpZ2F0aW9uTGluayIRCg9HZXRQYWdlc1JlcXVlc3QiXAoEUGFnZRIKCgJpZBgBIAEoCRINCgV0aXRsZRgCIAEoCRIMCgRzbHVnGAMgASgJEg8KB29yZGluYWwYBCABKAUSDAoEaWNvbhgFIAEoCRIMCgR2aWV3GAYgASgJIjEKEEdldFBhZ2VzUmVzcG9uc2USHQoFcGFnZXMYASADKAsyDi5zaWNrcm9jay5QYWdlIqABCgRJdGVtEgoKAmlkGAEgASgJEhIKCnNyX2NyZWF0ZWQYAiABKAMSPwoRYWRkaXRpb25hbF9maWVsZHMYAyADKAsyJC5zaWNrcm9jay5JdGVtLkFkZGl0aW9uYWxGaWVsZHNFbnRyeRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIjChBMaXN0SXRlbXNSZXF1ZXN0Eg8KB3RjX25hbWUYASABKAkiMgoRTGlzdEl0ZW1zUmVzcG9uc2USHQoFaXRlbXMYASADKAsyDi5zaWNrcm9jay5JdGVtIr8BChFDcmVhdGVJdGVtUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEhIKCnNyX2NyZWF0ZWQYAiABKAMSTAoRYWRkaXRpb25hbF9maWVsZHMYAyADKAsyMS5zaWNrcm9jay5DcmVhdGVJdGVtUmVxdWVzdC5BZGRpdGlvbmFsRmllbGRzRW50cnkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiMgoSQ3JlYXRlSXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIi0KDkdldEl0ZW1SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSCgoCaWQYAiABKAkiLwoPR2V0SXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIrMBCg9FZGl0SXRlbVJlcXVlc3QSCgoCaWQYASABKAkSSgoRYWRkaXRpb25hbF9maWVsZHMYAiADKAsyLy5zaWNrcm9jay5FZGl0SXRlbVJlcXVlc3QuQWRkaXRpb25hbEZpZWxkc0VudHJ5Eg8KB3BhZ2VfaWQYAyABKAkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiMAoQRWRpdEl0ZW1SZXNwb25zZRIcCgRpdGVtGAEgASgLMg4uc2lja3JvY2suSXRlbSIwChFEZWxldGVJdGVtUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEgoKAmlkGAIgASgJIiUKEkRlbGV0ZUl0ZW1SZXNwb25zZRIPCgdkZWxldGVkGAEgASgIIisKGEdldFRhYmxlU3RydWN0dXJlUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJIlsKBUZpZWxkEgwKBG5hbWUYASABKAkSDAoEdHlwZRgCIAEoCRIQCghyZXF1aXJlZBgDIAEoCBIkChxkZWZhdWx0X3RvX2N1cnJlbnRfdGltZXN0YW1wGAQgASgIImQKGUdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USHwoGZmllbGRzGAEgAygLMg8uc2lja3JvY2suRmllbGQSGAoQQ3JlYXRlQnV0dG9uVGV4dBgCIAEoCRIMCgR2aWV3GAMgASgJIkgKFUFkZFRhYmxlQ29sdW1uUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEh4KBWZpZWxkGAIgASgLMg8uc2lja3JvY2suRmllbGQiZAoPVGFibGVWaWV3Q29sdW1uEhMKC2NvbHVtbl9uYW1lGAEgASgJEhIKCmlzX3Zpc2libGUYAiABKAgSFAoMY29sdW1uX29yZGVyGAMgASgFEhIKCnNvcnRfb3JkZXIYBCABKAkiawoWQ3JlYXRlVGFibGVWaWV3UmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhEKCXZpZXdfbmFtZRgCIAEoCRIqCgdjb2x1bW5zGAMgAygLMhkuc2lja3JvY2suVGFibGVWaWV3Q29sdW1uIjsKF0NyZWF0ZVRhYmxlVmlld1Jlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSJ8ChZVcGRhdGVUYWJsZVZpZXdSZXF1ZXN0Eg8KB3ZpZXdfaWQYASABKAUSEgoKdGFibGVfbmFtZRgCIAEoCRIRCgl2aWV3X25hbWUYAyABKAkSKgoHY29sdW1ucxgEIAMoCzIZLnNpY2tyb2NrLlRhYmxlVmlld0NvbHVtbiI7ChdVcGRhdGVUYWJsZVZpZXdSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiKgoUR2V0VGFibGVWaWV3c1JlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCSJ+CglUYWJsZVZpZXcSCgoCaWQYASABKAUSEgoKdGFibGVfbmFtZRgCIAEoCRIRCgl2aWV3X25hbWUYAyABKAkSEgoKaXNfZGVmYXVsdBgEIAEoCBIqCgdjb2x1bW5zGAUgAygLMhkuc2lja3JvY2suVGFibGVWaWV3Q29sdW1uIjsKFUdldFRhYmxlVmlld3NSZXNwb25zZRIiCgV2aWV3cxgBIAMoCzITLnNpY2tyb2NrLlRhYmxlVmlldyIpChZEZWxldGVUYWJsZVZpZXdSZXF1ZXN0Eg8KB3ZpZXdfaWQYASABKAUiOwoXRGVsZXRlVGFibGVWaWV3UmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIrcBCgpGb3JlaWduS2V5EhcKD2NvbnN0cmFpbnRfbmFtZRgBIAEoCRISCgp0YWJsZV9uYW1lGAIgASgJEhMKC2NvbHVtbl9uYW1lGAMgASgJEhgKEHJlZmVyZW5jZWRfdGFibGUYBCABKAkSGQoRcmVmZXJlbmNlZF9jb2x1bW4YBSABKAkSGAoQb25fZGVsZXRlX2FjdGlvbhgGIAEoCRIYChBvbl91cGRhdGVfYWN0aW9uGAcgASgJIqsBChdDcmVhdGVGb3JlaWduS2V5UmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhMKC2NvbHVtbl9uYW1lGAIgASgJEhgKEHJlZmVyZW5jZWRfdGFibGUYAyABKAkSGQoRcmVmZXJlbmNlZF9jb2x1bW4YBCABKAkSGAoQb25fZGVsZXRlX2FjdGlvbhgFIAEoCRIYChBvbl91cGRhdGVfYWN0aW9uGAYgASgJIjwKGENyZWF0ZUZvcmVpZ25LZXlSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiKwoVR2V0Rm9yZWlnbktleXNSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkiRAoWR2V0Rm9yZWlnbktleXNSZXNwb25zZRIqCgxmb3JlaWduX2tleXMYASADKAsyFC5zaWNrcm9jay5Gb3JlaWduS2V5IjIKF0RlbGV0ZUZvcmVpZ25LZXlSZXF1ZXN0EhcKD2NvbnN0cmFpbnRfbmFtZRgBIAEoCSI8ChhEZWxldGVGb3JlaWduS2V5UmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIlQKF0NoYW5nZUNvbHVtblR5cGVSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEwoLY29sdW1uX25hbWUYAiABKAkSEAoIbmV3X3R5cGUYAyABKAkiPAoYQ2hhbmdlQ29sdW1uVHlwZVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSI8ChFEcm9wQ29sdW1uUmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhMKC2NvbHVtbl9uYW1lGAIgASgJIjYKEkRyb3BDb2x1bW5SZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiXwoXQ2hhbmdlQ29sdW1uTmFtZVJlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCRIXCg9vbGRfY29sdW1uX25hbWUYAiABKAkSFwoPbmV3X2NvbHVtbl9uYW1lGAMgASgJIjwKGENoYW5nZUNvbHVtbk5hbWVSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiLQocR2V0TW9zdFJlY2VudGx5Vmlld2VkUmVxdWVzdBINCgVsaW1pdBgBIAEoBSKDAQoSUmVjZW50bHlWaWV3ZWRJdGVtEgwKBG5hbWUYASABKAkSEAoIdGFibGVfaWQYAiABKAkSDAoEaWNvbhgDIAEoCRIXCg91cGRhdGVkX2F0X3VuaXgYBCABKAMSEQoJaXRlbV9uYW1lGAUgASgJEhMKC3RhYmxlX3RpdGxlGAYgASgJIkwKHUdldE1vc3RSZWNlbnRseVZpZXdlZFJlc3BvbnNlEisKBWl0ZW1zGAEgAygLMhwuc2lja3JvY2suUmVjZW50bHlWaWV3ZWRJdGVtIg0KC0luaXRSZXF1ZXN0Ik4KDEluaXRSZXNwb25zZRIPCgd2ZXJzaW9uGAEgASgJEg4KBmNvbW1pdBgCIAEoCRIMCgRkYXRlGAMgASgJEg8KB2RiX25hbWUYBCABKAkiMgoMTG9naW5SZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJIlQKDUxvZ2luUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEg0KBXRva2VuGAMgASgJEhIKCmV4cGlyZXNfYXQYBCABKAMiDwoNTG9nb3V0UmVxdWVzdCIyCg5Mb2dvdXRSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiJQoUVmFsaWRhdGVUb2tlblJlcXVlc3QSDQoFdG9rZW4YASABKAkiTAoVVmFsaWRhdGVUb2tlblJlc3BvbnNlEg0KBXZhbGlkGAEgASgIEhAKCHVzZXJuYW1lGAIgASgJEhIKCmV4cGlyZXNfYXQYAyABKAMiFgoUR2V0U3lzdGVtSW5mb1JlcXVlc3QiMgoVR2V0U3lzdGVtSW5mb1Jlc3BvbnNlEhkKEWFwcHJveF90b3RhbF9yb3dzGAEgASgDMpYQCghTaWNrUm9jaxI1CgRJbml0EhUuc2lja3JvY2suSW5pdFJlcXVlc3QaFi5zaWNrcm9jay5Jbml0UmVzcG9uc2USNQoEUGluZxIVLnNpY2tyb2NrLlBpbmdSZXF1ZXN0GhYuc2lja3JvY2suUGluZ1Jlc3BvbnNlEjgKBUxvZ2luEhYuc2lja3JvY2suTG9naW5SZXF1ZXN0Ghcuc2lja3JvY2suTG9naW5SZXNwb25zZRI7CgZMb2dvdXQSFy5zaWNrcm9jay5Mb2dvdXRSZXF1ZXN0Ghguc2lja3JvY2suTG9nb3V0UmVzcG9uc2USUAoNVmFsaWRhdGVUb2tlbhIeLnNpY2tyb2NrLlZhbGlkYXRlVG9rZW5SZXF1ZXN0Gh8uc2lja3JvY2suVmFsaWRhdGVUb2tlblJlc3BvbnNlEl8KEkdldE5hdmlnYXRpb25MaW5rcxIjLnNpY2tyb2NrLkdldE5hdmlnYXRpb25MaW5rc1JlcXVlc3QaJC5zaWNrcm9jay5HZXROYXZpZ2F0aW9uTGlua3NSZXNwb25zZRJBCghHZXRQYWdlcxIZLnNpY2tyb2NrLkdldFBhZ2VzUmVxdWVzdBoaLnNpY2tyb2NrLkdldFBhZ2VzUmVzcG9uc2USRAoJTGlzdEl0ZW1zEhouc2lja3JvY2suTGlzdEl0ZW1zUmVxdWVzdBobLnNpY2tyb2NrLkxpc3RJdGVtc1Jlc3BvbnNlEkcKCkNyZWF0ZUl0ZW0SGy5zaWNrcm9jay5DcmVhdGVJdGVtUmVxdWVzdBocLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXNwb25zZRI+CgdHZXRJdGVtEhguc2lja3JvY2suR2V0SXRlbVJlcXVlc3QaGS5zaWNrcm9jay5HZXRJdGVtUmVzcG9uc2USQQoIRWRpdEl0ZW0SGS5zaWNrcm9jay5FZGl0SXRlbVJlcXVlc3QaGi5zaWNrcm9jay5FZGl0SXRlbVJlc3BvbnNlEkcKCkRlbGV0ZUl0ZW0SGy5zaWNrcm9jay5EZWxldGVJdGVtUmVxdWVzdBocLnNpY2tyb2NrLkRlbGV0ZUl0ZW1SZXNwb25zZRJcChFHZXRUYWJsZVN0cnVjdHVyZRIiLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVxdWVzdBojLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USVgoOQWRkVGFibGVDb2x1bW4SHy5zaWNrcm9jay5BZGRUYWJsZUNvbHVtblJlcXVlc3QaIy5zaWNrcm9jay5HZXRUYWJsZVN0cnVjdHVyZVJlc3BvbnNlElYKD0NyZWF0ZVRhYmxlVmlldxIgLnNpY2tyb2NrLkNyZWF0ZVRhYmxlVmlld1JlcXVlc3QaIS5zaWNrcm9jay5DcmVhdGVUYWJsZVZpZXdSZXNwb25zZRJWCg9VcGRhdGVUYWJsZVZpZXcSIC5zaWNrcm9jay5VcGRhdGVUYWJsZVZpZXdSZXF1ZXN0GiEuc2lja3JvY2suVXBkYXRlVGFibGVWaWV3UmVzcG9uc2USUAoNR2V0VGFibGVWaWV3cxIeLnNpY2tyb2NrLkdldFRhYmxlVmlld3NSZXF1ZXN0Gh8uc2lja3JvY2suR2V0VGFibGVWaWV3c1Jlc3BvbnNlElYKD0RlbGV0ZVRhYmxlVmlldxIgLnNpY2tyb2NrLkRlbGV0ZVRhYmxlVmlld1JlcXVlc3QaIS5zaWNrcm9jay5EZWxldGVUYWJsZVZpZXdSZXNwb25zZRJZChBDcmVhdGVGb3JlaWduS2V5EiEuc2lja3JvY2suQ3JlYXRlRm9yZWlnbktleVJlcXVlc3QaIi5zaWNrcm9jay5DcmVhdGVGb3JlaWduS2V5UmVzcG9uc2USUwoOR2V0Rm9yZWlnbktleXMSHy5zaWNrcm9jay5HZXRGb3JlaWduS2V5c1JlcXVlc3QaIC5zaWNrcm9jay5HZXRGb3JlaWduS2V5c1Jlc3BvbnNlElkKEERlbGV0ZUZvcmVpZ25LZXkSIS5zaWNrcm9jay5EZWxldGVGb3JlaWduS2V5UmVxdWVzdBoiLnNpY2tyb2NrLkRlbGV0ZUZvcmVpZ25LZXlSZXNwb25zZRJZChBDaGFuZ2VDb2x1bW5UeXBlEiEuc2lja3JvY2suQ2hhbmdlQ29sdW1uVHlwZVJlcXVlc3QaIi5zaWNrcm9jay5DaGFuZ2VDb2x1bW5UeXBlUmVzcG9uc2USRwoKRHJvcENvbHVtbhIbLnNpY2tyb2NrLkRyb3BDb2x1bW5SZXF1ZXN0Ghwuc2lja3JvY2suRHJvcENvbHVtblJlc3BvbnNlElkKEENoYW5nZUNvbHVtbk5hbWUSIS5zaWNrcm9jay5DaGFuZ2VDb2x1bW5OYW1lUmVxdWVzdBoiLnNpY2tyb2NrLkNoYW5nZUNvbHVtbk5hbWVSZXNwb25zZRJoChVHZXRNb3N0UmVjZW50bHlWaWV3ZWQSJi5zaWNrcm9jay5HZXRNb3N0UmVjZW50bHlWaWV3ZWRSZXF1ZXN0Gicuc2lja3JvY2suR2V0TW9zdFJlY2VudGx5Vmlld2VkUmVzcG9uc2USUAoNR2V0U3lzdGVtSW5mbxIeLnNpY2tyb2NrLkdldFN5c3RlbUluZm9SZXF1ZXN0Gh8uc2lja3JvY2suR2V0U3lzdGVtSW5mb1Jlc3BvbnNlQpEBCgxjb20uc2lja3JvY2tCDVNpY2tyb2NrUHJvdG9QAVoyZ2l0aHViLmNvbS9qYW1lc3JlYWQvU2lja1JvY2svZ2VuL3Byb3RvO3NpY2tyb2NrcGKiAgNTWFiqAghTaWNrcm9ja8oCCFNpY2tyb2Nr4gIUU2lja3JvY2tcR1BCTWV0YWRhdGHqAghTaWNrcm9ja2IGcHJvdG8z");
+  fileDesc("Cg5zaWNrcm9jay5wcm90bxIIc2lja3JvY2siHgoLUGluZ1JlcXVlc3QSDwoHbWVzc2FnZRgBIAEoCSI3CgxQaW5nUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRIWCg50aW1lc3RhbXBfdW5peBgCIAEoAyIbChlHZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0Ii0KDk5hdmlnYXRpb25MaW5rEg0KBWxhYmVsGAEgASgJEgwKBHBhdGgYAiABKAkiRQoaR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USJwoFbGlua3MYASADKAsyGC5zaWNrcm9jay5OYXZpZ2F0aW9uTGluayIfCh1HZXRUYWJsZUNvbmZpZ3VyYXRpb25zUmVxdWVzdCJcCgRQYWdlEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEgwKBHNsdWcYAyABKAkSDwoHb3JkaW5hbBgEIAEoBRIMCgRpY29uGAUgASgJEgwKBHZpZXcYBiABKAkiPwoeR2V0VGFibGVDb25maWd1cmF0aW9uc1Jlc3BvbnNlEh0KBXBhZ2VzGAEgAygLMg4uc2lja3JvY2suUGFnZSIWChRHZXROYXZpZ2F0aW9uUmVxdWVzdCKbAQoOTmF2aWdhdGlvbkl0ZW0SCgoCaWQYASABKAUSDwoHb3JkaW5hbBgCIAEoBRIbChN0YWJsZV9jb25maWd1cmF0aW9uGAMgASgFEhIKCnRhYmxlX25hbWUYBCABKAkSEwoLdGFibGVfdGl0bGUYBSABKAkSEgoKdGFibGVfaWNvbhgGIAEoCRISCgp0YWJsZV92aWV3GAcgASgJIkAKFUdldE5hdmlnYXRpb25SZXNwb25zZRInCgVpdGVtcxgBIAMoCzIYLnNpY2tyb2NrLk5hdmlnYXRpb25JdGVtIqABCgRJdGVtEgoKAmlkGAEgASgJEhIKCnNyX2NyZWF0ZWQYAiABKAMSPwoRYWRkaXRpb25hbF9maWVsZHMYAyADKAsyJC5zaWNrcm9jay5JdGVtLkFkZGl0aW9uYWxGaWVsZHNFbnRyeRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKHAQoQTGlzdEl0ZW1zUmVxdWVzdBIPCgd0Y19uYW1lGAEgASgJEjQKBXdoZXJlGAIgAygLMiUuc2lja3JvY2suTGlzdEl0ZW1zUmVxdWVzdC5XaGVyZUVudHJ5GiwKCldoZXJlRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIyChFMaXN0SXRlbXNSZXNwb25zZRIdCgVpdGVtcxgBIAMoCzIOLnNpY2tyb2NrLkl0ZW0ivwEKEUNyZWF0ZUl0ZW1SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSEgoKc3JfY3JlYXRlZBgCIAEoAxJMChFhZGRpdGlvbmFsX2ZpZWxkcxgDIAMoCzIxLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXF1ZXN0LkFkZGl0aW9uYWxGaWVsZHNFbnRyeRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIyChJDcmVhdGVJdGVtUmVzcG9uc2USHAoEaXRlbRgBIAEoCzIOLnNpY2tyb2NrLkl0ZW0iLQoOR2V0SXRlbVJlcXVlc3QSDwoHcGFnZV9pZBgBIAEoCRIKCgJpZBgCIAEoCSIvCg9HZXRJdGVtUmVzcG9uc2USHAoEaXRlbRgBIAEoCzIOLnNpY2tyb2NrLkl0ZW0iswEKD0VkaXRJdGVtUmVxdWVzdBIKCgJpZBgBIAEoCRJKChFhZGRpdGlvbmFsX2ZpZWxkcxgCIAMoCzIvLnNpY2tyb2NrLkVkaXRJdGVtUmVxdWVzdC5BZGRpdGlvbmFsRmllbGRzRW50cnkSDwoHcGFnZV9pZBgDIAEoCRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIwChBFZGl0SXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIjAKEURlbGV0ZUl0ZW1SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSCgoCaWQYAiABKAkiJQoSRGVsZXRlSXRlbVJlc3BvbnNlEg8KB2RlbGV0ZWQYASABKAgiKwoYR2V0VGFibGVTdHJ1Y3R1cmVSZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkiWwoFRmllbGQSDAoEbmFtZRgBIAEoCRIMCgR0eXBlGAIgASgJEhAKCHJlcXVpcmVkGAMgASgIEiQKHGRlZmF1bHRfdG9fY3VycmVudF90aW1lc3RhbXAYBCABKAgiZAoZR2V0VGFibGVTdHJ1Y3R1cmVSZXNwb25zZRIfCgZmaWVsZHMYASADKAsyDy5zaWNrcm9jay5GaWVsZBIYChBDcmVhdGVCdXR0b25UZXh0GAIgASgJEgwKBHZpZXcYAyABKAkiSAoVQWRkVGFibGVDb2x1bW5SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSHgoFZmllbGQYAiABKAsyDy5zaWNrcm9jay5GaWVsZCJkCg9UYWJsZVZpZXdDb2x1bW4SEwoLY29sdW1uX25hbWUYASABKAkSEgoKaXNfdmlzaWJsZRgCIAEoCBIUCgxjb2x1bW5fb3JkZXIYAyABKAUSEgoKc29ydF9vcmRlchgEIAEoCSJrChZDcmVhdGVUYWJsZVZpZXdSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEQoJdmlld19uYW1lGAIgASgJEioKB2NvbHVtbnMYAyADKAsyGS5zaWNrcm9jay5UYWJsZVZpZXdDb2x1bW4iOwoXQ3JlYXRlVGFibGVWaWV3UmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJInwKFlVwZGF0ZVRhYmxlVmlld1JlcXVlc3QSDwoHdmlld19pZBgBIAEoBRISCgp0YWJsZV9uYW1lGAIgASgJEhEKCXZpZXdfbmFtZRgDIAEoCRIqCgdjb2x1bW5zGAQgAygLMhkuc2lja3JvY2suVGFibGVWaWV3Q29sdW1uIjsKF1VwZGF0ZVRhYmxlVmlld1Jlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSIqChRHZXRUYWJsZVZpZXdzUmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJIn4KCVRhYmxlVmlldxIKCgJpZBgBIAEoBRISCgp0YWJsZV9uYW1lGAIgASgJEhEKCXZpZXdfbmFtZRgDIAEoCRISCgppc19kZWZhdWx0GAQgASgIEioKB2NvbHVtbnMYBSADKAsyGS5zaWNrcm9jay5UYWJsZVZpZXdDb2x1bW4iOwoVR2V0VGFibGVWaWV3c1Jlc3BvbnNlEiIKBXZpZXdzGAEgAygLMhMuc2lja3JvY2suVGFibGVWaWV3IikKFkRlbGV0ZVRhYmxlVmlld1JlcXVlc3QSDwoHdmlld19pZBgBIAEoBSI7ChdEZWxldGVUYWJsZVZpZXdSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkitwEKCkZvcmVpZ25LZXkSFwoPY29uc3RyYWludF9uYW1lGAEgASgJEhIKCnRhYmxlX25hbWUYAiABKAkSEwoLY29sdW1uX25hbWUYAyABKAkSGAoQcmVmZXJlbmNlZF90YWJsZRgEIAEoCRIZChFyZWZlcmVuY2VkX2NvbHVtbhgFIAEoCRIYChBvbl9kZWxldGVfYWN0aW9uGAYgASgJEhgKEG9uX3VwZGF0ZV9hY3Rpb24YByABKAkiqwEKF0NyZWF0ZUZvcmVpZ25LZXlSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEwoLY29sdW1uX25hbWUYAiABKAkSGAoQcmVmZXJlbmNlZF90YWJsZRgDIAEoCRIZChFyZWZlcmVuY2VkX2NvbHVtbhgEIAEoCRIYChBvbl9kZWxldGVfYWN0aW9uGAUgASgJEhgKEG9uX3VwZGF0ZV9hY3Rpb24YBiABKAkiPAoYQ3JlYXRlRm9yZWlnbktleVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSIrChVHZXRGb3JlaWduS2V5c1JlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCSJEChZHZXRGb3JlaWduS2V5c1Jlc3BvbnNlEioKDGZvcmVpZ25fa2V5cxgBIAMoCzIULnNpY2tyb2NrLkZvcmVpZ25LZXkiMgoXRGVsZXRlRm9yZWlnbktleVJlcXVlc3QSFwoPY29uc3RyYWludF9uYW1lGAEgASgJIjwKGERlbGV0ZUZvcmVpZ25LZXlSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiVAoXQ2hhbmdlQ29sdW1uVHlwZVJlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCRITCgtjb2x1bW5fbmFtZRgCIAEoCRIQCghuZXdfdHlwZRgDIAEoCSI8ChhDaGFuZ2VDb2x1bW5UeXBlUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIjwKEURyb3BDb2x1bW5SZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEwoLY29sdW1uX25hbWUYAiABKAkiNgoSRHJvcENvbHVtblJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSJfChdDaGFuZ2VDb2x1bW5OYW1lUmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhcKD29sZF9jb2x1bW5fbmFtZRgCIAEoCRIXCg9uZXdfY29sdW1uX25hbWUYAyABKAkiPAoYQ2hhbmdlQ29sdW1uTmFtZVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSItChxHZXRNb3N0UmVjZW50bHlWaWV3ZWRSZXF1ZXN0Eg0KBWxpbWl0GAEgASgFIoMBChJSZWNlbnRseVZpZXdlZEl0ZW0SDAoEbmFtZRgBIAEoCRIQCgh0YWJsZV9pZBgCIAEoCRIMCgRpY29uGAMgASgJEhcKD3VwZGF0ZWRfYXRfdW5peBgEIAEoAxIRCglpdGVtX25hbWUYBSABKAkSEwoLdGFibGVfdGl0bGUYBiABKAkiTAodR2V0TW9zdFJlY2VudGx5Vmlld2VkUmVzcG9uc2USKwoFaXRlbXMYASADKAsyHC5zaWNrcm9jay5SZWNlbnRseVZpZXdlZEl0ZW0iDQoLSW5pdFJlcXVlc3QiTgoMSW5pdFJlc3BvbnNlEg8KB3ZlcnNpb24YASABKAkSDgoGY29tbWl0GAIgASgJEgwKBGRhdGUYAyABKAkSDwoHZGJfbmFtZRgEIAEoCSIyCgxMb2dpblJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkSEAoIcGFzc3dvcmQYAiABKAkiVAoNTG9naW5SZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSDQoFdG9rZW4YAyABKAkSEgoKZXhwaXJlc19hdBgEIAEoAyIPCg1Mb2dvdXRSZXF1ZXN0IjIKDkxvZ291dFJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSJCChhSZXNldFVzZXJQYXNzd29yZFJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkSFAoMbmV3X3Bhc3N3b3JkGAIgASgJIj0KGVJlc2V0VXNlclBhc3N3b3JkUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIiUKFFZhbGlkYXRlVG9rZW5SZXF1ZXN0Eg0KBXRva2VuGAEgASgJImMKFVZhbGlkYXRlVG9rZW5SZXNwb25zZRINCgV2YWxpZBgBIAEoCBIQCgh1c2VybmFtZRgCIAEoCRISCgpleHBpcmVzX2F0GAMgASgDEhUKDWluaXRpYWxfcm91dGUYBCABKAkiGwoZR2VuZXJhdGVEZXZpY2VDb2RlUmVxdWVzdCI+ChpHZW5lcmF0ZURldmljZUNvZGVSZXNwb25zZRIMCgRjb2RlGAEgASgJEhIKCmV4cGlyZXNfYXQYAiABKAMiJgoWQ2xhaW1EZXZpY2VDb2RlUmVxdWVzdBIMCgRjb2RlGAEgASgJIl4KF0NsYWltRGV2aWNlQ29kZVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCRINCgV0b2tlbhgDIAEoCRISCgpleHBpcmVzX2F0GAQgASgDIiYKFkNoZWNrRGV2aWNlQ29kZVJlcXVlc3QSDAoEY29kZRgBIAEoCSJuChdDaGVja0RldmljZUNvZGVSZXNwb25zZRINCgV2YWxpZBgBIAEoCBIPCgdjbGFpbWVkGAIgASgIEhIKCmV4cGlyZXNfYXQYAyABKAMSDQoFdG9rZW4YBCABKAkSEAoIdXNlcm5hbWUYBSABKAkiKwobR2V0RGV2aWNlQ29kZVNlc3Npb25SZXF1ZXN0EgwKBGNvZGUYASABKAkidQocR2V0RGV2aWNlQ29kZVNlc3Npb25SZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSDQoFdG9rZW4YAyABKAkSEgoKZXhwaXJlc19hdBgEIAEoAxIQCgh1c2VybmFtZRgFIAEoCSIWChRHZXRTeXN0ZW1JbmZvUmVxdWVzdCIyChVHZXRTeXN0ZW1JbmZvUmVzcG9uc2USGQoRYXBwcm94X3RvdGFsX3Jvd3MYASABKAMy6BQKCFNpY2tSb2NrEjUKBEluaXQSFS5zaWNrcm9jay5Jbml0UmVxdWVzdBoWLnNpY2tyb2NrLkluaXRSZXNwb25zZRI1CgRQaW5nEhUuc2lja3JvY2suUGluZ1JlcXVlc3QaFi5zaWNrcm9jay5QaW5nUmVzcG9uc2USOAoFTG9naW4SFi5zaWNrcm9jay5Mb2dpblJlcXVlc3QaFy5zaWNrcm9jay5Mb2dpblJlc3BvbnNlEjsKBkxvZ291dBIXLnNpY2tyb2NrLkxvZ291dFJlcXVlc3QaGC5zaWNrcm9jay5Mb2dvdXRSZXNwb25zZRJQCg1WYWxpZGF0ZVRva2VuEh4uc2lja3JvY2suVmFsaWRhdGVUb2tlblJlcXVlc3QaHy5zaWNrcm9jay5WYWxpZGF0ZVRva2VuUmVzcG9uc2USXAoRUmVzZXRVc2VyUGFzc3dvcmQSIi5zaWNrcm9jay5SZXNldFVzZXJQYXNzd29yZFJlcXVlc3QaIy5zaWNrcm9jay5SZXNldFVzZXJQYXNzd29yZFJlc3BvbnNlEl8KEkdlbmVyYXRlRGV2aWNlQ29kZRIjLnNpY2tyb2NrLkdlbmVyYXRlRGV2aWNlQ29kZVJlcXVlc3QaJC5zaWNrcm9jay5HZW5lcmF0ZURldmljZUNvZGVSZXNwb25zZRJWCg9DbGFpbURldmljZUNvZGUSIC5zaWNrcm9jay5DbGFpbURldmljZUNvZGVSZXF1ZXN0GiEuc2lja3JvY2suQ2xhaW1EZXZpY2VDb2RlUmVzcG9uc2USVgoPQ2hlY2tEZXZpY2VDb2RlEiAuc2lja3JvY2suQ2hlY2tEZXZpY2VDb2RlUmVxdWVzdBohLnNpY2tyb2NrLkNoZWNrRGV2aWNlQ29kZVJlc3BvbnNlEmUKFEdldERldmljZUNvZGVTZXNzaW9uEiUuc2lja3JvY2suR2V0RGV2aWNlQ29kZVNlc3Npb25SZXF1ZXN0GiYuc2lja3JvY2suR2V0RGV2aWNlQ29kZVNlc3Npb25SZXNwb25zZRJfChJHZXROYXZpZ2F0aW9uTGlua3MSIy5zaWNrcm9jay5HZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0GiQuc2lja3JvY2suR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USawoWR2V0VGFibGVDb25maWd1cmF0aW9ucxInLnNpY2tyb2NrLkdldFRhYmxlQ29uZmlndXJhdGlvbnNSZXF1ZXN0Giguc2lja3JvY2suR2V0VGFibGVDb25maWd1cmF0aW9uc1Jlc3BvbnNlElAKDUdldE5hdmlnYXRpb24SHi5zaWNrcm9jay5HZXROYXZpZ2F0aW9uUmVxdWVzdBofLnNpY2tyb2NrLkdldE5hdmlnYXRpb25SZXNwb25zZRJECglMaXN0SXRlbXMSGi5zaWNrcm9jay5MaXN0SXRlbXNSZXF1ZXN0Ghsuc2lja3JvY2suTGlzdEl0ZW1zUmVzcG9uc2USRwoKQ3JlYXRlSXRlbRIbLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXF1ZXN0Ghwuc2lja3JvY2suQ3JlYXRlSXRlbVJlc3BvbnNlEj4KB0dldEl0ZW0SGC5zaWNrcm9jay5HZXRJdGVtUmVxdWVzdBoZLnNpY2tyb2NrLkdldEl0ZW1SZXNwb25zZRJBCghFZGl0SXRlbRIZLnNpY2tyb2NrLkVkaXRJdGVtUmVxdWVzdBoaLnNpY2tyb2NrLkVkaXRJdGVtUmVzcG9uc2USRwoKRGVsZXRlSXRlbRIbLnNpY2tyb2NrLkRlbGV0ZUl0ZW1SZXF1ZXN0Ghwuc2lja3JvY2suRGVsZXRlSXRlbVJlc3BvbnNlElwKEUdldFRhYmxlU3RydWN0dXJlEiIuc2lja3JvY2suR2V0VGFibGVTdHJ1Y3R1cmVSZXF1ZXN0GiMuc2lja3JvY2suR2V0VGFibGVTdHJ1Y3R1cmVSZXNwb25zZRJWCg5BZGRUYWJsZUNvbHVtbhIfLnNpY2tyb2NrLkFkZFRhYmxlQ29sdW1uUmVxdWVzdBojLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USVgoPQ3JlYXRlVGFibGVWaWV3EiAuc2lja3JvY2suQ3JlYXRlVGFibGVWaWV3UmVxdWVzdBohLnNpY2tyb2NrLkNyZWF0ZVRhYmxlVmlld1Jlc3BvbnNlElYKD1VwZGF0ZVRhYmxlVmlldxIgLnNpY2tyb2NrLlVwZGF0ZVRhYmxlVmlld1JlcXVlc3QaIS5zaWNrcm9jay5VcGRhdGVUYWJsZVZpZXdSZXNwb25zZRJQCg1HZXRUYWJsZVZpZXdzEh4uc2lja3JvY2suR2V0VGFibGVWaWV3c1JlcXVlc3QaHy5zaWNrcm9jay5HZXRUYWJsZVZpZXdzUmVzcG9uc2USVgoPRGVsZXRlVGFibGVWaWV3EiAuc2lja3JvY2suRGVsZXRlVGFibGVWaWV3UmVxdWVzdBohLnNpY2tyb2NrLkRlbGV0ZVRhYmxlVmlld1Jlc3BvbnNlElkKEENyZWF0ZUZvcmVpZ25LZXkSIS5zaWNrcm9jay5DcmVhdGVGb3JlaWduS2V5UmVxdWVzdBoiLnNpY2tyb2NrLkNyZWF0ZUZvcmVpZ25LZXlSZXNwb25zZRJTCg5HZXRGb3JlaWduS2V5cxIfLnNpY2tyb2NrLkdldEZvcmVpZ25LZXlzUmVxdWVzdBogLnNpY2tyb2NrLkdldEZvcmVpZ25LZXlzUmVzcG9uc2USWQoQRGVsZXRlRm9yZWlnbktleRIhLnNpY2tyb2NrLkRlbGV0ZUZvcmVpZ25LZXlSZXF1ZXN0GiIuc2lja3JvY2suRGVsZXRlRm9yZWlnbktleVJlc3BvbnNlElkKEENoYW5nZUNvbHVtblR5cGUSIS5zaWNrcm9jay5DaGFuZ2VDb2x1bW5UeXBlUmVxdWVzdBoiLnNpY2tyb2NrLkNoYW5nZUNvbHVtblR5cGVSZXNwb25zZRJHCgpEcm9wQ29sdW1uEhsuc2lja3JvY2suRHJvcENvbHVtblJlcXVlc3QaHC5zaWNrcm9jay5Ecm9wQ29sdW1uUmVzcG9uc2USWQoQQ2hhbmdlQ29sdW1uTmFtZRIhLnNpY2tyb2NrLkNoYW5nZUNvbHVtbk5hbWVSZXF1ZXN0GiIuc2lja3JvY2suQ2hhbmdlQ29sdW1uTmFtZVJlc3BvbnNlEmgKFUdldE1vc3RSZWNlbnRseVZpZXdlZBImLnNpY2tyb2NrLkdldE1vc3RSZWNlbnRseVZpZXdlZFJlcXVlc3QaJy5zaWNrcm9jay5HZXRNb3N0UmVjZW50bHlWaWV3ZWRSZXNwb25zZRJQCg1HZXRTeXN0ZW1JbmZvEh4uc2lja3JvY2suR2V0U3lzdGVtSW5mb1JlcXVlc3QaHy5zaWNrcm9jay5HZXRTeXN0ZW1JbmZvUmVzcG9uc2VCkQEKDGNvbS5zaWNrcm9ja0INU2lja3JvY2tQcm90b1ABWjJnaXRodWIuY29tL2phbWVzcmVhZC9TaWNrUm9jay9nZW4vcHJvdG87c2lja3JvY2twYqICA1NYWKoCCFNpY2tyb2NrygIIU2lja3JvY2viAhRTaWNrcm9ja1xHUEJNZXRhZGF0YeoCCFNpY2tyb2NrYgZwcm90bzM");
 
 /**
  * @generated from message sickrock.PingRequest
@@ -108,18 +108,18 @@ export const GetNavigationLinksResponseSchema: GenMessage<GetNavigationLinksResp
   messageDesc(file_sickrock, 4);
 
 /**
- * Pages
+ * Table Configurations
  *
- * @generated from message sickrock.GetPagesRequest
+ * @generated from message sickrock.GetTableConfigurationsRequest
  */
-export type GetPagesRequest = Message<"sickrock.GetPagesRequest"> & {
+export type GetTableConfigurationsRequest = Message<"sickrock.GetTableConfigurationsRequest"> & {
 };
 
 /**
- * Describes the message sickrock.GetPagesRequest.
- * Use `create(GetPagesRequestSchema)` to create a new message.
+ * Describes the message sickrock.GetTableConfigurationsRequest.
+ * Use `create(GetTableConfigurationsRequestSchema)` to create a new message.
  */
-export const GetPagesRequestSchema: GenMessage<GetPagesRequest> = /*@__PURE__*/
+export const GetTableConfigurationsRequestSchema: GenMessage<GetTableConfigurationsRequest> = /*@__PURE__*/
   messageDesc(file_sickrock, 5);
 
 /**
@@ -165,9 +165,9 @@ export const PageSchema: GenMessage<Page> = /*@__PURE__*/
   messageDesc(file_sickrock, 6);
 
 /**
- * @generated from message sickrock.GetPagesResponse
+ * @generated from message sickrock.GetTableConfigurationsResponse
  */
-export type GetPagesResponse = Message<"sickrock.GetPagesResponse"> & {
+export type GetTableConfigurationsResponse = Message<"sickrock.GetTableConfigurationsResponse"> & {
   /**
    * @generated from field: repeated sickrock.Page pages = 1;
    */
@@ -175,11 +175,90 @@ export type GetPagesResponse = Message<"sickrock.GetPagesResponse"> & {
 };
 
 /**
- * Describes the message sickrock.GetPagesResponse.
- * Use `create(GetPagesResponseSchema)` to create a new message.
+ * Describes the message sickrock.GetTableConfigurationsResponse.
+ * Use `create(GetTableConfigurationsResponseSchema)` to create a new message.
  */
-export const GetPagesResponseSchema: GenMessage<GetPagesResponse> = /*@__PURE__*/
+export const GetTableConfigurationsResponseSchema: GenMessage<GetTableConfigurationsResponse> = /*@__PURE__*/
   messageDesc(file_sickrock, 7);
+
+/**
+ * Navigation
+ *
+ * @generated from message sickrock.GetNavigationRequest
+ */
+export type GetNavigationRequest = Message<"sickrock.GetNavigationRequest"> & {
+};
+
+/**
+ * Describes the message sickrock.GetNavigationRequest.
+ * Use `create(GetNavigationRequestSchema)` to create a new message.
+ */
+export const GetNavigationRequestSchema: GenMessage<GetNavigationRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 8);
+
+/**
+ * @generated from message sickrock.NavigationItem
+ */
+export type NavigationItem = Message<"sickrock.NavigationItem"> & {
+  /**
+   * @generated from field: int32 id = 1;
+   */
+  id: number;
+
+  /**
+   * @generated from field: int32 ordinal = 2;
+   */
+  ordinal: number;
+
+  /**
+   * @generated from field: int32 table_configuration = 3;
+   */
+  tableConfiguration: number;
+
+  /**
+   * @generated from field: string table_name = 4;
+   */
+  tableName: string;
+
+  /**
+   * @generated from field: string table_title = 5;
+   */
+  tableTitle: string;
+
+  /**
+   * @generated from field: string table_icon = 6;
+   */
+  tableIcon: string;
+
+  /**
+   * @generated from field: string table_view = 7;
+   */
+  tableView: string;
+};
+
+/**
+ * Describes the message sickrock.NavigationItem.
+ * Use `create(NavigationItemSchema)` to create a new message.
+ */
+export const NavigationItemSchema: GenMessage<NavigationItem> = /*@__PURE__*/
+  messageDesc(file_sickrock, 9);
+
+/**
+ * @generated from message sickrock.GetNavigationResponse
+ */
+export type GetNavigationResponse = Message<"sickrock.GetNavigationResponse"> & {
+  /**
+   * @generated from field: repeated sickrock.NavigationItem items = 1;
+   */
+  items: NavigationItem[];
+};
+
+/**
+ * Describes the message sickrock.GetNavigationResponse.
+ * Use `create(GetNavigationResponseSchema)` to create a new message.
+ */
+export const GetNavigationResponseSchema: GenMessage<GetNavigationResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 10);
 
 /**
  * Items
@@ -208,7 +287,7 @@ export type Item = Message<"sickrock.Item"> & {
  * Use `create(ItemSchema)` to create a new message.
  */
 export const ItemSchema: GenMessage<Item> = /*@__PURE__*/
-  messageDesc(file_sickrock, 8);
+  messageDesc(file_sickrock, 11);
 
 /**
  * @generated from message sickrock.ListItemsRequest
@@ -218,6 +297,13 @@ export type ListItemsRequest = Message<"sickrock.ListItemsRequest"> & {
    * @generated from field: string tc_name = 1;
    */
   tcName: string;
+
+  /**
+   * Exact-match filters: column -> value
+   *
+   * @generated from field: map<string, string> where = 2;
+   */
+  where: { [key: string]: string };
 };
 
 /**
@@ -225,7 +311,7 @@ export type ListItemsRequest = Message<"sickrock.ListItemsRequest"> & {
  * Use `create(ListItemsRequestSchema)` to create a new message.
  */
 export const ListItemsRequestSchema: GenMessage<ListItemsRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 9);
+  messageDesc(file_sickrock, 12);
 
 /**
  * @generated from message sickrock.ListItemsResponse
@@ -242,7 +328,7 @@ export type ListItemsResponse = Message<"sickrock.ListItemsResponse"> & {
  * Use `create(ListItemsResponseSchema)` to create a new message.
  */
 export const ListItemsResponseSchema: GenMessage<ListItemsResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 10);
+  messageDesc(file_sickrock, 13);
 
 /**
  * @generated from message sickrock.CreateItemRequest
@@ -271,7 +357,7 @@ export type CreateItemRequest = Message<"sickrock.CreateItemRequest"> & {
  * Use `create(CreateItemRequestSchema)` to create a new message.
  */
 export const CreateItemRequestSchema: GenMessage<CreateItemRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 11);
+  messageDesc(file_sickrock, 14);
 
 /**
  * @generated from message sickrock.CreateItemResponse
@@ -288,7 +374,7 @@ export type CreateItemResponse = Message<"sickrock.CreateItemResponse"> & {
  * Use `create(CreateItemResponseSchema)` to create a new message.
  */
 export const CreateItemResponseSchema: GenMessage<CreateItemResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 12);
+  messageDesc(file_sickrock, 15);
 
 /**
  * @generated from message sickrock.GetItemRequest
@@ -310,7 +396,7 @@ export type GetItemRequest = Message<"sickrock.GetItemRequest"> & {
  * Use `create(GetItemRequestSchema)` to create a new message.
  */
 export const GetItemRequestSchema: GenMessage<GetItemRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 13);
+  messageDesc(file_sickrock, 16);
 
 /**
  * @generated from message sickrock.GetItemResponse
@@ -327,7 +413,7 @@ export type GetItemResponse = Message<"sickrock.GetItemResponse"> & {
  * Use `create(GetItemResponseSchema)` to create a new message.
  */
 export const GetItemResponseSchema: GenMessage<GetItemResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 14);
+  messageDesc(file_sickrock, 17);
 
 /**
  * @generated from message sickrock.EditItemRequest
@@ -354,7 +440,7 @@ export type EditItemRequest = Message<"sickrock.EditItemRequest"> & {
  * Use `create(EditItemRequestSchema)` to create a new message.
  */
 export const EditItemRequestSchema: GenMessage<EditItemRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 15);
+  messageDesc(file_sickrock, 18);
 
 /**
  * @generated from message sickrock.EditItemResponse
@@ -371,7 +457,7 @@ export type EditItemResponse = Message<"sickrock.EditItemResponse"> & {
  * Use `create(EditItemResponseSchema)` to create a new message.
  */
 export const EditItemResponseSchema: GenMessage<EditItemResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 16);
+  messageDesc(file_sickrock, 19);
 
 /**
  * @generated from message sickrock.DeleteItemRequest
@@ -393,7 +479,7 @@ export type DeleteItemRequest = Message<"sickrock.DeleteItemRequest"> & {
  * Use `create(DeleteItemRequestSchema)` to create a new message.
  */
 export const DeleteItemRequestSchema: GenMessage<DeleteItemRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 17);
+  messageDesc(file_sickrock, 20);
 
 /**
  * @generated from message sickrock.DeleteItemResponse
@@ -410,7 +496,7 @@ export type DeleteItemResponse = Message<"sickrock.DeleteItemResponse"> & {
  * Use `create(DeleteItemResponseSchema)` to create a new message.
  */
 export const DeleteItemResponseSchema: GenMessage<DeleteItemResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 18);
+  messageDesc(file_sickrock, 21);
 
 /**
  * Table Structure
@@ -429,7 +515,7 @@ export type GetTableStructureRequest = Message<"sickrock.GetTableStructureReques
  * Use `create(GetTableStructureRequestSchema)` to create a new message.
  */
 export const GetTableStructureRequestSchema: GenMessage<GetTableStructureRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 19);
+  messageDesc(file_sickrock, 22);
 
 /**
  * @generated from message sickrock.Field
@@ -461,7 +547,7 @@ export type Field = Message<"sickrock.Field"> & {
  * Use `create(FieldSchema)` to create a new message.
  */
 export const FieldSchema: GenMessage<Field> = /*@__PURE__*/
-  messageDesc(file_sickrock, 20);
+  messageDesc(file_sickrock, 23);
 
 /**
  * @generated from message sickrock.GetTableStructureResponse
@@ -488,7 +574,7 @@ export type GetTableStructureResponse = Message<"sickrock.GetTableStructureRespo
  * Use `create(GetTableStructureResponseSchema)` to create a new message.
  */
 export const GetTableStructureResponseSchema: GenMessage<GetTableStructureResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 21);
+  messageDesc(file_sickrock, 24);
 
 /**
  * @generated from message sickrock.AddTableColumnRequest
@@ -510,7 +596,7 @@ export type AddTableColumnRequest = Message<"sickrock.AddTableColumnRequest"> & 
  * Use `create(AddTableColumnRequestSchema)` to create a new message.
  */
 export const AddTableColumnRequestSchema: GenMessage<AddTableColumnRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 22);
+  messageDesc(file_sickrock, 25);
 
 /**
  * Table Views
@@ -546,7 +632,7 @@ export type TableViewColumn = Message<"sickrock.TableViewColumn"> & {
  * Use `create(TableViewColumnSchema)` to create a new message.
  */
 export const TableViewColumnSchema: GenMessage<TableViewColumn> = /*@__PURE__*/
-  messageDesc(file_sickrock, 23);
+  messageDesc(file_sickrock, 26);
 
 /**
  * @generated from message sickrock.CreateTableViewRequest
@@ -573,7 +659,7 @@ export type CreateTableViewRequest = Message<"sickrock.CreateTableViewRequest"> 
  * Use `create(CreateTableViewRequestSchema)` to create a new message.
  */
 export const CreateTableViewRequestSchema: GenMessage<CreateTableViewRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 24);
+  messageDesc(file_sickrock, 27);
 
 /**
  * @generated from message sickrock.CreateTableViewResponse
@@ -595,7 +681,7 @@ export type CreateTableViewResponse = Message<"sickrock.CreateTableViewResponse"
  * Use `create(CreateTableViewResponseSchema)` to create a new message.
  */
 export const CreateTableViewResponseSchema: GenMessage<CreateTableViewResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 25);
+  messageDesc(file_sickrock, 28);
 
 /**
  * @generated from message sickrock.UpdateTableViewRequest
@@ -627,7 +713,7 @@ export type UpdateTableViewRequest = Message<"sickrock.UpdateTableViewRequest"> 
  * Use `create(UpdateTableViewRequestSchema)` to create a new message.
  */
 export const UpdateTableViewRequestSchema: GenMessage<UpdateTableViewRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 26);
+  messageDesc(file_sickrock, 29);
 
 /**
  * @generated from message sickrock.UpdateTableViewResponse
@@ -649,7 +735,7 @@ export type UpdateTableViewResponse = Message<"sickrock.UpdateTableViewResponse"
  * Use `create(UpdateTableViewResponseSchema)` to create a new message.
  */
 export const UpdateTableViewResponseSchema: GenMessage<UpdateTableViewResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 27);
+  messageDesc(file_sickrock, 30);
 
 /**
  * @generated from message sickrock.GetTableViewsRequest
@@ -666,7 +752,7 @@ export type GetTableViewsRequest = Message<"sickrock.GetTableViewsRequest"> & {
  * Use `create(GetTableViewsRequestSchema)` to create a new message.
  */
 export const GetTableViewsRequestSchema: GenMessage<GetTableViewsRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 28);
+  messageDesc(file_sickrock, 31);
 
 /**
  * @generated from message sickrock.TableView
@@ -703,7 +789,7 @@ export type TableView = Message<"sickrock.TableView"> & {
  * Use `create(TableViewSchema)` to create a new message.
  */
 export const TableViewSchema: GenMessage<TableView> = /*@__PURE__*/
-  messageDesc(file_sickrock, 29);
+  messageDesc(file_sickrock, 32);
 
 /**
  * @generated from message sickrock.GetTableViewsResponse
@@ -720,7 +806,7 @@ export type GetTableViewsResponse = Message<"sickrock.GetTableViewsResponse"> & 
  * Use `create(GetTableViewsResponseSchema)` to create a new message.
  */
 export const GetTableViewsResponseSchema: GenMessage<GetTableViewsResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 30);
+  messageDesc(file_sickrock, 33);
 
 /**
  * @generated from message sickrock.DeleteTableViewRequest
@@ -737,7 +823,7 @@ export type DeleteTableViewRequest = Message<"sickrock.DeleteTableViewRequest"> 
  * Use `create(DeleteTableViewRequestSchema)` to create a new message.
  */
 export const DeleteTableViewRequestSchema: GenMessage<DeleteTableViewRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 31);
+  messageDesc(file_sickrock, 34);
 
 /**
  * @generated from message sickrock.DeleteTableViewResponse
@@ -759,7 +845,7 @@ export type DeleteTableViewResponse = Message<"sickrock.DeleteTableViewResponse"
  * Use `create(DeleteTableViewResponseSchema)` to create a new message.
  */
 export const DeleteTableViewResponseSchema: GenMessage<DeleteTableViewResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 32);
+  messageDesc(file_sickrock, 35);
 
 /**
  * Foreign Key Management
@@ -808,7 +894,7 @@ export type ForeignKey = Message<"sickrock.ForeignKey"> & {
  * Use `create(ForeignKeySchema)` to create a new message.
  */
 export const ForeignKeySchema: GenMessage<ForeignKey> = /*@__PURE__*/
-  messageDesc(file_sickrock, 33);
+  messageDesc(file_sickrock, 36);
 
 /**
  * @generated from message sickrock.CreateForeignKeyRequest
@@ -854,7 +940,7 @@ export type CreateForeignKeyRequest = Message<"sickrock.CreateForeignKeyRequest"
  * Use `create(CreateForeignKeyRequestSchema)` to create a new message.
  */
 export const CreateForeignKeyRequestSchema: GenMessage<CreateForeignKeyRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 34);
+  messageDesc(file_sickrock, 37);
 
 /**
  * @generated from message sickrock.CreateForeignKeyResponse
@@ -876,7 +962,7 @@ export type CreateForeignKeyResponse = Message<"sickrock.CreateForeignKeyRespons
  * Use `create(CreateForeignKeyResponseSchema)` to create a new message.
  */
 export const CreateForeignKeyResponseSchema: GenMessage<CreateForeignKeyResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 35);
+  messageDesc(file_sickrock, 38);
 
 /**
  * @generated from message sickrock.GetForeignKeysRequest
@@ -893,7 +979,7 @@ export type GetForeignKeysRequest = Message<"sickrock.GetForeignKeysRequest"> & 
  * Use `create(GetForeignKeysRequestSchema)` to create a new message.
  */
 export const GetForeignKeysRequestSchema: GenMessage<GetForeignKeysRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 36);
+  messageDesc(file_sickrock, 39);
 
 /**
  * @generated from message sickrock.GetForeignKeysResponse
@@ -910,7 +996,7 @@ export type GetForeignKeysResponse = Message<"sickrock.GetForeignKeysResponse"> 
  * Use `create(GetForeignKeysResponseSchema)` to create a new message.
  */
 export const GetForeignKeysResponseSchema: GenMessage<GetForeignKeysResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 37);
+  messageDesc(file_sickrock, 40);
 
 /**
  * @generated from message sickrock.DeleteForeignKeyRequest
@@ -927,7 +1013,7 @@ export type DeleteForeignKeyRequest = Message<"sickrock.DeleteForeignKeyRequest"
  * Use `create(DeleteForeignKeyRequestSchema)` to create a new message.
  */
 export const DeleteForeignKeyRequestSchema: GenMessage<DeleteForeignKeyRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 38);
+  messageDesc(file_sickrock, 41);
 
 /**
  * @generated from message sickrock.DeleteForeignKeyResponse
@@ -949,7 +1035,7 @@ export type DeleteForeignKeyResponse = Message<"sickrock.DeleteForeignKeyRespons
  * Use `create(DeleteForeignKeyResponseSchema)` to create a new message.
  */
 export const DeleteForeignKeyResponseSchema: GenMessage<DeleteForeignKeyResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 39);
+  messageDesc(file_sickrock, 42);
 
 /**
  * Column Type Management
@@ -978,7 +1064,7 @@ export type ChangeColumnTypeRequest = Message<"sickrock.ChangeColumnTypeRequest"
  * Use `create(ChangeColumnTypeRequestSchema)` to create a new message.
  */
 export const ChangeColumnTypeRequestSchema: GenMessage<ChangeColumnTypeRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 40);
+  messageDesc(file_sickrock, 43);
 
 /**
  * @generated from message sickrock.ChangeColumnTypeResponse
@@ -1000,7 +1086,7 @@ export type ChangeColumnTypeResponse = Message<"sickrock.ChangeColumnTypeRespons
  * Use `create(ChangeColumnTypeResponseSchema)` to create a new message.
  */
 export const ChangeColumnTypeResponseSchema: GenMessage<ChangeColumnTypeResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 41);
+  messageDesc(file_sickrock, 44);
 
 /**
  * Drop Column Management
@@ -1024,7 +1110,7 @@ export type DropColumnRequest = Message<"sickrock.DropColumnRequest"> & {
  * Use `create(DropColumnRequestSchema)` to create a new message.
  */
 export const DropColumnRequestSchema: GenMessage<DropColumnRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 42);
+  messageDesc(file_sickrock, 45);
 
 /**
  * @generated from message sickrock.DropColumnResponse
@@ -1046,7 +1132,7 @@ export type DropColumnResponse = Message<"sickrock.DropColumnResponse"> & {
  * Use `create(DropColumnResponseSchema)` to create a new message.
  */
 export const DropColumnResponseSchema: GenMessage<DropColumnResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 43);
+  messageDesc(file_sickrock, 46);
 
 /**
  * Rename Column Management
@@ -1075,7 +1161,7 @@ export type ChangeColumnNameRequest = Message<"sickrock.ChangeColumnNameRequest"
  * Use `create(ChangeColumnNameRequestSchema)` to create a new message.
  */
 export const ChangeColumnNameRequestSchema: GenMessage<ChangeColumnNameRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 44);
+  messageDesc(file_sickrock, 47);
 
 /**
  * @generated from message sickrock.ChangeColumnNameResponse
@@ -1097,7 +1183,7 @@ export type ChangeColumnNameResponse = Message<"sickrock.ChangeColumnNameRespons
  * Use `create(ChangeColumnNameResponseSchema)` to create a new message.
  */
 export const ChangeColumnNameResponseSchema: GenMessage<ChangeColumnNameResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 45);
+  messageDesc(file_sickrock, 48);
 
 /**
  * Recently Viewed Items
@@ -1118,7 +1204,7 @@ export type GetMostRecentlyViewedRequest = Message<"sickrock.GetMostRecentlyView
  * Use `create(GetMostRecentlyViewedRequestSchema)` to create a new message.
  */
 export const GetMostRecentlyViewedRequestSchema: GenMessage<GetMostRecentlyViewedRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 46);
+  messageDesc(file_sickrock, 49);
 
 /**
  * @generated from message sickrock.RecentlyViewedItem
@@ -1172,7 +1258,7 @@ export type RecentlyViewedItem = Message<"sickrock.RecentlyViewedItem"> & {
  * Use `create(RecentlyViewedItemSchema)` to create a new message.
  */
 export const RecentlyViewedItemSchema: GenMessage<RecentlyViewedItem> = /*@__PURE__*/
-  messageDesc(file_sickrock, 47);
+  messageDesc(file_sickrock, 50);
 
 /**
  * @generated from message sickrock.GetMostRecentlyViewedResponse
@@ -1189,7 +1275,7 @@ export type GetMostRecentlyViewedResponse = Message<"sickrock.GetMostRecentlyVie
  * Use `create(GetMostRecentlyViewedResponseSchema)` to create a new message.
  */
 export const GetMostRecentlyViewedResponseSchema: GenMessage<GetMostRecentlyViewedResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 48);
+  messageDesc(file_sickrock, 51);
 
 /**
  * Build info
@@ -1204,7 +1290,7 @@ export type InitRequest = Message<"sickrock.InitRequest"> & {
  * Use `create(InitRequestSchema)` to create a new message.
  */
 export const InitRequestSchema: GenMessage<InitRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 49);
+  messageDesc(file_sickrock, 52);
 
 /**
  * @generated from message sickrock.InitResponse
@@ -1236,7 +1322,7 @@ export type InitResponse = Message<"sickrock.InitResponse"> & {
  * Use `create(InitResponseSchema)` to create a new message.
  */
 export const InitResponseSchema: GenMessage<InitResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 50);
+  messageDesc(file_sickrock, 53);
 
 /**
  * Authentication
@@ -1260,7 +1346,7 @@ export type LoginRequest = Message<"sickrock.LoginRequest"> & {
  * Use `create(LoginRequestSchema)` to create a new message.
  */
 export const LoginRequestSchema: GenMessage<LoginRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 51);
+  messageDesc(file_sickrock, 54);
 
 /**
  * @generated from message sickrock.LoginResponse
@@ -1294,7 +1380,7 @@ export type LoginResponse = Message<"sickrock.LoginResponse"> & {
  * Use `create(LoginResponseSchema)` to create a new message.
  */
 export const LoginResponseSchema: GenMessage<LoginResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 52);
+  messageDesc(file_sickrock, 55);
 
 /**
  * @generated from message sickrock.LogoutRequest
@@ -1307,7 +1393,7 @@ export type LogoutRequest = Message<"sickrock.LogoutRequest"> & {
  * Use `create(LogoutRequestSchema)` to create a new message.
  */
 export const LogoutRequestSchema: GenMessage<LogoutRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 53);
+  messageDesc(file_sickrock, 56);
 
 /**
  * @generated from message sickrock.LogoutResponse
@@ -1329,7 +1415,51 @@ export type LogoutResponse = Message<"sickrock.LogoutResponse"> & {
  * Use `create(LogoutResponseSchema)` to create a new message.
  */
 export const LogoutResponseSchema: GenMessage<LogoutResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 54);
+  messageDesc(file_sickrock, 57);
+
+/**
+ * @generated from message sickrock.ResetUserPasswordRequest
+ */
+export type ResetUserPasswordRequest = Message<"sickrock.ResetUserPasswordRequest"> & {
+  /**
+   * @generated from field: string username = 1;
+   */
+  username: string;
+
+  /**
+   * @generated from field: string new_password = 2;
+   */
+  newPassword: string;
+};
+
+/**
+ * Describes the message sickrock.ResetUserPasswordRequest.
+ * Use `create(ResetUserPasswordRequestSchema)` to create a new message.
+ */
+export const ResetUserPasswordRequestSchema: GenMessage<ResetUserPasswordRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 58);
+
+/**
+ * @generated from message sickrock.ResetUserPasswordResponse
+ */
+export type ResetUserPasswordResponse = Message<"sickrock.ResetUserPasswordResponse"> & {
+  /**
+   * @generated from field: bool success = 1;
+   */
+  success: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message sickrock.ResetUserPasswordResponse.
+ * Use `create(ResetUserPasswordResponseSchema)` to create a new message.
+ */
+export const ResetUserPasswordResponseSchema: GenMessage<ResetUserPasswordResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 59);
 
 /**
  * @generated from message sickrock.ValidateTokenRequest
@@ -1346,7 +1476,7 @@ export type ValidateTokenRequest = Message<"sickrock.ValidateTokenRequest"> & {
  * Use `create(ValidateTokenRequestSchema)` to create a new message.
  */
 export const ValidateTokenRequestSchema: GenMessage<ValidateTokenRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 55);
+  messageDesc(file_sickrock, 60);
 
 /**
  * @generated from message sickrock.ValidateTokenResponse
@@ -1366,6 +1496,11 @@ export type ValidateTokenResponse = Message<"sickrock.ValidateTokenResponse"> & 
    * @generated from field: int64 expires_at = 3;
    */
   expiresAt: bigint;
+
+  /**
+   * @generated from field: string initial_route = 4;
+   */
+  initialRoute: string;
 };
 
 /**
@@ -1373,7 +1508,213 @@ export type ValidateTokenResponse = Message<"sickrock.ValidateTokenResponse"> & 
  * Use `create(ValidateTokenResponseSchema)` to create a new message.
  */
 export const ValidateTokenResponseSchema: GenMessage<ValidateTokenResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 56);
+  messageDesc(file_sickrock, 61);
+
+/**
+ * Device Code Authentication
+ *
+ * @generated from message sickrock.GenerateDeviceCodeRequest
+ */
+export type GenerateDeviceCodeRequest = Message<"sickrock.GenerateDeviceCodeRequest"> & {
+};
+
+/**
+ * Describes the message sickrock.GenerateDeviceCodeRequest.
+ * Use `create(GenerateDeviceCodeRequestSchema)` to create a new message.
+ */
+export const GenerateDeviceCodeRequestSchema: GenMessage<GenerateDeviceCodeRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 62);
+
+/**
+ * @generated from message sickrock.GenerateDeviceCodeResponse
+ */
+export type GenerateDeviceCodeResponse = Message<"sickrock.GenerateDeviceCodeResponse"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+
+  /**
+   * Unix timestamp
+   *
+   * @generated from field: int64 expires_at = 2;
+   */
+  expiresAt: bigint;
+};
+
+/**
+ * Describes the message sickrock.GenerateDeviceCodeResponse.
+ * Use `create(GenerateDeviceCodeResponseSchema)` to create a new message.
+ */
+export const GenerateDeviceCodeResponseSchema: GenMessage<GenerateDeviceCodeResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 63);
+
+/**
+ * @generated from message sickrock.ClaimDeviceCodeRequest
+ */
+export type ClaimDeviceCodeRequest = Message<"sickrock.ClaimDeviceCodeRequest"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+};
+
+/**
+ * Describes the message sickrock.ClaimDeviceCodeRequest.
+ * Use `create(ClaimDeviceCodeRequestSchema)` to create a new message.
+ */
+export const ClaimDeviceCodeRequestSchema: GenMessage<ClaimDeviceCodeRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 64);
+
+/**
+ * @generated from message sickrock.ClaimDeviceCodeResponse
+ */
+export type ClaimDeviceCodeResponse = Message<"sickrock.ClaimDeviceCodeResponse"> & {
+  /**
+   * @generated from field: bool success = 1;
+   */
+  success: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string token = 3;
+   */
+  token: string;
+
+  /**
+   * Unix timestamp
+   *
+   * @generated from field: int64 expires_at = 4;
+   */
+  expiresAt: bigint;
+};
+
+/**
+ * Describes the message sickrock.ClaimDeviceCodeResponse.
+ * Use `create(ClaimDeviceCodeResponseSchema)` to create a new message.
+ */
+export const ClaimDeviceCodeResponseSchema: GenMessage<ClaimDeviceCodeResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 65);
+
+/**
+ * @generated from message sickrock.CheckDeviceCodeRequest
+ */
+export type CheckDeviceCodeRequest = Message<"sickrock.CheckDeviceCodeRequest"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+};
+
+/**
+ * Describes the message sickrock.CheckDeviceCodeRequest.
+ * Use `create(CheckDeviceCodeRequestSchema)` to create a new message.
+ */
+export const CheckDeviceCodeRequestSchema: GenMessage<CheckDeviceCodeRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 66);
+
+/**
+ * @generated from message sickrock.CheckDeviceCodeResponse
+ */
+export type CheckDeviceCodeResponse = Message<"sickrock.CheckDeviceCodeResponse"> & {
+  /**
+   * @generated from field: bool valid = 1;
+   */
+  valid: boolean;
+
+  /**
+   * @generated from field: bool claimed = 2;
+   */
+  claimed: boolean;
+
+  /**
+   * Unix timestamp
+   *
+   * @generated from field: int64 expires_at = 3;
+   */
+  expiresAt: bigint;
+
+  /**
+   * JWT token if claimed
+   *
+   * @generated from field: string token = 4;
+   */
+  token: string;
+
+  /**
+   * Username if claimed
+   *
+   * @generated from field: string username = 5;
+   */
+  username: string;
+};
+
+/**
+ * Describes the message sickrock.CheckDeviceCodeResponse.
+ * Use `create(CheckDeviceCodeResponseSchema)` to create a new message.
+ */
+export const CheckDeviceCodeResponseSchema: GenMessage<CheckDeviceCodeResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 67);
+
+/**
+ * @generated from message sickrock.GetDeviceCodeSessionRequest
+ */
+export type GetDeviceCodeSessionRequest = Message<"sickrock.GetDeviceCodeSessionRequest"> & {
+  /**
+   * @generated from field: string code = 1;
+   */
+  code: string;
+};
+
+/**
+ * Describes the message sickrock.GetDeviceCodeSessionRequest.
+ * Use `create(GetDeviceCodeSessionRequestSchema)` to create a new message.
+ */
+export const GetDeviceCodeSessionRequestSchema: GenMessage<GetDeviceCodeSessionRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 68);
+
+/**
+ * @generated from message sickrock.GetDeviceCodeSessionResponse
+ */
+export type GetDeviceCodeSessionResponse = Message<"sickrock.GetDeviceCodeSessionResponse"> & {
+  /**
+   * @generated from field: bool success = 1;
+   */
+  success: boolean;
+
+  /**
+   * @generated from field: string message = 2;
+   */
+  message: string;
+
+  /**
+   * @generated from field: string token = 3;
+   */
+  token: string;
+
+  /**
+   * Unix timestamp
+   *
+   * @generated from field: int64 expires_at = 4;
+   */
+  expiresAt: bigint;
+
+  /**
+   * @generated from field: string username = 5;
+   */
+  username: string;
+};
+
+/**
+ * Describes the message sickrock.GetDeviceCodeSessionResponse.
+ * Use `create(GetDeviceCodeSessionResponseSchema)` to create a new message.
+ */
+export const GetDeviceCodeSessionResponseSchema: GenMessage<GetDeviceCodeSessionResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 69);
 
 /**
  * System Info
@@ -1388,7 +1729,7 @@ export type GetSystemInfoRequest = Message<"sickrock.GetSystemInfoRequest"> & {
  * Use `create(GetSystemInfoRequestSchema)` to create a new message.
  */
 export const GetSystemInfoRequestSchema: GenMessage<GetSystemInfoRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 57);
+  messageDesc(file_sickrock, 70);
 
 /**
  * @generated from message sickrock.GetSystemInfoResponse
@@ -1405,7 +1746,7 @@ export type GetSystemInfoResponse = Message<"sickrock.GetSystemInfoResponse"> & 
  * Use `create(GetSystemInfoResponseSchema)` to create a new message.
  */
 export const GetSystemInfoResponseSchema: GenMessage<GetSystemInfoResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 58);
+  messageDesc(file_sickrock, 71);
 
 /**
  * @generated from service sickrock.SickRock
@@ -1454,6 +1795,48 @@ export const SickRock: GenService<{
     output: typeof ValidateTokenResponseSchema;
   },
   /**
+   * @generated from rpc sickrock.SickRock.ResetUserPassword
+   */
+  resetUserPassword: {
+    methodKind: "unary";
+    input: typeof ResetUserPasswordRequestSchema;
+    output: typeof ResetUserPasswordResponseSchema;
+  },
+  /**
+   * Device Code Authentication
+   *
+   * @generated from rpc sickrock.SickRock.GenerateDeviceCode
+   */
+  generateDeviceCode: {
+    methodKind: "unary";
+    input: typeof GenerateDeviceCodeRequestSchema;
+    output: typeof GenerateDeviceCodeResponseSchema;
+  },
+  /**
+   * @generated from rpc sickrock.SickRock.ClaimDeviceCode
+   */
+  claimDeviceCode: {
+    methodKind: "unary";
+    input: typeof ClaimDeviceCodeRequestSchema;
+    output: typeof ClaimDeviceCodeResponseSchema;
+  },
+  /**
+   * @generated from rpc sickrock.SickRock.CheckDeviceCode
+   */
+  checkDeviceCode: {
+    methodKind: "unary";
+    input: typeof CheckDeviceCodeRequestSchema;
+    output: typeof CheckDeviceCodeResponseSchema;
+  },
+  /**
+   * @generated from rpc sickrock.SickRock.GetDeviceCodeSession
+   */
+  getDeviceCodeSession: {
+    methodKind: "unary";
+    input: typeof GetDeviceCodeSessionRequestSchema;
+    output: typeof GetDeviceCodeSessionResponseSchema;
+  },
+  /**
    * Navigation for the UI
    *
    * @generated from rpc sickrock.SickRock.GetNavigationLinks
@@ -1464,14 +1847,24 @@ export const SickRock: GenService<{
     output: typeof GetNavigationLinksResponseSchema;
   },
   /**
-   * Pages available in the application
+   * Table configurations available in the application
    *
-   * @generated from rpc sickrock.SickRock.GetPages
+   * @generated from rpc sickrock.SickRock.GetTableConfigurations
    */
-  getPages: {
+  getTableConfigurations: {
     methodKind: "unary";
-    input: typeof GetPagesRequestSchema;
-    output: typeof GetPagesResponseSchema;
+    input: typeof GetTableConfigurationsRequestSchema;
+    output: typeof GetTableConfigurationsResponseSchema;
+  },
+  /**
+   * Navigation items from table_navigation
+   *
+   * @generated from rpc sickrock.SickRock.GetNavigation
+   */
+  getNavigation: {
+    methodKind: "unary";
+    input: typeof GetNavigationRequestSchema;
+    output: typeof GetNavigationResponseSchema;
   },
   /**
    * Generic CRUD over items on a page

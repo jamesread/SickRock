@@ -43,11 +43,29 @@ const (
 	SickRockLogoutProcedure = "/sickrock.SickRock/Logout"
 	// SickRockValidateTokenProcedure is the fully-qualified name of the SickRock's ValidateToken RPC.
 	SickRockValidateTokenProcedure = "/sickrock.SickRock/ValidateToken"
+	// SickRockResetUserPasswordProcedure is the fully-qualified name of the SickRock's
+	// ResetUserPassword RPC.
+	SickRockResetUserPasswordProcedure = "/sickrock.SickRock/ResetUserPassword"
+	// SickRockGenerateDeviceCodeProcedure is the fully-qualified name of the SickRock's
+	// GenerateDeviceCode RPC.
+	SickRockGenerateDeviceCodeProcedure = "/sickrock.SickRock/GenerateDeviceCode"
+	// SickRockClaimDeviceCodeProcedure is the fully-qualified name of the SickRock's ClaimDeviceCode
+	// RPC.
+	SickRockClaimDeviceCodeProcedure = "/sickrock.SickRock/ClaimDeviceCode"
+	// SickRockCheckDeviceCodeProcedure is the fully-qualified name of the SickRock's CheckDeviceCode
+	// RPC.
+	SickRockCheckDeviceCodeProcedure = "/sickrock.SickRock/CheckDeviceCode"
+	// SickRockGetDeviceCodeSessionProcedure is the fully-qualified name of the SickRock's
+	// GetDeviceCodeSession RPC.
+	SickRockGetDeviceCodeSessionProcedure = "/sickrock.SickRock/GetDeviceCodeSession"
 	// SickRockGetNavigationLinksProcedure is the fully-qualified name of the SickRock's
 	// GetNavigationLinks RPC.
 	SickRockGetNavigationLinksProcedure = "/sickrock.SickRock/GetNavigationLinks"
-	// SickRockGetPagesProcedure is the fully-qualified name of the SickRock's GetPages RPC.
-	SickRockGetPagesProcedure = "/sickrock.SickRock/GetPages"
+	// SickRockGetTableConfigurationsProcedure is the fully-qualified name of the SickRock's
+	// GetTableConfigurations RPC.
+	SickRockGetTableConfigurationsProcedure = "/sickrock.SickRock/GetTableConfigurations"
+	// SickRockGetNavigationProcedure is the fully-qualified name of the SickRock's GetNavigation RPC.
+	SickRockGetNavigationProcedure = "/sickrock.SickRock/GetNavigation"
 	// SickRockListItemsProcedure is the fully-qualified name of the SickRock's ListItems RPC.
 	SickRockListItemsProcedure = "/sickrock.SickRock/ListItems"
 	// SickRockCreateItemProcedure is the fully-qualified name of the SickRock's CreateItem RPC.
@@ -105,10 +123,18 @@ type SickRockClient interface {
 	Login(context.Context, *connect.Request[proto.LoginRequest]) (*connect.Response[proto.LoginResponse], error)
 	Logout(context.Context, *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error)
 	ValidateToken(context.Context, *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error)
+	ResetUserPassword(context.Context, *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error)
+	// Device Code Authentication
+	GenerateDeviceCode(context.Context, *connect.Request[proto.GenerateDeviceCodeRequest]) (*connect.Response[proto.GenerateDeviceCodeResponse], error)
+	ClaimDeviceCode(context.Context, *connect.Request[proto.ClaimDeviceCodeRequest]) (*connect.Response[proto.ClaimDeviceCodeResponse], error)
+	CheckDeviceCode(context.Context, *connect.Request[proto.CheckDeviceCodeRequest]) (*connect.Response[proto.CheckDeviceCodeResponse], error)
+	GetDeviceCodeSession(context.Context, *connect.Request[proto.GetDeviceCodeSessionRequest]) (*connect.Response[proto.GetDeviceCodeSessionResponse], error)
 	// Navigation for the UI
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
-	// Pages available in the application
-	GetPages(context.Context, *connect.Request[proto.GetPagesRequest]) (*connect.Response[proto.GetPagesResponse], error)
+	// Table configurations available in the application
+	GetTableConfigurations(context.Context, *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error)
+	// Navigation items from table_navigation
+	GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error)
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
@@ -179,16 +205,52 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("ValidateToken")),
 			connect.WithClientOptions(opts...),
 		),
+		resetUserPassword: connect.NewClient[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse](
+			httpClient,
+			baseURL+SickRockResetUserPasswordProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ResetUserPassword")),
+			connect.WithClientOptions(opts...),
+		),
+		generateDeviceCode: connect.NewClient[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse](
+			httpClient,
+			baseURL+SickRockGenerateDeviceCodeProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GenerateDeviceCode")),
+			connect.WithClientOptions(opts...),
+		),
+		claimDeviceCode: connect.NewClient[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse](
+			httpClient,
+			baseURL+SickRockClaimDeviceCodeProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ClaimDeviceCode")),
+			connect.WithClientOptions(opts...),
+		),
+		checkDeviceCode: connect.NewClient[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse](
+			httpClient,
+			baseURL+SickRockCheckDeviceCodeProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CheckDeviceCode")),
+			connect.WithClientOptions(opts...),
+		),
+		getDeviceCodeSession: connect.NewClient[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse](
+			httpClient,
+			baseURL+SickRockGetDeviceCodeSessionProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetDeviceCodeSession")),
+			connect.WithClientOptions(opts...),
+		),
 		getNavigationLinks: connect.NewClient[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse](
 			httpClient,
 			baseURL+SickRockGetNavigationLinksProcedure,
 			connect.WithSchema(sickRockMethods.ByName("GetNavigationLinks")),
 			connect.WithClientOptions(opts...),
 		),
-		getPages: connect.NewClient[proto.GetPagesRequest, proto.GetPagesResponse](
+		getTableConfigurations: connect.NewClient[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse](
 			httpClient,
-			baseURL+SickRockGetPagesProcedure,
-			connect.WithSchema(sickRockMethods.ByName("GetPages")),
+			baseURL+SickRockGetTableConfigurationsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetTableConfigurations")),
+			connect.WithClientOptions(opts...),
+		),
+		getNavigation: connect.NewClient[proto.GetNavigationRequest, proto.GetNavigationResponse](
+			httpClient,
+			baseURL+SickRockGetNavigationProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetNavigation")),
 			connect.WithClientOptions(opts...),
 		),
 		listItems: connect.NewClient[proto.ListItemsRequest, proto.ListItemsResponse](
@@ -310,32 +372,38 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 
 // sickRockClient implements SickRockClient.
 type sickRockClient struct {
-	init                  *connect.Client[proto.InitRequest, proto.InitResponse]
-	ping                  *connect.Client[proto.PingRequest, proto.PingResponse]
-	login                 *connect.Client[proto.LoginRequest, proto.LoginResponse]
-	logout                *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
-	validateToken         *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
-	getNavigationLinks    *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
-	getPages              *connect.Client[proto.GetPagesRequest, proto.GetPagesResponse]
-	listItems             *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
-	createItem            *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
-	getItem               *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
-	editItem              *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
-	deleteItem            *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
-	getTableStructure     *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
-	addTableColumn        *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
-	createTableView       *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
-	updateTableView       *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
-	getTableViews         *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
-	deleteTableView       *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
-	createForeignKey      *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
-	getForeignKeys        *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
-	deleteForeignKey      *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
-	changeColumnType      *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
-	dropColumn            *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
-	changeColumnName      *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
-	getMostRecentlyViewed *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
-	getSystemInfo         *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
+	init                   *connect.Client[proto.InitRequest, proto.InitResponse]
+	ping                   *connect.Client[proto.PingRequest, proto.PingResponse]
+	login                  *connect.Client[proto.LoginRequest, proto.LoginResponse]
+	logout                 *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
+	validateToken          *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
+	resetUserPassword      *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
+	generateDeviceCode     *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
+	claimDeviceCode        *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
+	checkDeviceCode        *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
+	getDeviceCodeSession   *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
+	getNavigationLinks     *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
+	getTableConfigurations *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
+	getNavigation          *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
+	listItems              *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
+	createItem             *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
+	getItem                *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
+	editItem               *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
+	deleteItem             *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
+	getTableStructure      *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
+	addTableColumn         *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
+	createTableView        *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
+	updateTableView        *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
+	getTableViews          *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
+	deleteTableView        *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
+	createForeignKey       *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
+	getForeignKeys         *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
+	deleteForeignKey       *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
+	changeColumnType       *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
+	dropColumn             *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
+	changeColumnName       *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
+	getMostRecentlyViewed  *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
+	getSystemInfo          *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -363,14 +431,44 @@ func (c *sickRockClient) ValidateToken(ctx context.Context, req *connect.Request
 	return c.validateToken.CallUnary(ctx, req)
 }
 
+// ResetUserPassword calls sickrock.SickRock.ResetUserPassword.
+func (c *sickRockClient) ResetUserPassword(ctx context.Context, req *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error) {
+	return c.resetUserPassword.CallUnary(ctx, req)
+}
+
+// GenerateDeviceCode calls sickrock.SickRock.GenerateDeviceCode.
+func (c *sickRockClient) GenerateDeviceCode(ctx context.Context, req *connect.Request[proto.GenerateDeviceCodeRequest]) (*connect.Response[proto.GenerateDeviceCodeResponse], error) {
+	return c.generateDeviceCode.CallUnary(ctx, req)
+}
+
+// ClaimDeviceCode calls sickrock.SickRock.ClaimDeviceCode.
+func (c *sickRockClient) ClaimDeviceCode(ctx context.Context, req *connect.Request[proto.ClaimDeviceCodeRequest]) (*connect.Response[proto.ClaimDeviceCodeResponse], error) {
+	return c.claimDeviceCode.CallUnary(ctx, req)
+}
+
+// CheckDeviceCode calls sickrock.SickRock.CheckDeviceCode.
+func (c *sickRockClient) CheckDeviceCode(ctx context.Context, req *connect.Request[proto.CheckDeviceCodeRequest]) (*connect.Response[proto.CheckDeviceCodeResponse], error) {
+	return c.checkDeviceCode.CallUnary(ctx, req)
+}
+
+// GetDeviceCodeSession calls sickrock.SickRock.GetDeviceCodeSession.
+func (c *sickRockClient) GetDeviceCodeSession(ctx context.Context, req *connect.Request[proto.GetDeviceCodeSessionRequest]) (*connect.Response[proto.GetDeviceCodeSessionResponse], error) {
+	return c.getDeviceCodeSession.CallUnary(ctx, req)
+}
+
 // GetNavigationLinks calls sickrock.SickRock.GetNavigationLinks.
 func (c *sickRockClient) GetNavigationLinks(ctx context.Context, req *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error) {
 	return c.getNavigationLinks.CallUnary(ctx, req)
 }
 
-// GetPages calls sickrock.SickRock.GetPages.
-func (c *sickRockClient) GetPages(ctx context.Context, req *connect.Request[proto.GetPagesRequest]) (*connect.Response[proto.GetPagesResponse], error) {
-	return c.getPages.CallUnary(ctx, req)
+// GetTableConfigurations calls sickrock.SickRock.GetTableConfigurations.
+func (c *sickRockClient) GetTableConfigurations(ctx context.Context, req *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error) {
+	return c.getTableConfigurations.CallUnary(ctx, req)
+}
+
+// GetNavigation calls sickrock.SickRock.GetNavigation.
+func (c *sickRockClient) GetNavigation(ctx context.Context, req *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error) {
+	return c.getNavigation.CallUnary(ctx, req)
 }
 
 // ListItems calls sickrock.SickRock.ListItems.
@@ -476,10 +574,18 @@ type SickRockHandler interface {
 	Login(context.Context, *connect.Request[proto.LoginRequest]) (*connect.Response[proto.LoginResponse], error)
 	Logout(context.Context, *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error)
 	ValidateToken(context.Context, *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error)
+	ResetUserPassword(context.Context, *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error)
+	// Device Code Authentication
+	GenerateDeviceCode(context.Context, *connect.Request[proto.GenerateDeviceCodeRequest]) (*connect.Response[proto.GenerateDeviceCodeResponse], error)
+	ClaimDeviceCode(context.Context, *connect.Request[proto.ClaimDeviceCodeRequest]) (*connect.Response[proto.ClaimDeviceCodeResponse], error)
+	CheckDeviceCode(context.Context, *connect.Request[proto.CheckDeviceCodeRequest]) (*connect.Response[proto.CheckDeviceCodeResponse], error)
+	GetDeviceCodeSession(context.Context, *connect.Request[proto.GetDeviceCodeSessionRequest]) (*connect.Response[proto.GetDeviceCodeSessionResponse], error)
 	// Navigation for the UI
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
-	// Pages available in the application
-	GetPages(context.Context, *connect.Request[proto.GetPagesRequest]) (*connect.Response[proto.GetPagesResponse], error)
+	// Table configurations available in the application
+	GetTableConfigurations(context.Context, *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error)
+	// Navigation items from table_navigation
+	GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error)
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
@@ -546,16 +652,52 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("ValidateToken")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockResetUserPasswordHandler := connect.NewUnaryHandler(
+		SickRockResetUserPasswordProcedure,
+		svc.ResetUserPassword,
+		connect.WithSchema(sickRockMethods.ByName("ResetUserPassword")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGenerateDeviceCodeHandler := connect.NewUnaryHandler(
+		SickRockGenerateDeviceCodeProcedure,
+		svc.GenerateDeviceCode,
+		connect.WithSchema(sickRockMethods.ByName("GenerateDeviceCode")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockClaimDeviceCodeHandler := connect.NewUnaryHandler(
+		SickRockClaimDeviceCodeProcedure,
+		svc.ClaimDeviceCode,
+		connect.WithSchema(sickRockMethods.ByName("ClaimDeviceCode")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCheckDeviceCodeHandler := connect.NewUnaryHandler(
+		SickRockCheckDeviceCodeProcedure,
+		svc.CheckDeviceCode,
+		connect.WithSchema(sickRockMethods.ByName("CheckDeviceCode")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetDeviceCodeSessionHandler := connect.NewUnaryHandler(
+		SickRockGetDeviceCodeSessionProcedure,
+		svc.GetDeviceCodeSession,
+		connect.WithSchema(sickRockMethods.ByName("GetDeviceCodeSession")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockGetNavigationLinksHandler := connect.NewUnaryHandler(
 		SickRockGetNavigationLinksProcedure,
 		svc.GetNavigationLinks,
 		connect.WithSchema(sickRockMethods.ByName("GetNavigationLinks")),
 		connect.WithHandlerOptions(opts...),
 	)
-	sickRockGetPagesHandler := connect.NewUnaryHandler(
-		SickRockGetPagesProcedure,
-		svc.GetPages,
-		connect.WithSchema(sickRockMethods.ByName("GetPages")),
+	sickRockGetTableConfigurationsHandler := connect.NewUnaryHandler(
+		SickRockGetTableConfigurationsProcedure,
+		svc.GetTableConfigurations,
+		connect.WithSchema(sickRockMethods.ByName("GetTableConfigurations")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetNavigationHandler := connect.NewUnaryHandler(
+		SickRockGetNavigationProcedure,
+		svc.GetNavigation,
+		connect.WithSchema(sickRockMethods.ByName("GetNavigation")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockListItemsHandler := connect.NewUnaryHandler(
@@ -684,10 +826,22 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockLogoutHandler.ServeHTTP(w, r)
 		case SickRockValidateTokenProcedure:
 			sickRockValidateTokenHandler.ServeHTTP(w, r)
+		case SickRockResetUserPasswordProcedure:
+			sickRockResetUserPasswordHandler.ServeHTTP(w, r)
+		case SickRockGenerateDeviceCodeProcedure:
+			sickRockGenerateDeviceCodeHandler.ServeHTTP(w, r)
+		case SickRockClaimDeviceCodeProcedure:
+			sickRockClaimDeviceCodeHandler.ServeHTTP(w, r)
+		case SickRockCheckDeviceCodeProcedure:
+			sickRockCheckDeviceCodeHandler.ServeHTTP(w, r)
+		case SickRockGetDeviceCodeSessionProcedure:
+			sickRockGetDeviceCodeSessionHandler.ServeHTTP(w, r)
 		case SickRockGetNavigationLinksProcedure:
 			sickRockGetNavigationLinksHandler.ServeHTTP(w, r)
-		case SickRockGetPagesProcedure:
-			sickRockGetPagesHandler.ServeHTTP(w, r)
+		case SickRockGetTableConfigurationsProcedure:
+			sickRockGetTableConfigurationsHandler.ServeHTTP(w, r)
+		case SickRockGetNavigationProcedure:
+			sickRockGetNavigationHandler.ServeHTTP(w, r)
 		case SickRockListItemsProcedure:
 			sickRockListItemsHandler.ServeHTTP(w, r)
 		case SickRockCreateItemProcedure:
@@ -755,12 +909,36 @@ func (UnimplementedSickRockHandler) ValidateToken(context.Context, *connect.Requ
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ValidateToken is not implemented"))
 }
 
+func (UnimplementedSickRockHandler) ResetUserPassword(context.Context, *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ResetUserPassword is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GenerateDeviceCode(context.Context, *connect.Request[proto.GenerateDeviceCodeRequest]) (*connect.Response[proto.GenerateDeviceCodeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GenerateDeviceCode is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ClaimDeviceCode(context.Context, *connect.Request[proto.ClaimDeviceCodeRequest]) (*connect.Response[proto.ClaimDeviceCodeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ClaimDeviceCode is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CheckDeviceCode(context.Context, *connect.Request[proto.CheckDeviceCodeRequest]) (*connect.Response[proto.CheckDeviceCodeResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CheckDeviceCode is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetDeviceCodeSession(context.Context, *connect.Request[proto.GetDeviceCodeSessionRequest]) (*connect.Response[proto.GetDeviceCodeSessionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetDeviceCodeSession is not implemented"))
+}
+
 func (UnimplementedSickRockHandler) GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetNavigationLinks is not implemented"))
 }
 
-func (UnimplementedSickRockHandler) GetPages(context.Context, *connect.Request[proto.GetPagesRequest]) (*connect.Response[proto.GetPagesResponse], error) {
-	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetPages is not implemented"))
+func (UnimplementedSickRockHandler) GetTableConfigurations(context.Context, *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetTableConfigurations is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetNavigation is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error) {

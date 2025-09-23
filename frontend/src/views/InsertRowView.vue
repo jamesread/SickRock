@@ -13,6 +13,7 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableName as string
 const fieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const initialValues = ref<Record<string, string> | null>(null)
 const displayFieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
 const selectedDate = ref<string | null>(null)
 const createButtonText = ref<string>('Insert Row')
@@ -106,6 +107,16 @@ onMounted(async () => {
     if (dateParam) {
       selectedDate.value = dateParam
     }
+
+    // Prepopulate initial values from query params (e.g. fk=value)
+    const iv: Record<string, string> = {}
+    Object.entries(route.query).forEach(([k, v]) => {
+      if (k === 'date') return
+      if (typeof v === 'string') {
+        iv[k] = v
+      }
+    })
+    initialValues.value = Object.keys(iv).length ? iv : null
   } catch (error) {
     console.error('Error loading table structure:', error)
   }
@@ -114,7 +125,13 @@ onMounted(async () => {
 // Recompute display fields when selection or definitions change
 watch([selectedViewId, fieldDefs], applyViewToFields)
 function handleCreated() {
-  router.push({ name: 'after-insert', params: { tableName: tableId } })
+  // If this insert was initiated from a related row context, propagate origin for return link
+  const fromTable = route.query.fromTable as string | undefined
+  const fromRowId = route.query.fromRowId as string | undefined
+  const q: Record<string, string> = {}
+  if (fromTable) q.fromTable = fromTable
+  if (fromRowId) q.fromRowId = fromRowId
+  router.push({ name: 'after-insert', params: { tableName: tableId }, query: q })
 }
 
 function goBack() {
@@ -126,22 +143,59 @@ function goBack() {
   <Section :title="createButtonText">
     <template #toolbar>
       <div class="toolbar-group">
-        <label for="insert-view-select">View:</label>
-        <select
-          id="insert-view-select"
-          v-model="selectedViewId"
-          class="view-dropdown"
-        >
-          <option v-for="view in viewOptions" :key="view.id" :value="view.id">
-            {{ view.viewName }}
-          </option>
-        </select>
+        <div class="view-selector">
+          <label for="insert-view-select">View:</label>
+          <select
+            id="insert-view-select"
+            v-model="selectedViewId"
+            class="view-dropdown"
+          >
+            <option v-for="view in viewOptions" :key="view.id" :value="view.id">
+              {{ view.viewName }}
+            </option>
+          </select>
+        </div>
       </div>
       <button @click="goBack" class="button back-button">
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
         Back to Table
       </button>
     </template>
-    <InsertRow :table-id="tableId" :field-defs="displayFieldDefs" :selected-date="selectedDate" @created="handleCreated" />
+    <InsertRow :table-id="tableId" :field-defs="displayFieldDefs" :selected-date="selectedDate" :initial-values="initialValues" @created="handleCreated" />
   </Section>
 </template>
+
+<style scoped>
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.view-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.view-selector label {
+  font-weight: 600;
+  color: #333;
+}
+
+.view-dropdown {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 1rem;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.view-dropdown:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+</style>

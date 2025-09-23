@@ -3,9 +3,9 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
-import { SickRock } from '../gen/sickrock_pb'
-import Table from '../components/Table.vue'
-import CalendarView from '../components/CalendarView.vue'
+import type { GetTableStructureResponse } from '../gen/sickrock_pb'
+import TableComponent from '../components/TableComponent.vue'
+import CalendarComponent from '../components/CalendarComponent.vue'
 
 const route = useRoute()
 const props = defineProps<{ tableName?: string }>()
@@ -14,16 +14,16 @@ const tableId = computed(() => (props.tableName ?? (route.params.tableName as st
 // Transport handled by authenticated client
 const client = createApiClient()
 
-const tableStructure = ref<{ view: string } | null>(null)
+const tableStructure = ref<GetTableStructureResponse | null>(null)
 const loading = ref(true)
 
 onMounted(async () => {
   try {
     const res = await client.getTableStructure({ pageId: tableId.value })
-    tableStructure.value = { view: res.view || '' }
+    tableStructure.value = res
   } catch (error) {
     console.error('Failed to get table structure:', error)
-    tableStructure.value = { view: '' }
+    tableStructure.value = null
   } finally {
     loading.value = false
   }
@@ -33,7 +33,7 @@ onMounted(async () => {
 <template>
   <div v-if="loading">Loading...</div>
   <template v-else>
-    <CalendarView v-if="tableStructure?.view === 'calendar'" :table-id="tableId" />
-    <Table v-else :table-id="tableId" :show-toolbar="true" :show-pagination="true" />
+    <CalendarComponent v-if="tableStructure?.view === 'calendar'" :table-id="tableId" />
+    <TableComponent v-else :table-id="tableId" :table-structure="tableStructure" :show-toolbar="true" :show-view-switcher="true" :show-export="true" :show-structure="true" :show-insert="true" :show-pagination="true" :show-view-create="true" :show-view-edit="true"/>
   </template>
 </template>

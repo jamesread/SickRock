@@ -10,7 +10,9 @@ import {
   RefreshIcon,
   AddIcon,
   BashIcon,
-  HomeIcon
+  HomeIcon,
+  UserIcon,
+  KeyIcon
 } from '@hugeicons/core-free-icons'
 
 const router = useRouter()
@@ -24,6 +26,8 @@ const buildDate = ref<string>('')
 const dbName = ref<string>('')
 const loading = ref(false)
 const error = ref<string | null>(null)
+const resetUser = ref({ username: '', newPassword: '' })
+const resetStatus = ref<string>('')
 
 // Database stats
 const totalTables = ref<number>(0)
@@ -63,7 +67,7 @@ async function loadBuildInfo() {
 
 async function loadDatabaseStats() {
   try {
-    const pages = await client.getPages({})
+    const pages = await client.getTableConfigurations({})
     totalTables.value = pages.pages.length
 
     // Use efficient system info endpoint for approximate total rows
@@ -131,6 +135,30 @@ function refreshData() {
   ]).finally(() => {
     loading.value = false
   })
+}
+
+async function resetUserPassword() {
+  resetStatus.value = ''
+  error.value = null
+  try {
+    if (!resetUser.value.username || !resetUser.value.newPassword) {
+      error.value = 'Username and new password are required'
+      return
+    }
+    const resp = await client.resetUserPassword({
+      username: resetUser.value.username,
+      newPassword: resetUser.value.newPassword
+    } as any)
+    if ((resp as any).success) {
+      resetStatus.value = 'Password updated'
+      resetUser.value = { username: '', newPassword: '' }
+    } else {
+      error.value = (resp as any).message || 'Failed to update password'
+    }
+  } catch (e) {
+    console.error(e)
+    error.value = 'Network error'
+  }
 }
 </script>
 
@@ -286,6 +314,41 @@ function refreshData() {
             <HugeiconsIcon :icon="HomeIcon" width="18" height="18" class="action-icon" />
             Go to Home
           </button>
+        </div>
+      </Section>
+
+      <!-- User Management -->
+      <Section title = "User Management">
+        <div class="add-rule-form">
+          <h3>Reset User Password</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Username:</label>
+              <input v-model="resetUser.username" type="text" placeholder="e.g., admin" />
+            </div>
+            <div class="form-group">
+              <label>New Password:</label>
+              <input v-model="resetUser.newPassword" type="password" placeholder="new password" />
+            </div>
+          </div>
+          <div class="form-actions">
+            <button @click="resetUserPassword" class="save-btn">Reset Password</button>
+            <span v-if="resetStatus" class="subtle">{{ resetStatus }}</span>
+          </div>
+        </div>
+      </Section>
+
+      <!-- System Tables -->
+      <Section title = "System Tables">
+        <div class="quick-actions">
+          <router-link to="/table/table_sessions" class="button">
+            <HugeiconsIcon :icon="UserIcon" width="18" height="18" class="action-icon" />
+            View Sessions
+          </router-link>
+          <router-link to="/table/device_codes" class="button">
+            <HugeiconsIcon :icon="KeyIcon" width="18" height="18" class="action-icon" />
+            View Device Codes
+          </router-link>
         </div>
       </Section>
     </div>

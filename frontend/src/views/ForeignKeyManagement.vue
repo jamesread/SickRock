@@ -36,6 +36,7 @@ const showDeleteConfirm = ref<string | null>(null)
 
 // Form state
 const formData = ref({
+  constraintName: '',
   columnName: '',
   referencedTable: '',
   referencedColumn: '',
@@ -77,7 +78,7 @@ async function loadForeignKeys() {
 
 async function loadAvailableTables() {
   try {
-    const response = await client.getPages({})
+    const response = await client.getTableConfigurations({})
     availableTables.value = response.pages.map(page => ({
       name: page.id,
       title: page.title || page.id
@@ -132,6 +133,7 @@ async function createForeignKey() {
     if (response.success) {
       // Reset form
       formData.value = {
+        constraintName: '',
         columnName: '',
         referencedTable: '',
         referencedColumn: '',
@@ -259,8 +261,15 @@ onMounted(async () => {
 
     <!-- Create Foreign Key Form -->
     <div v-if="showCreateForm" class="create-form">
-      <h3>Create Foreign Key</h3>
       <form @submit.prevent="createForeignKey">
+        <label for="constraint-name">Constraint Name (optional)</label>
+        <input
+          id="constraint-name"
+          v-model="formData.constraintName"
+          type="text"
+          placeholder="e.g. fk_orders_customer_id"
+        />
+
         <label for="column-name">Column Name</label>
         <select v-model="formData.columnName" id="column-name" required>
           <option value="">Select a column</option>
@@ -419,12 +428,6 @@ onMounted(async () => {
 
 .action {
   margin-right: 1rem;
-}
-
-.create-form {
-  padding: 1.5rem;
-  border-radius: 4px;
-  margin-bottom: 2rem;
 }
 
 .create-form h3 {

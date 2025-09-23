@@ -5,7 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { SickRock } from '../gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Edit01Icon, Delete01Icon } from '@hugeicons/core-free-icons'
-import Table from '../components/Table.vue'
+import Table from '../components/TableComponent.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import type { createApiClient } from '../stores/api'
 
@@ -128,25 +128,11 @@ async function loadRelatedRows() {
       console.log(`Direction 1 - Looking for ${fk.referencedColumn} = ${referencedValue} in table ${fk.tableName}`)
 
       try {
-        // Get all items from the referencing table
-        const response = await client.listItems({ tcName: fk.tableName })
-        const allItems = response.items || []
-        console.log(`Loaded ${allItems.length} items from ${fk.tableName}`)
-        if (allItems.length > 0) {
-          console.log('Sample item structure:', allItems[0])
+        let matchingItems: any[] = []
+        if (referencedValue !== null && referencedValue !== undefined && referencedValue !== '') {
+          const res = await client.listItems({ tcName: fk.tableName, where: { [fk.columnName]: String(referencedValue) } })
+          matchingItems = res.items || []
         }
-
-        // Filter items where the foreign key column matches the referenced value
-        const matchingItems = referencedValue !== null && referencedValue !== undefined
-          ? allItems.filter((row: any) => {
-              // Check both top-level fields and additionalFields
-              const fkValue = row[fk.columnName] || (row.additionalFields && row.additionalFields[fk.columnName])
-              return fkValue !== null && fkValue !== undefined && String(fkValue) === String(referencedValue)
-            })
-          : []
-        console.log(`Found ${matchingItems.length} matching items in ${fk.tableName}`)
-
-        // Always include the table, even if it has 0 matching rows
         relatedData[`${fk.tableName}.${fk.columnName}`] = matchingItems
       } catch (err) {
         console.error(`Error loading related rows for ${fk.tableName}:`, err)
@@ -161,19 +147,8 @@ async function loadRelatedRows() {
 
       if (currentValue !== null && currentValue !== undefined) {
         try {
-          // Get all items from the referenced table
-          const response = await client.listItems({ tcName: fk.referencedTable })
-          const allItems = response.items || []
-
-          // Filter items where the referenced column matches the current value
-          const matchingItems = allItems.filter((row: any) => {
-            // Check both top-level fields and additionalFields
-            const refValue = row[fk.referencedColumn] || (row.additionalFields && row.additionalFields[fk.referencedColumn])
-            return refValue !== null && refValue !== undefined && String(refValue) === String(currentValue)
-          })
-
-          // Add the referenced table with matching rows
-          relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = matchingItems
+          const res = await client.listItems({ tcName: fk.referencedTable, where: { [fk.referencedColumn]: String(currentValue) } })
+          relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = res.items || []
         } catch (err) {
           console.error(`Error loading referenced rows for ${fk.referencedTable}:`, err)
           relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = []
@@ -288,6 +263,10 @@ const relatedTables = computed(() => {
     rows: any[]
     title: string
     direction: 'referencing' | 'referenced'
+    filterColumn: string
+    filterValue: string
+    relationName: string
+    rowCountText: string
   }> = []
 
   for (const [key, rows] of Object.entries(relatedRows.value)) {
@@ -301,16 +280,27 @@ const relatedTables = computed(() => {
 
     const direction = fk && fk.tableName === tableName ? 'referencing' : 'referenced'
 
-    // Create a descriptive title based on direction
+    // Create a descriptive title including relation name (constraint or column)
     const rowCount = `${rows.length} related row${rows.length !== 1 ? 's' : ''}`
-    let title = `${tableName} (${rowCount})`
+    const relationName = fk?.constraintName || columnName
+    const title = `${tableName} (${rowCount})`
+    const rowCountText = `(${rowCount})`
 
-    if (direction === 'referencing') {
-      // Rows in this table that reference the current row
-      title = `${tableName} (${rowCount})`
-    } else {
-      // Rows in this table that the current row references
-      title = `${tableName} (${rowCount})`
+    // Determine filter column (on the related table) and value (from the current item)
+    let filterColumn = columnName
+    let filterValue = ''
+    if (fk) {
+      if (direction === 'referencing') {
+        // Related table column is fk.columnName, value on current item is fk.referencedColumn
+        filterColumn = fk.columnName
+        const v = resolveRawFieldValue(fk.referencedColumn)
+        filterValue = v == null ? '' : String(v)
+      } else {
+        // Related table column is fk.referencedColumn, value on current item is fk.columnName
+        filterColumn = fk.referencedColumn
+        const v = resolveRawFieldValue(fk.columnName)
+        filterValue = v == null ? '' : String(v)
+      }
     }
 
     tables.push({
@@ -318,7 +308,11 @@ const relatedTables = computed(() => {
       columnName,
       rows,
       title,
-      direction
+      direction,
+      filterColumn,
+      filterValue,
+      relationName,
+      rowCountText
     })
   }
 
@@ -414,17 +408,40 @@ function cancelDelete() {
     <!-- Related Tables as Top-Level Sections -->
     <template v-if="foreignKeys.length > 0">
       <template v-for="table in relatedTables" :key="`${table.tableName}.${table.columnName}`">
+          <div class="section-header">
+            <h3>
+              <span :title="table.relationName">{{ table.tableName }}</span>
+              &nbsp;
+              <span class="subtle"> {{ table.rowCountText }}</span>
+            </h3>
+            <div class="header-actions">
+              <router-link :to="`/table/${table.tableName}`" class="button neutral">Open Table</router-link>
+              <router-link :to="{ path: `/table/${table.tableName}/export`, query: { where: JSON.stringify(table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) } }" class="button neutral">Export</router-link>
+                <router-link :to="{ path: `/table/${table.tableName}/insert-row`, query: Object.assign({ fromTable: tableName, fromRowId: rowId }, table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) }" class="button neutral">Insert</router-link>
+            </div>
+          </div>
           <Section v-if="loadingRelated" class="loading-related">
             Loading related rows...
           </Section>
           <div v-else-if="table.rows.length > 0">
             <Table
-              :title="table.title"
+              :key="`${table.tableName}.${table.columnName}.${table.rows.length}`"
+              :title="''"
               :table-id="table.tableName"
               :items="table.rows"
-              :show-toolbar="false"
+              :show-toolbar="true"
+              :show-view-edit="false"
+              :show-view-create="false"
               :show-pagination="false"
-
+              :show-view-switcher="true"
+              @rows-updated="loadRelatedRows"
+              @row-deleted="(id) => {
+                // Optimistically remove the deleted row from this related section
+                const key = `${table.tableName}.${table.columnName}`
+                if (relatedRows[key]) {
+                  relatedRows[key] = relatedRows[key].filter((r: any) => String(r.id) !== String(id))
+                }
+              }"
             />
           </div>
           <Section v-else :title="table.title">
@@ -543,6 +560,14 @@ function cancelDelete() {
 .cancel-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.button:not(.bad) {
+  background: #efefef;
+}
+
+.button:hover:not(:disabled) {
+  background: #e0e0e0;
 }
 
 @media (max-width: 768px) {

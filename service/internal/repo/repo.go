@@ -2,8 +2,10 @@ package repo
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"fmt"
+	"math/big"
 	"os"
 	"regexp"
 	"slices"
@@ -15,6 +17,7 @@ import (
 	"github.com/jamesread/golure/pkg/redact"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 	_ "modernc.org/sqlite"
 )
 
@@ -70,7 +73,7 @@ func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, err
 }
 
 func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]TableConfig, error) {
-	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal,0) as ordinal, icon, view, db FROM table_configurations ORDER BY name, ordinal ASC")
+	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal,0) as ordinal, create_button_text, icon, view, db FROM table_configurations ORDER BY name, ordinal ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +81,7 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 	var configs []TableConfig
 	for rows.Next() {
 		var config TableConfig
-		if err := rows.Scan(&config.Name, &config.Title, &config.Ordinal, &config.CreateButtonText, &config.Icon, &config.View); err != nil {
+		if err := rows.Scan(&config.Name, &config.Title, &config.Ordinal, &config.CreateButtonText, &config.Icon, &config.View, &config.Db); err != nil {
 			return nil, err
 		}
 		configs = append(configs, config)
@@ -86,182 +89,347 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 	return configs, rows.Err()
 }
 
-func (r *Repository) EnsureSchema(ctx context.Context) error {
-	log.Infof("Using database driver: %s", r.db.DriverName())
-	log.Infof("Ensuring schema")
-	var schema string
-	switch r.db.DriverName() {
-	case "mysql":
-		schema = `
-CREATE TABLE IF NOT EXISTS table_configurations (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(191) NOT NULL UNIQUE,
-    title VARCHAR(191),
-    ordinal INT DEFAULT 0,
-    db VARCHAR(191)
-);
-
-CREATE TABLE IF NOT EXISTS table_conditional_formatting_rules (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    table_name VARCHAR(191) NOT NULL,
-    column_name VARCHAR(191) NOT NULL,
-    condition_type VARCHAR(50) NOT NULL,
-    condition_value TEXT,
-    format_type VARCHAR(50) NOT NULL,
-    format_value TEXT,
-    priority INT DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix BIGINT DEFAULT (UNIX_TIMESTAMP())
-);
-
-CREATE TABLE IF NOT EXISTS table_views (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    table_name VARCHAR(191) NOT NULL,
-    view_name VARCHAR(191) NOT NULL,
-    is_default BOOLEAN DEFAULT FALSE,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix BIGINT DEFAULT (UNIX_TIMESTAMP()),
-    UNIQUE KEY unique_table_view (table_name, view_name)
-);
-
-CREATE TABLE IF NOT EXISTS table_view_columns (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    view_id INT NOT NULL,
-    column_name VARCHAR(191) NOT NULL,
-    is_visible BOOLEAN DEFAULT TRUE,
-    column_order INT DEFAULT 0,
-    column_width INT,
-    sort_order VARCHAR(10),
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix BIGINT DEFAULT (UNIX_TIMESTAMP()),
-    FOREIGN KEY (view_id) REFERENCES table_views(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_view_column (view_id, column_name)
-);
-
-CREATE TABLE IF NOT EXISTS table_recently_viewed (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    table_id BIGINT NOT NULL,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix BIGINT DEFAULT (UNIX_TIMESTAMP())
-);
-`
-	default:
-		schema = `
-CREATE TABLE IF NOT EXISTS table_configurations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    title TEXT,
-    ordinal INTEGER DEFAULT 0,
-    db TEXT
-);
-
-CREATE TABLE IF NOT EXISTS table_conditional_formatting_rules (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    table_name TEXT NOT NULL,
-    column_name TEXT NOT NULL,
-    condition_type TEXT NOT NULL,
-    condition_value TEXT,
-    format_type TEXT NOT NULL,
-    format_value TEXT,
-    priority INTEGER DEFAULT 0,
-    is_active INTEGER DEFAULT 1,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix INTEGER DEFAULT (strftime('%s', 'now'))
-);
-
-CREATE TABLE IF NOT EXISTS table_views (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    table_name TEXT NOT NULL,
-    view_name TEXT NOT NULL,
-    is_default INTEGER DEFAULT 0,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix INTEGER DEFAULT (strftime('%s', 'now')),
-    UNIQUE(table_name, view_name)
-);
-
-CREATE TABLE IF NOT EXISTS table_view_columns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    view_id INTEGER NOT NULL,
-    column_name TEXT NOT NULL,
-    is_visible INTEGER DEFAULT 1,
-    column_order INTEGER DEFAULT 0,
-    column_width INTEGER,
-    sort_order TEXT,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix INTEGER DEFAULT (strftime('%s', 'now')),
-    FOREIGN KEY (view_id) REFERENCES table_views(id) ON DELETE CASCADE,
-    UNIQUE(view_id, column_name)
-);
-
-CREATE TABLE IF NOT EXISTS table_recently_viewed (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    table_id INTEGER NOT NULL,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at_unix INTEGER DEFAULT (strftime('%s', 'now'))
-);
-`
-	}
-	_, err := r.db.ExecContext(ctx, schema)
-	if err != nil {
-		return err
-	}
-
-	// Add ordinal column if it doesn't exist (migration)
-	return r.migrateTableConfigurations(ctx)
+type NavigationItem struct {
+	ID                 int
+	Ordinal            int
+	TableConfiguration int
+	TableName          string
+	TableTitle         string
+	TableIcon          sql.NullString
+	TableView          sql.NullString
 }
 
-// migrateTableConfigurations adds the ordinal and title columns to existing table_configurations
-func (r *Repository) migrateTableConfigurations(ctx context.Context) error {
-	if r.db.DriverName() == "sqlite3" {
-		// SQLite doesn't have information_schema, so we'll try to add the columns and ignore errors
-		_, _ = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN ordinal INTEGER DEFAULT 0")
-		_, _ = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN title TEXT")
-		return nil // Ignore errors as columns might already exist
+func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error) {
+	query := `
+		SELECT
+			tn.id,
+			tn.ordinal,
+			tn.table_configuration,
+			tc.name as table_name,
+			COALESCE(tc.title, tc.name) as table_title,
+			tc.icon as table_icon,
+			tc.view as table_view
+		FROM table_navigation tn
+		JOIN table_configurations tc ON tn.table_configuration = tc.id
+		ORDER BY tn.ordinal ASC, tc.name ASC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []NavigationItem
+	for rows.Next() {
+		var item NavigationItem
+		if err := rows.Scan(
+			&item.ID,
+			&item.Ordinal,
+			&item.TableConfiguration,
+			&item.TableName,
+			&item.TableTitle,
+			&item.TableIcon,
+			&item.TableView,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
 	}
 
-	// For MySQL, check if columns exist before adding
-	var ordinalCount, titleCount, dbColCount int
-	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'table_configurations' AND column_name = 'ordinal'").Scan(&ordinalCount)
+	return items, rows.Err()
+}
+
+type User struct {
+	ID           int
+	Username     string
+	Password     string
+	InitialRoute string
+}
+
+func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*User, error) {
+	query := "SELECT id, username, password, initial_route FROM table_users WHERE username = ?"
+
+	var user User
+	err := r.db.QueryRowxContext(ctx, query, username).Scan(&user.ID, &user.Username, &user.Password, &user.InitialRoute)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // User not found
+		}
+		return nil, err
+	}
+
+	return &user, nil
+}
+
+func (r *Repository) HasUsers(ctx context.Context) (bool, error) {
+	query := "SELECT COUNT(*) FROM table_users"
+	var count int
+	err := r.db.QueryRowxContext(ctx, query).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	hasUsers := count > 0
+	log.Debugf("User count in database: %d, has users: %v", count, hasUsers)
+	return hasUsers, nil
+}
+
+func (r *Repository) CreateDefaultAdminUser(ctx context.Context) error {
+	// Check if admin user already exists
+	existingUser, err := r.GetUserByUsername(ctx, "admin")
+	if err != nil {
+		return err
+	}
+	if existingUser != nil {
+		// Admin user already exists, nothing to do
+		log.Debug("Admin user already exists, skipping creation")
+		return nil
+	}
+
+	log.Info("Creating default admin user")
+
+	// Hash the password "admin"
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'table_configurations' AND column_name = 'title'").Scan(&titleCount)
+	// Insert the admin user
+	query := "INSERT INTO table_users (username, password, initial_route) VALUES (?, ?, ?)"
+	_, err = r.db.ExecContext(ctx, query, "admin", string(hashedPassword), "/")
 	if err != nil {
 		return err
 	}
 
-	if ordinalCount == 0 {
-		// Ordinal column doesn't exist, add it
-		_, err = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN ordinal INT DEFAULT 0")
-		if err != nil {
-			return err
-		}
-	}
+	log.Info("Default admin user created successfully")
+	return nil
+}
 
-	if titleCount == 0 {
-		// Title column doesn't exist, add it
-		_, err = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN title VARCHAR(191)")
-		if err != nil {
-			return err
-		}
+// UpdateUserPassword sets a new bcrypt-hashed password for a given username.
+func (r *Repository) UpdateUserPassword(ctx context.Context, username, newPassword string) error {
+	if username == "" || newPassword == "" {
+		return fmt.Errorf("username and new password are required")
 	}
-
-	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'table_configurations' AND column_name = 'db'").Scan(&dbColCount)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-	if dbColCount == 0 {
-		_, err = r.db.ExecContext(ctx, "ALTER TABLE table_configurations ADD COLUMN db VARCHAR(191)")
-		if err != nil {
-			return err
+	query := "UPDATE table_users SET password = ? WHERE username = ?"
+	res, err := r.db.ExecContext(ctx, query, string(hashedPassword), username)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("user not found")
+	}
+	return nil
+}
+
+type Session struct {
+	ID           int
+	SessionID    string
+	Username     string
+	CreatedAt    time.Time
+	ExpiresAt    time.Time
+	LastAccessed time.Time
+	UserAgent    sql.NullString
+	IPAddress    sql.NullString
+}
+
+func (r *Repository) CreateSession(ctx context.Context, sessionID, username string, expiresAt time.Time, userAgent, ipAddress string) error {
+	query := `
+		INSERT INTO table_sessions (session_id, username, expires_at, user_agent, ip_address)
+		VALUES (?, ?, ?, ?, ?)
+	`
+	_, err := r.db.ExecContext(ctx, query, sessionID, username, expiresAt, userAgent, ipAddress)
+	return err
+}
+
+func (r *Repository) GetSession(ctx context.Context, sessionID string) (*Session, error) {
+	query := `
+		SELECT id, session_id, username, created_at, expires_at, last_accessed, user_agent, ip_address
+		FROM table_sessions
+		WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP
+	`
+
+	var session Session
+	err := r.db.QueryRowxContext(ctx, query, sessionID).Scan(
+		&session.ID,
+		&session.SessionID,
+		&session.Username,
+		&session.CreatedAt,
+		&session.ExpiresAt,
+		&session.LastAccessed,
+		&session.UserAgent,
+		&session.IPAddress,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Session not found or expired
 		}
+		return nil, err
+	}
+
+	return &session, nil
+}
+
+func (r *Repository) GetSessionByUsername(ctx context.Context, username string) (*Session, error) {
+	query := `
+		SELECT session_id, username, created_at, expires_at, last_accessed, user_agent, ip_address
+		FROM table_sessions
+		WHERE username = ? AND expires_at > CURRENT_TIMESTAMP
+		ORDER BY last_accessed DESC
+		LIMIT 1
+	`
+
+	var session Session
+	err := r.db.QueryRowxContext(ctx, query, username).Scan(
+		&session.SessionID,
+		&session.Username,
+		&session.CreatedAt,
+		&session.ExpiresAt,
+		&session.LastAccessed,
+		&session.UserAgent,
+		&session.IPAddress,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Session not found
+		}
+		return nil, err
+	}
+
+	return &session, nil
+}
+
+func (r *Repository) UpdateSessionLastAccessed(ctx context.Context, sessionID string) error {
+	query := `
+		UPDATE table_sessions
+		SET last_accessed = CURRENT_TIMESTAMP
+		WHERE session_id = ? AND expires_at > CURRENT_TIMESTAMP
+	`
+	_, err := r.db.ExecContext(ctx, query, sessionID)
+	return err
+}
+
+func (r *Repository) DeleteSession(ctx context.Context, sessionID string) error {
+	query := "DELETE FROM table_sessions WHERE session_id = ?"
+	_, err := r.db.ExecContext(ctx, query, sessionID)
+	return err
+}
+
+func (r *Repository) DeleteUserSessions(ctx context.Context, username string) error {
+	query := "DELETE FROM table_sessions WHERE username = ?"
+	_, err := r.db.ExecContext(ctx, query, username)
+	return err
+}
+
+func (r *Repository) CleanupExpiredSessions(ctx context.Context) error {
+	query := "DELETE FROM table_sessions WHERE expires_at <= CURRENT_TIMESTAMP"
+	result, err := r.db.ExecContext(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Warnf("Could not get rows affected count: %v", err)
+	} else {
+		log.Infof("Cleaned up %d expired sessions", rowsAffected)
 	}
 
 	return nil
+}
+
+type DeviceCode struct {
+	ID        int
+	Code      string
+	CreatedAt time.Time
+	ExpiresAt time.Time
+	ClaimedBy sql.NullString
+	ClaimedAt sql.NullTime
+}
+
+func (r *Repository) CreateDeviceCode(ctx context.Context, code string, expiresAt time.Time) error {
+	query := "INSERT INTO device_codes (code, expires_at) VALUES (?, ?)"
+	_, err := r.db.ExecContext(ctx, query, code, expiresAt)
+	return err
+}
+
+func (r *Repository) GetDeviceCode(ctx context.Context, code string) (*DeviceCode, error) {
+	query := `
+		SELECT id, code, created_at, expires_at, claimed_by, claimed_at
+		FROM device_codes
+		WHERE code = ? AND expires_at > CURRENT_TIMESTAMP
+	`
+
+	var deviceCode DeviceCode
+	err := r.db.QueryRowxContext(ctx, query, code).Scan(
+		&deviceCode.ID,
+		&deviceCode.Code,
+		&deviceCode.CreatedAt,
+		&deviceCode.ExpiresAt,
+		&deviceCode.ClaimedBy,
+		&deviceCode.ClaimedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Device code not found or expired
+		}
+		return nil, err
+	}
+
+	return &deviceCode, nil
+}
+
+func (r *Repository) ClaimDeviceCode(ctx context.Context, code, username string) error {
+	query := `
+		UPDATE device_codes
+		SET claimed_by = ?, claimed_at = CURRENT_TIMESTAMP
+		WHERE code = ? AND expires_at > CURRENT_TIMESTAMP AND claimed_by IS NULL
+	`
+	result, err := r.db.ExecContext(ctx, query, username, code)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("device code not found, expired, or already claimed")
+	}
+
+	return nil
+}
+
+func (r *Repository) CleanupExpiredDeviceCodes(ctx context.Context) error {
+	query := "DELETE FROM device_codes WHERE expires_at <= CURRENT_TIMESTAMP"
+	result, err := r.db.ExecContext(ctx, query)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Warnf("Could not get rows affected count: %v", err)
+	} else {
+		log.Infof("Cleaned up %d expired device codes", rowsAffected)
+	}
+
+	return nil
+}
+
+func (r *Repository) GenerateDeviceCode() (string, error) {
+	// Generate a 4-digit random number
+	n, err := rand.Int(rand.Reader, big.NewInt(10000))
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%04d", n.Int64()), nil
 }
 
 // sanitizeTableName ensures the table name is a safe SQL identifier: [a-zA-Z0-9_]+
@@ -371,7 +539,7 @@ type FieldSpec struct {
 	DefaultToCurrentTimestamp bool
 }
 
-func (r *Repository) ListItemsInTable(ctx context.Context, tcName string) ([]Item, error) {
+func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where map[string]string) ([]Item, error) {
 	tc, err := r.GetTableConfiguration(ctx, tcName)
 
 	if err != nil {
@@ -400,11 +568,24 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string) ([]Ite
 		sortColumn = "id"
 	}
 
-	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `%s` DESC", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, sortColumn)
+	// Build WHERE clause from provided filters (exact match)
+	var whereClause string
+	var args []interface{}
+	if len(where) > 0 {
+		parts := make([]string, 0, len(where))
+		for k, v := range where {
+			col := sanitizeTableName(k)
+			parts = append(parts, fmt.Sprintf("`%s` = ?", col))
+			args = append(args, v)
+		}
+		whereClause = " WHERE " + strings.Join(parts, " AND ")
+	}
+
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s`%s ORDER BY `%s` DESC", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, whereClause, sortColumn)
 	log.Infof("ListItems SQL Query: %s db:%v tbl:%v", query, tc.Db, tc.Table)
 
 	// Use QueryxContext to get raw rows and manually map them
-	rows, err := r.db.QueryxContext(ctx, query)
+	rows, err := r.db.QueryxContext(ctx, query, args...)
 	if err != nil {
 		log.Errorf("Failed to list items in table %s: %v", tcName, err)
 		return nil, err
@@ -479,26 +660,29 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string) ([]Ite
 }
 
 func (r *Repository) CreateItemInTable(ctx context.Context, table string, additionalFields map[string]string) (Item, error) {
-	now := time.Now()
-	return r.CreateItemInTableWithTimestamp(ctx, table, additionalFields, now)
+	return r.CreateItemInTableWithTimestamp(ctx, table, additionalFields)
 }
 
-func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table string, additionalFields map[string]string, timestamp time.Time) (Item, error) {
-	t := sanitizeTableName(table)
+func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table string, additionalFields map[string]string) (Item, error) {
+	tc, err := r.GetTableConfiguration(ctx, table)
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
+	}
 
 	// Build dynamic INSERT query
-	columns := []string{"sr_created"}
-	placeholders := []string{"?"}
-	values := []interface{}{timestamp}
+	columns := []string{}
+	placeholders := []string{}
+	values := []interface{}{}
 
 	for key, value := range additionalFields {
-		columns = append(columns, key)
+		columns = append(columns, fmt.Sprintf("`%s`", key))
 		placeholders = append(placeholders, "?")
 		values = append(values, value)
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", t, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
-	log.Infof("Creating item in table %s with fields: %+v, timestamp: %v, query: %s", t, additionalFields, timestamp, query)
+	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)", tc.Db.String, tc.Table.String, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	// Log the SQL used (without parameter values)
+	log.WithFields(log.Fields{"table": tc.Table.String}).Infof("CreateItem SQL: %s", query)
 
 	res, err := r.db.ExecContext(ctx, query, values...)
 	if err != nil {
@@ -513,7 +697,7 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 		fields[key] = value
 	}
 
-	item := Item{ID: strconv.FormatInt(lastID, 10), SrCreated: timestamp, Fields: fields}
+	item := Item{ID: strconv.FormatInt(lastID, 10), Fields: fields}
 	log.Infof("Created item: %+v", item)
 	return item, nil
 }
@@ -624,8 +808,12 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 }
 
 func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id string) (bool, error) {
-	t := sanitizeTableName(table)
-	query := fmt.Sprintf("DELETE FROM %s WHERE id = ?", t)
+	tc, err := r.GetTableConfiguration(ctx, table)
+	if err != nil {
+		return false, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
+	}
+
+	query := fmt.Sprintf("DELETE FROM %s.%s WHERE id = ?", tc.Db.String, tc.Table.String)
 	res, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return false, err
@@ -689,7 +877,7 @@ func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldS
 			DfltValue *string `db:"dflt_value"`
 		}
 		var rows []srow
-		q := fmt.Sprintf("PRAGMA table_info(%s)", tc.Table)
+		q := fmt.Sprintf("PRAGMA table_info(%s)", tc.Table.String)
 		if err := r.db.SelectContext(ctx, &rows, q); err != nil {
 			return nil, err
 		}
@@ -1059,7 +1247,7 @@ func (r *Repository) DeleteForeignKey(ctx context.Context, constraintName string
 
 		alterQuery = fmt.Sprintf("ALTER TABLE %s DROP FOREIGN KEY %s", tableName, constraintName)
 	default: // SQLite
-		alterQuery = fmt.Sprintf("ALTER TABLE %s DROP CONSTRAINT %s", constraintName)
+		return fmt.Errorf("dropping foreign keys is not supported on SQLite in this implementation")
 	}
 
 	_, err := r.db.ExecContext(ctx, alterQuery)

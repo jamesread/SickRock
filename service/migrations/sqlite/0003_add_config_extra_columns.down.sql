@@ -1,0 +1,1 @@
+-- SQLite cannot drop columns easily; this down migration is a no-op.

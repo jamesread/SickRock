@@ -7,11 +7,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/gin-gonic/gin"
 	"github.com/jamesread/golure/pkg/dirs"
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database"
+	"github.com/golang-migrate/migrate/v4/database/mysql"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	"github.com/jamesread/SickRock/internal/auth"
@@ -128,13 +136,35 @@ func main() {
 
 	repo := repo.NewRepository(db)
 
-	if err := repo.EnsureSchema(context.Background()); err != nil {
-		log.Fatalf("schema: %v", err)
+	// Log database engine version before migrations
+	logDatabaseEngineVersion(db)
+
+	if err := runMigrations(db); err != nil {
+		log.Fatalf("migrations failed: %v", err)
+	}
+
+	// Log database engine version after migrations
+	logDatabaseEngineVersion(db)
+
+	// Create default admin user if no users exist
+	hasUsers, err := repo.HasUsers(context.Background())
+	if err != nil {
+		log.Fatalf("failed to check for existing users: %v", err)
+	}
+	if !hasUsers {
+		log.Info("No users found in database, creating default admin user")
+		if err := repo.CreateDefaultAdminUser(context.Background()); err != nil {
+			log.Fatalf("failed to create default admin user: %v", err)
+		}
+		log.Info("Default admin user created (username: admin, password: admin)")
 	}
 
 	srv := srvpkg.NewSickRockServer(repo)
 
-	authService := auth.NewAuthService()
+	authService := auth.NewAuthService(repo)
+
+	// Start session cleanup job
+	go startSessionCleanupJob(repo)
 
 	interceptors := connect.WithInterceptors(auth.ConnectAuthMiddleware(authService))
 	path, handler := sickrockpbconnect.NewSickRockHandler(srv, interceptors)
@@ -168,6 +198,91 @@ func main() {
 	router.Run(":" + getPort())
 }
 
+func runMigrations(db *sqlx.DB) error {
+	// Use the underlying *sql.DB for migrate drivers
+	sqlDB := db.DB
+
+	driverName := db.DriverName()
+
+	// Select migrations directory by driver
+	cwd, _ := os.Getwd()
+	var migDir string
+	var databaseName string
+	var d database.Driver
+
+	switch driverName {
+	case "mysql":
+		migDir = filepath.Join(cwd, "migrations", "mysql")
+		databaseName = "mysql"
+		md, err := mysql.WithInstance(sqlDB, &mysql.Config{})
+		if err != nil {
+			return err
+		}
+		d = md
+	default: // sqlite
+		migDir = filepath.Join(cwd, "migrations", "sqlite")
+		databaseName = "sqlite3"
+		sd, err := sqlite3.WithInstance(sqlDB, &sqlite3.Config{})
+		if err != nil {
+			return err
+		}
+		d = sd
+	}
+
+	srcURL := "file://" + migDir
+	m, err := migrate.NewWithDatabaseInstance(srcURL, databaseName, d)
+	if err != nil {
+		return err
+	}
+	// Do not close m here; Close() would close the shared *sql.DB instance
+
+	// Version before
+	beforeVer, beforeDirty, verr := m.Version()
+	if verr == migrate.ErrNilVersion {
+		beforeVer, beforeDirty = 0, false
+		log.Infof("Migration version before: none (version=0), dirty=%v", beforeDirty)
+	} else if verr != nil {
+		log.Warnf("Could not get migration version before: %v", verr)
+	} else {
+		log.Infof("Migration version before: %d, dirty=%v", beforeVer, beforeDirty)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+
+	// Version after
+	afterVer, afterDirty, aerr := m.Version()
+	if aerr == migrate.ErrNilVersion {
+		afterVer, afterDirty = 0, false
+		log.Infof("Migration version after: none (version=0), dirty=%v", afterDirty)
+	} else if aerr != nil {
+		log.Warnf("Could not get migration version after: %v", aerr)
+	} else {
+		log.Infof("Migration version after: %d, dirty=%v", afterVer, afterDirty)
+	}
+
+	log.Infof("Database migrations applied from %s", srcURL)
+	return nil
+}
+
+func logDatabaseEngineVersion(db *sqlx.DB) {
+	driver := db.DriverName()
+	var version string
+	var err error
+	switch driver {
+	case "mysql":
+		err = db.Get(&version, "SELECT VERSION()")
+	default: // sqlite3
+		err = db.Get(&version, "SELECT sqlite_version()")
+	}
+	if err != nil {
+		log.Warnf("Could not read database engine version: %v", err)
+		return
+	}
+	log.Infof("Database engine %s version: %s", driver, version)
+}
+
 func getPort() string {
 	port := os.Getenv("PORT")
 
@@ -178,4 +293,34 @@ func getPort() string {
 	log.Infof("Listening on port %s", port)
 
 	return port
+}
+
+func startSessionCleanupJob(repo *repo.Repository) {
+	ticker := time.NewTicker(7 * 24 * time.Hour) // Weekly cleanup
+	defer ticker.Stop()
+
+	log.Info("Session cleanup job started - will run weekly")
+
+	// Run immediately on startup
+	cleanupSessions(repo)
+
+	// Then run weekly
+	for range ticker.C {
+		cleanupSessions(repo)
+	}
+}
+
+func cleanupSessions(repo *repo.Repository) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	err := repo.CleanupExpiredSessions(ctx)
+	if err != nil {
+		log.Errorf("Session cleanup failed: %v", err)
+	}
+
+	err = repo.CleanupExpiredDeviceCodes(ctx)
+	if err != nil {
+		log.Errorf("Device code cleanup failed: %v", err)
+	}
 }

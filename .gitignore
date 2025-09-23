@@ -2,6 +2,7 @@ dist/
 /SickRock
 service/tmp
 service/SickRock
+service/sickrock
 proto/tmp
 **/.swp
 **/.swo

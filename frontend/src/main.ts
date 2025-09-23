@@ -12,8 +12,20 @@ const pinia = createPinia()
 app.use(pinia)
 app.use(router)
 
-// Initialize auth store and check for existing token
+// Initialize auth store; token validation happens in the router guard
 const authStore = useAuthStore()
-authStore.validateToken()
 
 app.mount('#app')
+
+// Register service worker for PWA support
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then((registration) => {
+        console.log('SW registered: ', registration);
+      })
+      .catch((registrationError) => {
+        console.log('SW registration failed: ', registrationError);
+      });
+  });
+}

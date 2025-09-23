@@ -59,6 +59,10 @@ const foreignKeys = ref<Array<{
   onUpdateAction: string
 }>>([])
 
+// Drop FK state
+const showDropFkConfirm = ref<string | null>(null)
+const droppingFk = ref(false)
+
 async function loadForeignKeys() {
   try {
     const res = await client.getForeignKeys({ tableName: tableId })
@@ -245,6 +249,24 @@ async function dropColumn(columnName: string) {
   }
 }
 
+async function dropForeignKey(constraintName: string) {
+  droppingFk.value = true
+  error.value = null
+  try {
+    const res = await client.deleteForeignKey({ constraintName })
+    if (!res.success) {
+      throw new Error(res.message || 'Failed to drop foreign key')
+    }
+    // Remove FK locally
+    foreignKeys.value = foreignKeys.value.filter(fk => fk.constraintName !== constraintName)
+    showDropFkConfirm.value = null
+  } catch (err: any) {
+    error.value = `Error dropping foreign key: ${err?.message || err}`
+  } finally {
+    droppingFk.value = false
+  }
+}
+
 function goBack() {
   router.push({ name: 'table', params: { tableName: tableId } })
 }
@@ -269,7 +291,7 @@ onMounted(async () => {
         <HugeiconsIcon :icon="Edit03Icon" />
         Foreign Keys
       </router-link>
-      <router-link :to="`/table/${tableId}/add-column`" class="button good">
+      <router-link :to="`/table/${tableId}/add-column`" class="button">
         <HugeiconsIcon :icon="Edit03Icon" />
         Create Column
       </router-link>
@@ -308,6 +330,7 @@ onMounted(async () => {
               <div class="fk-info" v-for="fk in foreignKeys.filter(fk => fk.columnName === column.name)" :key="fk.constraintName">
                 FK → <router-link :to="`/table/${fk.referencedTable}`">{{ fk.referencedTable }}</router-link> ({{ fk.referencedColumn }})
                 <span class="fk-action">on delete {{ fk.onDeleteAction }}, on update {{ fk.onUpdateAction }}</span>
+                <button class="button xsmall bad" @click="showDropFkConfirm = fk.constraintName" title="Drop foreign key">Drop FK</button>
               </div>
             </template>
           </div>
@@ -419,6 +442,19 @@ onMounted(async () => {
       </div>
     </div>
   </Section>
+
+  <!-- Drop Foreign Key Confirmation Modal -->
+  <div v-if="showDropFkConfirm" class="modal-overlay" @click="showDropFkConfirm = null">
+    <div class="modal" @click.stop>
+      <h3>Drop Foreign Key</h3>
+      <p>Are you sure you want to drop the foreign key <strong>{{ showDropFkConfirm }}</strong>?</p>
+      <p class="warning">This action cannot be undone. It removes referential integrity for the linked column.</p>
+      <div class="modal-actions">
+        <button class="button bad" :disabled="droppingFk" @click="dropForeignKey(showDropFkConfirm!)">{{ droppingFk ? 'Dropping…' : 'Drop Foreign Key' }}</button>
+        <button class="button neutral" :disabled="droppingFk" @click="showDropFkConfirm = null">Cancel</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>

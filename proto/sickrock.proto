@@ -25,8 +25,8 @@ message GetNavigationLinksResponse {
   repeated NavigationLink links = 1;
 }
 
-// Pages
-message GetPagesRequest {}
+// Table Configurations
+message GetTableConfigurationsRequest {}
 
 message Page {
   string id = 1;
@@ -37,8 +37,25 @@ message Page {
   string view = 6;
 }
 
-message GetPagesResponse {
+message GetTableConfigurationsResponse {
   repeated Page pages = 1;
+}
+
+// Navigation
+message GetNavigationRequest {}
+
+message NavigationItem {
+  int32 id = 1;
+  int32 ordinal = 2;
+  int32 table_configuration = 3;
+  string table_name = 4;
+  string table_title = 5;
+  string table_icon = 6;
+  string table_view = 7;
+}
+
+message GetNavigationResponse {
+  repeated NavigationItem items = 1;
 }
 
 // Items
@@ -50,6 +67,8 @@ message Item {
 
 message ListItemsRequest {
   string tc_name = 1;
+  // Exact-match filters: column -> value
+  map<string, string> where = 2;
 }
 
 message ListItemsResponse {
@@ -298,6 +317,16 @@ message LogoutResponse {
   string message = 2;
 }
 
+message ResetUserPasswordRequest {
+  string username = 1;
+  string new_password = 2;
+}
+
+message ResetUserPasswordResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 message ValidateTokenRequest {
   string token = 1;
 }
@@ -306,6 +335,50 @@ message ValidateTokenResponse {
   bool valid = 1;
   string username = 2;
   int64 expires_at = 3;
+  string initial_route = 4;
+}
+
+// Device Code Authentication
+message GenerateDeviceCodeRequest {}
+
+message GenerateDeviceCodeResponse {
+  string code = 1;
+  int64 expires_at = 2; // Unix timestamp
+}
+
+message ClaimDeviceCodeRequest {
+  string code = 1;
+}
+
+message ClaimDeviceCodeResponse {
+  bool success = 1;
+  string message = 2;
+  string token = 3;
+  int64 expires_at = 4; // Unix timestamp
+}
+
+message CheckDeviceCodeRequest {
+  string code = 1;
+}
+
+message CheckDeviceCodeResponse {
+  bool valid = 1;
+  bool claimed = 2;
+  int64 expires_at = 3; // Unix timestamp
+  string token = 4; // JWT token if claimed
+  string username = 5; // Username if claimed
+}
+
+message GetDeviceCodeSessionRequest {
+  string code = 1;
+}
+
+message GetDeviceCodeSessionResponse {
+  bool success = 1;
+  string message = 2;
+  string token = 3;
+  int64 expires_at = 4; // Unix timestamp
+  string username = 5;
 }
 
 // System Info
@@ -322,12 +395,22 @@ service SickRock {
   rpc Login(LoginRequest) returns (LoginResponse);
   rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+  rpc ResetUserPassword(ResetUserPasswordRequest) returns (ResetUserPasswordResponse);
+
+  // Device Code Authentication
+  rpc GenerateDeviceCode(GenerateDeviceCodeRequest) returns (GenerateDeviceCodeResponse);
+  rpc ClaimDeviceCode(ClaimDeviceCodeRequest) returns (ClaimDeviceCodeResponse);
+  rpc CheckDeviceCode(CheckDeviceCodeRequest) returns (CheckDeviceCodeResponse);
+  rpc GetDeviceCodeSession(GetDeviceCodeSessionRequest) returns (GetDeviceCodeSessionResponse);
 
   // Navigation for the UI
   rpc GetNavigationLinks(GetNavigationLinksRequest) returns (GetNavigationLinksResponse);
 
-  // Pages available in the application
-  rpc GetPages(GetPagesRequest) returns (GetPagesResponse);
+  // Table configurations available in the application
+  rpc GetTableConfigurations(GetTableConfigurationsRequest) returns (GetTableConfigurationsResponse);
+
+  // Navigation items from table_navigation
+  rpc GetNavigation(GetNavigationRequest) returns (GetNavigationResponse);
 
   // Generic CRUD over items on a page
   rpc ListItems(ListItemsRequest) returns (ListItemsResponse);

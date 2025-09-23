@@ -54,7 +54,7 @@ func (s *SickRockServer) GetNavigationLinks(ctx context.Context, req *connect.Re
 	return res, nil
 }
 
-func (s *SickRockServer) GetPages(ctx context.Context, req *connect.Request[sickrockpb.GetPagesRequest]) (*connect.Response[sickrockpb.GetPagesResponse], error) {
+func (s *SickRockServer) GetTableConfigurations(ctx context.Context, req *connect.Request[sickrockpb.GetTableConfigurationsRequest]) (*connect.Response[sickrockpb.GetTableConfigurationsResponse], error) {
 	configs, err := s.repo.ListTableConfigurationsWithDetails(ctx)
 	if err != nil {
 		return nil, err
@@ -70,7 +70,30 @@ func (s *SickRockServer) GetPages(ctx context.Context, req *connect.Request[sick
 			View:    config.View.String,
 		})
 	}
-	res := connect.NewResponse(&sickrockpb.GetPagesResponse{Pages: pages})
+	res := connect.NewResponse(&sickrockpb.GetTableConfigurationsResponse{Pages: pages})
+	return res, nil
+}
+
+func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request[sickrockpb.GetNavigationRequest]) (*connect.Response[sickrockpb.GetNavigationResponse], error) {
+	items, err := s.repo.GetNavigation(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	navigationItems := make([]*sickrockpb.NavigationItem, 0, len(items))
+	for _, item := range items {
+		navigationItems = append(navigationItems, &sickrockpb.NavigationItem{
+			Id:                 int32(item.ID),
+			Ordinal:            int32(item.Ordinal),
+			TableConfiguration: int32(item.TableConfiguration),
+			TableName:          item.TableName,
+			TableTitle:         item.TableTitle,
+			TableIcon:          item.TableIcon.String,
+			TableView:          item.TableView.String,
+		})
+	}
+
+	res := connect.NewResponse(&sickrockpb.GetNavigationResponse{Items: navigationItems})
 	return res, nil
 }
 
@@ -84,7 +107,16 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
 		return nil, err
 	}
-	items, err := s.repo.ListItemsInTable(ctx, table)
+	// Build where map from request
+	where := map[string]string{}
+	for k, v := range req.Msg.GetWhere() {
+		if k == "" {
+			continue
+		}
+		where[k] = v
+	}
+
+	items, err := s.repo.ListItemsInTable(ctx, table, where)
 
 	if err != nil {
 		return nil, err
@@ -120,10 +152,7 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 		return nil, err
 	}
 
-	// Always use current time for sr_created
-	timestamp := time.Now()
-
-	it, err := s.repo.CreateItemInTableWithTimestamp(ctx, table, req.Msg.GetAdditionalFields(), timestamp)
+	it, err := s.repo.CreateItemInTableWithTimestamp(ctx, table, req.Msg.GetAdditionalFields())
 	if err != nil {
 		return nil, err
 	}
@@ -263,9 +292,14 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 
 	log.Infof("GetTableStructureResponse: %+v", tc)
 
+	createButtonText := "Insert Row"
+	if tc.CreateButtonText.Valid {
+		createButtonText = tc.CreateButtonText.String
+	}
+
 	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
 		Fields:           fields,
-		CreateButtonText: tc.CreateButtonText.String,
+		CreateButtonText: createButtonText,
 		View:             tc.View.String,
 	}), nil
 }

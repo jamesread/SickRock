@@ -11,7 +11,8 @@ const props = defineProps<{
   // Edit mode props
   editMode?: boolean,
   itemId?: string,
-  existingItem?: Record<string, unknown> | null
+  existingItem?: Record<string, unknown> | null,
+  initialValues?: Record<string, string> | null
 }>()
 const emit = defineEmits<{
   created: [],
@@ -41,6 +42,9 @@ const foreignKeys = ref<Array<{
 
 const referencedTableData = ref<Record<string, any[]>>({})
 const loadingForeignKeys = ref(false)
+const initialApplied = ref(false)
+// Queue for FK values that should apply once FK options are loaded
+const pendingFkInitials = ref<Record<string, string>>({})
 
 // Search state for each foreign key field
 const searchQueries = ref<Record<string, string>>({})
@@ -287,6 +291,18 @@ function initializeFormWithExistingData() {
       } else {
         initialData[key] = String(value)
       }
+
+      // Handle foreign key display text
+      if (isForeignKey(key)) {
+        const list = referencedTableData.value[key] || []
+        const found = list.find((it: any) => String(it.id) === String(value))
+        if (found) {
+          const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
+          searchQueries.value[key] = display ? String(display) : String(value)
+        } else if (!searchQueries.value[key]) {
+          searchQueries.value[key] = String(value)
+        }
+      }
     })
   }
 
@@ -315,7 +331,109 @@ function isoToDatetimeLocal(isoString: string): string {
 onMounted(() => {
   loadForeignKeys()
   initializeFormWithExistingData()
+  // Apply initialValues for create mode
+  if (!isEditMode.value && props.initialValues) {
+    // Defer applying FK display names until FK data is loaded
+    applyInitialValues()
+  }
 })
+
+function applyInitialValues() {
+  if (isEditMode.value || !props.initialValues) return
+  let appliedAny = false
+  for (const [k, v] of Object.entries(props.initialValues)) {
+    // Only set if not already filled by user or prior application
+    const current = form.value[k]
+    if (current == null || current === '') {
+      if (isForeignKey(k)) {
+        // If FK options for this field aren't loaded yet, queue it
+        const options = referencedTableData.value[k]
+        if (!options || options.length === 0 || loadingForeignKeys.value) {
+          pendingFkInitials.value[k] = String(v)
+        } else {
+          form.value[k] = v
+          appliedAny = true
+        }
+      } else {
+        form.value[k] = v
+        appliedAny = true
+      }
+    }
+    if (isForeignKey(k)) {
+      // Try to find the referenced item to show its name
+      const list = referencedTableData.value[k] || []
+      const found = list.find((it: any) => String(it.id) === String(v))
+      if (found) {
+        const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
+        searchQueries.value[k] = display ? String(display) : String(v)
+      } else if (!searchQueries.value[k]) {
+        searchQueries.value[k] = String(v)
+      }
+    }
+  }
+  if (appliedAny) initialApplied.value = true
+}
+
+// When FK referenced data finishes loading, attempt to apply initial values for FK display
+watch(referencedTableData, () => {
+  if (!initialApplied.value && !isEditMode.value && props.initialValues) {
+    applyInitialValues()
+  }
+
+  // Handle edit mode: update search queries for existing foreign key values
+  if (isEditMode.value && props.existingItem && props.existingItem.additionalFields) {
+    Object.entries(props.existingItem.additionalFields).forEach(([key, value]) => {
+      if (isForeignKey(key) && form.value[key] && !searchQueries.value[key]) {
+        const list = referencedTableData.value[key] || []
+        const found = list.find((it: any) => String(it.id) === String(value))
+        if (found) {
+          const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
+          searchQueries.value[key] = display ? String(display) : String(value)
+        } else {
+          searchQueries.value[key] = String(value)
+        }
+      }
+    })
+  }
+
+  // Apply queued FK initials when their options arrive
+  if (!isEditMode.value && Object.keys(pendingFkInitials.value).length > 0) {
+    const queue = { ...pendingFkInitials.value }
+    let applied = false
+    for (const [field, val] of Object.entries(queue)) {
+      const opts = referencedTableData.value[field]
+      if (opts && opts.length) {
+        if (!form.value[field]) {
+          form.value[field] = val
+          applied = true
+        }
+        const found = opts.find((it: any) => String(it.id) === String(val))
+        if (found) {
+          const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
+          searchQueries.value[field] = display ? String(display) : String(val)
+        } else if (!searchQueries.value[field]) {
+          searchQueries.value[field] = String(val)
+        }
+        delete pendingFkInitials.value[field]
+      }
+    }
+    if (applied) initialApplied.value = true
+  }
+})
+
+// Also react to initialValues arriving after mount (race with parent loading)
+watch(() => props.initialValues, (val) => {
+  if (val && !isEditMode.value && !initialApplied.value) {
+    applyInitialValues()
+  }
+}, { immediate: true })
+
+// Re-apply when field definitions are ready (some parents compute these async)
+watch(() => props.fieldDefs, (defs) => {
+  if ((defs && defs.length) && props.initialValues && !isEditMode.value && !initialApplied.value) {
+    applyInitialValues()
+  }
+}, { immediate: true })
 
 async function submit() {
   const payload: Record<string, any> = {}
@@ -343,6 +461,8 @@ async function submit() {
         continue
       }
     } else if (f.type === 'int64' || f.type === 'int' || f.type === 'bigint' || f.type === 'integer') {
+      payload[f.name] = String(Number(v))
+    } else if (f.type === 'float') {
       payload[f.name] = String(Number(v))
     } else {
       payload[f.name] = String(v)
@@ -459,11 +579,12 @@ function cancel() {
             />
             <!-- Number input -->
             <input
-              v-else-if="f.type === 'int64' || f.type === 'int' || f.type === 'bigint' || f.type === 'integer'"
+              v-else-if="f.type === 'int64' || f.type === 'int' || f.type === 'bigint' || f.type === 'integer' || f.type === 'float'"
               v-model.number="form[f.name]"
               :placeholder="f.name"
               :id="'field-' + f.name"
               type="number"
+              :step="f.type === 'float' ? '0.01' : '1'"
               @keyup.enter="submit"
             />
             <!-- DateTime input -->
@@ -766,6 +887,12 @@ select:disabled {
   border: 1px solid #f5c6cb;
   border-radius: 4px;
   margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+  form {
+    grid-template-columns: 1fr;
+  }
 }
 
 </style>

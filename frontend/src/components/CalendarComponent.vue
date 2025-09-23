@@ -527,7 +527,7 @@ onMounted(load)
 
     <div v-if="error" class="error">{{ error }}</div>
     <div v-else-if="loading">Loading…</div>
-    <div v-else class="section-content padding">
+      <div v-else class="section-content md:p-8">
       <div class="calendar-container">
         <div class="calendar-grid">
           <div v-for="day in dayNames" :key="day" class="day-header">{{ day }}</div>
@@ -732,13 +732,11 @@ onMounted(load)
 .calendar-container {
   background: white;
   border: 1px solid #e0e0e0;
-  border-radius: 8px;
   overflow: hidden;
 }
 
 .calendar-header {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
   background: #f8f9fa;
   border-bottom: 1px solid #e0e0e0;
 }
@@ -759,7 +757,7 @@ onMounted(load)
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr)); /* Fixed width columns */
   min-height: 400px;
 }
 
@@ -825,7 +823,6 @@ onMounted(load)
 }
 
 .day-content {
-  padding: 0.25rem;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -863,12 +860,11 @@ onMounted(load)
 .calendar-item {
   background: #d6f1aa;
   border: 1px solid #c4db96;
-  border-radius: 4px;
-  padding: 0.25rem 0.5rem;
   margin-bottom: 0.25rem;
   cursor: pointer;
   transition: all 0.2s;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  padding: 0.1rem 0.1rem;
 }
 
 .calendar-item:hover {
@@ -1061,16 +1057,8 @@ onMounted(load)
     min-height: 80px;
   }
 
-  .day-content {
-    padding: 0.25rem;
-  }
-
   .day-number {
     font-size: 1rem;
-  }
-
-  .calendar-item {
-    padding: 0.125rem 0.25rem;
   }
 
   .item-title {
@@ -1095,6 +1083,10 @@ onMounted(load)
     padding: 0.5rem 0.25rem;
     font-size: 0.8rem;
   }
+  section {
+    margin-top: 0;
+  }
+
 }
 
 /* Quick Add Modal */
@@ -1160,5 +1152,24 @@ onMounted(load)
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
   z-index: 1000;
+}
+
+@media (min-width: 768px) {
+  .section-content {
+    padding: 1em;
+  }
+
+  .day-content {
+    padding: 0.45rem;
+  }
+
+  .calendar-item {
+    border-radius: 4px;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .calendar-container {
+    border-radius: 8px;
+  }
 }
 </style>

@@ -12,10 +12,13 @@ import (
 
 func AuthMiddleware(authService *AuthService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip authentication for login, init, and validate-token endpoints
+		// Skip authentication for login, init, validate-token, and device code endpoints
 		if c.Request.URL.Path == "/api/sickrock.SickRock/Login" ||
 			c.Request.URL.Path == "/api/sickrock.SickRock/Init" ||
-			c.Request.URL.Path == "/api/sickrock.SickRock/ValidateToken" {
+			c.Request.URL.Path == "/api/sickrock.SickRock/ValidateToken" ||
+			c.Request.URL.Path == "/api/sickrock.SickRock/GenerateDeviceCode" ||
+			c.Request.URL.Path == "/api/sickrock.SickRock/CheckDeviceCode" ||
+			c.Request.URL.Path == "/api/sickrock.SickRock/GetDeviceCodeSession" {
 			c.Next()
 			return
 		}
@@ -37,7 +40,7 @@ func AuthMiddleware(authService *AuthService) gin.HandlerFunc {
 		}
 
 		token := parts[1]
-		claims, err := authService.ValidateToken(token)
+		claims, err := authService.ValidateToken(c.Request.Context(), token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
@@ -55,11 +58,14 @@ func ConnectAuthMiddleware(authService *AuthService) connect.UnaryInterceptorFun
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
 			log.Tracef("Auth interceptor called for procedure: %s", req.Spec().Procedure)
 
-			// Skip authentication for login, init, and validate-token methods
+			// Skip authentication for login, init, validate-token, and device code methods
 			if req.Spec().Procedure == "/sickrock.SickRock/Login" ||
 				req.Spec().Procedure == "/sickrock.SickRock/Init" ||
-				req.Spec().Procedure == "/sickrock.SickRock/ValidateToken" {
-				log.Trace("Skipping auth for login/init")
+				req.Spec().Procedure == "/sickrock.SickRock/ValidateToken" ||
+				req.Spec().Procedure == "/sickrock.SickRock/GenerateDeviceCode" ||
+				req.Spec().Procedure == "/sickrock.SickRock/CheckDeviceCode" ||
+				req.Spec().Procedure == "/sickrock.SickRock/GetDeviceCodeSession" {
+				log.Trace("Skipping auth for public endpoints")
 				return next(ctx, req)
 			}
 
@@ -80,7 +86,7 @@ func ConnectAuthMiddleware(authService *AuthService) connect.UnaryInterceptorFun
 			}
 
 			token := parts[1]
-			claims, err := authService.ValidateToken(token)
+			claims, err := authService.ValidateToken(ctx, token)
 			if err != nil {
 				log.Tracef("Token validation failed: %v", err)
 				return nil, connect.NewError(connect.CodeUnauthenticated, nil)

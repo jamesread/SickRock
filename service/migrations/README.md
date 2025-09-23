@@ -1,0 +1,3 @@
+-- Write SQL migrations here. Example filenames:
+-- 0001_create_table_users.up.sql
+-- 0001_create_table_users.down.sql

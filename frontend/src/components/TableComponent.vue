@@ -32,16 +32,25 @@ const loadingForeignKeys = ref(false)
 
 const props = defineProps<{
   tableId: string;
+  tableStructure?: GetTableStructureResponse | null;
   fields?: Array<{ name: string; type: string }>;
   createButtonText?: string;
   items?: any[];
   showToolbar?: boolean;
+  showViewSwitcher?: boolean;
+  showViewEdit?: boolean;
+  showViewCreate?: boolean;
+  showExport?: boolean;
+  showStructure?: boolean;
+  showInsert?: boolean;
   showPagination?: boolean;
   title?: string;
 }>()
 
 const emit = defineEmits<{
   'view-created': []
+  'rows-updated': []
+  'row-deleted': [id: string]
 }>()
 
 // View management state
@@ -140,8 +149,13 @@ watch(
   { immediate: true }
 )
 async function loadStructure() {
-  tableStructure.value = await client.getTableStructure({ pageId: props.tableId })
-  const defs = (tableStructure.value.fields ?? []).map(f => ({ name: f.name, type: f.type, required: !!f.required }))
+  // Prefer provided structure to avoid extra API call
+  if (props.tableStructure) {
+    tableStructure.value = props.tableStructure
+  } else {
+    tableStructure.value = await client.getTableStructure({ pageId: props.tableId })
+  }
+  const defs = (tableStructure.value?.fields ?? []).map(f => ({ name: f.name, type: f.type, required: !!f.required }))
   const names = defs.map(d => d.name)
   if (names.length) {
     localFieldDefs.value = defs
@@ -284,9 +298,18 @@ const displayItems = computed(() => {
   return props.items || items.value
 })
 
-// Show toolbar and pagination based on props
+// Fine-grained toolbar controls with backward compatibility
+const showViewSwitcher = computed(() => props.showViewSwitcher !== false)
+const showViewEdit = computed(() => props.showViewEdit !== false)
+const showViewCreate = computed(() => props.showViewCreate !== false)
+const showExport = computed(() => props.showExport !== false)
+const showStructure = computed(() => props.showStructure !== false)
+const showInsert = computed(() => props.showInsert !== false)
+
+// Show toolbar if not explicitly disabled and any control is enabled
 const showToolbar = computed(() => {
-  return props.showToolbar !== false // Default to true unless explicitly false
+  if (props.showToolbar === false) return false
+  return showViewSwitcher.value || showViewEdit.value || showViewCreate.value || showExport.value || showStructure.value || showInsert.value
 })
 
 const showPagination = computed(() => {
@@ -658,8 +681,8 @@ onMounted(loadForeignKeys)
   <Section :title="sectionTitle" :padding="false">
     <template v-if="showToolbar" #toolbar>
       <div class="toolbar-group">
-        <div class="view-selector">
-          <label for="view-select">View:</label>
+        <div v-if="showViewSwitcher" class="view-selector">
+          <label for="view-select" class="ss-large">View:</label>
           <select
             id="view-select"
             v-model="selectedViewId"
@@ -676,19 +699,20 @@ onMounted(loadForeignKeys)
           </select>
         </div>
         <button
-          v-if="currentView && currentView.id !== -1"
+          v-if="showViewEdit && currentView && currentView.id !== -1"
           @click="editTableView"
-          class="button neutral"
+          class="button neutral ss-large"
         >
           <HugeiconsIcon :icon="Edit03Icon" />
           Edit View
         </button>
-        <button @click="createTableView" class="button neutral">
+        <button v-if="showViewCreate && showViewSwitcher" @click="createTableView" class="button neutral ss-large">
           <HugeiconsIcon :icon="ViewIcon" />
           Create View
         </button>
-        <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
-        <router-link :to="`/table/${props.tableId}/insert-row`" class="button neutral" accesskey="n" title="Insert row" >
+        <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button neutral ss-large">Export</router-link>
+        <router-link v-if="showStructure" :to="`/table/${props.tableId}/column-types`" class="button neutral ss-large">Structure</router-link>
+        <router-link v-if="showInsert" :to="`/table/${props.tableId}/insert-row`" class="button neutral" accesskey="n" title="Insert row" >
           {{ tableStructure?.CreateButtonText ?? 'Insert row' }}
         </router-link>
       </div>
@@ -722,6 +746,11 @@ onMounted(loadForeignKeys)
         </button>
       </div>
       <table class="table row-hover">
+        <colgroup>
+          <col class="checkbox-col">
+          <col v-for="col in visibleColumns" :key="col" :class="{ 'id-col': col === 'id' }">
+          <col class="actions-col">
+        </colgroup>
         <thead>
           <tr>
             <th class="small">
@@ -813,7 +842,7 @@ onMounted(loadForeignKeys)
               </div>
             </td>
             <td style = "width: 5%">
-              <RowActionsDropdown :table-id="props.tableId" :row-id="getItemValue(it, 'id')" @deleted="load" />
+              <RowActionsDropdown :table-id="props.tableId" :row-id="getItemValue(it, 'id')" @deleted="() => { const id = String(getItemValue(it, 'id')); emit('row-deleted', id); load(); emit('rows-updated') }" />
             </td>
           </tr>
         </tbody>
@@ -960,6 +989,37 @@ onMounted(loadForeignKeys)
 .table {
   width: 100%;
   border-collapse: collapse;
+}
+
+/* Column group styles for consistent column widths */
+.checkbox-col {
+  width: 1rem;
+  min-width: 1rem;
+  max-width: 1rem;
+}
+
+.id-col {
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 5rem;
+}
+
+.actions-col {
+  width: 5rem;
+  min-width: 5rem;
+  max-width: 5rem;
+}
+
+/* Hide columns 3 and above on small screens */
+@media (max-width: 768px) {
+  colgroup col:nth-child(n+5) {
+    display: none;
+  }
+
+  .table thead th:nth-child(n+5),
+  .table tbody td:nth-child(n+5) {
+    display: none;
+  }
 }
 
 .table thead th {
@@ -1166,7 +1226,7 @@ onMounted(loadForeignKeys)
 }
 
 .small {
-  width: 1rem;
+  width: 0rem;
 }
 
 .small input {
@@ -1212,6 +1272,10 @@ onMounted(loadForeignKeys)
     width: 100%;
     max-width: 250px;
   }
+
+  section {
+    margin-top: 0;
+  }
 }
 
 .insert-toolbar {
@@ -1220,5 +1284,11 @@ onMounted(loadForeignKeys)
 }
 
 .fg1 { flex-grow: 1 }
+
+@media (max-width: 768px) {
+  .ss-large {
+    display: none;
+  }
+}
 
 </style>

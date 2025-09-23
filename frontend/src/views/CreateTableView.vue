@@ -28,6 +28,59 @@ const isEditMode = computed(() => !!viewId && viewId !== 'new')
 const pageTitle = computed(() => isEditMode.value ? 'Edit Table View' : 'Create Table View')
 const submitButtonText = computed(() => loading.value ? 'Saving...' : (isEditMode.value ? 'Update View' : 'Save View'))
 
+// Drag-and-drop state
+const dragIndex = ref<number | null>(null)
+const overIndex = ref<number | null>(null)
+
+function onDragStart(index: number, ev: DragEvent) {
+  dragIndex.value = index
+  ev.dataTransfer?.setData('text/plain', String(index))
+  ev.dataTransfer?.setDragImage?.(new Image(), 0, 0)
+}
+
+function onDragOverAt(index: number, ev: DragEvent) {
+  ev.preventDefault()
+  const el = ev.currentTarget as HTMLElement | null
+  if (el) {
+    const rect = el.getBoundingClientRect()
+    const offsetY = ev.clientY - rect.top
+    const half = rect.height / 2
+    overIndex.value = offsetY < half ? index : index + 1
+  } else {
+    overIndex.value = index
+  }
+  if (ev.dataTransfer) ev.dataTransfer.dropEffect = 'move'
+}
+
+function onDragEnterAt(index: number, ev: DragEvent) {
+  ev.preventDefault()
+  overIndex.value = index
+}
+
+function onDrop(targetIndex: number, ev: DragEvent) {
+  ev.preventDefault()
+  const from = dragIndex.value ?? parseInt(ev.dataTransfer?.getData('text/plain') || '-1')
+  const to = overIndex.value ?? targetIndex
+  if (isNaN(from) || from < 0 || from === to) return
+  const list = [...selectedColumns.value]
+  const [moved] = list.splice(from, 1)
+  const boundedTo = Math.max(0, Math.min(list.length, to))
+  list.splice(boundedTo, 0, moved)
+  list.forEach((c, i) => { c.columnOrder = i })
+  selectedColumns.value = list
+  dragIndex.value = null
+  overIndex.value = null
+}
+function onListDragOver(ev: DragEvent) {
+  ev.preventDefault()
+}
+
+
+function onDragEnd() {
+  dragIndex.value = null
+  overIndex.value = null
+}
+
 // Load available columns from table structure
 onMounted(async () => {
   try {
@@ -219,13 +272,37 @@ async function deleteTableView() {
         />
 
         <label>Column Configuration</label>
-        <div class="columns-list">
+        <div class="columns-list" @dragover="onListDragOver">
+          <!-- Drag indicators -->
+          <div v-if="dragIndex !== null" class="drag-status">
+            Dragging: <code>{{ selectedColumns[dragIndex].name }}</code>
+            <span v-if="overIndex !== null" class="drop-pos">→ Drop at position {{ overIndex + 1 }}</span>
+          </div>
           <div
             v-for="(column, index) in selectedColumns"
             :key="column.name"
             class="column-item"
+            :data-index="index"
+            @dragover="onDragOverAt(index, $event)"
+            @dragenter="onDragEnterAt(index, $event)"
+            @drop="onDrop(index, $event)"
+            @dragend="onDragEnd"
           >
+            <div
+              v-if="overIndex !== null && (overIndex === index || overIndex === index + 1)"
+              class="drop-indicator"
+              :style="{
+                top: (overIndex === index ? '0' : 'calc(100% - 2px)')
+              }"
+            />
             <div class="column-info">
+              <span
+                class="drag-handle"
+                title="Drag to reorder"
+                aria-label="Drag to reorder"
+                draggable="true"
+                @dragstart="onDragStart(index, $event)"
+              >⠿</span>
               <input
                 type="checkbox"
                 :id="`col-${index}`"
@@ -338,8 +415,25 @@ async function deleteTableView() {
 .columns-list {
   border: 1px solid #ddd;
   border-radius: 4px;
-  max-height: 400px;
+  max-height: 750px;
   overflow-y: auto;
+}
+
+.drag-status {
+  position: sticky;
+  top: 0;
+  background: #fffbe6;
+  border-bottom: 1px solid #f1e8b8;
+  color: #6b5d00;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.drag-status .drop-pos {
+  margin-left: .5rem;
+  font-weight: 600;
 }
 
 .column-item {
@@ -348,16 +442,55 @@ async function deleteTableView() {
   align-items: center;
   padding: 1rem;
   border-bottom: 1px solid #eee;
+  background: #fff;
+  position: relative; /* for drop indicator positioning */
 }
 
 .column-item:last-child {
   border-bottom: none;
 }
 
+/* Drag initiated only from handle */
+
+.drop-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: #007bff;
+  border-radius: 2px;
+  z-index: 5;
+  pointer-events: none;
+}
+
 .column-info {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  color: #888;
+  cursor: grab;
+  user-select: none;
+  font-size: 1.4rem;
+  border-radius: 4px;
+  transition: color .15s ease, background-color .15s ease, transform .1s ease;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:hover {
+  color: #333;
+  background: #f2f4f7;
+  transform: scale(1.05);
 }
 
 .column-name {

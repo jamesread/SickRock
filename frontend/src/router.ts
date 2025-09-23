@@ -10,10 +10,12 @@ import AfterInsertView from './views/AfterInsertView.vue'
 import CreateTableView from './views/CreateTableView.vue'
 import ForeignKeyManagement from './views/ForeignKeyManagement.vue'
 import ColumnTypeManagement from './views/ColumnTypeManagement.vue'
+import ExportView from './views/ExportView.vue'
 import TableCreate from './views/TableCreate.vue'
 import ControlPanel from './views/ControlPanel.vue'
 import LoginView from './views/LoginView.vue'
 import NotFoundView from './views/NotFoundView.vue'
+import DeviceCodeClaimerView from './views/DeviceCodeClaimerView.vue'
 import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
 import { useAuthStore } from './stores/auth'
 
@@ -25,6 +27,19 @@ const router = createRouter({
       name: 'login',
       component: LoginView,
       meta: { requiresAuth: false }
+    },
+    {
+      path: '/table/:tableName/export',
+      name: 'export',
+      component: ExportView,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Export CSV' },
+        ],
+      },
     },
     {
       path: '/',
@@ -188,6 +203,16 @@ const router = createRouter({
         icon: DatabaseAddIcon
       },
     },
+    {
+      path: '/device-code-claimer',
+      name: 'device-code-claimer',
+      component: DeviceCodeClaimerView,
+      meta: {
+        requiresAuth: true,
+        title: 'Device Code Claimer',
+        icon: DatabaseAddIcon
+      },
+    },
     // Logout handled by sidebar link with programmatic action
     {
       path: '/:pathMatch(.*)*',
@@ -220,8 +245,19 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
+  // Attempt to restore authentication from localStorage before redirecting
+  try {
+    const ok = await authStore.validateToken()
+    if (ok) {
+      next()
+      return
+    }
+  } catch {
+    // fall through to login
+  }
+
   // If not authenticated, redirect to login
-  next('/login')
+  next({ path: '/login', query: { redirect: to.fullPath } })
 })
 
 export default router

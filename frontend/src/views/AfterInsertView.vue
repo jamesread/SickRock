@@ -6,6 +6,8 @@ import Section from 'picocrank/vue/components/Section.vue'
 const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableName as string
+const fromTable = route.query.fromTable as string | undefined
+const fromRowId = route.query.fromRowId as string | undefined
 
 // Check if this is from column addition or row insertion based on the referrer
 const isFromColumnAddition = ref(false)
@@ -31,6 +33,12 @@ function returnToTable() {
   // Navigate back to the table view
   router.push({ name: 'table', params: { tableName: tableId } })
 }
+
+function returnToOriginRow() {
+  if (fromTable && fromRowId) {
+    router.push({ name: 'row', params: { tableName: fromTable, rowId: fromRowId } })
+  }
+}
 </script>
 
 <template>
@@ -46,6 +54,9 @@ function returnToTable() {
       </button>
       <button @click="insertAnother" class="button neutral">
         {{ isFromColumnAddition ? '➕ Add Another Column' : '➕ Insert Another Row' }}
+      </button>
+      <button v-if="fromTable && fromRowId" @click="returnToOriginRow" class="button neutral">
+        🔙 Back to Row
       </button>
     </div>
   </Section>
