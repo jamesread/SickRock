@@ -10,7 +10,7 @@ import * as Hugeicons from '@hugeicons/core-free-icons'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 import { create } from '@bufbuild/protobuf'
-import { InitRequestSchema } from './gen/sickrock_pb'
+import { InitRequestSchema, ItemSchema } from './gen/sickrock_pb'
 
 const sidebar = ref(null)
 const isSidebarOpen = ref(true)
@@ -41,7 +41,7 @@ async function handleLogout() {
     router.push('/login')
 }
 
-const pages = ref<Array<{ id: string; title: string; slug: string; view: string; icon: string }>>([])
+const pages = ref<Array<{ id: string; title: string; slug: string; view: string; icon: string, path: string }>>([])
 const version = ref<string>('')
 const quickSearch = ref(null)
 
@@ -61,14 +61,18 @@ async function loadAppData() {
 
         const navResponse = await apiClient.getNavigation({})
         const sortedItems = [...(navResponse.items || [])].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
-        pages.value = sortedItems.map(item => ({
-            id: item.tableName,
-            name: item.tableName,
-            title: item.tableTitle,
-            slug: item.tableName,
-            icon: item.tableIcon,
-            view: item.tableView
-        }))
+        pages.value = sortedItems
+            .map(item => {
+                const title = item.tableTitle || item.tableName || item.dashboardName || String(item.id)
+                const slug = item.tableName || item.dashboardName || ''
+                const icon = item.tableIcon || 'DatabaseIcon'
+                const view = item.tableView || ''
+                const id = title
+                const name = title
+                const path = item.dashboardId > 0 ? `/dashboard/${item.dashboardName}` : `/table/${item.tableName}`
+                return { id, name, title, slug, icon, view, path }
+            })
+            .filter(pg => !!pg.slug)
 
         sidebar.value.clearNavigationLinks()
         quickSearch.value.clearItems()
@@ -95,13 +99,12 @@ async function loadAppData() {
 
         pages.value.forEach(pg => {
             const icon = Hugeicons[pg.icon] || DatabaseIcon
-            const path = `/table/${pg.slug}`
 
             sidebar.value?.addNavigationLink({
                 id: pg.id,
                 name: pg.id,
                 title: pg.title,
-                path: path,
+                path: pg.path,
                 icon: icon
             })
 
@@ -111,7 +114,7 @@ async function loadAppData() {
                 title: pg.title,
                 description: 'Table: ' + pg.title,
                 category: 'Navigation',
-                path: path,
+                path: `/table/${pg.id}`,
                 type: 'route',
                 icon: icon
             })

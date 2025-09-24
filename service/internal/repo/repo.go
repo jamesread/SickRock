@@ -31,6 +31,107 @@ type Repository struct {
 	db *sqlx.DB
 }
 
+// Dashboard represents a row in table_dashboards
+type Dashboard struct {
+	ID   int    `db:"id"`
+	Name string `db:"name"`
+}
+
+// ListDashboards returns all dashboards
+func (r *Repository) ListDashboards(ctx context.Context) ([]Dashboard, error) {
+	rows, err := r.db.QueryxContext(ctx, "SELECT id, name FROM table_dashboards ORDER BY id ASC")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	dashboards := make([]Dashboard, 0, 8)
+	for rows.Next() {
+		var d Dashboard
+		if err := rows.Scan(&d.ID, &d.Name); err != nil {
+			return nil, err
+		}
+		dashboards = append(dashboards, d)
+	}
+	return dashboards, rows.Err()
+}
+
+type DashboardComponent struct {
+	ID         int            `db:"id"`
+	Name       string         `db:"name"`
+	TcID       sql.NullInt32  `db:"tc_id"`
+	QueryType  sql.NullString `db:"query_type"`
+	ColumnName sql.NullString `db:"column_name"`
+	Formula    sql.NullString `db:"formula"`
+}
+
+// ListDashboardComponents returns components for a given dashboard id
+func (r *Repository) ListDashboardComponents(ctx context.Context, dashboardID int) ([]DashboardComponent, error) {
+	rows, err := r.db.QueryxContext(ctx, "SELECT id, name, tc_id, query_type, column_name, formula FROM table_dashboard_components WHERE dashboard = ? ORDER BY ordinal ASC, id ASC", dashboardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]DashboardComponent, 0, 8)
+	for rows.Next() {
+		var c DashboardComponent
+		if err := rows.Scan(&c.ID, &c.Name, &c.TcID, &c.QueryType, &c.ColumnName, &c.Formula); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// DashboardComponentRule represents a rule for a dashboard component
+type DashboardComponentRule struct {
+	ID        int    `db:"id"`
+	Component int    `db:"dashboard_component"`
+	Ordinal   int    `db:"ordinal"`
+	Operation string `db:"operation"`
+	Operand   string `db:"operand"`
+}
+
+// GetDashboardComponentRules lists rules, optionally filtered by component id
+func (r *Repository) GetDashboardComponentRules(ctx context.Context, component *int) ([]DashboardComponentRule, error) {
+	var (
+		rows *sqlx.Rows
+		err  error
+	)
+	if component != nil {
+		rows, err = r.db.QueryxContext(ctx, "SELECT id, dashboard_component, COALESCE(ordinal, 0) as ordinal, operation, operand FROM table_dashboard_component_rules WHERE dashboard_component = ? ORDER BY ordinal ASC, id ASC", *component)
+	} else {
+		rows, err = r.db.QueryxContext(ctx, "SELECT id, dashboard_component, COALESCE(ordinal, 0) as ordinal, operation, operand FROM table_dashboard_component_rules ORDER BY dashboard_component ASC, ordinal ASC, id ASC")
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	rules := make([]DashboardComponentRule, 0, 8)
+	for rows.Next() {
+		var rle DashboardComponentRule
+		if err := rows.StructScan(&rle); err != nil {
+			return nil, err
+		}
+		rules = append(rules, rle)
+	}
+	return rules, rows.Err()
+}
+
+// CreateDashboardComponentRule inserts a new rule and returns it
+func (r *Repository) CreateDashboardComponentRule(ctx context.Context, component int, ordinal int, operation, operand string) (DashboardComponentRule, error) {
+	res, err := r.db.ExecContext(ctx, "INSERT INTO table_dashboard_component_rules (dashboard_component, ordinal, operation, operand) VALUES (?, ?, ?, ?)", component, ordinal, operation, operand)
+	if err != nil {
+		return DashboardComponentRule{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return DashboardComponentRule{}, err
+	}
+	return DashboardComponentRule{ID: int(id), Component: component, Ordinal: ordinal, Operation: operation, Operand: operand}, nil
+}
+
 func NewRepository(db *sqlx.DB) *Repository {
 	return &Repository{db: db}
 }
@@ -92,11 +193,13 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 type NavigationItem struct {
 	ID                 int
 	Ordinal            int
-	TableConfiguration int
-	TableName          string
-	TableTitle         string
+	TableConfiguration sql.NullInt64
+	TableName          sql.NullString
+	TableTitle         sql.NullString
 	TableIcon          sql.NullString
 	TableView          sql.NullString
+	DashboardID        sql.NullInt64
+	DashboardName      sql.NullString
 }
 
 func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error) {
@@ -108,9 +211,12 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			tc.name as table_name,
 			COALESCE(tc.title, tc.name) as table_title,
 			tc.icon as table_icon,
-			tc.view as table_view
+            tc.view as table_view,
+            tn.dashboard_id as dashboard_id,
+            td.name as dashboard_name
 		FROM table_navigation tn
-		JOIN table_configurations tc ON tn.table_configuration = tc.id
+		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
+        LEFT JOIN table_dashboards td ON tn.dashboard_id = td.id
 		ORDER BY tn.ordinal ASC, tc.name ASC
 	`
 
@@ -131,6 +237,8 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			&item.TableTitle,
 			&item.TableIcon,
 			&item.TableView,
+			&item.DashboardID,
+			&item.DashboardName,
 		); err != nil {
 			return nil, err
 		}
@@ -596,7 +704,6 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 
 	var items []Item
 	for rows.Next() {
-		log.Infof("Row iteration")
 		// Get the row as a map
 		rowMap := make(map[string]interface{})
 		if err := rows.MapScan(rowMap); err != nil {
@@ -611,18 +718,14 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 
 		// Map known fields
 		if id, ok := rowMap["id"]; ok {
-			log.Infof("id field found: %v (type: %T)", id, id)
 			if idStr, ok := id.(string); ok {
 				item.ID = idStr
 			} else if idInt, ok := id.(int64); ok {
 				item.ID = strconv.FormatInt(idInt, 10)
 			}
-		} else {
-			log.Warnf("id field not found in rowMap")
 		}
 		// name field is now handled as a dynamic field
 		if createdAt, ok := rowMap["sr_created"]; ok {
-			log.Infof("sr_created field found: %v (type: %T)", createdAt, createdAt)
 			if createdAtTime, ok := createdAt.(time.Time); ok {
 				item.SrCreated = createdAtTime
 			} else if createdAtStr, ok := createdAt.(string); ok {
@@ -635,8 +738,6 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 			} else {
 				log.Warnf("sr_created field is not time.Time or string, got type: %T, value: %v", createdAt, createdAt)
 			}
-		} else {
-			log.Warnf("sr_created field not found in rowMap")
 		}
 
 		// Add all other fields to the dynamic Fields map (including name now)
@@ -700,6 +801,58 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 	item := Item{ID: strconv.FormatInt(lastID, 10), Fields: fields}
 	log.Infof("Created item: %+v", item)
 	return item, nil
+}
+
+func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
+	log.Infof("GetLastItem: %d", tcID)
+	tc, err := r.GetTableConfigurationByID(ctx, tcID)
+
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get table configuration for table %d: %w", tcID, err)
+	}
+
+	// First get the column names for this table
+	columns, err := r.ListColumns(ctx, tc)
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get columns for table %d: %w", tcID, err)
+	}
+
+	// Build dynamic SELECT query with all columns
+	columnNames := make([]string, 0, len(columns))
+	for _, col := range columns {
+		columnNames = append(columnNames, col.Name)
+	}
+
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `id` DESC LIMIT 1", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String)
+	log.Infof("GetLastItem SQL Query: %s db:%v tbl:%v", query, tc.Db.String, tc.Table.String)
+	rows, err := r.db.QueryxContext(ctx, query)
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get last item for table %d: %w", tcID, err)
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return Item{}, fmt.Errorf("no items found for table %d", tcID)
+	}
+
+	item := Item{
+		Fields: make(map[string]interface{}),
+	}
+
+	rowMap := make(map[string]interface{})
+	if err := rows.MapScan(rowMap); err != nil {
+		return Item{}, fmt.Errorf("failed to scan last item for table %d: %w", tcID, err)
+	}
+
+	for colName, value := range rowMap {
+		if valueBytes, ok := value.([]uint8); ok {
+			item.Fields[colName] = string(valueBytes)
+		} else {
+			item.Fields[colName] = value
+		}
+	}
+
+	return item, rows.Err()
 }
 
 func (r *Repository) GetItemInTable(ctx context.Context, table string, id string) (Item, error) {
@@ -888,6 +1041,18 @@ func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldS
 		}
 	}
 	return specs, nil
+}
+
+func (r *Repository) GetTableConfigurationByID(ctx context.Context, tcID int) (*TableConfig, error) {
+	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon, view FROM table_configurations WHERE id = ?"
+	var config TableConfig
+	err := r.db.GetContext(ctx, &config, query, tcID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get table configuration for table %s: %w", tcID, err)
+	}
+
+	return &config, nil
 }
 
 // GetTableConfiguration returns the structure information for a table

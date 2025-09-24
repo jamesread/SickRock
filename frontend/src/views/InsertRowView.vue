@@ -128,9 +128,13 @@ function handleCreated() {
   // If this insert was initiated from a related row context, propagate origin for return link
   const fromTable = route.query.fromTable as string | undefined
   const fromRowId = route.query.fromRowId as string | undefined
+  const dashboard = route.query.dashboard as string | undefined
+  const dashboardName = route.query.dashboardName as string | undefined
   const q: Record<string, string> = {}
   if (fromTable) q.fromTable = fromTable
   if (fromRowId) q.fromRowId = fromRowId
+  if (dashboard) q.dashboard = dashboard
+  if (dashboardName) q.dashboardName = dashboardName
   router.push({ name: 'after-insert', params: { tableName: tableId }, query: q })
 }
 

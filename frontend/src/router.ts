@@ -17,6 +17,8 @@ import LoginView from './views/LoginView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import DeviceCodeClaimerView from './views/DeviceCodeClaimerView.vue'
 import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
+import DashboardListView from './views/DashboardListView.vue'
+import Dashboard from './views/Dashboard.vue'
 import { useAuthStore } from './stores/auth'
 
 const router = createRouter({
@@ -46,6 +48,25 @@ const router = createRouter({
       name: 'home',
       component: HomeView,
       meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboards',
+      name: 'dashboards',
+      component: DashboardListView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/dashboard/:dashboardName',
+      name: 'dashboard',
+      component: Dashboard,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: (route: any) => [
+          { name: 'Dashboards', href: { name: 'dashboards' } },
+          { name: String(route.params.dashboardName) },
+        ],
+      },
     },
     {
       path: '/about',

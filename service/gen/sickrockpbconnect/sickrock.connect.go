@@ -111,6 +111,14 @@ const (
 	// SickRockGetMostRecentlyViewedProcedure is the fully-qualified name of the SickRock's
 	// GetMostRecentlyViewed RPC.
 	SickRockGetMostRecentlyViewedProcedure = "/sickrock.SickRock/GetMostRecentlyViewed"
+	// SickRockGetDashboardsProcedure is the fully-qualified name of the SickRock's GetDashboards RPC.
+	SickRockGetDashboardsProcedure = "/sickrock.SickRock/GetDashboards"
+	// SickRockGetDashboardComponentRulesProcedure is the fully-qualified name of the SickRock's
+	// GetDashboardComponentRules RPC.
+	SickRockGetDashboardComponentRulesProcedure = "/sickrock.SickRock/GetDashboardComponentRules"
+	// SickRockCreateDashboardComponentRuleProcedure is the fully-qualified name of the SickRock's
+	// CreateDashboardComponentRule RPC.
+	SickRockCreateDashboardComponentRuleProcedure = "/sickrock.SickRock/CreateDashboardComponentRule"
 	// SickRockGetSystemInfoProcedure is the fully-qualified name of the SickRock's GetSystemInfo RPC.
 	SickRockGetSystemInfoProcedure = "/sickrock.SickRock/GetSystemInfo"
 )
@@ -160,6 +168,11 @@ type SickRockClient interface {
 	ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error)
 	// Recently Viewed Items
 	GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error)
+	// Dashboards
+	GetDashboards(context.Context, *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error)
+	// Dashboard Component Rules
+	GetDashboardComponentRules(context.Context, *connect.Request[proto.GetDashboardComponentRulesRequest]) (*connect.Response[proto.GetDashboardComponentRulesResponse], error)
+	CreateDashboardComponentRule(context.Context, *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error)
 	// System Info
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 }
@@ -361,6 +374,24 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("GetMostRecentlyViewed")),
 			connect.WithClientOptions(opts...),
 		),
+		getDashboards: connect.NewClient[proto.GetDashboardsRequest, proto.GetDashboardsResponse](
+			httpClient,
+			baseURL+SickRockGetDashboardsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetDashboards")),
+			connect.WithClientOptions(opts...),
+		),
+		getDashboardComponentRules: connect.NewClient[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse](
+			httpClient,
+			baseURL+SickRockGetDashboardComponentRulesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetDashboardComponentRules")),
+			connect.WithClientOptions(opts...),
+		),
+		createDashboardComponentRule: connect.NewClient[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse](
+			httpClient,
+			baseURL+SickRockCreateDashboardComponentRuleProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateDashboardComponentRule")),
+			connect.WithClientOptions(opts...),
+		),
 		getSystemInfo: connect.NewClient[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse](
 			httpClient,
 			baseURL+SickRockGetSystemInfoProcedure,
@@ -372,38 +403,41 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 
 // sickRockClient implements SickRockClient.
 type sickRockClient struct {
-	init                   *connect.Client[proto.InitRequest, proto.InitResponse]
-	ping                   *connect.Client[proto.PingRequest, proto.PingResponse]
-	login                  *connect.Client[proto.LoginRequest, proto.LoginResponse]
-	logout                 *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
-	validateToken          *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
-	resetUserPassword      *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
-	generateDeviceCode     *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
-	claimDeviceCode        *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
-	checkDeviceCode        *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
-	getDeviceCodeSession   *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
-	getNavigationLinks     *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
-	getTableConfigurations *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
-	getNavigation          *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
-	listItems              *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
-	createItem             *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
-	getItem                *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
-	editItem               *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
-	deleteItem             *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
-	getTableStructure      *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
-	addTableColumn         *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
-	createTableView        *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
-	updateTableView        *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
-	getTableViews          *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
-	deleteTableView        *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
-	createForeignKey       *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
-	getForeignKeys         *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
-	deleteForeignKey       *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
-	changeColumnType       *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
-	dropColumn             *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
-	changeColumnName       *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
-	getMostRecentlyViewed  *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
-	getSystemInfo          *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
+	init                         *connect.Client[proto.InitRequest, proto.InitResponse]
+	ping                         *connect.Client[proto.PingRequest, proto.PingResponse]
+	login                        *connect.Client[proto.LoginRequest, proto.LoginResponse]
+	logout                       *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
+	validateToken                *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
+	resetUserPassword            *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
+	generateDeviceCode           *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
+	claimDeviceCode              *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
+	checkDeviceCode              *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
+	getDeviceCodeSession         *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
+	getNavigationLinks           *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
+	getTableConfigurations       *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
+	getNavigation                *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
+	listItems                    *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
+	createItem                   *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
+	getItem                      *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
+	editItem                     *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
+	deleteItem                   *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
+	getTableStructure            *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
+	addTableColumn               *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
+	createTableView              *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
+	updateTableView              *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
+	getTableViews                *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
+	deleteTableView              *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
+	createForeignKey             *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
+	getForeignKeys               *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
+	deleteForeignKey             *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
+	changeColumnType             *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
+	dropColumn                   *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
+	changeColumnName             *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
+	getMostRecentlyViewed        *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
+	getDashboards                *connect.Client[proto.GetDashboardsRequest, proto.GetDashboardsResponse]
+	getDashboardComponentRules   *connect.Client[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse]
+	createDashboardComponentRule *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
+	getSystemInfo                *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -561,6 +595,21 @@ func (c *sickRockClient) GetMostRecentlyViewed(ctx context.Context, req *connect
 	return c.getMostRecentlyViewed.CallUnary(ctx, req)
 }
 
+// GetDashboards calls sickrock.SickRock.GetDashboards.
+func (c *sickRockClient) GetDashboards(ctx context.Context, req *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error) {
+	return c.getDashboards.CallUnary(ctx, req)
+}
+
+// GetDashboardComponentRules calls sickrock.SickRock.GetDashboardComponentRules.
+func (c *sickRockClient) GetDashboardComponentRules(ctx context.Context, req *connect.Request[proto.GetDashboardComponentRulesRequest]) (*connect.Response[proto.GetDashboardComponentRulesResponse], error) {
+	return c.getDashboardComponentRules.CallUnary(ctx, req)
+}
+
+// CreateDashboardComponentRule calls sickrock.SickRock.CreateDashboardComponentRule.
+func (c *sickRockClient) CreateDashboardComponentRule(ctx context.Context, req *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error) {
+	return c.createDashboardComponentRule.CallUnary(ctx, req)
+}
+
 // GetSystemInfo calls sickrock.SickRock.GetSystemInfo.
 func (c *sickRockClient) GetSystemInfo(ctx context.Context, req *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error) {
 	return c.getSystemInfo.CallUnary(ctx, req)
@@ -611,6 +660,11 @@ type SickRockHandler interface {
 	ChangeColumnName(context.Context, *connect.Request[proto.ChangeColumnNameRequest]) (*connect.Response[proto.ChangeColumnNameResponse], error)
 	// Recently Viewed Items
 	GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error)
+	// Dashboards
+	GetDashboards(context.Context, *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error)
+	// Dashboard Component Rules
+	GetDashboardComponentRules(context.Context, *connect.Request[proto.GetDashboardComponentRulesRequest]) (*connect.Response[proto.GetDashboardComponentRulesResponse], error)
+	CreateDashboardComponentRule(context.Context, *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error)
 	// System Info
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 }
@@ -808,6 +862,24 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("GetMostRecentlyViewed")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetDashboardsHandler := connect.NewUnaryHandler(
+		SickRockGetDashboardsProcedure,
+		svc.GetDashboards,
+		connect.WithSchema(sickRockMethods.ByName("GetDashboards")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetDashboardComponentRulesHandler := connect.NewUnaryHandler(
+		SickRockGetDashboardComponentRulesProcedure,
+		svc.GetDashboardComponentRules,
+		connect.WithSchema(sickRockMethods.ByName("GetDashboardComponentRules")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateDashboardComponentRuleHandler := connect.NewUnaryHandler(
+		SickRockCreateDashboardComponentRuleProcedure,
+		svc.CreateDashboardComponentRule,
+		connect.WithSchema(sickRockMethods.ByName("CreateDashboardComponentRule")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockGetSystemInfoHandler := connect.NewUnaryHandler(
 		SickRockGetSystemInfoProcedure,
 		svc.GetSystemInfo,
@@ -878,6 +950,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockChangeColumnNameHandler.ServeHTTP(w, r)
 		case SickRockGetMostRecentlyViewedProcedure:
 			sickRockGetMostRecentlyViewedHandler.ServeHTTP(w, r)
+		case SickRockGetDashboardsProcedure:
+			sickRockGetDashboardsHandler.ServeHTTP(w, r)
+		case SickRockGetDashboardComponentRulesProcedure:
+			sickRockGetDashboardComponentRulesHandler.ServeHTTP(w, r)
+		case SickRockCreateDashboardComponentRuleProcedure:
+			sickRockCreateDashboardComponentRuleHandler.ServeHTTP(w, r)
 		case SickRockGetSystemInfoProcedure:
 			sickRockGetSystemInfoHandler.ServeHTTP(w, r)
 		default:
@@ -1011,6 +1089,18 @@ func (UnimplementedSickRockHandler) ChangeColumnName(context.Context, *connect.R
 
 func (UnimplementedSickRockHandler) GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetMostRecentlyViewed is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetDashboards(context.Context, *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetDashboards is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetDashboardComponentRules(context.Context, *connect.Request[proto.GetDashboardComponentRulesRequest]) (*connect.Response[proto.GetDashboardComponentRulesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetDashboardComponentRules is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateDashboardComponentRule(context.Context, *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateDashboardComponentRule is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error) {

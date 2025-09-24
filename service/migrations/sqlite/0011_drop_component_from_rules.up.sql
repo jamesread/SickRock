@@ -1,0 +1,3 @@
+-- Drop legacy 'component' column from table_dashboard_component_rules (SQLite)
+-- Note: SQLite does not support DROP COLUMN directly; leaving as a no-op.
+-- To fully drop, a table rebuild migration would be required.

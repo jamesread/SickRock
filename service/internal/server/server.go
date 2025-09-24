@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
+	"github.com/expr-lang/expr"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/buildinfo"
@@ -83,13 +85,25 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 	navigationItems := make([]*sickrockpb.NavigationItem, 0, len(items))
 	for _, item := range items {
 		navigationItems = append(navigationItems, &sickrockpb.NavigationItem{
-			Id:                 int32(item.ID),
-			Ordinal:            int32(item.Ordinal),
-			TableConfiguration: int32(item.TableConfiguration),
-			TableName:          item.TableName,
-			TableTitle:         item.TableTitle,
-			TableIcon:          item.TableIcon.String,
-			TableView:          item.TableView.String,
+			Id:      int32(item.ID),
+			Ordinal: int32(item.Ordinal),
+			TableConfiguration: func() int32 {
+				if item.TableConfiguration.Valid {
+					return int32(item.TableConfiguration.Int64)
+				}
+				return 0
+			}(),
+			TableName:  item.TableName.String,
+			TableTitle: item.TableTitle.String,
+			TableIcon:  item.TableIcon.String,
+			TableView:  item.TableView.String,
+			DashboardId: func() int32 {
+				if item.DashboardID.Valid {
+					return int32(item.DashboardID.Int64)
+				}
+				return 0
+			}(),
+			DashboardName: item.DashboardName.String,
 		})
 	}
 
@@ -717,4 +731,178 @@ func (s *SickRockServer) GetSystemInfo(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.GetSystemInfoResponse{ApproxTotalRows: total}), nil
+}
+
+func (s *SickRockServer) GetDashboards(ctx context.Context, req *connect.Request[sickrockpb.GetDashboardsRequest]) (*connect.Response[sickrockpb.GetDashboardsResponse], error) {
+	dashboards, err := s.repo.ListDashboards(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Infof("Dashboards: %v", dashboards)
+
+	out := make([]*sickrockpb.Dashboard, 0, len(dashboards))
+	for _, d := range dashboards {
+		comps, err := s.repo.ListDashboardComponents(ctx, d.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		runningEnv := make(map[string]interface{})
+		runningEnv["round1"] = func(in float64) (float64, error) {
+			return math.Round(in*10) / 10, nil
+		}
+
+		pbComps := make([]*sickrockpb.DashboardComponent, 0, len(comps))
+		// Preload rules for each component without returning them to the client
+		for _, c := range comps {
+			data, err := s.getDashboardComponentData(ctx, c, &runningEnv)
+
+			runningEnv[c.Name] = data
+
+			var pbComp *sickrockpb.DashboardComponent
+			if err != nil {
+				// If there's an error getting component data, create a component with error info
+				pbComp = &sickrockpb.DashboardComponent{
+					Id:         int32(c.ID),
+					Name:       c.Name,
+					DataString: "",
+					DataNumber: 0,
+					Error:      err.Error(),
+					Suffix:     "",
+				}
+				log.WithError(err).WithField("component", c.ID).Warn("Failed to load dashboard component data")
+			} else {
+				rules, err := s.repo.GetDashboardComponentRules(ctx, &c.ID)
+
+				if err != nil {
+					log.WithError(err).WithField("component", c.ID).Warn("Failed to load dashboard component rules")
+				}
+
+				pbComp = &sickrockpb.DashboardComponent{
+					Id:         int32(c.ID),
+					Name:       c.Name,
+					DataString: fmt.Sprintf("%v", data),
+					Suffix:     "",
+				}
+
+				s.applyRules(pbComp, rules)
+			}
+
+			pbComps = append(pbComps, pbComp)
+		}
+		out = append(out, &sickrockpb.Dashboard{Id: int32(d.ID), Name: d.Name, Components: pbComps})
+	}
+	return connect.NewResponse(&sickrockpb.GetDashboardsResponse{Dashboards: out}), nil
+}
+
+func (s *SickRockServer) getDashboardComponentData(ctx context.Context, comp repo.DashboardComponent, runningEnv *map[string]interface{}) (any, error) {
+	formula := strings.TrimSpace(comp.Formula.String)
+
+	if formula == "" {
+		return "", nil
+	}
+
+	// Handle special case for "latest" query type
+	if formula == "latest" {
+		if !comp.TcID.Valid {
+			return "", fmt.Errorf("tc_id is not valid for component %d", comp.ID)
+		}
+		item, err := s.repo.GetLastItem(ctx, int(comp.TcID.Int32))
+
+		if err != nil {
+			return "", err
+		}
+
+		return item.Fields[comp.ColumnName.String], nil
+	}
+
+	// Parse expression using expr-lang/expr
+	if formula != "" {
+		// Create environment with available data
+		env := *runningEnv
+		env["latest"] = func() (map[string]interface{}, error) {
+			if !comp.TcID.Valid {
+				return nil, fmt.Errorf("tc_id is not valid for component %d", comp.ID)
+			}
+			item, err := s.repo.GetLastItem(ctx, int(comp.TcID.Int32))
+			if err != nil {
+				return nil, err
+			}
+			return item.Fields, nil
+		}
+
+		// Compile and evaluate the expression
+		program, err := expr.Compile(formula, expr.Env(env))
+		if err != nil {
+			return "", fmt.Errorf("failed to compile expression '%s': %w", formula, err)
+		}
+
+		result, err := expr.Run(program, env)
+		if err != nil {
+			return "", fmt.Errorf("failed to evaluate expression '%s': %w", formula, err)
+		}
+
+		return result, nil
+	}
+
+	return "", fmt.Errorf("no formula specified for component %d", comp.ID)
+}
+
+func (s *SickRockServer) applyRules(comp *sickrockpb.DashboardComponent, rules []repo.DashboardComponentRule) {
+	for _, r := range rules {
+		log.Infof("Applying rule %+v to component %v", r, comp.Name)
+
+		switch r.Operation {
+		case "suffix":
+			comp.Suffix = r.Operand
+			break
+		default:
+			log.Warnf("Unknown operation %s", r.Operation)
+		}
+	}
+}
+
+func (s *SickRockServer) GetDashboardComponentRules(ctx context.Context, req *connect.Request[sickrockpb.GetDashboardComponentRulesRequest]) (*connect.Response[sickrockpb.GetDashboardComponentRulesResponse], error) {
+	var compPtr *int
+	if req.Msg != nil && req.Msg.GetComponent() != 0 {
+		v := int(req.Msg.GetComponent())
+		compPtr = &v
+	}
+	rules, err := s.repo.GetDashboardComponentRules(ctx, compPtr)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*sickrockpb.DashboardComponentRule, 0, len(rules))
+	for _, rle := range rules {
+		out = append(out, &sickrockpb.DashboardComponentRule{
+			Id:        int32(rle.ID),
+			Component: int32(rle.Component),
+			Ordinal:   int32(rle.Ordinal),
+			Operation: rle.Operation,
+			Operand:   rle.Operand,
+		})
+	}
+	return connect.NewResponse(&sickrockpb.GetDashboardComponentRulesResponse{Rules: out}), nil
+}
+
+func (s *SickRockServer) CreateDashboardComponentRule(ctx context.Context, req *connect.Request[sickrockpb.CreateDashboardComponentRuleRequest]) (*connect.Response[sickrockpb.CreateDashboardComponentRuleResponse], error) {
+	component := int(req.Msg.GetComponent())
+	ordinal := int(req.Msg.GetOrdinal())
+	operation := strings.TrimSpace(req.Msg.GetOperation())
+	operand := req.Msg.GetOperand()
+	if component <= 0 || operation == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("component and operation are required"))
+	}
+	rule, err := s.repo.CreateDashboardComponentRule(ctx, component, ordinal, operation, operand)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&sickrockpb.CreateDashboardComponentRuleResponse{Rule: &sickrockpb.DashboardComponentRule{
+		Id:        int32(rule.ID),
+		Component: int32(rule.Component),
+		Ordinal:   int32(rule.Ordinal),
+		Operation: rule.Operation,
+		Operand:   rule.Operand,
+	}}), nil
 }

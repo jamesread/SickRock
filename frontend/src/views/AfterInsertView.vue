@@ -8,6 +8,8 @@ const router = useRouter()
 const tableId = route.params.tableName as string
 const fromTable = route.query.fromTable as string | undefined
 const fromRowId = route.query.fromRowId as string | undefined
+const dashboard = route.query.dashboard as string | undefined
+const dashboardName = route.query.dashboardName as string | undefined
 
 // Check if this is from column addition or row insertion based on the referrer
 const isFromColumnAddition = ref(false)
@@ -39,6 +41,12 @@ function returnToOriginRow() {
     router.push({ name: 'row', params: { tableName: fromTable, rowId: fromRowId } })
   }
 }
+
+function returnToDashboard() {
+  if (dashboardName) {
+    router.push({ name: 'dashboard', params: { dashboardName: dashboardName } })
+  }
+}
 </script>
 
 <template>
@@ -54,6 +62,9 @@ function returnToOriginRow() {
       </button>
       <button @click="insertAnother" class="button neutral">
         {{ isFromColumnAddition ? '➕ Add Another Column' : '➕ Insert Another Row' }}
+      </button>
+      <button v-if="dashboardName" @click="returnToDashboard" class="button neutral">
+        📊 Return to Dashboard
       </button>
       <button v-if="fromTable && fromRowId" @click="returnToOriginRow" class="button neutral">
         🔙 Back to Row

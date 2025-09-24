@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file sickrock.proto.
  */
 export const file_sickrock: GenFile = /*@__PURE__*/
-  fileDesc("Cg5zaWNrcm9jay5wcm90bxIIc2lja3JvY2siHgoLUGluZ1JlcXVlc3QSDwoHbWVzc2FnZRgBIAEoCSI3CgxQaW5nUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRIWCg50aW1lc3RhbXBfdW5peBgCIAEoAyIbChlHZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0Ii0KDk5hdmlnYXRpb25MaW5rEg0KBWxhYmVsGAEgASgJEgwKBHBhdGgYAiABKAkiRQoaR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USJwoFbGlua3MYASADKAsyGC5zaWNrcm9jay5OYXZpZ2F0aW9uTGluayIfCh1HZXRUYWJsZUNvbmZpZ3VyYXRpb25zUmVxdWVzdCJcCgRQYWdlEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEgwKBHNsdWcYAyABKAkSDwoHb3JkaW5hbBgEIAEoBRIMCgRpY29uGAUgASgJEgwKBHZpZXcYBiABKAkiPwoeR2V0VGFibGVDb25maWd1cmF0aW9uc1Jlc3BvbnNlEh0KBXBhZ2VzGAEgAygLMg4uc2lja3JvY2suUGFnZSIWChRHZXROYXZpZ2F0aW9uUmVxdWVzdCKbAQoOTmF2aWdhdGlvbkl0ZW0SCgoCaWQYASABKAUSDwoHb3JkaW5hbBgCIAEoBRIbChN0YWJsZV9jb25maWd1cmF0aW9uGAMgASgFEhIKCnRhYmxlX25hbWUYBCABKAkSEwoLdGFibGVfdGl0bGUYBSABKAkSEgoKdGFibGVfaWNvbhgGIAEoCRISCgp0YWJsZV92aWV3GAcgASgJIkAKFUdldE5hdmlnYXRpb25SZXNwb25zZRInCgVpdGVtcxgBIAMoCzIYLnNpY2tyb2NrLk5hdmlnYXRpb25JdGVtIqABCgRJdGVtEgoKAmlkGAEgASgJEhIKCnNyX2NyZWF0ZWQYAiABKAMSPwoRYWRkaXRpb25hbF9maWVsZHMYAyADKAsyJC5zaWNrcm9jay5JdGVtLkFkZGl0aW9uYWxGaWVsZHNFbnRyeRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASKHAQoQTGlzdEl0ZW1zUmVxdWVzdBIPCgd0Y19uYW1lGAEgASgJEjQKBXdoZXJlGAIgAygLMiUuc2lja3JvY2suTGlzdEl0ZW1zUmVxdWVzdC5XaGVyZUVudHJ5GiwKCldoZXJlRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIyChFMaXN0SXRlbXNSZXNwb25zZRIdCgVpdGVtcxgBIAMoCzIOLnNpY2tyb2NrLkl0ZW0ivwEKEUNyZWF0ZUl0ZW1SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSEgoKc3JfY3JlYXRlZBgCIAEoAxJMChFhZGRpdGlvbmFsX2ZpZWxkcxgDIAMoCzIxLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXF1ZXN0LkFkZGl0aW9uYWxGaWVsZHNFbnRyeRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIyChJDcmVhdGVJdGVtUmVzcG9uc2USHAoEaXRlbRgBIAEoCzIOLnNpY2tyb2NrLkl0ZW0iLQoOR2V0SXRlbVJlcXVlc3QSDwoHcGFnZV9pZBgBIAEoCRIKCgJpZBgCIAEoCSIvCg9HZXRJdGVtUmVzcG9uc2USHAoEaXRlbRgBIAEoCzIOLnNpY2tyb2NrLkl0ZW0iswEKD0VkaXRJdGVtUmVxdWVzdBIKCgJpZBgBIAEoCRJKChFhZGRpdGlvbmFsX2ZpZWxkcxgCIAMoCzIvLnNpY2tyb2NrLkVkaXRJdGVtUmVxdWVzdC5BZGRpdGlvbmFsRmllbGRzRW50cnkSDwoHcGFnZV9pZBgDIAEoCRo3ChVBZGRpdGlvbmFsRmllbGRzRW50cnkSCwoDa2V5GAEgASgJEg0KBXZhbHVlGAIgASgJOgI4ASIwChBFZGl0SXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIjAKEURlbGV0ZUl0ZW1SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSCgoCaWQYAiABKAkiJQoSRGVsZXRlSXRlbVJlc3BvbnNlEg8KB2RlbGV0ZWQYASABKAgiKwoYR2V0VGFibGVTdHJ1Y3R1cmVSZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkiWwoFRmllbGQSDAoEbmFtZRgBIAEoCRIMCgR0eXBlGAIgASgJEhAKCHJlcXVpcmVkGAMgASgIEiQKHGRlZmF1bHRfdG9fY3VycmVudF90aW1lc3RhbXAYBCABKAgiZAoZR2V0VGFibGVTdHJ1Y3R1cmVSZXNwb25zZRIfCgZmaWVsZHMYASADKAsyDy5zaWNrcm9jay5GaWVsZBIYChBDcmVhdGVCdXR0b25UZXh0GAIgASgJEgwKBHZpZXcYAyABKAkiSAoVQWRkVGFibGVDb2x1bW5SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSHgoFZmllbGQYAiABKAsyDy5zaWNrcm9jay5GaWVsZCJkCg9UYWJsZVZpZXdDb2x1bW4SEwoLY29sdW1uX25hbWUYASABKAkSEgoKaXNfdmlzaWJsZRgCIAEoCBIUCgxjb2x1bW5fb3JkZXIYAyABKAUSEgoKc29ydF9vcmRlchgEIAEoCSJrChZDcmVhdGVUYWJsZVZpZXdSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEQoJdmlld19uYW1lGAIgASgJEioKB2NvbHVtbnMYAyADKAsyGS5zaWNrcm9jay5UYWJsZVZpZXdDb2x1bW4iOwoXQ3JlYXRlVGFibGVWaWV3UmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJInwKFlVwZGF0ZVRhYmxlVmlld1JlcXVlc3QSDwoHdmlld19pZBgBIAEoBRISCgp0YWJsZV9uYW1lGAIgASgJEhEKCXZpZXdfbmFtZRgDIAEoCRIqCgdjb2x1bW5zGAQgAygLMhkuc2lja3JvY2suVGFibGVWaWV3Q29sdW1uIjsKF1VwZGF0ZVRhYmxlVmlld1Jlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSIqChRHZXRUYWJsZVZpZXdzUmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJIn4KCVRhYmxlVmlldxIKCgJpZBgBIAEoBRISCgp0YWJsZV9uYW1lGAIgASgJEhEKCXZpZXdfbmFtZRgDIAEoCRISCgppc19kZWZhdWx0GAQgASgIEioKB2NvbHVtbnMYBSADKAsyGS5zaWNrcm9jay5UYWJsZVZpZXdDb2x1bW4iOwoVR2V0VGFibGVWaWV3c1Jlc3BvbnNlEiIKBXZpZXdzGAEgAygLMhMuc2lja3JvY2suVGFibGVWaWV3IikKFkRlbGV0ZVRhYmxlVmlld1JlcXVlc3QSDwoHdmlld19pZBgBIAEoBSI7ChdEZWxldGVUYWJsZVZpZXdSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkitwEKCkZvcmVpZ25LZXkSFwoPY29uc3RyYWludF9uYW1lGAEgASgJEhIKCnRhYmxlX25hbWUYAiABKAkSEwoLY29sdW1uX25hbWUYAyABKAkSGAoQcmVmZXJlbmNlZF90YWJsZRgEIAEoCRIZChFyZWZlcmVuY2VkX2NvbHVtbhgFIAEoCRIYChBvbl9kZWxldGVfYWN0aW9uGAYgASgJEhgKEG9uX3VwZGF0ZV9hY3Rpb24YByABKAkiqwEKF0NyZWF0ZUZvcmVpZ25LZXlSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEwoLY29sdW1uX25hbWUYAiABKAkSGAoQcmVmZXJlbmNlZF90YWJsZRgDIAEoCRIZChFyZWZlcmVuY2VkX2NvbHVtbhgEIAEoCRIYChBvbl9kZWxldGVfYWN0aW9uGAUgASgJEhgKEG9uX3VwZGF0ZV9hY3Rpb24YBiABKAkiPAoYQ3JlYXRlRm9yZWlnbktleVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSIrChVHZXRGb3JlaWduS2V5c1JlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCSJEChZHZXRGb3JlaWduS2V5c1Jlc3BvbnNlEioKDGZvcmVpZ25fa2V5cxgBIAMoCzIULnNpY2tyb2NrLkZvcmVpZ25LZXkiMgoXRGVsZXRlRm9yZWlnbktleVJlcXVlc3QSFwoPY29uc3RyYWludF9uYW1lGAEgASgJIjwKGERlbGV0ZUZvcmVpZ25LZXlSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiVAoXQ2hhbmdlQ29sdW1uVHlwZVJlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCRITCgtjb2x1bW5fbmFtZRgCIAEoCRIQCghuZXdfdHlwZRgDIAEoCSI8ChhDaGFuZ2VDb2x1bW5UeXBlUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIjwKEURyb3BDb2x1bW5SZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEwoLY29sdW1uX25hbWUYAiABKAkiNgoSRHJvcENvbHVtblJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSJfChdDaGFuZ2VDb2x1bW5OYW1lUmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhcKD29sZF9jb2x1bW5fbmFtZRgCIAEoCRIXCg9uZXdfY29sdW1uX25hbWUYAyABKAkiPAoYQ2hhbmdlQ29sdW1uTmFtZVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSItChxHZXRNb3N0UmVjZW50bHlWaWV3ZWRSZXF1ZXN0Eg0KBWxpbWl0GAEgASgFIoMBChJSZWNlbnRseVZpZXdlZEl0ZW0SDAoEbmFtZRgBIAEoCRIQCgh0YWJsZV9pZBgCIAEoCRIMCgRpY29uGAMgASgJEhcKD3VwZGF0ZWRfYXRfdW5peBgEIAEoAxIRCglpdGVtX25hbWUYBSABKAkSEwoLdGFibGVfdGl0bGUYBiABKAkiTAodR2V0TW9zdFJlY2VudGx5Vmlld2VkUmVzcG9uc2USKwoFaXRlbXMYASADKAsyHC5zaWNrcm9jay5SZWNlbnRseVZpZXdlZEl0ZW0iDQoLSW5pdFJlcXVlc3QiTgoMSW5pdFJlc3BvbnNlEg8KB3ZlcnNpb24YASABKAkSDgoGY29tbWl0GAIgASgJEgwKBGRhdGUYAyABKAkSDwoHZGJfbmFtZRgEIAEoCSIyCgxMb2dpblJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkSEAoIcGFzc3dvcmQYAiABKAkiVAoNTG9naW5SZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSDQoFdG9rZW4YAyABKAkSEgoKZXhwaXJlc19hdBgEIAEoAyIPCg1Mb2dvdXRSZXF1ZXN0IjIKDkxvZ291dFJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSJCChhSZXNldFVzZXJQYXNzd29yZFJlcXVlc3QSEAoIdXNlcm5hbWUYASABKAkSFAoMbmV3X3Bhc3N3b3JkGAIgASgJIj0KGVJlc2V0VXNlclBhc3N3b3JkUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIiUKFFZhbGlkYXRlVG9rZW5SZXF1ZXN0Eg0KBXRva2VuGAEgASgJImMKFVZhbGlkYXRlVG9rZW5SZXNwb25zZRINCgV2YWxpZBgBIAEoCBIQCgh1c2VybmFtZRgCIAEoCRISCgpleHBpcmVzX2F0GAMgASgDEhUKDWluaXRpYWxfcm91dGUYBCABKAkiGwoZR2VuZXJhdGVEZXZpY2VDb2RlUmVxdWVzdCI+ChpHZW5lcmF0ZURldmljZUNvZGVSZXNwb25zZRIMCgRjb2RlGAEgASgJEhIKCmV4cGlyZXNfYXQYAiABKAMiJgoWQ2xhaW1EZXZpY2VDb2RlUmVxdWVzdBIMCgRjb2RlGAEgASgJIl4KF0NsYWltRGV2aWNlQ29kZVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCRINCgV0b2tlbhgDIAEoCRISCgpleHBpcmVzX2F0GAQgASgDIiYKFkNoZWNrRGV2aWNlQ29kZVJlcXVlc3QSDAoEY29kZRgBIAEoCSJuChdDaGVja0RldmljZUNvZGVSZXNwb25zZRINCgV2YWxpZBgBIAEoCBIPCgdjbGFpbWVkGAIgASgIEhIKCmV4cGlyZXNfYXQYAyABKAMSDQoFdG9rZW4YBCABKAkSEAoIdXNlcm5hbWUYBSABKAkiKwobR2V0RGV2aWNlQ29kZVNlc3Npb25SZXF1ZXN0EgwKBGNvZGUYASABKAkidQocR2V0RGV2aWNlQ29kZVNlc3Npb25SZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSDQoFdG9rZW4YAyABKAkSEgoKZXhwaXJlc19hdBgEIAEoAxIQCgh1c2VybmFtZRgFIAEoCSIWChRHZXRTeXN0ZW1JbmZvUmVxdWVzdCIyChVHZXRTeXN0ZW1JbmZvUmVzcG9uc2USGQoRYXBwcm94X3RvdGFsX3Jvd3MYASABKAMy6BQKCFNpY2tSb2NrEjUKBEluaXQSFS5zaWNrcm9jay5Jbml0UmVxdWVzdBoWLnNpY2tyb2NrLkluaXRSZXNwb25zZRI1CgRQaW5nEhUuc2lja3JvY2suUGluZ1JlcXVlc3QaFi5zaWNrcm9jay5QaW5nUmVzcG9uc2USOAoFTG9naW4SFi5zaWNrcm9jay5Mb2dpblJlcXVlc3QaFy5zaWNrcm9jay5Mb2dpblJlc3BvbnNlEjsKBkxvZ291dBIXLnNpY2tyb2NrLkxvZ291dFJlcXVlc3QaGC5zaWNrcm9jay5Mb2dvdXRSZXNwb25zZRJQCg1WYWxpZGF0ZVRva2VuEh4uc2lja3JvY2suVmFsaWRhdGVUb2tlblJlcXVlc3QaHy5zaWNrcm9jay5WYWxpZGF0ZVRva2VuUmVzcG9uc2USXAoRUmVzZXRVc2VyUGFzc3dvcmQSIi5zaWNrcm9jay5SZXNldFVzZXJQYXNzd29yZFJlcXVlc3QaIy5zaWNrcm9jay5SZXNldFVzZXJQYXNzd29yZFJlc3BvbnNlEl8KEkdlbmVyYXRlRGV2aWNlQ29kZRIjLnNpY2tyb2NrLkdlbmVyYXRlRGV2aWNlQ29kZVJlcXVlc3QaJC5zaWNrcm9jay5HZW5lcmF0ZURldmljZUNvZGVSZXNwb25zZRJWCg9DbGFpbURldmljZUNvZGUSIC5zaWNrcm9jay5DbGFpbURldmljZUNvZGVSZXF1ZXN0GiEuc2lja3JvY2suQ2xhaW1EZXZpY2VDb2RlUmVzcG9uc2USVgoPQ2hlY2tEZXZpY2VDb2RlEiAuc2lja3JvY2suQ2hlY2tEZXZpY2VDb2RlUmVxdWVzdBohLnNpY2tyb2NrLkNoZWNrRGV2aWNlQ29kZVJlc3BvbnNlEmUKFEdldERldmljZUNvZGVTZXNzaW9uEiUuc2lja3JvY2suR2V0RGV2aWNlQ29kZVNlc3Npb25SZXF1ZXN0GiYuc2lja3JvY2suR2V0RGV2aWNlQ29kZVNlc3Npb25SZXNwb25zZRJfChJHZXROYXZpZ2F0aW9uTGlua3MSIy5zaWNrcm9jay5HZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0GiQuc2lja3JvY2suR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USawoWR2V0VGFibGVDb25maWd1cmF0aW9ucxInLnNpY2tyb2NrLkdldFRhYmxlQ29uZmlndXJhdGlvbnNSZXF1ZXN0Giguc2lja3JvY2suR2V0VGFibGVDb25maWd1cmF0aW9uc1Jlc3BvbnNlElAKDUdldE5hdmlnYXRpb24SHi5zaWNrcm9jay5HZXROYXZpZ2F0aW9uUmVxdWVzdBofLnNpY2tyb2NrLkdldE5hdmlnYXRpb25SZXNwb25zZRJECglMaXN0SXRlbXMSGi5zaWNrcm9jay5MaXN0SXRlbXNSZXF1ZXN0Ghsuc2lja3JvY2suTGlzdEl0ZW1zUmVzcG9uc2USRwoKQ3JlYXRlSXRlbRIbLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXF1ZXN0Ghwuc2lja3JvY2suQ3JlYXRlSXRlbVJlc3BvbnNlEj4KB0dldEl0ZW0SGC5zaWNrcm9jay5HZXRJdGVtUmVxdWVzdBoZLnNpY2tyb2NrLkdldEl0ZW1SZXNwb25zZRJBCghFZGl0SXRlbRIZLnNpY2tyb2NrLkVkaXRJdGVtUmVxdWVzdBoaLnNpY2tyb2NrLkVkaXRJdGVtUmVzcG9uc2USRwoKRGVsZXRlSXRlbRIbLnNpY2tyb2NrLkRlbGV0ZUl0ZW1SZXF1ZXN0Ghwuc2lja3JvY2suRGVsZXRlSXRlbVJlc3BvbnNlElwKEUdldFRhYmxlU3RydWN0dXJlEiIuc2lja3JvY2suR2V0VGFibGVTdHJ1Y3R1cmVSZXF1ZXN0GiMuc2lja3JvY2suR2V0VGFibGVTdHJ1Y3R1cmVSZXNwb25zZRJWCg5BZGRUYWJsZUNvbHVtbhIfLnNpY2tyb2NrLkFkZFRhYmxlQ29sdW1uUmVxdWVzdBojLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USVgoPQ3JlYXRlVGFibGVWaWV3EiAuc2lja3JvY2suQ3JlYXRlVGFibGVWaWV3UmVxdWVzdBohLnNpY2tyb2NrLkNyZWF0ZVRhYmxlVmlld1Jlc3BvbnNlElYKD1VwZGF0ZVRhYmxlVmlldxIgLnNpY2tyb2NrLlVwZGF0ZVRhYmxlVmlld1JlcXVlc3QaIS5zaWNrcm9jay5VcGRhdGVUYWJsZVZpZXdSZXNwb25zZRJQCg1HZXRUYWJsZVZpZXdzEh4uc2lja3JvY2suR2V0VGFibGVWaWV3c1JlcXVlc3QaHy5zaWNrcm9jay5HZXRUYWJsZVZpZXdzUmVzcG9uc2USVgoPRGVsZXRlVGFibGVWaWV3EiAuc2lja3JvY2suRGVsZXRlVGFibGVWaWV3UmVxdWVzdBohLnNpY2tyb2NrLkRlbGV0ZVRhYmxlVmlld1Jlc3BvbnNlElkKEENyZWF0ZUZvcmVpZ25LZXkSIS5zaWNrcm9jay5DcmVhdGVGb3JlaWduS2V5UmVxdWVzdBoiLnNpY2tyb2NrLkNyZWF0ZUZvcmVpZ25LZXlSZXNwb25zZRJTCg5HZXRGb3JlaWduS2V5cxIfLnNpY2tyb2NrLkdldEZvcmVpZ25LZXlzUmVxdWVzdBogLnNpY2tyb2NrLkdldEZvcmVpZ25LZXlzUmVzcG9uc2USWQoQRGVsZXRlRm9yZWlnbktleRIhLnNpY2tyb2NrLkRlbGV0ZUZvcmVpZ25LZXlSZXF1ZXN0GiIuc2lja3JvY2suRGVsZXRlRm9yZWlnbktleVJlc3BvbnNlElkKEENoYW5nZUNvbHVtblR5cGUSIS5zaWNrcm9jay5DaGFuZ2VDb2x1bW5UeXBlUmVxdWVzdBoiLnNpY2tyb2NrLkNoYW5nZUNvbHVtblR5cGVSZXNwb25zZRJHCgpEcm9wQ29sdW1uEhsuc2lja3JvY2suRHJvcENvbHVtblJlcXVlc3QaHC5zaWNrcm9jay5Ecm9wQ29sdW1uUmVzcG9uc2USWQoQQ2hhbmdlQ29sdW1uTmFtZRIhLnNpY2tyb2NrLkNoYW5nZUNvbHVtbk5hbWVSZXF1ZXN0GiIuc2lja3JvY2suQ2hhbmdlQ29sdW1uTmFtZVJlc3BvbnNlEmgKFUdldE1vc3RSZWNlbnRseVZpZXdlZBImLnNpY2tyb2NrLkdldE1vc3RSZWNlbnRseVZpZXdlZFJlcXVlc3QaJy5zaWNrcm9jay5HZXRNb3N0UmVjZW50bHlWaWV3ZWRSZXNwb25zZRJQCg1HZXRTeXN0ZW1JbmZvEh4uc2lja3JvY2suR2V0U3lzdGVtSW5mb1JlcXVlc3QaHy5zaWNrcm9jay5HZXRTeXN0ZW1JbmZvUmVzcG9uc2VCkQEKDGNvbS5zaWNrcm9ja0INU2lja3JvY2tQcm90b1ABWjJnaXRodWIuY29tL2phbWVzcmVhZC9TaWNrUm9jay9nZW4vcHJvdG87c2lja3JvY2twYqICA1NYWKoCCFNpY2tyb2NrygIIU2lja3JvY2viAhRTaWNrcm9ja1xHUEJNZXRhZGF0YeoCCFNpY2tyb2NrYgZwcm90bzM");
+  fileDesc("Cg5zaWNrcm9jay5wcm90bxIIc2lja3JvY2siHgoLUGluZ1JlcXVlc3QSDwoHbWVzc2FnZRgBIAEoCSI3CgxQaW5nUmVzcG9uc2USDwoHbWVzc2FnZRgBIAEoCRIWCg50aW1lc3RhbXBfdW5peBgCIAEoAyIbChlHZXROYXZpZ2F0aW9uTGlua3NSZXF1ZXN0Ii0KDk5hdmlnYXRpb25MaW5rEg0KBWxhYmVsGAEgASgJEgwKBHBhdGgYAiABKAkiRQoaR2V0TmF2aWdhdGlvbkxpbmtzUmVzcG9uc2USJwoFbGlua3MYASADKAsyGC5zaWNrcm9jay5OYXZpZ2F0aW9uTGluayIfCh1HZXRUYWJsZUNvbmZpZ3VyYXRpb25zUmVxdWVzdCJcCgRQYWdlEgoKAmlkGAEgASgJEg0KBXRpdGxlGAIgASgJEgwKBHNsdWcYAyABKAkSDwoHb3JkaW5hbBgEIAEoBRIMCgRpY29uGAUgASgJEgwKBHZpZXcYBiABKAkiPwoeR2V0VGFibGVDb25maWd1cmF0aW9uc1Jlc3BvbnNlEh0KBXBhZ2VzGAEgAygLMg4uc2lja3JvY2suUGFnZSIWChRHZXROYXZpZ2F0aW9uUmVxdWVzdCLJAQoOTmF2aWdhdGlvbkl0ZW0SCgoCaWQYASABKAUSDwoHb3JkaW5hbBgCIAEoBRIbChN0YWJsZV9jb25maWd1cmF0aW9uGAMgASgFEhIKCnRhYmxlX25hbWUYBCABKAkSEwoLdGFibGVfdGl0bGUYBSABKAkSEgoKdGFibGVfaWNvbhgGIAEoCRISCgp0YWJsZV92aWV3GAcgASgJEhQKDGRhc2hib2FyZF9pZBgIIAEoBRIWCg5kYXNoYm9hcmRfbmFtZRgJIAEoCSJAChVHZXROYXZpZ2F0aW9uUmVzcG9uc2USJwoFaXRlbXMYASADKAsyGC5zaWNrcm9jay5OYXZpZ2F0aW9uSXRlbSKgAQoESXRlbRIKCgJpZBgBIAEoCRISCgpzcl9jcmVhdGVkGAIgASgDEj8KEWFkZGl0aW9uYWxfZmllbGRzGAMgAygLMiQuc2lja3JvY2suSXRlbS5BZGRpdGlvbmFsRmllbGRzRW50cnkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEihwEKEExpc3RJdGVtc1JlcXVlc3QSDwoHdGNfbmFtZRgBIAEoCRI0CgV3aGVyZRgCIAMoCzIlLnNpY2tyb2NrLkxpc3RJdGVtc1JlcXVlc3QuV2hlcmVFbnRyeRosCgpXaGVyZUVudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiMgoRTGlzdEl0ZW1zUmVzcG9uc2USHQoFaXRlbXMYASADKAsyDi5zaWNrcm9jay5JdGVtIr8BChFDcmVhdGVJdGVtUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEhIKCnNyX2NyZWF0ZWQYAiABKAMSTAoRYWRkaXRpb25hbF9maWVsZHMYAyADKAsyMS5zaWNrcm9jay5DcmVhdGVJdGVtUmVxdWVzdC5BZGRpdGlvbmFsRmllbGRzRW50cnkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiMgoSQ3JlYXRlSXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIi0KDkdldEl0ZW1SZXF1ZXN0Eg8KB3BhZ2VfaWQYASABKAkSCgoCaWQYAiABKAkiLwoPR2V0SXRlbVJlc3BvbnNlEhwKBGl0ZW0YASABKAsyDi5zaWNrcm9jay5JdGVtIrMBCg9FZGl0SXRlbVJlcXVlc3QSCgoCaWQYASABKAkSSgoRYWRkaXRpb25hbF9maWVsZHMYAiADKAsyLy5zaWNrcm9jay5FZGl0SXRlbVJlcXVlc3QuQWRkaXRpb25hbEZpZWxkc0VudHJ5Eg8KB3BhZ2VfaWQYAyABKAkaNwoVQWRkaXRpb25hbEZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRINCgV2YWx1ZRgCIAEoCToCOAEiMAoQRWRpdEl0ZW1SZXNwb25zZRIcCgRpdGVtGAEgASgLMg4uc2lja3JvY2suSXRlbSIwChFEZWxldGVJdGVtUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEgoKAmlkGAIgASgJIiUKEkRlbGV0ZUl0ZW1SZXNwb25zZRIPCgdkZWxldGVkGAEgASgIIisKGEdldFRhYmxlU3RydWN0dXJlUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJIlsKBUZpZWxkEgwKBG5hbWUYASABKAkSDAoEdHlwZRgCIAEoCRIQCghyZXF1aXJlZBgDIAEoCBIkChxkZWZhdWx0X3RvX2N1cnJlbnRfdGltZXN0YW1wGAQgASgIImQKGUdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USHwoGZmllbGRzGAEgAygLMg8uc2lja3JvY2suRmllbGQSGAoQQ3JlYXRlQnV0dG9uVGV4dBgCIAEoCRIMCgR2aWV3GAMgASgJIkgKFUFkZFRhYmxlQ29sdW1uUmVxdWVzdBIPCgdwYWdlX2lkGAEgASgJEh4KBWZpZWxkGAIgASgLMg8uc2lja3JvY2suRmllbGQiZAoPVGFibGVWaWV3Q29sdW1uEhMKC2NvbHVtbl9uYW1lGAEgASgJEhIKCmlzX3Zpc2libGUYAiABKAgSFAoMY29sdW1uX29yZGVyGAMgASgFEhIKCnNvcnRfb3JkZXIYBCABKAkiawoWQ3JlYXRlVGFibGVWaWV3UmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhEKCXZpZXdfbmFtZRgCIAEoCRIqCgdjb2x1bW5zGAMgAygLMhkuc2lja3JvY2suVGFibGVWaWV3Q29sdW1uIjsKF0NyZWF0ZVRhYmxlVmlld1Jlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSJ8ChZVcGRhdGVUYWJsZVZpZXdSZXF1ZXN0Eg8KB3ZpZXdfaWQYASABKAUSEgoKdGFibGVfbmFtZRgCIAEoCRIRCgl2aWV3X25hbWUYAyABKAkSKgoHY29sdW1ucxgEIAMoCzIZLnNpY2tyb2NrLlRhYmxlVmlld0NvbHVtbiI7ChdVcGRhdGVUYWJsZVZpZXdSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiKgoUR2V0VGFibGVWaWV3c1JlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCSJ+CglUYWJsZVZpZXcSCgoCaWQYASABKAUSEgoKdGFibGVfbmFtZRgCIAEoCRIRCgl2aWV3X25hbWUYAyABKAkSEgoKaXNfZGVmYXVsdBgEIAEoCBIqCgdjb2x1bW5zGAUgAygLMhkuc2lja3JvY2suVGFibGVWaWV3Q29sdW1uIjsKFUdldFRhYmxlVmlld3NSZXNwb25zZRIiCgV2aWV3cxgBIAMoCzITLnNpY2tyb2NrLlRhYmxlVmlldyIpChZEZWxldGVUYWJsZVZpZXdSZXF1ZXN0Eg8KB3ZpZXdfaWQYASABKAUiOwoXRGVsZXRlVGFibGVWaWV3UmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIrcBCgpGb3JlaWduS2V5EhcKD2NvbnN0cmFpbnRfbmFtZRgBIAEoCRISCgp0YWJsZV9uYW1lGAIgASgJEhMKC2NvbHVtbl9uYW1lGAMgASgJEhgKEHJlZmVyZW5jZWRfdGFibGUYBCABKAkSGQoRcmVmZXJlbmNlZF9jb2x1bW4YBSABKAkSGAoQb25fZGVsZXRlX2FjdGlvbhgGIAEoCRIYChBvbl91cGRhdGVfYWN0aW9uGAcgASgJIqsBChdDcmVhdGVGb3JlaWduS2V5UmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhMKC2NvbHVtbl9uYW1lGAIgASgJEhgKEHJlZmVyZW5jZWRfdGFibGUYAyABKAkSGQoRcmVmZXJlbmNlZF9jb2x1bW4YBCABKAkSGAoQb25fZGVsZXRlX2FjdGlvbhgFIAEoCRIYChBvbl91cGRhdGVfYWN0aW9uGAYgASgJIjwKGENyZWF0ZUZvcmVpZ25LZXlSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiKwoVR2V0Rm9yZWlnbktleXNSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkiRAoWR2V0Rm9yZWlnbktleXNSZXNwb25zZRIqCgxmb3JlaWduX2tleXMYASADKAsyFC5zaWNrcm9jay5Gb3JlaWduS2V5IjIKF0RlbGV0ZUZvcmVpZ25LZXlSZXF1ZXN0EhcKD2NvbnN0cmFpbnRfbmFtZRgBIAEoCSI8ChhEZWxldGVGb3JlaWduS2V5UmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJIlQKF0NoYW5nZUNvbHVtblR5cGVSZXF1ZXN0EhIKCnRhYmxlX25hbWUYASABKAkSEwoLY29sdW1uX25hbWUYAiABKAkSEAoIbmV3X3R5cGUYAyABKAkiPAoYQ2hhbmdlQ29sdW1uVHlwZVJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSI8ChFEcm9wQ29sdW1uUmVxdWVzdBISCgp0YWJsZV9uYW1lGAEgASgJEhMKC2NvbHVtbl9uYW1lGAIgASgJIjYKEkRyb3BDb2x1bW5SZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiXwoXQ2hhbmdlQ29sdW1uTmFtZVJlcXVlc3QSEgoKdGFibGVfbmFtZRgBIAEoCRIXCg9vbGRfY29sdW1uX25hbWUYAiABKAkSFwoPbmV3X2NvbHVtbl9uYW1lGAMgASgJIjwKGENoYW5nZUNvbHVtbk5hbWVSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiLQocR2V0TW9zdFJlY2VudGx5Vmlld2VkUmVxdWVzdBINCgVsaW1pdBgBIAEoBSKDAQoSUmVjZW50bHlWaWV3ZWRJdGVtEgwKBG5hbWUYASABKAkSEAoIdGFibGVfaWQYAiABKAkSDAoEaWNvbhgDIAEoCRIXCg91cGRhdGVkX2F0X3VuaXgYBCABKAMSEQoJaXRlbV9uYW1lGAUgASgJEhMKC3RhYmxlX3RpdGxlGAYgASgJIkwKHUdldE1vc3RSZWNlbnRseVZpZXdlZFJlc3BvbnNlEisKBWl0ZW1zGAEgAygLMhwuc2lja3JvY2suUmVjZW50bHlWaWV3ZWRJdGVtIlcKCURhc2hib2FyZBIKCgJpZBgBIAEoBRIMCgRuYW1lGAIgASgJEjAKCmNvbXBvbmVudHMYAyADKAsyHC5zaWNrcm9jay5EYXNoYm9hcmRDb21wb25lbnQiFgoUR2V0RGFzaGJvYXJkc1JlcXVlc3QiQAoVR2V0RGFzaGJvYXJkc1Jlc3BvbnNlEicKCmRhc2hib2FyZHMYASADKAsyEy5zaWNrcm9jay5EYXNoYm9hcmQidQoSRGFzaGJvYXJkQ29tcG9uZW50EgoKAmlkGAEgASgFEgwKBG5hbWUYAiABKAkSEgoKZGF0YVN0cmluZxgDIAEoCRISCgpkYXRhTnVtYmVyGAQgASgCEg0KBWVycm9yGAUgASgJEg4KBnN1ZmZpeBgGIAEoCSJsChZEYXNoYm9hcmRDb21wb25lbnRSdWxlEgoKAmlkGAEgASgFEhEKCWNvbXBvbmVudBgCIAEoBRIPCgdvcmRpbmFsGAMgASgFEhEKCW9wZXJhdGlvbhgEIAEoCRIPCgdvcGVyYW5kGAUgASgJIjYKIUdldERhc2hib2FyZENvbXBvbmVudFJ1bGVzUmVxdWVzdBIRCgljb21wb25lbnQYASABKAUiVQoiR2V0RGFzaGJvYXJkQ29tcG9uZW50UnVsZXNSZXNwb25zZRIvCgVydWxlcxgBIAMoCzIgLnNpY2tyb2NrLkRhc2hib2FyZENvbXBvbmVudFJ1bGUibQojQ3JlYXRlRGFzaGJvYXJkQ29tcG9uZW50UnVsZVJlcXVlc3QSEQoJY29tcG9uZW50GAEgASgFEg8KB29yZGluYWwYAiABKAUSEQoJb3BlcmF0aW9uGAMgASgJEg8KB29wZXJhbmQYBCABKAkiVgokQ3JlYXRlRGFzaGJvYXJkQ29tcG9uZW50UnVsZVJlc3BvbnNlEi4KBHJ1bGUYASABKAsyIC5zaWNrcm9jay5EYXNoYm9hcmRDb21wb25lbnRSdWxlIg0KC0luaXRSZXF1ZXN0Ik4KDEluaXRSZXNwb25zZRIPCgd2ZXJzaW9uGAEgASgJEg4KBmNvbW1pdBgCIAEoCRIMCgRkYXRlGAMgASgJEg8KB2RiX25hbWUYBCABKAkiMgoMTG9naW5SZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEhAKCHBhc3N3b3JkGAIgASgJIlQKDUxvZ2luUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEg0KBXRva2VuGAMgASgJEhIKCmV4cGlyZXNfYXQYBCABKAMiDwoNTG9nb3V0UmVxdWVzdCIyCg5Mb2dvdXRSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkiQgoYUmVzZXRVc2VyUGFzc3dvcmRSZXF1ZXN0EhAKCHVzZXJuYW1lGAEgASgJEhQKDG5ld19wYXNzd29yZBgCIAEoCSI9ChlSZXNldFVzZXJQYXNzd29yZFJlc3BvbnNlEg8KB3N1Y2Nlc3MYASABKAgSDwoHbWVzc2FnZRgCIAEoCSIlChRWYWxpZGF0ZVRva2VuUmVxdWVzdBINCgV0b2tlbhgBIAEoCSJjChVWYWxpZGF0ZVRva2VuUmVzcG9uc2USDQoFdmFsaWQYASABKAgSEAoIdXNlcm5hbWUYAiABKAkSEgoKZXhwaXJlc19hdBgDIAEoAxIVCg1pbml0aWFsX3JvdXRlGAQgASgJIhsKGUdlbmVyYXRlRGV2aWNlQ29kZVJlcXVlc3QiPgoaR2VuZXJhdGVEZXZpY2VDb2RlUmVzcG9uc2USDAoEY29kZRgBIAEoCRISCgpleHBpcmVzX2F0GAIgASgDIiYKFkNsYWltRGV2aWNlQ29kZVJlcXVlc3QSDAoEY29kZRgBIAEoCSJeChdDbGFpbURldmljZUNvZGVSZXNwb25zZRIPCgdzdWNjZXNzGAEgASgIEg8KB21lc3NhZ2UYAiABKAkSDQoFdG9rZW4YAyABKAkSEgoKZXhwaXJlc19hdBgEIAEoAyImChZDaGVja0RldmljZUNvZGVSZXF1ZXN0EgwKBGNvZGUYASABKAkibgoXQ2hlY2tEZXZpY2VDb2RlUmVzcG9uc2USDQoFdmFsaWQYASABKAgSDwoHY2xhaW1lZBgCIAEoCBISCgpleHBpcmVzX2F0GAMgASgDEg0KBXRva2VuGAQgASgJEhAKCHVzZXJuYW1lGAUgASgJIisKG0dldERldmljZUNvZGVTZXNzaW9uUmVxdWVzdBIMCgRjb2RlGAEgASgJInUKHEdldERldmljZUNvZGVTZXNzaW9uUmVzcG9uc2USDwoHc3VjY2VzcxgBIAEoCBIPCgdtZXNzYWdlGAIgASgJEg0KBXRva2VuGAMgASgJEhIKCmV4cGlyZXNfYXQYBCABKAMSEAoIdXNlcm5hbWUYBSABKAkiFgoUR2V0U3lzdGVtSW5mb1JlcXVlc3QiMgoVR2V0U3lzdGVtSW5mb1Jlc3BvbnNlEhkKEWFwcHJveF90b3RhbF9yb3dzGAEgASgDMrIXCghTaWNrUm9jaxI1CgRJbml0EhUuc2lja3JvY2suSW5pdFJlcXVlc3QaFi5zaWNrcm9jay5Jbml0UmVzcG9uc2USNQoEUGluZxIVLnNpY2tyb2NrLlBpbmdSZXF1ZXN0GhYuc2lja3JvY2suUGluZ1Jlc3BvbnNlEjgKBUxvZ2luEhYuc2lja3JvY2suTG9naW5SZXF1ZXN0Ghcuc2lja3JvY2suTG9naW5SZXNwb25zZRI7CgZMb2dvdXQSFy5zaWNrcm9jay5Mb2dvdXRSZXF1ZXN0Ghguc2lja3JvY2suTG9nb3V0UmVzcG9uc2USUAoNVmFsaWRhdGVUb2tlbhIeLnNpY2tyb2NrLlZhbGlkYXRlVG9rZW5SZXF1ZXN0Gh8uc2lja3JvY2suVmFsaWRhdGVUb2tlblJlc3BvbnNlElwKEVJlc2V0VXNlclBhc3N3b3JkEiIuc2lja3JvY2suUmVzZXRVc2VyUGFzc3dvcmRSZXF1ZXN0GiMuc2lja3JvY2suUmVzZXRVc2VyUGFzc3dvcmRSZXNwb25zZRJfChJHZW5lcmF0ZURldmljZUNvZGUSIy5zaWNrcm9jay5HZW5lcmF0ZURldmljZUNvZGVSZXF1ZXN0GiQuc2lja3JvY2suR2VuZXJhdGVEZXZpY2VDb2RlUmVzcG9uc2USVgoPQ2xhaW1EZXZpY2VDb2RlEiAuc2lja3JvY2suQ2xhaW1EZXZpY2VDb2RlUmVxdWVzdBohLnNpY2tyb2NrLkNsYWltRGV2aWNlQ29kZVJlc3BvbnNlElYKD0NoZWNrRGV2aWNlQ29kZRIgLnNpY2tyb2NrLkNoZWNrRGV2aWNlQ29kZVJlcXVlc3QaIS5zaWNrcm9jay5DaGVja0RldmljZUNvZGVSZXNwb25zZRJlChRHZXREZXZpY2VDb2RlU2Vzc2lvbhIlLnNpY2tyb2NrLkdldERldmljZUNvZGVTZXNzaW9uUmVxdWVzdBomLnNpY2tyb2NrLkdldERldmljZUNvZGVTZXNzaW9uUmVzcG9uc2USXwoSR2V0TmF2aWdhdGlvbkxpbmtzEiMuc2lja3JvY2suR2V0TmF2aWdhdGlvbkxpbmtzUmVxdWVzdBokLnNpY2tyb2NrLkdldE5hdmlnYXRpb25MaW5rc1Jlc3BvbnNlEmsKFkdldFRhYmxlQ29uZmlndXJhdGlvbnMSJy5zaWNrcm9jay5HZXRUYWJsZUNvbmZpZ3VyYXRpb25zUmVxdWVzdBooLnNpY2tyb2NrLkdldFRhYmxlQ29uZmlndXJhdGlvbnNSZXNwb25zZRJQCg1HZXROYXZpZ2F0aW9uEh4uc2lja3JvY2suR2V0TmF2aWdhdGlvblJlcXVlc3QaHy5zaWNrcm9jay5HZXROYXZpZ2F0aW9uUmVzcG9uc2USRAoJTGlzdEl0ZW1zEhouc2lja3JvY2suTGlzdEl0ZW1zUmVxdWVzdBobLnNpY2tyb2NrLkxpc3RJdGVtc1Jlc3BvbnNlEkcKCkNyZWF0ZUl0ZW0SGy5zaWNrcm9jay5DcmVhdGVJdGVtUmVxdWVzdBocLnNpY2tyb2NrLkNyZWF0ZUl0ZW1SZXNwb25zZRI+CgdHZXRJdGVtEhguc2lja3JvY2suR2V0SXRlbVJlcXVlc3QaGS5zaWNrcm9jay5HZXRJdGVtUmVzcG9uc2USQQoIRWRpdEl0ZW0SGS5zaWNrcm9jay5FZGl0SXRlbVJlcXVlc3QaGi5zaWNrcm9jay5FZGl0SXRlbVJlc3BvbnNlEkcKCkRlbGV0ZUl0ZW0SGy5zaWNrcm9jay5EZWxldGVJdGVtUmVxdWVzdBocLnNpY2tyb2NrLkRlbGV0ZUl0ZW1SZXNwb25zZRJcChFHZXRUYWJsZVN0cnVjdHVyZRIiLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVxdWVzdBojLnNpY2tyb2NrLkdldFRhYmxlU3RydWN0dXJlUmVzcG9uc2USVgoOQWRkVGFibGVDb2x1bW4SHy5zaWNrcm9jay5BZGRUYWJsZUNvbHVtblJlcXVlc3QaIy5zaWNrcm9jay5HZXRUYWJsZVN0cnVjdHVyZVJlc3BvbnNlElYKD0NyZWF0ZVRhYmxlVmlldxIgLnNpY2tyb2NrLkNyZWF0ZVRhYmxlVmlld1JlcXVlc3QaIS5zaWNrcm9jay5DcmVhdGVUYWJsZVZpZXdSZXNwb25zZRJWCg9VcGRhdGVUYWJsZVZpZXcSIC5zaWNrcm9jay5VcGRhdGVUYWJsZVZpZXdSZXF1ZXN0GiEuc2lja3JvY2suVXBkYXRlVGFibGVWaWV3UmVzcG9uc2USUAoNR2V0VGFibGVWaWV3cxIeLnNpY2tyb2NrLkdldFRhYmxlVmlld3NSZXF1ZXN0Gh8uc2lja3JvY2suR2V0VGFibGVWaWV3c1Jlc3BvbnNlElYKD0RlbGV0ZVRhYmxlVmlldxIgLnNpY2tyb2NrLkRlbGV0ZVRhYmxlVmlld1JlcXVlc3QaIS5zaWNrcm9jay5EZWxldGVUYWJsZVZpZXdSZXNwb25zZRJZChBDcmVhdGVGb3JlaWduS2V5EiEuc2lja3JvY2suQ3JlYXRlRm9yZWlnbktleVJlcXVlc3QaIi5zaWNrcm9jay5DcmVhdGVGb3JlaWduS2V5UmVzcG9uc2USUwoOR2V0Rm9yZWlnbktleXMSHy5zaWNrcm9jay5HZXRGb3JlaWduS2V5c1JlcXVlc3QaIC5zaWNrcm9jay5HZXRGb3JlaWduS2V5c1Jlc3BvbnNlElkKEERlbGV0ZUZvcmVpZ25LZXkSIS5zaWNrcm9jay5EZWxldGVGb3JlaWduS2V5UmVxdWVzdBoiLnNpY2tyb2NrLkRlbGV0ZUZvcmVpZ25LZXlSZXNwb25zZRJZChBDaGFuZ2VDb2x1bW5UeXBlEiEuc2lja3JvY2suQ2hhbmdlQ29sdW1uVHlwZVJlcXVlc3QaIi5zaWNrcm9jay5DaGFuZ2VDb2x1bW5UeXBlUmVzcG9uc2USRwoKRHJvcENvbHVtbhIbLnNpY2tyb2NrLkRyb3BDb2x1bW5SZXF1ZXN0Ghwuc2lja3JvY2suRHJvcENvbHVtblJlc3BvbnNlElkKEENoYW5nZUNvbHVtbk5hbWUSIS5zaWNrcm9jay5DaGFuZ2VDb2x1bW5OYW1lUmVxdWVzdBoiLnNpY2tyb2NrLkNoYW5nZUNvbHVtbk5hbWVSZXNwb25zZRJoChVHZXRNb3N0UmVjZW50bHlWaWV3ZWQSJi5zaWNrcm9jay5HZXRNb3N0UmVjZW50bHlWaWV3ZWRSZXF1ZXN0Gicuc2lja3JvY2suR2V0TW9zdFJlY2VudGx5Vmlld2VkUmVzcG9uc2USUAoNR2V0RGFzaGJvYXJkcxIeLnNpY2tyb2NrLkdldERhc2hib2FyZHNSZXF1ZXN0Gh8uc2lja3JvY2suR2V0RGFzaGJvYXJkc1Jlc3BvbnNlEncKGkdldERhc2hib2FyZENvbXBvbmVudFJ1bGVzEisuc2lja3JvY2suR2V0RGFzaGJvYXJkQ29tcG9uZW50UnVsZXNSZXF1ZXN0Giwuc2lja3JvY2suR2V0RGFzaGJvYXJkQ29tcG9uZW50UnVsZXNSZXNwb25zZRJ9ChxDcmVhdGVEYXNoYm9hcmRDb21wb25lbnRSdWxlEi0uc2lja3JvY2suQ3JlYXRlRGFzaGJvYXJkQ29tcG9uZW50UnVsZVJlcXVlc3QaLi5zaWNrcm9jay5DcmVhdGVEYXNoYm9hcmRDb21wb25lbnRSdWxlUmVzcG9uc2USUAoNR2V0U3lzdGVtSW5mbxIeLnNpY2tyb2NrLkdldFN5c3RlbUluZm9SZXF1ZXN0Gh8uc2lja3JvY2suR2V0U3lzdGVtSW5mb1Jlc3BvbnNlQpEBCgxjb20uc2lja3JvY2tCDVNpY2tyb2NrUHJvdG9QAVoyZ2l0aHViLmNvbS9qYW1lc3JlYWQvU2lja1JvY2svZ2VuL3Byb3RvO3NpY2tyb2NrcGKiAgNTWFiqAghTaWNrcm9ja8oCCFNpY2tyb2Nr4gIUU2lja3JvY2tcR1BCTWV0YWRhdGHqAghTaWNrcm9ja2IGcHJvdG8z");
 
 /**
  * @generated from message sickrock.PingRequest
@@ -234,6 +234,20 @@ export type NavigationItem = Message<"sickrock.NavigationItem"> & {
    * @generated from field: string table_view = 7;
    */
   tableView: string;
+
+  /**
+   * optional, 0 if not set
+   *
+   * @generated from field: int32 dashboard_id = 8;
+   */
+  dashboardId: number;
+
+  /**
+   * optional
+   *
+   * @generated from field: string dashboard_name = 9;
+   */
+  dashboardName: string;
 };
 
 /**
@@ -1278,6 +1292,229 @@ export const GetMostRecentlyViewedResponseSchema: GenMessage<GetMostRecentlyView
   messageDesc(file_sickrock, 51);
 
 /**
+ * Dashboards
+ *
+ * @generated from message sickrock.Dashboard
+ */
+export type Dashboard = Message<"sickrock.Dashboard"> & {
+  /**
+   * @generated from field: int32 id = 1;
+   */
+  id: number;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: repeated sickrock.DashboardComponent components = 3;
+   */
+  components: DashboardComponent[];
+};
+
+/**
+ * Describes the message sickrock.Dashboard.
+ * Use `create(DashboardSchema)` to create a new message.
+ */
+export const DashboardSchema: GenMessage<Dashboard> = /*@__PURE__*/
+  messageDesc(file_sickrock, 52);
+
+/**
+ * @generated from message sickrock.GetDashboardsRequest
+ */
+export type GetDashboardsRequest = Message<"sickrock.GetDashboardsRequest"> & {
+};
+
+/**
+ * Describes the message sickrock.GetDashboardsRequest.
+ * Use `create(GetDashboardsRequestSchema)` to create a new message.
+ */
+export const GetDashboardsRequestSchema: GenMessage<GetDashboardsRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 53);
+
+/**
+ * @generated from message sickrock.GetDashboardsResponse
+ */
+export type GetDashboardsResponse = Message<"sickrock.GetDashboardsResponse"> & {
+  /**
+   * @generated from field: repeated sickrock.Dashboard dashboards = 1;
+   */
+  dashboards: Dashboard[];
+};
+
+/**
+ * Describes the message sickrock.GetDashboardsResponse.
+ * Use `create(GetDashboardsResponseSchema)` to create a new message.
+ */
+export const GetDashboardsResponseSchema: GenMessage<GetDashboardsResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 54);
+
+/**
+ * @generated from message sickrock.DashboardComponent
+ */
+export type DashboardComponent = Message<"sickrock.DashboardComponent"> & {
+  /**
+   * @generated from field: int32 id = 1;
+   */
+  id: number;
+
+  /**
+   * @generated from field: string name = 2;
+   */
+  name: string;
+
+  /**
+   * @generated from field: string dataString = 3;
+   */
+  dataString: string;
+
+  /**
+   * @generated from field: float dataNumber = 4;
+   */
+  dataNumber: number;
+
+  /**
+   * @generated from field: string error = 5;
+   */
+  error: string;
+
+  /**
+   * @generated from field: string suffix = 6;
+   */
+  suffix: string;
+};
+
+/**
+ * Describes the message sickrock.DashboardComponent.
+ * Use `create(DashboardComponentSchema)` to create a new message.
+ */
+export const DashboardComponentSchema: GenMessage<DashboardComponent> = /*@__PURE__*/
+  messageDesc(file_sickrock, 55);
+
+/**
+ * @generated from message sickrock.DashboardComponentRule
+ */
+export type DashboardComponentRule = Message<"sickrock.DashboardComponentRule"> & {
+  /**
+   * @generated from field: int32 id = 1;
+   */
+  id: number;
+
+  /**
+   * @generated from field: int32 component = 2;
+   */
+  component: number;
+
+  /**
+   * @generated from field: int32 ordinal = 3;
+   */
+  ordinal: number;
+
+  /**
+   * @generated from field: string operation = 4;
+   */
+  operation: string;
+
+  /**
+   * @generated from field: string operand = 5;
+   */
+  operand: string;
+};
+
+/**
+ * Describes the message sickrock.DashboardComponentRule.
+ * Use `create(DashboardComponentRuleSchema)` to create a new message.
+ */
+export const DashboardComponentRuleSchema: GenMessage<DashboardComponentRule> = /*@__PURE__*/
+  messageDesc(file_sickrock, 56);
+
+/**
+ * @generated from message sickrock.GetDashboardComponentRulesRequest
+ */
+export type GetDashboardComponentRulesRequest = Message<"sickrock.GetDashboardComponentRulesRequest"> & {
+  /**
+   * filter by component id
+   *
+   * @generated from field: int32 component = 1;
+   */
+  component: number;
+};
+
+/**
+ * Describes the message sickrock.GetDashboardComponentRulesRequest.
+ * Use `create(GetDashboardComponentRulesRequestSchema)` to create a new message.
+ */
+export const GetDashboardComponentRulesRequestSchema: GenMessage<GetDashboardComponentRulesRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 57);
+
+/**
+ * @generated from message sickrock.GetDashboardComponentRulesResponse
+ */
+export type GetDashboardComponentRulesResponse = Message<"sickrock.GetDashboardComponentRulesResponse"> & {
+  /**
+   * @generated from field: repeated sickrock.DashboardComponentRule rules = 1;
+   */
+  rules: DashboardComponentRule[];
+};
+
+/**
+ * Describes the message sickrock.GetDashboardComponentRulesResponse.
+ * Use `create(GetDashboardComponentRulesResponseSchema)` to create a new message.
+ */
+export const GetDashboardComponentRulesResponseSchema: GenMessage<GetDashboardComponentRulesResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 58);
+
+/**
+ * @generated from message sickrock.CreateDashboardComponentRuleRequest
+ */
+export type CreateDashboardComponentRuleRequest = Message<"sickrock.CreateDashboardComponentRuleRequest"> & {
+  /**
+   * @generated from field: int32 component = 1;
+   */
+  component: number;
+
+  /**
+   * @generated from field: int32 ordinal = 2;
+   */
+  ordinal: number;
+
+  /**
+   * @generated from field: string operation = 3;
+   */
+  operation: string;
+
+  /**
+   * @generated from field: string operand = 4;
+   */
+  operand: string;
+};
+
+/**
+ * Describes the message sickrock.CreateDashboardComponentRuleRequest.
+ * Use `create(CreateDashboardComponentRuleRequestSchema)` to create a new message.
+ */
+export const CreateDashboardComponentRuleRequestSchema: GenMessage<CreateDashboardComponentRuleRequest> = /*@__PURE__*/
+  messageDesc(file_sickrock, 59);
+
+/**
+ * @generated from message sickrock.CreateDashboardComponentRuleResponse
+ */
+export type CreateDashboardComponentRuleResponse = Message<"sickrock.CreateDashboardComponentRuleResponse"> & {
+  /**
+   * @generated from field: sickrock.DashboardComponentRule rule = 1;
+   */
+  rule?: DashboardComponentRule;
+};
+
+/**
+ * Describes the message sickrock.CreateDashboardComponentRuleResponse.
+ * Use `create(CreateDashboardComponentRuleResponseSchema)` to create a new message.
+ */
+export const CreateDashboardComponentRuleResponseSchema: GenMessage<CreateDashboardComponentRuleResponse> = /*@__PURE__*/
+  messageDesc(file_sickrock, 60);
+
+/**
  * Build info
  *
  * @generated from message sickrock.InitRequest
@@ -1290,7 +1527,7 @@ export type InitRequest = Message<"sickrock.InitRequest"> & {
  * Use `create(InitRequestSchema)` to create a new message.
  */
 export const InitRequestSchema: GenMessage<InitRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 52);
+  messageDesc(file_sickrock, 61);
 
 /**
  * @generated from message sickrock.InitResponse
@@ -1322,7 +1559,7 @@ export type InitResponse = Message<"sickrock.InitResponse"> & {
  * Use `create(InitResponseSchema)` to create a new message.
  */
 export const InitResponseSchema: GenMessage<InitResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 53);
+  messageDesc(file_sickrock, 62);
 
 /**
  * Authentication
@@ -1346,7 +1583,7 @@ export type LoginRequest = Message<"sickrock.LoginRequest"> & {
  * Use `create(LoginRequestSchema)` to create a new message.
  */
 export const LoginRequestSchema: GenMessage<LoginRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 54);
+  messageDesc(file_sickrock, 63);
 
 /**
  * @generated from message sickrock.LoginResponse
@@ -1380,7 +1617,7 @@ export type LoginResponse = Message<"sickrock.LoginResponse"> & {
  * Use `create(LoginResponseSchema)` to create a new message.
  */
 export const LoginResponseSchema: GenMessage<LoginResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 55);
+  messageDesc(file_sickrock, 64);
 
 /**
  * @generated from message sickrock.LogoutRequest
@@ -1393,7 +1630,7 @@ export type LogoutRequest = Message<"sickrock.LogoutRequest"> & {
  * Use `create(LogoutRequestSchema)` to create a new message.
  */
 export const LogoutRequestSchema: GenMessage<LogoutRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 56);
+  messageDesc(file_sickrock, 65);
 
 /**
  * @generated from message sickrock.LogoutResponse
@@ -1415,7 +1652,7 @@ export type LogoutResponse = Message<"sickrock.LogoutResponse"> & {
  * Use `create(LogoutResponseSchema)` to create a new message.
  */
 export const LogoutResponseSchema: GenMessage<LogoutResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 57);
+  messageDesc(file_sickrock, 66);
 
 /**
  * @generated from message sickrock.ResetUserPasswordRequest
@@ -1437,7 +1674,7 @@ export type ResetUserPasswordRequest = Message<"sickrock.ResetUserPasswordReques
  * Use `create(ResetUserPasswordRequestSchema)` to create a new message.
  */
 export const ResetUserPasswordRequestSchema: GenMessage<ResetUserPasswordRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 58);
+  messageDesc(file_sickrock, 67);
 
 /**
  * @generated from message sickrock.ResetUserPasswordResponse
@@ -1459,7 +1696,7 @@ export type ResetUserPasswordResponse = Message<"sickrock.ResetUserPasswordRespo
  * Use `create(ResetUserPasswordResponseSchema)` to create a new message.
  */
 export const ResetUserPasswordResponseSchema: GenMessage<ResetUserPasswordResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 59);
+  messageDesc(file_sickrock, 68);
 
 /**
  * @generated from message sickrock.ValidateTokenRequest
@@ -1476,7 +1713,7 @@ export type ValidateTokenRequest = Message<"sickrock.ValidateTokenRequest"> & {
  * Use `create(ValidateTokenRequestSchema)` to create a new message.
  */
 export const ValidateTokenRequestSchema: GenMessage<ValidateTokenRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 60);
+  messageDesc(file_sickrock, 69);
 
 /**
  * @generated from message sickrock.ValidateTokenResponse
@@ -1508,7 +1745,7 @@ export type ValidateTokenResponse = Message<"sickrock.ValidateTokenResponse"> & 
  * Use `create(ValidateTokenResponseSchema)` to create a new message.
  */
 export const ValidateTokenResponseSchema: GenMessage<ValidateTokenResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 61);
+  messageDesc(file_sickrock, 70);
 
 /**
  * Device Code Authentication
@@ -1523,7 +1760,7 @@ export type GenerateDeviceCodeRequest = Message<"sickrock.GenerateDeviceCodeRequ
  * Use `create(GenerateDeviceCodeRequestSchema)` to create a new message.
  */
 export const GenerateDeviceCodeRequestSchema: GenMessage<GenerateDeviceCodeRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 62);
+  messageDesc(file_sickrock, 71);
 
 /**
  * @generated from message sickrock.GenerateDeviceCodeResponse
@@ -1547,7 +1784,7 @@ export type GenerateDeviceCodeResponse = Message<"sickrock.GenerateDeviceCodeRes
  * Use `create(GenerateDeviceCodeResponseSchema)` to create a new message.
  */
 export const GenerateDeviceCodeResponseSchema: GenMessage<GenerateDeviceCodeResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 63);
+  messageDesc(file_sickrock, 72);
 
 /**
  * @generated from message sickrock.ClaimDeviceCodeRequest
@@ -1564,7 +1801,7 @@ export type ClaimDeviceCodeRequest = Message<"sickrock.ClaimDeviceCodeRequest"> 
  * Use `create(ClaimDeviceCodeRequestSchema)` to create a new message.
  */
 export const ClaimDeviceCodeRequestSchema: GenMessage<ClaimDeviceCodeRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 64);
+  messageDesc(file_sickrock, 73);
 
 /**
  * @generated from message sickrock.ClaimDeviceCodeResponse
@@ -1598,7 +1835,7 @@ export type ClaimDeviceCodeResponse = Message<"sickrock.ClaimDeviceCodeResponse"
  * Use `create(ClaimDeviceCodeResponseSchema)` to create a new message.
  */
 export const ClaimDeviceCodeResponseSchema: GenMessage<ClaimDeviceCodeResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 65);
+  messageDesc(file_sickrock, 74);
 
 /**
  * @generated from message sickrock.CheckDeviceCodeRequest
@@ -1615,7 +1852,7 @@ export type CheckDeviceCodeRequest = Message<"sickrock.CheckDeviceCodeRequest"> 
  * Use `create(CheckDeviceCodeRequestSchema)` to create a new message.
  */
 export const CheckDeviceCodeRequestSchema: GenMessage<CheckDeviceCodeRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 66);
+  messageDesc(file_sickrock, 75);
 
 /**
  * @generated from message sickrock.CheckDeviceCodeResponse
@@ -1658,7 +1895,7 @@ export type CheckDeviceCodeResponse = Message<"sickrock.CheckDeviceCodeResponse"
  * Use `create(CheckDeviceCodeResponseSchema)` to create a new message.
  */
 export const CheckDeviceCodeResponseSchema: GenMessage<CheckDeviceCodeResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 67);
+  messageDesc(file_sickrock, 76);
 
 /**
  * @generated from message sickrock.GetDeviceCodeSessionRequest
@@ -1675,7 +1912,7 @@ export type GetDeviceCodeSessionRequest = Message<"sickrock.GetDeviceCodeSession
  * Use `create(GetDeviceCodeSessionRequestSchema)` to create a new message.
  */
 export const GetDeviceCodeSessionRequestSchema: GenMessage<GetDeviceCodeSessionRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 68);
+  messageDesc(file_sickrock, 77);
 
 /**
  * @generated from message sickrock.GetDeviceCodeSessionResponse
@@ -1714,7 +1951,7 @@ export type GetDeviceCodeSessionResponse = Message<"sickrock.GetDeviceCodeSessio
  * Use `create(GetDeviceCodeSessionResponseSchema)` to create a new message.
  */
 export const GetDeviceCodeSessionResponseSchema: GenMessage<GetDeviceCodeSessionResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 69);
+  messageDesc(file_sickrock, 78);
 
 /**
  * System Info
@@ -1729,7 +1966,7 @@ export type GetSystemInfoRequest = Message<"sickrock.GetSystemInfoRequest"> & {
  * Use `create(GetSystemInfoRequestSchema)` to create a new message.
  */
 export const GetSystemInfoRequestSchema: GenMessage<GetSystemInfoRequest> = /*@__PURE__*/
-  messageDesc(file_sickrock, 70);
+  messageDesc(file_sickrock, 79);
 
 /**
  * @generated from message sickrock.GetSystemInfoResponse
@@ -1746,7 +1983,7 @@ export type GetSystemInfoResponse = Message<"sickrock.GetSystemInfoResponse"> & 
  * Use `create(GetSystemInfoResponseSchema)` to create a new message.
  */
 export const GetSystemInfoResponseSchema: GenMessage<GetSystemInfoResponse> = /*@__PURE__*/
-  messageDesc(file_sickrock, 71);
+  messageDesc(file_sickrock, 80);
 
 /**
  * @generated from service sickrock.SickRock
@@ -2023,6 +2260,34 @@ export const SickRock: GenService<{
     methodKind: "unary";
     input: typeof GetMostRecentlyViewedRequestSchema;
     output: typeof GetMostRecentlyViewedResponseSchema;
+  },
+  /**
+   * Dashboards
+   *
+   * @generated from rpc sickrock.SickRock.GetDashboards
+   */
+  getDashboards: {
+    methodKind: "unary";
+    input: typeof GetDashboardsRequestSchema;
+    output: typeof GetDashboardsResponseSchema;
+  },
+  /**
+   * Dashboard Component Rules
+   *
+   * @generated from rpc sickrock.SickRock.GetDashboardComponentRules
+   */
+  getDashboardComponentRules: {
+    methodKind: "unary";
+    input: typeof GetDashboardComponentRulesRequestSchema;
+    output: typeof GetDashboardComponentRulesResponseSchema;
+  },
+  /**
+   * @generated from rpc sickrock.SickRock.CreateDashboardComponentRule
+   */
+  createDashboardComponentRule: {
+    methodKind: "unary";
+    input: typeof CreateDashboardComponentRuleRequestSchema;
+    output: typeof CreateDashboardComponentRuleResponseSchema;
   },
   /**
    * System Info
