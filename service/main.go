@@ -219,6 +219,8 @@ func runMigrations(db *sqlx.DB) error {
 	switch driverName {
 	case "mysql":
 		migDir = filepath.Join(cwd, "migrations", "mysql")
+
+		log.Infof("MySQL detected - migrations dir: %s", migDir)
 		databaseName = "mysql"
 		md, err := mysql.WithInstance(sqlDB, &mysql.Config{})
 		if err != nil {

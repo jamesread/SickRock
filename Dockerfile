@@ -8,8 +8,10 @@ ENV GIN_MODE=release
 
 COPY frontend/dist/ ./www/
 
-COPY SickRock /SickRock
+COPY service/migrations/ /app/migrations/
+
+COPY SickRock /app/SickRock
 
 VOLUME [ "/config" ]
 
-ENTRYPOINT [ "/SickRock" ]
+ENTRYPOINT [ "/app/SickRock" ]
