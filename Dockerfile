@@ -14,4 +14,6 @@ COPY SickRock /app/SickRock
 
 VOLUME [ "/config" ]
 
+WORKDIR /app
+
 ENTRYPOINT [ "/app/SickRock" ]
