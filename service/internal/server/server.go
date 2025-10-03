@@ -12,6 +12,7 @@ import (
 	"github.com/expr-lang/expr"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
+	"github.com/jamesread/SickRock/internal/auth"
 	"github.com/jamesread/SickRock/internal/buildinfo"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	log "github.com/sirupsen/logrus"
@@ -25,8 +26,28 @@ func NewSickRockServer(r *repo.Repository) *SickRockServer {
 	return &SickRockServer{repo: r}
 }
 
+// getUserIDFromContext extracts the user ID from the context
+func (s *SickRockServer) getUserIDFromContext(ctx context.Context) (int, error) {
+	authService := auth.NewAuthService(s.repo)
+	username, err := authService.GetUserFromContext(ctx)
+	if err != nil {
+		return 0, err
+	}
+
+	user, err := s.repo.GetUserByUsername(ctx, username)
+	if err != nil {
+		return 0, err
+	}
+	if user == nil {
+		return 0, fmt.Errorf("user not found")
+	}
+
+	return user.ID, nil
+}
+
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
+
 	res := connect.NewResponse(&sickrockpb.InitResponse{
 		Version: buildinfo.Version,
 		Commit:  buildinfo.Commit,
@@ -104,10 +125,61 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 				return 0
 			}(),
 			DashboardName: item.DashboardName.String,
+			Title:         item.Navigation.String,
 		})
 	}
 
-	res := connect.NewResponse(&sickrockpb.GetNavigationResponse{Items: navigationItems})
+	// Get user bookmarks if authenticated
+	var bookmarks []*sickrockpb.UserBookmark
+	userID, err := s.getUserIDFromContext(ctx)
+	if err == nil && userID > 0 {
+		// User is authenticated, get their bookmarks
+		userBookmarks, err := s.repo.GetUserBookmarks(ctx, userID)
+		if err != nil {
+			log.Warnf("Failed to load user bookmarks: %v", err)
+		} else {
+			// Convert to protobuf format
+			for _, bookmark := range userBookmarks {
+				var navItem *sickrockpb.NavigationItem
+				if bookmark.NavigationItem != nil {
+					navItem = &sickrockpb.NavigationItem{
+						Id:      int32(bookmark.NavigationItem.ID),
+						Ordinal: int32(bookmark.NavigationItem.Ordinal),
+						TableConfiguration: func() int32 {
+							if bookmark.NavigationItem.TableConfiguration.Valid {
+								return int32(bookmark.NavigationItem.TableConfiguration.Int64)
+							}
+							return 0
+						}(),
+						TableName:  bookmark.NavigationItem.TableName.String,
+						TableTitle: bookmark.NavigationItem.TableTitle.String,
+						TableIcon:  bookmark.NavigationItem.TableIcon.String,
+						TableView:  bookmark.NavigationItem.TableView.String,
+						DashboardId: func() int32 {
+							if bookmark.NavigationItem.DashboardID.Valid {
+								return int32(bookmark.NavigationItem.DashboardID.Int64)
+							}
+							return 0
+						}(),
+						DashboardName: bookmark.NavigationItem.DashboardName.String,
+						Title:         bookmark.NavigationItem.Navigation.String,
+					}
+				}
+
+				bookmarks = append(bookmarks, &sickrockpb.UserBookmark{
+					Id:               int32(bookmark.ID),
+					UserId:           int32(bookmark.UserID),
+					NavigationItemId: int32(bookmark.NavigationItemID),
+					NavigationItem:   navItem,
+				})
+			}
+		}
+	}
+
+	res := connect.NewResponse(&sickrockpb.GetNavigationResponse{
+		Items:     navigationItems,
+		Bookmarks: bookmarks,
+	})
 	return res, nil
 }
 
@@ -319,18 +391,19 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 }
 
 func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Request[sickrockpb.AddTableColumnRequest]) (*connect.Response[sickrockpb.GetTableStructureResponse], error) {
-	table := req.Msg.GetPageId()
-	if table == "" {
-		table = "items"
+	tc, err := s.repo.GetTableConfiguration(ctx, req.Msg.GetPageId())
+	if err != nil {
+		return nil, err
 	}
-	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
+
+	if err := s.repo.EnsureSchemaForTable(ctx, tc.Table.String); err != nil {
 		return nil, err
 	}
 	f := req.Msg.GetField()
 	if f == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("field required"))
 	}
-	err := s.repo.AddColumn(ctx, table, repo.FieldSpec{
+	err = s.repo.AddColumn(ctx, tc.Db.String, tc.Table.String, repo.FieldSpec{
 		Name:                      f.GetName(),
 		Type:                      f.GetType(),
 		Required:                  f.GetRequired(),
@@ -339,7 +412,7 @@ func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Reques
 	if err != nil {
 		return nil, err
 	}
-	return s.GetTableStructure(ctx, &connect.Request[sickrockpb.GetTableStructureRequest]{Msg: &sickrockpb.GetTableStructureRequest{PageId: table}})
+	return s.GetTableStructure(ctx, &connect.Request[sickrockpb.GetTableStructureRequest]{Msg: &sickrockpb.GetTableStructureRequest{PageId: req.Msg.GetPageId()}})
 }
 
 func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Request[sickrockpb.CreateTableViewRequest]) (*connect.Response[sickrockpb.CreateTableViewResponse], error) {
@@ -905,4 +978,126 @@ func (s *SickRockServer) CreateDashboardComponentRule(ctx context.Context, req *
 		Operation: rule.Operation,
 		Operand:   rule.Operand,
 	}}), nil
+}
+
+// GetUserBookmarks retrieves all bookmarks for the authenticated user
+func (s *SickRockServer) GetUserBookmarks(ctx context.Context, req *connect.Request[sickrockpb.GetUserBookmarksRequest]) (*connect.Response[sickrockpb.GetUserBookmarksResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	bookmarks, err := s.repo.GetUserBookmarks(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	pbBookmarks := make([]*sickrockpb.UserBookmark, 0, len(bookmarks))
+	for _, bookmark := range bookmarks {
+		var navItem *sickrockpb.NavigationItem
+		if bookmark.NavigationItem != nil {
+			navItem = &sickrockpb.NavigationItem{
+				Id:      int32(bookmark.NavigationItem.ID),
+				Ordinal: int32(bookmark.NavigationItem.Ordinal),
+				TableConfiguration: func() int32 {
+					if bookmark.NavigationItem.TableConfiguration.Valid {
+						return int32(bookmark.NavigationItem.TableConfiguration.Int64)
+					}
+					return 0
+				}(),
+				TableName:  bookmark.NavigationItem.TableName.String,
+				TableTitle: bookmark.NavigationItem.TableTitle.String,
+				TableIcon:  bookmark.NavigationItem.TableIcon.String,
+				TableView:  bookmark.NavigationItem.TableView.String,
+				DashboardId: func() int32 {
+					if bookmark.NavigationItem.DashboardID.Valid {
+						return int32(bookmark.NavigationItem.DashboardID.Int64)
+					}
+					return 0
+				}(),
+				DashboardName: bookmark.NavigationItem.DashboardName.String,
+			}
+		}
+
+		pbBookmarks = append(pbBookmarks, &sickrockpb.UserBookmark{
+			Id:               int32(bookmark.ID),
+			UserId:           int32(bookmark.UserID),
+			NavigationItemId: int32(bookmark.NavigationItemID),
+			NavigationItem:   navItem,
+		})
+	}
+
+	return connect.NewResponse(&sickrockpb.GetUserBookmarksResponse{Bookmarks: pbBookmarks}), nil
+}
+
+// CreateUserBookmark creates a new bookmark for the authenticated user
+func (s *SickRockServer) CreateUserBookmark(ctx context.Context, req *connect.Request[sickrockpb.CreateUserBookmarkRequest]) (*connect.Response[sickrockpb.CreateUserBookmarkResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	navigationItemID := int(req.Msg.GetNavigationItemId())
+	if navigationItemID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("navigation item ID is required"))
+	}
+
+	bookmark, err := s.repo.CreateUserBookmark(ctx, userID, navigationItemID)
+	if err != nil {
+		return nil, err
+	}
+
+	var navItem *sickrockpb.NavigationItem
+	if bookmark.NavigationItem != nil {
+		navItem = &sickrockpb.NavigationItem{
+			Id:      int32(bookmark.NavigationItem.ID),
+			Ordinal: int32(bookmark.NavigationItem.Ordinal),
+			TableConfiguration: func() int32 {
+				if bookmark.NavigationItem.TableConfiguration.Valid {
+					return int32(bookmark.NavigationItem.TableConfiguration.Int64)
+				}
+				return 0
+			}(),
+			TableName:  bookmark.NavigationItem.TableName.String,
+			TableTitle: bookmark.NavigationItem.TableTitle.String,
+			TableIcon:  bookmark.NavigationItem.TableIcon.String,
+			TableView:  bookmark.NavigationItem.TableView.String,
+			DashboardId: func() int32 {
+				if bookmark.NavigationItem.DashboardID.Valid {
+					return int32(bookmark.NavigationItem.DashboardID.Int64)
+				}
+				return 0
+			}(),
+			DashboardName: bookmark.NavigationItem.DashboardName.String,
+		}
+	}
+
+	pbBookmark := &sickrockpb.UserBookmark{
+		Id:               int32(bookmark.ID),
+		UserId:           int32(bookmark.UserID),
+		NavigationItemId: int32(bookmark.NavigationItemID),
+		NavigationItem:   navItem,
+	}
+
+	return connect.NewResponse(&sickrockpb.CreateUserBookmarkResponse{Bookmark: pbBookmark}), nil
+}
+
+// DeleteUserBookmark removes a bookmark for the authenticated user
+func (s *SickRockServer) DeleteUserBookmark(ctx context.Context, req *connect.Request[sickrockpb.DeleteUserBookmarkRequest]) (*connect.Response[sickrockpb.DeleteUserBookmarkResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	bookmarkID := int(req.Msg.GetBookmarkId())
+	if bookmarkID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("bookmark ID is required"))
+	}
+
+	err = s.repo.DeleteUserBookmark(ctx, userID, bookmarkID)
+	if err != nil {
+		return nil, err
+	}
+
+	return connect.NewResponse(&sickrockpb.DeleteUserBookmarkResponse{Deleted: true}), nil
 }

@@ -19,6 +19,7 @@ import DeviceCodeClaimerView from './views/DeviceCodeClaimerView.vue'
 import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
 import DashboardListView from './views/DashboardListView.vue'
 import Dashboard from './views/Dashboard.vue'
+import UserPreferences from './views/UserPreferences.vue'
 import { useAuthStore } from './stores/auth'
 
 const router = createRouter({
@@ -72,6 +73,12 @@ const router = createRouter({
       path: '/about',
       name: 'about',
       component: AboutView,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/user-preferences',
+      name: 'user-preferences',
+      component: UserPreferences,
       meta: { requiresAuth: true }
     },
     {

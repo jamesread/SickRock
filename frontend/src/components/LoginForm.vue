@@ -243,7 +243,7 @@ h2 {
 
 section {
   max-width: 400px;
-  margin: 10em auto;
+  margin: 3em auto;
 }
 
 .login-tabs {

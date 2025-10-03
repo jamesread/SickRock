@@ -200,6 +200,7 @@ type NavigationItem struct {
 	TableView          sql.NullString
 	DashboardID        sql.NullInt64
 	DashboardName      sql.NullString
+	Navigation         sql.NullString
 }
 
 func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error) {
@@ -213,7 +214,8 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			tc.icon as table_icon,
             tc.view as table_view,
             tn.dashboard_id as dashboard_id,
-            td.name as dashboard_name
+            td.name as dashboard_name,
+            tn.name as navigation
 		FROM table_navigation tn
 		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
         LEFT JOIN table_dashboards td ON tn.dashboard_id = td.id
@@ -239,6 +241,7 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			&item.TableView,
 			&item.DashboardID,
 			&item.DashboardName,
+			&item.Navigation,
 		); err != nil {
 			return nil, err
 		}
@@ -555,23 +558,27 @@ func sanitizeTableName(input string) string {
 
 // EnsureSchemaForTable creates the table if it doesn't exist.
 func (r *Repository) EnsureSchemaForTable(ctx context.Context, table string) error {
-	t := sanitizeTableName(table)
+	tc, err := r.GetTableConfiguration(ctx, table)
+	if err != nil {
+		return err
+	}
+
 	var schema string
 	switch r.db.DriverName() {
 	case "mysql":
 		schema = fmt.Sprintf(`
-CREATE TABLE IF NOT EXISTS %s (
+CREATE TABLE IF NOT EXISTS %s.%s (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     sr_created DATETIME DEFAULT CURRENT_TIMESTAMP
-);`, t)
+);`, tc.Db.String, tc.Table.String)
 	default:
 		schema = fmt.Sprintf(`
-CREATE TABLE IF NOT EXISTS %s (
+CREATE TABLE IF NOT EXISTS %s.%s (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     sr_created DATETIME DEFAULT CURRENT_TIMESTAMP
-);`, t)
+;`, tc.Db.String, tc.Table.String)
 	}
-	_, err := r.db.ExecContext(ctx, schema)
+	_, err = r.db.ExecContext(ctx, schema)
 	if err != nil {
 		return err
 	}
@@ -579,21 +586,21 @@ CREATE TABLE IF NOT EXISTS %s (
 	// Add sr_created column if it doesn't exist (for existing tables)
 	switch r.db.DriverName() {
 	case "mysql":
-		alterQuery := fmt.Sprintf("ALTER TABLE %s ADD COLUMN IF NOT EXISTS sr_created DATETIME DEFAULT CURRENT_TIMESTAMP", t)
+		alterQuery := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN IF NOT EXISTS sr_created DATETIME DEFAULT CURRENT_TIMESTAMP", tc.Db.String, tc.Table.String)
 		_, err = r.db.ExecContext(ctx, alterQuery)
 		if err != nil {
-			log.Warnf("Failed to add sr_created column to table %s: %v", t, err)
+			log.Warnf("Failed to add sr_created column to table %s: %v", tc.Table.String, err)
 		}
 	default:
 		// SQLite doesn't support IF NOT EXISTS in ALTER TABLE, so we'll check if column exists first
 		var count int
-		checkQuery := fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name='sr_created'", t)
+		checkQuery := fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name='sr_created'", tc.Table.String)
 		err = r.db.GetContext(ctx, &count, checkQuery)
 		if err == nil && count == 0 {
-			alterQuery := fmt.Sprintf("ALTER TABLE %s ADD COLUMN sr_created DATETIME DEFAULT CURRENT_TIMESTAMP", t)
+			alterQuery := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN sr_created DATETIME DEFAULT CURRENT_TIMESTAMP", tc.Db.String, tc.Table.String)
 			_, err = r.db.ExecContext(ctx, alterQuery)
 			if err != nil {
-				log.Warnf("Failed to add sr_created column to table %s: %v", t, err)
+				log.Warnf("Failed to add sr_created column to table %s: %v", tc.Table.String, err)
 			}
 		}
 	}
@@ -601,7 +608,7 @@ CREATE TABLE IF NOT EXISTS %s (
 	return nil
 }
 
-func (r *Repository) AddColumn(ctx context.Context, table string, field FieldSpec) error {
+func (r *Repository) AddColumn(ctx context.Context, db, table string, field FieldSpec) error {
 	t := sanitizeTableName(table)
 	col := sanitizeTableName(field.Name)
 	typ := "TEXT"
@@ -635,7 +642,7 @@ func (r *Repository) AddColumn(ctx context.Context, table string, field FieldSpe
 		notNull = " NOT NULL"
 	}
 
-	query := fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s%s%s", t, col, typ, notNull, defaultClause)
+	query := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN %s %s%s%s", db, t, col, typ, notNull, defaultClause)
 	_, err := r.db.ExecContext(ctx, query)
 	return err
 }
@@ -1304,6 +1311,16 @@ func (r *Repository) CreateForeignKey(ctx context.Context, tableName, columnName
 	col := sanitizeTableName(columnName)
 	refCol := sanitizeTableName(referencedColumn)
 
+	tc, err := r.GetTableConfiguration(ctx, tableName)
+	if err != nil {
+		return err
+	}
+
+	tcRef, err := r.GetTableConfiguration(ctx, referencedTable)
+	if err != nil {
+		return err
+	}
+
 	// Generate constraint name
 	constraintName := fmt.Sprintf("fk_%s_%s_%s_%s", t, col, refTable, refCol)
 
@@ -1312,27 +1329,31 @@ func (r *Repository) CreateForeignKey(ctx context.Context, tableName, columnName
 	switch r.db.DriverName() {
 	case "mysql":
 		alterQuery = fmt.Sprintf(
-			"ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s(%s) ON DELETE %s ON UPDATE %s",
-			t, constraintName, col, refTable, refCol, onDeleteAction, onUpdateAction,
+			"ALTER TABLE %s.%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s(%s) ON DELETE %s ON UPDATE %s",
+			tc.Db.String, tc.Table.String, constraintName, col, tcRef.Db.String, tcRef.Table.String, refCol, onDeleteAction, onUpdateAction,
 		)
 
 	default: // SQLite
 		// SQLite has limited foreign key support, but we can still create the constraint
 		alterQuery = fmt.Sprintf(
-			"ALTER TABLE %s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s(%s) ON DELETE %s ON UPDATE %s",
-			t, constraintName, col, refTable, refCol, onDeleteAction, onUpdateAction,
+			"ALTER TABLE %s.%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s(%s) ON DELETE %s ON UPDATE %s",
+			tc.Db.String, tc.Table.String, constraintName, col, tcRef.Db.String, tcRef.Table.String, refCol, onDeleteAction, onUpdateAction,
 		)
 	}
 
 	log.Infof("Creating foreign key: %s", alterQuery)
 
-	_, err := r.db.ExecContext(ctx, alterQuery)
+	_, err = r.db.ExecContext(ctx, alterQuery)
 	return err
 }
 
 // GetForeignKeys retrieves all foreign keys for a given table (bidirectional)
 func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]ForeignKey, error) {
-	t := sanitizeTableName(tableName)
+	tc, err := r.GetTableConfiguration(ctx, tableName)
+	if err != nil {
+		return nil, err
+	}
+
 	var foreignKeys []ForeignKey
 
 	switch r.db.DriverName() {
@@ -1353,17 +1374,13 @@ func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]Fo
 				AND kcu.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
 			WHERE kcu.TABLE_SCHEMA = DATABASE()
 			AND (kcu.TABLE_NAME = ? OR kcu.REFERENCED_TABLE_NAME = ?)
+			AND kcu.TABLE_SCHEMA = ?
 			AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
 			ORDER BY kcu.CONSTRAINT_NAME`
 
 		log.Tracef("GetForeignKeys Query: %v", query)
 
-		var dbName string
-		if err := r.db.GetContext(ctx, &dbName, "SELECT DATABASE()"); err != nil {
-			return nil, err
-		}
-
-		rows, err := r.db.QueryxContext(ctx, query, t, t)
+		rows, err := r.db.QueryxContext(ctx, query, tc.Table.String, tc.Table.String, tc.Db.String)
 		if err != nil {
 			return nil, err
 		}
@@ -1421,14 +1438,18 @@ func (r *Repository) DeleteForeignKey(ctx context.Context, constraintName string
 
 // ChangeColumnType changes the data type of a column
 func (r *Repository) ChangeColumnType(ctx context.Context, tableName, columnName, newType string) error {
-	t := sanitizeTableName(tableName)
+	tc, err := r.GetTableConfiguration(ctx, tableName)
+	if err != nil {
+		return err
+	}
+
 	col := sanitizeTableName(columnName)
 
 	// Use the newType directly as it's now a native database type
 	dbType := newType
 
 	// Build the ALTER TABLE statement
-	alterQuery := fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s", t, col, dbType)
+	alterQuery := fmt.Sprintf("ALTER TABLE %s.%s MODIFY COLUMN %s %s", tc.Db.String, tc.Table.String, col, dbType)
 
 	// For SQLite, we need to use a different approach since it doesn't support MODIFY COLUMN
 	if r.db.DriverName() == "sqlite" {
@@ -1439,33 +1460,41 @@ func (r *Repository) ChangeColumnType(ctx context.Context, tableName, columnName
 		return fmt.Errorf("column type changes are not fully supported in SQLite. Please recreate the table with the desired column types")
 	}
 
-	_, err := r.db.ExecContext(ctx, alterQuery)
+	_, err = r.db.ExecContext(ctx, alterQuery)
 	return err
 }
 
 // DropColumn drops a column from a table
 func (r *Repository) DropColumn(ctx context.Context, tableName, columnName string) error {
-	t := sanitizeTableName(tableName)
+	tc, err := r.GetTableConfiguration(ctx, tableName)
+	if err != nil {
+		return err
+	}
+
 	col := sanitizeTableName(columnName)
 
 	// Build the ALTER TABLE statement
 	var alterQuery string
 	switch r.db.DriverName() {
 	case "mysql":
-		alterQuery = fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s", t, col)
+		alterQuery = fmt.Sprintf("ALTER TABLE %s.%s DROP COLUMN %s", tc.Db.String, tc.Table.String, col)
 	default: // SQLite
 		// SQLite doesn't support DROP COLUMN directly in older versions
 		// For now, we'll return an error indicating this feature isn't fully supported in SQLite
 		return fmt.Errorf("column dropping is not fully supported in SQLite. Please recreate the table without the unwanted column")
 	}
 
-	_, err := r.db.ExecContext(ctx, alterQuery)
+	_, err = r.db.ExecContext(ctx, alterQuery)
 	return err
 }
 
 // ChangeColumnName renames a column in a table
 func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnName, newColumnName string) error {
-	t := sanitizeTableName(tableName)
+	tc, err := r.GetTableConfiguration(ctx, tableName)
+	if err != nil {
+		return err
+	}
+
 	oldCol := sanitizeTableName(oldColumnName)
 	newCol := sanitizeTableName(newColumnName)
 
@@ -1476,12 +1505,12 @@ func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnN
 	var alterQuery string
 	switch r.db.DriverName() {
 	case "mysql":
-		alterQuery = fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s", t, oldCol, newCol)
+		alterQuery = fmt.Sprintf("ALTER TABLE %s.%s RENAME COLUMN %s TO %s", tc.Db.String, tc.Table.String, oldCol, newCol)
 	default: // SQLite
 		return fmt.Errorf("column renaming is not fully supported in SQLite in this implementation")
 	}
 
-	_, err := r.db.ExecContext(ctx, alterQuery)
+	_, err = r.db.ExecContext(ctx, alterQuery)
 	return err
 }
 
@@ -1628,4 +1657,133 @@ func (r *Repository) GetApproxTotalRows(ctx context.Context) (int64, error) {
 		// Optional: Could iterate tables and SUM COUNT(*) but that would be heavy.
 		return 0, nil
 	}
+}
+
+// UserBookmark represents a user bookmark
+type UserBookmark struct {
+	ID               int
+	UserID           int
+	NavigationItemID int
+	NavigationItem   *NavigationItem
+}
+
+// GetUserBookmarks retrieves all bookmarks for a specific user
+func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBookmark, error) {
+	query := `
+		SELECT
+			ub.id,
+			ub.user,
+			ub.navigation_item,
+			tn.id as nav_id,
+			tn.ordinal,
+			tn.table_configuration,
+			tc.name as table_name,
+			COALESCE(tc.title, tc.name) as table_title,
+			tc.icon as table_icon,
+			tc.view as table_view,
+			tn.dashboard_id as dashboard_id,
+			td.name as dashboard_name
+		FROM table_user_bookmarks ub
+		LEFT JOIN table_navigation tn ON ub.navigation_item = tn.id
+		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
+		LEFT JOIN table_dashboards td ON tn.dashboard_id = td.id
+		WHERE ub.user = ?
+		ORDER BY ub.id DESC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var bookmarks []UserBookmark
+	for rows.Next() {
+		var bookmark UserBookmark
+		var navItem NavigationItem
+		err := rows.Scan(
+			&bookmark.ID,
+			&bookmark.UserID,
+			&bookmark.NavigationItemID,
+			&navItem.ID,
+			&navItem.Ordinal,
+			&navItem.TableConfiguration,
+			&navItem.TableName,
+			&navItem.TableTitle,
+			&navItem.TableIcon,
+			&navItem.TableView,
+			&navItem.DashboardID,
+			&navItem.DashboardName,
+		)
+		if err != nil {
+			return nil, err
+		}
+		bookmark.NavigationItem = &navItem
+		bookmarks = append(bookmarks, bookmark)
+	}
+
+	return bookmarks, rows.Err()
+}
+
+// CreateUserBookmark creates a new bookmark for a user
+func (r *Repository) CreateUserBookmark(ctx context.Context, userID, navigationItemID int) (*UserBookmark, error) {
+	// Check if bookmark already exists
+	var count int
+	err := r.db.GetContext(ctx, &count,
+		"SELECT COUNT(*) FROM table_user_bookmarks WHERE user = ? AND navigation_item = ?",
+		userID, navigationItemID)
+	if err != nil {
+		return nil, err
+	}
+	if count > 0 {
+		return nil, fmt.Errorf("bookmark already exists")
+	}
+
+	// Insert new bookmark
+	result, err := r.db.ExecContext(ctx,
+		"INSERT INTO table_user_bookmarks (user, navigation_item) VALUES (?, ?)",
+		userID, navigationItemID)
+	if err != nil {
+		return nil, err
+	}
+
+	bookmarkID, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	// Get the created bookmark with navigation item details
+	bookmarks, err := r.GetUserBookmarks(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, bookmark := range bookmarks {
+		if bookmark.ID == int(bookmarkID) {
+			return &bookmark, nil
+		}
+	}
+
+	return nil, fmt.Errorf("failed to retrieve created bookmark")
+}
+
+// DeleteUserBookmark removes a bookmark for a user
+func (r *Repository) DeleteUserBookmark(ctx context.Context, userID, bookmarkID int) error {
+	result, err := r.db.ExecContext(ctx,
+		"DELETE FROM table_user_bookmarks WHERE id = ? AND user = ?",
+		bookmarkID, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("bookmark not found or not owned by user")
+	}
+
+	return nil
 }

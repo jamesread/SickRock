@@ -121,6 +121,15 @@ const (
 	SickRockCreateDashboardComponentRuleProcedure = "/sickrock.SickRock/CreateDashboardComponentRule"
 	// SickRockGetSystemInfoProcedure is the fully-qualified name of the SickRock's GetSystemInfo RPC.
 	SickRockGetSystemInfoProcedure = "/sickrock.SickRock/GetSystemInfo"
+	// SickRockGetUserBookmarksProcedure is the fully-qualified name of the SickRock's GetUserBookmarks
+	// RPC.
+	SickRockGetUserBookmarksProcedure = "/sickrock.SickRock/GetUserBookmarks"
+	// SickRockCreateUserBookmarkProcedure is the fully-qualified name of the SickRock's
+	// CreateUserBookmark RPC.
+	SickRockCreateUserBookmarkProcedure = "/sickrock.SickRock/CreateUserBookmark"
+	// SickRockDeleteUserBookmarkProcedure is the fully-qualified name of the SickRock's
+	// DeleteUserBookmark RPC.
+	SickRockDeleteUserBookmarkProcedure = "/sickrock.SickRock/DeleteUserBookmark"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -175,6 +184,10 @@ type SickRockClient interface {
 	CreateDashboardComponentRule(context.Context, *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error)
 	// System Info
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
+	// User Bookmarks
+	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
+	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
+	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -398,6 +411,24 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("GetSystemInfo")),
 			connect.WithClientOptions(opts...),
 		),
+		getUserBookmarks: connect.NewClient[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse](
+			httpClient,
+			baseURL+SickRockGetUserBookmarksProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUserBookmarks")),
+			connect.WithClientOptions(opts...),
+		),
+		createUserBookmark: connect.NewClient[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse](
+			httpClient,
+			baseURL+SickRockCreateUserBookmarkProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateUserBookmark")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteUserBookmark: connect.NewClient[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse](
+			httpClient,
+			baseURL+SickRockDeleteUserBookmarkProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteUserBookmark")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -438,6 +469,9 @@ type sickRockClient struct {
 	getDashboardComponentRules   *connect.Client[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse]
 	createDashboardComponentRule *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
 	getSystemInfo                *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
+	getUserBookmarks             *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
+	createUserBookmark           *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
+	deleteUserBookmark           *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -615,6 +649,21 @@ func (c *sickRockClient) GetSystemInfo(ctx context.Context, req *connect.Request
 	return c.getSystemInfo.CallUnary(ctx, req)
 }
 
+// GetUserBookmarks calls sickrock.SickRock.GetUserBookmarks.
+func (c *sickRockClient) GetUserBookmarks(ctx context.Context, req *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error) {
+	return c.getUserBookmarks.CallUnary(ctx, req)
+}
+
+// CreateUserBookmark calls sickrock.SickRock.CreateUserBookmark.
+func (c *sickRockClient) CreateUserBookmark(ctx context.Context, req *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error) {
+	return c.createUserBookmark.CallUnary(ctx, req)
+}
+
+// DeleteUserBookmark calls sickrock.SickRock.DeleteUserBookmark.
+func (c *sickRockClient) DeleteUserBookmark(ctx context.Context, req *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error) {
+	return c.deleteUserBookmark.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -667,6 +716,10 @@ type SickRockHandler interface {
 	CreateDashboardComponentRule(context.Context, *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error)
 	// System Info
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
+	// User Bookmarks
+	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
+	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
+	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -886,6 +939,24 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("GetSystemInfo")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetUserBookmarksHandler := connect.NewUnaryHandler(
+		SickRockGetUserBookmarksProcedure,
+		svc.GetUserBookmarks,
+		connect.WithSchema(sickRockMethods.ByName("GetUserBookmarks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateUserBookmarkHandler := connect.NewUnaryHandler(
+		SickRockCreateUserBookmarkProcedure,
+		svc.CreateUserBookmark,
+		connect.WithSchema(sickRockMethods.ByName("CreateUserBookmark")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteUserBookmarkHandler := connect.NewUnaryHandler(
+		SickRockDeleteUserBookmarkProcedure,
+		svc.DeleteUserBookmark,
+		connect.WithSchema(sickRockMethods.ByName("DeleteUserBookmark")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -958,6 +1029,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockCreateDashboardComponentRuleHandler.ServeHTTP(w, r)
 		case SickRockGetSystemInfoProcedure:
 			sickRockGetSystemInfoHandler.ServeHTTP(w, r)
+		case SickRockGetUserBookmarksProcedure:
+			sickRockGetUserBookmarksHandler.ServeHTTP(w, r)
+		case SickRockCreateUserBookmarkProcedure:
+			sickRockCreateUserBookmarkHandler.ServeHTTP(w, r)
+		case SickRockDeleteUserBookmarkProcedure:
+			sickRockDeleteUserBookmarkHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1105,4 +1182,16 @@ func (UnimplementedSickRockHandler) CreateDashboardComponentRule(context.Context
 
 func (UnimplementedSickRockHandler) GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetSystemInfo is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserBookmarks is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateUserBookmark is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserBookmark is not implemented"))
 }

@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import * as Hugeicons from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
+import Section from 'picocrank/vue/components/Section.vue'
 
 // Use global API client
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
@@ -97,8 +98,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section>
-    <h2>Welcome</h2>
+  <Section title="Welcome">
     <div v-if="loading">Loading…</div>
     <div v-else>
       <div v-if="!isAuthenticated" class="subtle">Please log in to view your recently viewed items.</div>
@@ -113,11 +113,17 @@ onMounted(load)
           <div class="recently-viewed-groups">
             <div v-for="group in groupedRecentlyViewed" :key="group.name" class="recent-group">
               <div class="group-header">
-                <HugeiconsIcon
-                  v-if="group.icon && (Hugeicons as any)[group.icon]"
-                  :icon="(Hugeicons as any)[group.icon]"
-                />
-                <h4>{{ group.title }}</h4>
+                <router-link
+                  :to="`/table/${group.name}`"
+                  class="table-heading-link"
+                  title="View table"
+                >
+                  <HugeiconsIcon
+                    v-if="group.icon && (Hugeicons as any)[group.icon]"
+                    :icon="(Hugeicons as any)[group.icon]"
+                  />
+                  <h4>{{ group.title }}</h4>
+                </router-link>
               </div>
 
               <div class="recently-viewed">
@@ -147,7 +153,7 @@ onMounted(load)
         </div>
       </div>
     </div>
-  </section>
+  </Section>
 </template>
 
 <style scoped>
@@ -180,7 +186,20 @@ onMounted(load)
   gap: 0.5rem;
 }
 
-.group-header h4 {
+.table-heading-link {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: color 0.2s ease;
+}
+
+.table-heading-link:hover {
+  color: #007bff;
+}
+
+.table-heading-link h4 {
   margin: 0;
 }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
@@ -8,6 +9,8 @@ import RowActionsDropdown from '../components/RowActionsDropdown.vue'
 const props = defineProps<{
   tableId: string
 }>()
+
+const router = useRouter()
 
 type Item = Record<string, unknown>
 
@@ -30,10 +33,11 @@ const contextMenu = ref<{ visible: boolean; x: number; y: number; item: Item | n
 const deleting = ref(false)
 
 // Quick add state
-const quickAdd = ref<{ visible: boolean; date: Date | null; name: string }>({
+const quickAdd = ref<{ visible: boolean; date: Date | null; name: string; icon: string }>({
   visible: false,
   date: null,
-  name: ''
+  name: '',
+  icon: ''
 })
 const creating = ref(false)
 
@@ -41,6 +45,14 @@ const creating = ref(false)
 const currentDate = ref(new Date())
 const currentMonth = computed(() => currentDate.value.getMonth())
 const currentYear = computed(() => currentDate.value.getFullYear())
+
+// Table structure state
+const tableStructure = ref<any>(null)
+
+// Check if table has icon field
+const hasIconField = computed(() => {
+  return tableStructure.value?.fields?.some((f: any) => f.name === 'icon')
+})
 
 // Transport handled by authenticated client
 const client = createApiClient()
@@ -59,20 +71,29 @@ function getItemValue(item: any, column: string): any {
   return item[column]
 }
 
-// Get items for a specific date using starts/finishes fields
+// Get items for a specific date using calendar_date field
 function getItemsForDate(date: Date): Item[] {
   const targetDate = new Date(date)
   targetDate.setHours(0, 0, 0, 0)
 
   return items.value.filter(item => {
+    const calendarDate = getItemValue(item, 'calendar_date')
+
+    // If we have calendar_date field, use it for date checking
+    if (calendarDate) {
+      const itemDate = new Date(calendarDate)
+      const itemDateOnly = new Date(itemDate)
+      itemDateOnly.setHours(0, 0, 0, 0)
+
+      return targetDate.getTime() === itemDateOnly.getTime()
+    }
+
+    // Fallback to starts/finishes fields for backward compatibility
     const starts = getItemValue(item, 'starts')
     const finishes = getItemValue(item, 'finishes')
 
-    // If we have starts field, use it for date checking
     if (starts) {
       const startDate = new Date(starts)
-
-      // Check if the start date matches the target date (ignoring time)
       const startDateOnly = new Date(startDate)
       startDateOnly.setHours(0, 0, 0, 0)
 
@@ -89,7 +110,7 @@ function getItemsForDate(date: Date): Item[] {
       }
     }
 
-    // Fallback to sr_created for backward compatibility
+    // Final fallback to sr_created for backward compatibility
     const createdAt = getItemValue(item, 'sr_created')
     if (createdAt) {
       const itemDate = new Date(Number(createdAt) * 1000)
@@ -252,8 +273,13 @@ async function load() {
   loading.value = true
   error.value = null
   try {
+    // Load items
     const res = await client.listItems({ tcName: props.tableId })
     items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
+
+    // Load table structure
+    const structureRes = await client.getTableStructure({ pageId: props.tableId })
+    tableStructure.value = structureRes
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -274,7 +300,8 @@ function showQuickAdd(date: Date) {
   quickAdd.value = {
     visible: true,
     date: date,
-    name: ''
+    name: '',
+    icon: ''
   }
   // Focus the input after the DOM updates
   setTimeout(() => {
@@ -289,7 +316,8 @@ function hideQuickAdd() {
   quickAdd.value = {
     visible: false,
     date: null,
-    name: ''
+    name: '',
+    icon: ''
   }
 }
 
@@ -303,19 +331,34 @@ async function saveItem() {
       name: quickAdd.value.name.trim()
     }
 
-    // Add starts field if it exists in the table structure
-    const structureRes = await client.getTableStructure({ pageId: props.tableId })
-    const hasStartsField = structureRes.fields?.some(f => f.name === 'starts' && f.type === 'datetime')
+    // Add icon field if provided and table has icon field
+    if (quickAdd.value.icon.trim() && hasIconField.value) {
+      additionalFields.icon = quickAdd.value.icon.trim()
+    }
 
-    if (hasStartsField) {
-      // Convert to MySQL datetime format
+    // Add calendar_date field if it exists in the table structure
+    const structureRes = await client.getTableStructure({ pageId: props.tableId })
+    const hasCalendarDateField = structureRes.fields?.some(f => f.name === 'calendar_date' && f.type === 'date')
+
+    if (hasCalendarDateField) {
+      // Convert to MySQL date format (YYYY-MM-DD)
       const year = quickAdd.value.date.getFullYear()
       const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
       const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
-      const hours = String(quickAdd.value.date.getHours()).padStart(2, '0')
-      const minutes = String(quickAdd.value.date.getMinutes()).padStart(2, '0')
-      const seconds = String(quickAdd.value.date.getSeconds()).padStart(2, '0')
-      additionalFields.starts = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+      additionalFields.calendar_date = `${year}-${month}-${day}`
+    } else {
+      // Fallback to starts field if calendar_date doesn't exist
+      const hasStartsField = structureRes.fields?.some(f => f.name === 'starts' && f.type === 'datetime')
+      if (hasStartsField) {
+        // Convert to MySQL datetime format
+        const year = quickAdd.value.date.getFullYear()
+        const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
+        const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
+        const hours = String(quickAdd.value.date.getHours()).padStart(2, '0')
+        const minutes = String(quickAdd.value.date.getMinutes()).padStart(2, '0')
+        const seconds = String(quickAdd.value.date.getSeconds()).padStart(2, '0')
+        additionalFields.starts = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+      }
     }
 
     await client.createItem({
@@ -346,19 +389,34 @@ async function saveAndEdit() {
       name: quickAdd.value.name.trim()
     }
 
-    // Add starts field if it exists in the table structure
-    const structureRes = await client.getTableStructure({ pageId: props.tableId })
-    const hasStartsField = structureRes.fields?.some(f => f.name === 'starts' && f.type === 'datetime')
+    // Add icon field if provided and table has icon field
+    if (quickAdd.value.icon.trim() && hasIconField.value) {
+      additionalFields.icon = quickAdd.value.icon.trim()
+    }
 
-    if (hasStartsField) {
-      // Convert to MySQL datetime format
+    // Add calendar_date field if it exists in the table structure
+    const structureRes = await client.getTableStructure({ pageId: props.tableId })
+    const hasCalendarDateField = structureRes.fields?.some(f => f.name === 'calendar_date' && f.type === 'date')
+
+    if (hasCalendarDateField) {
+      // Convert to MySQL date format (YYYY-MM-DD)
       const year = quickAdd.value.date.getFullYear()
       const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
       const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
-      const hours = String(quickAdd.value.date.getHours()).padStart(2, '0')
-      const minutes = String(quickAdd.value.date.getMinutes()).padStart(2, '0')
-      const seconds = String(quickAdd.value.date.getSeconds()).padStart(2, '0')
-      additionalFields.starts = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+      additionalFields.calendar_date = `${year}-${month}-${day}`
+    } else {
+      // Fallback to starts field if calendar_date doesn't exist
+      const hasStartsField = structureRes.fields?.some(f => f.name === 'starts' && f.type === 'datetime')
+      if (hasStartsField) {
+        // Convert to MySQL datetime format
+        const year = quickAdd.value.date.getFullYear()
+        const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
+        const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
+        const hours = String(quickAdd.value.date.getHours()).padStart(2, '0')
+        const minutes = String(quickAdd.value.date.getMinutes()).padStart(2, '0')
+        const seconds = String(quickAdd.value.date.getSeconds()).padStart(2, '0')
+        additionalFields.starts = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+      }
     }
 
     const res = await client.createItem({
@@ -519,6 +577,7 @@ onMounted(load)
       <h2 class="calendar-title">{{ monthNames[currentMonth] }} {{ currentYear }}</h2>
 
       <div class = "toolbar">
+        <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
         <button @click="previousMonth" class="button neutral">‹</button>
         <button @click="goToToday" class="button neutral">Today</button>
         <button @click="nextMonth" class="button neutral">›</button>
@@ -600,6 +659,9 @@ onMounted(load)
                       <span v-if="getItemValue(item, 'starts') && getItemValue(item, 'finishes')">
                         {{ formatEventTime(item, day.date) }}
                       </span>
+                      <span v-else-if="getItemValue(item, 'calendar_date')">
+                        All day
+                      </span>
                       <span v-else-if="getItemValue(item, 'sr_created')">
                         {{ new Date(Number(getItemValue(item, 'sr_created')) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
                       </span>
@@ -661,6 +723,15 @@ onMounted(load)
             @keydown.enter="saveItem"
             @keydown.escape="hideQuickAdd"
             ref="quickAddInput"
+          />
+          <input
+            v-if="hasIconField"
+            v-model="quickAdd.icon"
+            type="text"
+            placeholder="Icon (optional)"
+            class="quick-add-input"
+            @keydown.enter="saveItem"
+            @keydown.escape="hideQuickAdd"
           />
           <div class="quick-add-actions">
             <button @click="hideQuickAdd" class="button neutral" :disabled="creating">

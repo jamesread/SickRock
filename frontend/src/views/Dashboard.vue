@@ -3,8 +3,9 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { inject } from 'vue'
 import type { createApiClient } from '../stores/api'
-import { Edit01Icon } from '@hugeicons/core-free-icons'
+import { Edit02Icon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import { HugeiconsIcon } from '@hugeicons/vue'
 
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
 const route = useRoute()
@@ -86,7 +87,7 @@ onMounted(load)
                 :to="`/table/table_dashboard_components/${c.id}`"
                 class="edit-icon-btn"
               >
-                <edit01icon />
+                <HugeiconsIcon :icon="Edit02Icon" />
               </router-link>
 
             </div>
@@ -96,7 +97,7 @@ onMounted(load)
                 :to="`/table/table_dashboard_components/${c.id}`"
                 class="edit-icon-btn"
               >
-                <edit01icon />
+                <HugeiconsIcon :icon="Edit02Icon" />
               </router-link>
 
                 <div class="stat-label">{{ c.name }}</div>
