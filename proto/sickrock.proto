@@ -50,7 +50,7 @@ message NavigationItem {
   int32 table_configuration = 3;
   string table_name = 4;
   string table_title = 5;
-  string table_icon = 6;
+  string icon = 6;
   string table_view = 7;
   int32 dashboard_id = 8; // optional, 0 if not set
   string dashboard_name = 9; // optional
@@ -464,6 +464,7 @@ message UserBookmark {
   int32 user_id = 2;
   int32 navigation_item_id = 3;
   NavigationItem navigation_item = 4;
+  string title = 5; // navigation name from table_navigation
 }
 
 service SickRock {

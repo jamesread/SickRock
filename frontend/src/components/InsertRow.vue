@@ -327,10 +327,31 @@ function isoToDatetimeLocal(isoString: string): string {
   return ''
 }
 
+// Set default values for datetime fields when not in edit mode
+function setDefaultDatetimeValues() {
+  if (isEditMode.value) return // Don't set defaults in edit mode
+
+  for (const field of props.fieldDefs) {
+    if ((field.type === 'datetime' || field.type === 'timestamp') && !form.value[field.name]) {
+      // Set current timestamp as default value in datetime-local format
+      const now = new Date()
+      const year = now.getFullYear()
+      const month = String(now.getMonth() + 1).padStart(2, '0')
+      const day = String(now.getDate()).padStart(2, '0')
+      const hours = String(now.getHours()).padStart(2, '0')
+      const minutes = String(now.getMinutes()).padStart(2, '0')
+      const datetimeLocalValue = `${year}-${month}-${day}T${hours}:${minutes}`
+
+      form.value[field.name] = datetimeLocalValue
+    }
+  }
+}
+
 // Load foreign keys when component is mounted
 onMounted(() => {
   loadForeignKeys()
   initializeFormWithExistingData()
+  setDefaultDatetimeValues()
   // Apply initialValues for create mode
   if (!isEditMode.value && props.initialValues) {
     // Defer applying FK display names until FK data is loaded
@@ -432,6 +453,10 @@ watch(() => props.initialValues, (val) => {
 watch(() => props.fieldDefs, (defs) => {
   if ((defs && defs.length) && props.initialValues && !isEditMode.value && !initialApplied.value) {
     applyInitialValues()
+  }
+  // Set default datetime values when field definitions are ready
+  if (defs && defs.length && !isEditMode.value) {
+    setDefaultDatetimeValues()
   }
 }, { immediate: true })
 

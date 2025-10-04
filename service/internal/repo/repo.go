@@ -196,7 +196,7 @@ type NavigationItem struct {
 	TableConfiguration sql.NullInt64
 	TableName          sql.NullString
 	TableTitle         sql.NullString
-	TableIcon          sql.NullString
+	Icon               sql.NullString
 	TableView          sql.NullString
 	DashboardID        sql.NullInt64
 	DashboardName      sql.NullString
@@ -211,7 +211,7 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			tn.table_configuration,
 			tc.name as table_name,
 			COALESCE(tc.title, tc.name) as table_title,
-			tc.icon as table_icon,
+			tc.icon as icon,
             tc.view as table_view,
             tn.dashboard_id as dashboard_id,
             td.name as dashboard_name,
@@ -237,7 +237,7 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			&item.TableConfiguration,
 			&item.TableName,
 			&item.TableTitle,
-			&item.TableIcon,
+			&item.Icon,
 			&item.TableView,
 			&item.DashboardID,
 			&item.DashboardName,
@@ -1056,7 +1056,7 @@ func (r *Repository) GetTableConfigurationByID(ctx context.Context, tcID int) (*
 	err := r.db.GetContext(ctx, &config, query, tcID)
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to get table configuration for table %s: %w", tcID, err)
+		return nil, fmt.Errorf("failed to get table configuration for table %d: %w", tcID, err)
 	}
 
 	return &config, nil
@@ -1665,6 +1665,7 @@ type UserBookmark struct {
 	UserID           int
 	NavigationItemID int
 	NavigationItem   *NavigationItem
+	Title            sql.NullString
 }
 
 // GetUserBookmarks retrieves all bookmarks for a specific user
@@ -1678,11 +1679,11 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			tn.ordinal,
 			tn.table_configuration,
 			tc.name as table_name,
-			COALESCE(tc.title, tc.name) as table_title,
 			tc.icon as table_icon,
 			tc.view as table_view,
 			tn.dashboard_id as dashboard_id,
-			td.name as dashboard_name
+			td.name as dashboard_name,
+			tn.name as title
 		FROM table_user_bookmarks ub
 		LEFT JOIN table_navigation tn ON ub.navigation_item = tn.id
 		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
@@ -1709,11 +1710,11 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			&navItem.Ordinal,
 			&navItem.TableConfiguration,
 			&navItem.TableName,
-			&navItem.TableTitle,
-			&navItem.TableIcon,
+			&navItem.Icon,
 			&navItem.TableView,
 			&navItem.DashboardID,
 			&navItem.DashboardName,
+			&bookmark.Title,
 		)
 		if err != nil {
 			return nil, err

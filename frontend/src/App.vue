@@ -51,13 +51,13 @@ const bookmarks = ref<Array<{
   id: number;
   userId: number;
   navigationItemId: number;
+  title: string;
   navigationItem?: {
     id: number;
     ordinal: number;
     tableConfiguration: number;
     tableName: string;
-    tableTitle: string;
-    tableIcon: string;
+    icon: string;
     tableView: string;
     dashboardId: number;
     dashboardName: string;
@@ -88,13 +88,13 @@ async function loadAppData() {
           id: bookmark.id,
           userId: bookmark.userId,
           navigationItemId: bookmark.navigationItemId,
+          title: bookmark.title,
           navigationItem: bookmark.navigationItem ? {
             id: bookmark.navigationItem.id,
             ordinal: bookmark.navigationItem.ordinal,
             tableConfiguration: bookmark.navigationItem.tableConfiguration,
             tableName: bookmark.navigationItem.tableName,
-            tableTitle: bookmark.navigationItem.tableTitle,
-            tableIcon: bookmark.navigationItem.tableIcon,
+            icon: bookmark.navigationItem.icon,
             tableView: bookmark.navigationItem.tableView,
             dashboardId: bookmark.navigationItem.dashboardId,
             dashboardName: bookmark.navigationItem.dashboardName
@@ -106,7 +106,7 @@ async function loadAppData() {
             .map(item => {
                 const title = item.title || String(item.id)
                 const slug = item.tableName || item.dashboardName || ''
-                const icon = item.tableIcon || 'DatabaseIcon'
+                const icon = item.icon || 'DatabaseIcon'
                 const view = item.tableView || ''
                 const id = title
                 const name = title
@@ -311,15 +311,16 @@ onMounted(async () => {
                                 ? `/dashboard/${bookmark.navigationItem.dashboardName}`
                                 : `/table/${bookmark.navigationItem?.tableName}`"
                             class="bookmark-toolbar-item"
-                            :title="bookmark.navigationItem?.dashboardName || bookmark.navigationItem?.tableTitle || bookmark.navigationItem?.tableName"
+                            :title="bookmark.title || bookmark.navigationItem?.tableName"
                         >
                             <HugeiconsIcon
-                                v-if="bookmark.navigationItem?.tableIcon && (Hugeicons as any)[bookmark.navigationItem.tableIcon]"
-                                :icon="(Hugeicons as any)[bookmark.navigationItem.tableIcon]"
+                                :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
+                                    ? (Hugeicons as any)[bookmark.navigationItem.icon]
+                                    : DatabaseIcon"
                                 class="bookmark-toolbar-icon"
                             />
                             <span class="bookmark-toolbar-text">
-                                {{ bookmark.navigationItem?.dashboardName || bookmark.navigationItem?.tableTitle || bookmark.navigationItem?.tableName }}
+                                {{ bookmark.title || bookmark.navigationItem?.tableName }}
                             </span>
                         </router-link>
                     </div>
@@ -526,5 +527,16 @@ onMounted(async () => {
 
 .search-toolbar {
     flex: 1;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+    .toolbar-content {
+        display: none;
+    }
+
+    .bookmark-button {
+        display: none;
+    }
 }
 </style>

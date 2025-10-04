@@ -3,6 +3,7 @@ import { ref, onMounted, computed, inject } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import * as Hugeicons from '@hugeicons/core-free-icons'
+import { DatabaseIcon } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 
@@ -33,7 +34,7 @@ const bookmarks = ref<Array<{
     tableConfiguration: number;
     tableName: string;
     tableTitle: string;
-    tableIcon: string;
+    icon: string;
     tableView: string;
     dashboardId: number;
     dashboardName: string;
@@ -70,7 +71,7 @@ async function loadBookmarks() {
         tableConfiguration: bookmark.navigationItem.tableConfiguration,
         tableName: bookmark.navigationItem.tableName,
         tableTitle: bookmark.navigationItem.tableTitle,
-        tableIcon: bookmark.navigationItem.tableIcon,
+        icon: bookmark.navigationItem.icon,
         tableView: bookmark.navigationItem.tableView,
         dashboardId: bookmark.navigationItem.dashboardId,
         dashboardName: bookmark.navigationItem.dashboardName
@@ -181,12 +182,13 @@ onMounted(async () => {
               >
                 <div class="bookmark-content">
                   <HugeiconsIcon
-                    v-if="bookmark.navigationItem?.tableIcon && (Hugeicons as any)[bookmark.navigationItem.tableIcon]"
-                    :icon="(Hugeicons as any)[bookmark.navigationItem.tableIcon]"
+                    :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
+                        ? (Hugeicons as any)[bookmark.navigationItem.icon]
+                        : DatabaseIcon"
                     class="bookmark-icon"
                   />
                   <div class="bookmark-info">
-                    <span class="bookmark-title">{{ bookmark.navigationItem?.dashboardName || bookmark.navigationItem?.tableTitle || bookmark.navigationItem?.tableName || 'Unknown' }}</span>
+                    <span class="bookmark-title">{{ bookmark.title || bookmark.navigationItem?.tableName || 'Unknown' }}</span>
                   </div>
                 </div>
                 <button

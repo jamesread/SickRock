@@ -116,7 +116,7 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 			}(),
 			TableName:  item.TableName.String,
 			TableTitle: item.TableTitle.String,
-			TableIcon:  item.TableIcon.String,
+			Icon:       item.Icon.String,
 			TableView:  item.TableView.String,
 			DashboardId: func() int32 {
 				if item.DashboardID.Valid {
@@ -153,7 +153,7 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 						}(),
 						TableName:  bookmark.NavigationItem.TableName.String,
 						TableTitle: bookmark.NavigationItem.TableTitle.String,
-						TableIcon:  bookmark.NavigationItem.TableIcon.String,
+						Icon:       bookmark.NavigationItem.Icon.String,
 						TableView:  bookmark.NavigationItem.TableView.String,
 						DashboardId: func() int32 {
 							if bookmark.NavigationItem.DashboardID.Valid {
@@ -171,6 +171,7 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 					UserId:           int32(bookmark.UserID),
 					NavigationItemId: int32(bookmark.NavigationItemID),
 					NavigationItem:   navItem,
+					Title:            bookmark.Title.String,
 				})
 			}
 		}
@@ -1007,7 +1008,7 @@ func (s *SickRockServer) GetUserBookmarks(ctx context.Context, req *connect.Requ
 				}(),
 				TableName:  bookmark.NavigationItem.TableName.String,
 				TableTitle: bookmark.NavigationItem.TableTitle.String,
-				TableIcon:  bookmark.NavigationItem.TableIcon.String,
+				Icon:       bookmark.NavigationItem.Icon.String,
 				TableView:  bookmark.NavigationItem.TableView.String,
 				DashboardId: func() int32 {
 					if bookmark.NavigationItem.DashboardID.Valid {
@@ -1024,6 +1025,7 @@ func (s *SickRockServer) GetUserBookmarks(ctx context.Context, req *connect.Requ
 			UserId:           int32(bookmark.UserID),
 			NavigationItemId: int32(bookmark.NavigationItemID),
 			NavigationItem:   navItem,
+			Title:            bookmark.Title.String,
 		})
 	}
 
@@ -1060,7 +1062,7 @@ func (s *SickRockServer) CreateUserBookmark(ctx context.Context, req *connect.Re
 			}(),
 			TableName:  bookmark.NavigationItem.TableName.String,
 			TableTitle: bookmark.NavigationItem.TableTitle.String,
-			TableIcon:  bookmark.NavigationItem.TableIcon.String,
+			Icon:       bookmark.NavigationItem.Icon.String,
 			TableView:  bookmark.NavigationItem.TableView.String,
 			DashboardId: func() int32 {
 				if bookmark.NavigationItem.DashboardID.Valid {

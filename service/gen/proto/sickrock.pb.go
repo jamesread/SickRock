@@ -459,7 +459,7 @@ type NavigationItem struct {
 	TableConfiguration int32                  `protobuf:"varint,3,opt,name=table_configuration,json=tableConfiguration,proto3" json:"table_configuration,omitempty"`
 	TableName          string                 `protobuf:"bytes,4,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
 	TableTitle         string                 `protobuf:"bytes,5,opt,name=table_title,json=tableTitle,proto3" json:"table_title,omitempty"`
-	TableIcon          string                 `protobuf:"bytes,6,opt,name=table_icon,json=tableIcon,proto3" json:"table_icon,omitempty"`
+	Icon               string                 `protobuf:"bytes,6,opt,name=icon,proto3" json:"icon,omitempty"`
 	TableView          string                 `protobuf:"bytes,7,opt,name=table_view,json=tableView,proto3" json:"table_view,omitempty"`
 	DashboardId        int32                  `protobuf:"varint,8,opt,name=dashboard_id,json=dashboardId,proto3" json:"dashboard_id,omitempty"`      // optional, 0 if not set
 	DashboardName      string                 `protobuf:"bytes,9,opt,name=dashboard_name,json=dashboardName,proto3" json:"dashboard_name,omitempty"` // optional
@@ -533,9 +533,9 @@ func (x *NavigationItem) GetTableTitle() string {
 	return ""
 }
 
-func (x *NavigationItem) GetTableIcon() string {
+func (x *NavigationItem) GetIcon() string {
 	if x != nil {
-		return x.TableIcon
+		return x.Icon
 	}
 	return ""
 }
@@ -4697,6 +4697,7 @@ type UserBookmark struct {
 	UserId           int32                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	NavigationItemId int32                  `protobuf:"varint,3,opt,name=navigation_item_id,json=navigationItemId,proto3" json:"navigation_item_id,omitempty"`
 	NavigationItem   *NavigationItem        `protobuf:"bytes,4,opt,name=navigation_item,json=navigationItem,proto3" json:"navigation_item,omitempty"`
+	Title            string                 `protobuf:"bytes,5,opt,name=title,proto3" json:"title,omitempty"` // navigation name from table_navigation
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -4759,6 +4760,13 @@ func (x *UserBookmark) GetNavigationItem() *NavigationItem {
 	return nil
 }
 
+func (x *UserBookmark) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
 var File_sickrock_proto protoreflect.FileDescriptor
 
 const file_sickrock_proto_rawDesc = "" +
@@ -4785,7 +4793,7 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x04view\x18\x06 \x01(\tR\x04view\"F\n" +
 	"\x1eGetTableConfigurationsResponse\x12$\n" +
 	"\x05pages\x18\x01 \x03(\v2\x0e.sickrock.PageR\x05pages\"\x16\n" +
-	"\x14GetNavigationRequest\"\xc9\x02\n" +
+	"\x14GetNavigationRequest\"\xbe\x02\n" +
 	"\x0eNavigationItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x18\n" +
 	"\aordinal\x18\x02 \x01(\x05R\aordinal\x12/\n" +
@@ -4793,9 +4801,8 @@ const file_sickrock_proto_rawDesc = "" +
 	"\n" +
 	"table_name\x18\x04 \x01(\tR\ttableName\x12\x1f\n" +
 	"\vtable_title\x18\x05 \x01(\tR\n" +
-	"tableTitle\x12\x1d\n" +
-	"\n" +
-	"table_icon\x18\x06 \x01(\tR\ttableIcon\x12\x1d\n" +
+	"tableTitle\x12\x12\n" +
+	"\x04icon\x18\x06 \x01(\tR\x04icon\x12\x1d\n" +
 	"\n" +
 	"table_view\x18\a \x01(\tR\ttableView\x12!\n" +
 	"\fdashboard_id\x18\b \x01(\x05R\vdashboardId\x12%\n" +
@@ -5095,12 +5102,13 @@ const file_sickrock_proto_rawDesc = "" +
 	"\vbookmark_id\x18\x01 \x01(\x05R\n" +
 	"bookmarkId\"6\n" +
 	"\x1aDeleteUserBookmarkResponse\x12\x18\n" +
-	"\adeleted\x18\x01 \x01(\bR\adeleted\"\xa8\x01\n" +
+	"\adeleted\x18\x01 \x01(\bR\adeleted\"\xbe\x01\n" +
 	"\fUserBookmark\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x05R\x06userId\x12,\n" +
 	"\x12navigation_item_id\x18\x03 \x01(\x05R\x10navigationItemId\x12A\n" +
-	"\x0fnavigation_item\x18\x04 \x01(\v2\x18.sickrock.NavigationItemR\x0enavigationItem2\xcf\x19\n" +
+	"\x0fnavigation_item\x18\x04 \x01(\v2\x18.sickrock.NavigationItemR\x0enavigationItem\x12\x14\n" +
+	"\x05title\x18\x05 \x01(\tR\x05title2\xcf\x19\n" +
 	"\bSickRock\x125\n" +
 	"\x04Init\x12\x15.sickrock.InitRequest\x1a\x16.sickrock.InitResponse\x125\n" +
 	"\x04Ping\x12\x15.sickrock.PingRequest\x1a\x16.sickrock.PingResponse\x128\n" +

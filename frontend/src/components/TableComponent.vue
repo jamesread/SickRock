@@ -11,7 +11,7 @@ import InsertRow from './InsertRow.vue'
 import { GetTableStructureResponse } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon } from '@hugeicons/core-free-icons'
+import { ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon, Add01Icon, Download01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
 
 const router = useRouter()
 const tableStructure = ref<GetTableStructureResponse | null>(null)
@@ -248,6 +248,45 @@ const visibleColumns = computed(() =>
 
 const sortBy = ref<string | null>(null)
 const sortDir = ref<'asc' | 'desc'>('asc')
+
+// Natural sort function for alphanumeric strings
+function naturalSort(a: string, b: string): number {
+  const aStr = String(a)
+  const bStr = String(b)
+
+  // Split strings into parts (numbers and text)
+  const aParts = aStr.match(/(\d+|\D+)/g) || []
+  const bParts = bStr.match(/(\d+|\D+)/g) || []
+
+  const maxLength = Math.max(aParts.length, bParts.length)
+
+  for (let i = 0; i < maxLength; i++) {
+    const aPart = aParts[i] || ''
+    const bPart = bParts[i] || ''
+
+    // Check if both parts are numbers
+    const aIsNum = /^\d+$/.test(aPart)
+    const bIsNum = /^\d+$/.test(bPart)
+
+    if (aIsNum && bIsNum) {
+      // Compare as numbers
+      const aNum = parseInt(aPart, 10)
+      const bNum = parseInt(bPart, 10)
+      if (aNum !== bNum) {
+        return aNum - bNum
+      }
+    } else {
+      // Compare as strings (case-insensitive)
+      const comparison = aPart.toLowerCase().localeCompare(bPart.toLowerCase())
+      if (comparison !== 0) {
+        return comparison
+      }
+    }
+  }
+
+  return 0
+}
+
 function toggleSort(col: string) {
   if (sortBy.value === col) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
@@ -279,7 +318,7 @@ const sortedItems = computed(() => {
     if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
     const as = String(av)
     const bs = String(bv)
-    return as.localeCompare(bs) * dir
+    return naturalSort(as, bs) * dir
   })
 })
 
@@ -287,7 +326,19 @@ const page = ref(1)
 const pageSize = ref(10)
 const total = computed(() => sortedItems.value.length)
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-watch([sortedItems, pageSize], () => { page.value = 1 })
+
+// Only reset page when pageSize changes, not when sortedItems changes
+watch([pageSize], () => { page.value = 1 })
+
+// Reset page when data is actually reloaded (not just sorted)
+const previousItemsLength = ref(0)
+watch(sortedItems, (newItems) => {
+  if (newItems.length !== previousItemsLength.value) {
+    page.value = 1
+    previousItemsLength.value = newItems.length
+  }
+}, { immediate: true })
+
 const pagedItems = computed(() => {
   const start = (page.value - 1) * pageSize.value
   return sortedItems.value.slice(start, start + pageSize.value)
@@ -327,6 +378,38 @@ const editInput = ref<HTMLInputElement | null>(null)
 // Bulk delete state
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
+
+// Quick add dialog state
+const showQuickAddDialog = ref(false)
+const quickAddLoading = ref(false)
+const quickAddSelectedViewId = ref<number | null>(null)
+
+// Computed property for quick add field definitions based on selected view
+const quickAddFieldDefs = computed(() => {
+  if (quickAddSelectedViewId.value === null || quickAddSelectedViewId.value === -1) {
+    // Use all fields (default view)
+    return localFieldDefs.value
+  }
+
+  // Find the selected view
+  const selectedView = tableViews.value.find(view => view.id === quickAddSelectedViewId.value)
+  if (!selectedView) {
+    return localFieldDefs.value
+  }
+
+  // Get field definitions for visible columns in the selected view
+  const visibleColumns = selectedView.columns
+    .filter(col => col.isVisible)
+    .sort((a, b) => a.columnOrder - b.columnOrder)
+    .map(col => col.columnName)
+
+  return localFieldDefs.value.filter(field => visibleColumns.includes(field.name))
+})
+
+// Computed property for quick add view options
+const quickAddViewOptions = computed(() => {
+  return viewOptions.value
+})
 
 // Helper function to get item value for a column, handling both standard and dynamic fields
 function getItemValue(item: any, column: string): any {
@@ -626,13 +709,23 @@ async function deleteSelectedItems() {
       const key = keyOf(item)
       if (key !== '') {
         await client.deleteItem({ pageId: props.tableId, id: key })
+        // Emit row-deleted event for each deleted item
+        emit('row-deleted', key)
       }
     }
 
-    // Clear selection and reload data
+    // Clear selection
     selectedKeys.value.clear()
-    await load()
-    showDeleteConfirm.value = false
+
+    // If using props.items, don't reload - let parent handle it
+    if (props.items) {
+      showDeleteConfirm.value = false
+      emit('rows-updated')
+    } else {
+      // If using local items.value, reload data
+      await load()
+      showDeleteConfirm.value = false
+    }
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -648,6 +741,36 @@ function confirmDeleteSelected() {
 
 function cancelDeleteSelected() {
   showDeleteConfirm.value = false
+}
+
+// Quick add functions
+function openQuickAddDialog() {
+  // Set the default view to the currently selected view
+  quickAddSelectedViewId.value = selectedViewId.value
+  showQuickAddDialog.value = true
+
+  // Focus the dialog for keyboard events
+  setTimeout(() => {
+    const dialog = document.querySelector('.modal-overlay')
+    if (dialog) {
+      (dialog as HTMLElement).focus()
+    }
+  }, 100)
+}
+
+function closeQuickAddDialog() {
+  showQuickAddDialog.value = false
+}
+
+async function onQuickAddCreated() {
+  // Reload data to show the new item
+  await load()
+  closeQuickAddDialog()
+  emit('rows-updated')
+}
+
+function onQuickAddCancelled() {
+  closeQuickAddDialog()
 }
 
 function selectAll() {
@@ -710,11 +833,26 @@ onMounted(loadForeignKeys)
           <HugeiconsIcon :icon="ViewIcon" />
           Create View
         </button>
-        <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button neutral ss-large">Export</router-link>
-        <router-link v-if="showStructure" :to="`/table/${props.tableId}/column-types`" class="button neutral ss-large">Structure</router-link>
-        <router-link v-if="showInsert" :to="`/table/${props.tableId}/insert-row`" class="button neutral" accesskey="n" title="Insert row" >
-          {{ tableStructure?.CreateButtonText ?? 'Insert row' }}
+        <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button neutral ss-large">
+          <HugeiconsIcon :icon="Download01Icon" />
+          Export
         </router-link>
+        <router-link v-if="showStructure" :to="`/table/${props.tableId}/column-types`" class="button neutral ss-large">
+          <HugeiconsIcon :icon="Settings01Icon" />
+          Structure
+        </router-link>
+
+        <!-- Blended Insert/Quick Add Button Group -->
+        <div v-if="showInsert" class="insert-button-group">
+          <router-link :to="`/table/${props.tableId}/insert-row`" class="button neutral insert-button" accesskey="n" title="Insert row">
+            <HugeiconsIcon :icon="AddCircleIcon" />
+            {{ tableStructure?.CreateButtonText ?? 'Insert row' }}
+          </router-link>
+          <button @click="openQuickAddDialog" class="button primary quick-add-button" title="Quick Add">
+            <HugeiconsIcon :icon="Add01Icon" />
+            <span class="quick-add-text">Quick Add</span>
+          </button>
+        </div>
       </div>
     </template>
     <div v-if="error" class="error">{{ error }}</div>
@@ -848,7 +986,13 @@ onMounted(loadForeignKeys)
         </tbody>
       </table>
 	  <div v-if="showPagination" class = "padding">
-		  <Pagination :total="total" v-model:page="page" v-model:page-size="pageSize" />
+		  <Pagination
+		    :total="total"
+		    :page="page"
+		    :page-size="pageSize"
+		    @update:page="(newPage) => page = newPage"
+		    @update:page-size="(newPageSize) => pageSize = newPageSize"
+		  />
 	  </div>
     </div>
 
@@ -864,6 +1008,51 @@ onMounted(loadForeignKeys)
           <button @click="deleteSelectedItems" class="button confirm-delete-button" :disabled="deleting">
             {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.size} Row(s)` }}
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Add Dialog -->
+    <div
+      v-if="showQuickAddDialog"
+      class="modal-overlay"
+      @click="closeQuickAddDialog"
+      @keydown.escape="closeQuickAddDialog"
+      tabindex="0"
+    >
+      <div class="modal-content quick-add-modal" @click.stop>
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <h3>{{ tableStructure?.CreateButtonText ?? 'Insert row' }}</h3>
+            <!-- View Selector -->
+            <div v-if="quickAddViewOptions.length > 1" class="quick-add-view-selector">
+              <label for="quick-add-view">View:</label>
+              <select
+                id="quick-add-view"
+                v-model="quickAddSelectedViewId"
+                class="view-dropdown"
+              >
+                <option
+                  v-for="view in quickAddViewOptions"
+                  :key="view.id"
+                  :value="view.id"
+                >
+                  {{ view.viewName }}
+                </option>
+              </select>
+            </div>
+          </div>
+          <button @click="closeQuickAddDialog" class="button neutral" title="Close">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body">
+          <InsertRow
+            :table-id="props.tableId"
+            :field-defs="quickAddFieldDefs"
+            @created="onQuickAddCreated"
+            @cancelled="onQuickAddCancelled"
+          />
         </div>
       </div>
     </div>
@@ -1107,21 +1296,17 @@ onMounted(loadForeignKeys)
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 
 .modal-content {
   background: white;
   border-radius: 8px;
-  padding: 2rem;
+  padding: 1rem;
   max-width: 400px;
   width: 90%;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.modal-content h3 {
-  margin: 0 0 1rem 0;
-  color: #dc3545;
-  font-size: 1.25rem;
 }
 
 .modal-content p {
@@ -1285,10 +1470,299 @@ onMounted(loadForeignKeys)
 
 .fg1 { flex-grow: 1 }
 
+/* Blended Insert/Quick Add Button Group */
+.insert-button-group {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.insert-button {
+  border-radius: 0;
+  border-right: none;
+  flex: 1;
+  min-width: auto;
+  white-space: nowrap;
+}
+
+.insert-button:hover {
+  background: #c9ccd4;
+}
+
+.quick-add-button {
+  border-radius: 0;
+  border-left: none;
+  flex: 0 0 auto;
+  min-width: auto;
+  white-space: nowrap;
+}
+
+.quick-add-button:hover {
+  background: #0056b3;
+}
+
+/* Ensure proper spacing between buttons */
+.insert-button-group .button {
+  margin: 0;
+}
+
 @media (max-width: 768px) {
   .ss-large {
     display: none;
   }
+
+  .view-selector {
+    display: none;
+  }
+
+  .quick-add-view-selector {
+    display: none;
+  }
+
+  /* Mobile Insert Button Group Styles */
+  .insert-button-group {
+    flex-direction: row;
+    border-radius: 4px;
+  }
+
+  .insert-button {
+    border-radius: 0;
+    border-right: 1px solid #ddd;
+    border-bottom: 1px solid #ddd;
+    flex: 1;
+  }
+
+  .insert-button:first-child {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .quick-add-button {
+    border-radius: 0;
+    border-left: 1px solid #ddd;
+    border-top: 1px solid #ddd;
+    flex: 0 0 auto;
+  }
+
+  .quick-add-button:last-child {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  /* Hide Quick Add text on mobile */
+  .quick-add-text {
+    display: none;
+  }
+
+  /* Mobile Quick Add Dialog Styles */
+  .quick-add-modal {
+    max-width: 95%;
+    width: 95%;
+    max-height: 90vh;
+    margin: 0.5rem;
+  }
+
+  .modal-overlay {
+    padding: 0.5rem;
+    align-items: flex-start;
+    padding-top: 2rem;
+  }
+
+  .modal-content {
+    padding: 0.5rem;
+    max-width: none;
+    width: 100%;
+    border-radius: 4px;
+  }
+
+  .modal-header {
+    padding: 0.5rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .modal-header-left {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .modal-header h3 {
+    font-size: 1.1rem;
+    margin: 0;
+  }
+
+  .modal-header button {
+    align-self: flex-end;
+    padding: 0.25rem 0.5rem;
+    font-size: 1rem;
+  }
+
+  .modal-body {
+    padding: 0.5rem;
+  }
+
+  .quick-add-view-selector {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+  }
+
+  .quick-add-view-selector label {
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .quick-add-view-selector .view-dropdown {
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    min-width: auto;
+    width: 100%;
+  }
+}
+
+/* Extra small mobile screens */
+@media (max-width: 480px) {
+  .quick-add-modal {
+    max-width: 98%;
+    width: 98%;
+    margin: 0.25rem;
+    max-height: 95vh;
+  }
+
+  .modal-overlay {
+    padding: 0.25rem;
+    padding-top: 1rem;
+  }
+
+  .modal-content {
+    padding: 0.25rem;
+    border-radius: 2px;
+  }
+
+  .modal-header {
+    padding: 0.25rem;
+  }
+
+  .modal-header h3 {
+    font-size: 1rem;
+  }
+
+  .modal-body {
+    padding: 0.25rem;
+  }
+
+  .quick-add-view-selector {
+    padding: 0.25rem;
+  }
+
+  .quick-add-view-selector label {
+    font-size: 0.8rem;
+  }
+
+  .quick-add-view-selector .view-dropdown {
+    padding: 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  /* Extra small mobile button group styles */
+  .insert-button-group {
+    margin: 0.25rem 0;
+  }
+
+  .insert-button,
+  .quick-add-button {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  /* Ensure Quick Add text stays hidden on extra small screens */
+  .quick-add-text {
+    display: none;
+  }
+}
+
+/* Quick Add Dialog Styles */
+.quick-add-modal {
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0.75rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.modal-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.modal-header button {
+  padding: 0.5rem;
+  min-width: auto;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.modal-body {
+  padding: 0.75rem;
+}
+
+.quick-add-view-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.quick-add-view-selector label {
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.quick-add-view-selector .view-dropdown {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background: white;
+  font-size: 0.9rem;
+  cursor: pointer;
+  min-width: 120px;
+}
+
+.quick-add-view-selector .view-dropdown:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 </style>
