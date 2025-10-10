@@ -850,7 +850,7 @@ onMounted(loadForeignKeys)
           </router-link>
           <button @click="openQuickAddDialog" class="button primary quick-add-button" title="Quick Add">
             <HugeiconsIcon :icon="Add01Icon" />
-            <span class="quick-add-text">Quick Add</span>
+            <span class="quick-add-text"></span>
           </button>
         </div>
       </div>

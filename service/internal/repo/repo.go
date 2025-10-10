@@ -21,6 +21,19 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// sanitizeDatabaseIdentifier ensures the table name is a safe SQL identifier: [a-zA-Z0-9_]+
+func sanitizeDatabaseIdentifier(input string) string {
+	if input == "" {
+		return "items"
+	}
+	re := regexp.MustCompile(`[^a-zA-Z0-9_]`)
+	sanitized := re.ReplaceAllString(input, "")
+	if sanitized == "" {
+		return "items"
+	}
+	return sanitized
+}
+
 type Item struct {
 	ID        string                 `db:"id"`
 	SrCreated time.Time              `db:"sr_created"`
@@ -134,18 +147,6 @@ func (r *Repository) CreateDashboardComponentRule(ctx context.Context, component
 
 func NewRepository(db *sqlx.DB) *Repository {
 	return &Repository{db: db}
-}
-
-func (r *Repository) InsertTableConfiguration(ctx context.Context, name string) error {
-	n := sanitizeTableName(name)
-	switch r.db.DriverName() {
-	case "mysql":
-		_, err := r.db.ExecContext(ctx, "INSERT IGNORE INTO table_configurations (name, title, ordinal, db) VALUES (?, ?, 0, DATABASE())", n, n)
-		return err
-	default:
-		_, err := r.db.ExecContext(ctx, "INSERT OR IGNORE INTO table_configurations (name, title, ordinal, db) VALUES (?, ?, 0, '')", n, n)
-		return err
-	}
 }
 
 type TableConfig struct {
@@ -543,19 +544,6 @@ func (r *Repository) GenerateDeviceCode() (string, error) {
 	return fmt.Sprintf("%04d", n.Int64()), nil
 }
 
-// sanitizeTableName ensures the table name is a safe SQL identifier: [a-zA-Z0-9_]+
-func sanitizeTableName(input string) string {
-	if input == "" {
-		return "items"
-	}
-	re := regexp.MustCompile(`[^a-zA-Z0-9_]`)
-	sanitized := re.ReplaceAllString(input, "")
-	if sanitized == "" {
-		return "items"
-	}
-	return sanitized
-}
-
 // EnsureSchemaForTable creates the table if it doesn't exist.
 func (r *Repository) EnsureSchemaForTable(ctx context.Context, table string) error {
 	tc, err := r.GetTableConfiguration(ctx, table)
@@ -609,8 +597,8 @@ CREATE TABLE IF NOT EXISTS %s.%s (
 }
 
 func (r *Repository) AddColumn(ctx context.Context, db, table string, field FieldSpec) error {
-	t := sanitizeTableName(table)
-	col := sanitizeTableName(field.Name)
+	t := sanitizeDatabaseIdentifier(table)
+	col := sanitizeDatabaseIdentifier(field.Name)
 	typ := "TEXT"
 	defaultClause := ""
 
@@ -689,7 +677,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 	if len(where) > 0 {
 		parts := make([]string, 0, len(where))
 		for k, v := range where {
-			col := sanitizeTableName(k)
+			col := sanitizeDatabaseIdentifier(k)
 			parts = append(parts, fmt.Sprintf("`%s` = ?", col))
 			args = append(args, v)
 		}
@@ -862,17 +850,11 @@ func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
 	return item, rows.Err()
 }
 
-func (r *Repository) GetItemInTable(ctx context.Context, table string, id string) (Item, error) {
-	tc, err := r.GetTableConfiguration(ctx, table)
-
-	if err != nil {
-		return Item{}, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
-	}
-
+func (r *Repository) GetItemInTable(ctx context.Context, tc *TableConfig, id string) (Item, error) {
 	// First get the column names for this table
 	columns, err := r.ListColumns(ctx, tc)
 	if err != nil {
-		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", tc.Table.String, err)
 	}
 
 	// Build dynamic SELECT query with all columns
@@ -941,7 +923,11 @@ func (r *Repository) GetItemInTable(ctx context.Context, table string, id string
 }
 
 func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string, id string, name string, additionalFields map[string]string) (Item, error) {
-	t := sanitizeTableName(table)
+	tc, err := r.GetTableConfiguration(ctx, table)
+
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
+	}
 
 	// Build dynamic UPDATE query
 	setParts := []string{"name = ?"}
@@ -949,14 +935,14 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 
 	for fieldName, fieldValue := range additionalFields {
 		// Sanitize field name to prevent SQL injection
-		sanitizedFieldName := sanitizeTableName(fieldName)
+		sanitizedFieldName := sanitizeDatabaseIdentifier(fieldName)
 		setParts = append(setParts, fmt.Sprintf("`%s` = ?", sanitizedFieldName))
 		args = append(args, fieldValue)
 	}
 
 	args = append(args, id) // Add id for WHERE clause
 
-	query := fmt.Sprintf("UPDATE `%s` SET %s WHERE `id` = ?", t, strings.Join(setParts, ", "))
+	query := fmt.Sprintf("UPDATE `%s`.`%s` SET %s WHERE `id` = ?", tc.Db.String, tc.Table.String, strings.Join(setParts, ", "))
 	log.Infof("Executing update query: %s with args: %v", query, args)
 
 	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
@@ -964,7 +950,7 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 		return Item{}, err
 	}
 
-	return r.GetItemInTable(ctx, t, id)
+	return r.GetItemInTable(ctx, tc, id)
 }
 
 func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id string) (bool, error) {
@@ -1064,8 +1050,6 @@ func (r *Repository) GetTableConfigurationByID(ctx context.Context, tcID int) (*
 
 // GetTableConfiguration returns the structure information for a table
 func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (*TableConfig, error) {
-	t := sanitizeTableName(tcName)
-
 	log.WithFields(log.Fields{
 		"tcName": tcName,
 	}).Infof("Getting TableConfiguration")
@@ -1073,10 +1057,10 @@ func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (
 	// Query table_configurations for this table's metadata
 	var config TableConfig
 	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon, view FROM table_configurations WHERE name = ?"
-	err := r.db.GetContext(ctx, &config, query, t)
+	err := r.db.GetContext(ctx, &config, query, tcName)
 
 	if err != nil {
-		log.Errorf("Failed to get table configuration for table %s: %v", t, err)
+		log.Errorf("Failed to get table configuration for table %s: %v", tcName, err)
 
 		if err == sql.ErrNoRows {
 			// Table not found in configurations, return default structure
@@ -1113,7 +1097,7 @@ type TableView struct {
 
 // CreateTableView creates a new table view with its column configurations
 func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName string, columns []TableViewColumn) error {
-	t := sanitizeTableName(tableName)
+	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Start a transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -1168,7 +1152,7 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName st
 
 // UpdateTableView updates an existing table view with its column configurations
 func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName, viewName string, columns []TableViewColumn) error {
-	t := sanitizeTableName(tableName)
+	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Start a transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -1212,7 +1196,7 @@ func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName,
 
 // GetTableViews retrieves all views for a given table
 func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]TableView, error) {
-	t := sanitizeTableName(tableName)
+	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Get all views for the table
 	rows, err := r.db.QueryxContext(ctx,
@@ -1306,10 +1290,10 @@ type ForeignKey struct {
 
 // CreateForeignKey creates a foreign key constraint
 func (r *Repository) CreateForeignKey(ctx context.Context, tableName, columnName, referencedTable, referencedColumn, onDeleteAction, onUpdateAction string) error {
-	t := sanitizeTableName(tableName)
-	refTable := sanitizeTableName(referencedTable)
-	col := sanitizeTableName(columnName)
-	refCol := sanitizeTableName(referencedColumn)
+	t := sanitizeDatabaseIdentifier(tableName)
+	refTable := sanitizeDatabaseIdentifier(referencedTable)
+	col := sanitizeDatabaseIdentifier(columnName)
+	refCol := sanitizeDatabaseIdentifier(referencedColumn)
 
 	tc, err := r.GetTableConfiguration(ctx, tableName)
 	if err != nil {
@@ -1443,7 +1427,7 @@ func (r *Repository) ChangeColumnType(ctx context.Context, tableName, columnName
 		return err
 	}
 
-	col := sanitizeTableName(columnName)
+	col := sanitizeDatabaseIdentifier(columnName)
 
 	// Use the newType directly as it's now a native database type
 	dbType := newType
@@ -1471,7 +1455,7 @@ func (r *Repository) DropColumn(ctx context.Context, tableName, columnName strin
 		return err
 	}
 
-	col := sanitizeTableName(columnName)
+	col := sanitizeDatabaseIdentifier(columnName)
 
 	// Build the ALTER TABLE statement
 	var alterQuery string
@@ -1495,8 +1479,8 @@ func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnN
 		return err
 	}
 
-	oldCol := sanitizeTableName(oldColumnName)
-	newCol := sanitizeTableName(newColumnName)
+	oldCol := sanitizeDatabaseIdentifier(oldColumnName)
+	newCol := sanitizeDatabaseIdentifier(newColumnName)
 
 	if oldCol == "id" || oldCol == "sr_created" {
 		return fmt.Errorf("cannot rename system columns (id, sr_created)")
@@ -1614,7 +1598,7 @@ func (r *Repository) GetMostRecentlyViewed(ctx context.Context, limit int) ([]Re
 
 // getItemName fetches the name field from a specific item in a table
 func (r *Repository) getItemName(ctx context.Context, tableName, itemID string) (string, error) {
-	t := sanitizeTableName(tableName)
+	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Try to get the 'name' field first, fallback to 'title' if it doesn't exist
 	var name string

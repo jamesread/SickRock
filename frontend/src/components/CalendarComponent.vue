@@ -164,6 +164,21 @@ function getMultiDayPosition(item: Item, date: Date): 'start' | 'middle' | 'end'
   return 'single'
 }
 
+// Helper function to check if a time is midnight (00:00)
+function isMidnight(dateValue: any): boolean {
+  if (!dateValue) return false
+  const date = new Date(dateValue)
+  return date.getHours() === 0 && date.getMinutes() === 0
+}
+
+// Helper function to format time, returning "No time" if midnight
+function formatTimeOrNoTime(dateValue: any): string {
+  if (!dateValue) return 'No time'
+  if (isMidnight(dateValue)) return 'No time'
+  const date = new Date(dateValue)
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
 // Format event time based on position in multi-day event
 function formatEventTime(item: Item, date: Date): string {
   const starts = getItemValue(item, 'starts')
@@ -182,11 +197,13 @@ function formatEventTime(item: Item, date: Date): string {
   targetDate.setHours(0, 0, 0, 0)
 
   if (position === 'start') {
-    return new Date(starts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return formatTimeOrNoTime(starts)
   } else if (position === 'end') {
-    return new Date(finishes).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    return formatTimeOrNoTime(finishes)
   } else if (position === 'middle') {
     return 'All day'
+  } else if (position === 'single') {
+    return formatTimeOrNoTime(starts)
   }
 
   return 'All day'
@@ -659,11 +676,14 @@ onMounted(load)
                       <span v-if="getItemValue(item, 'starts') && getItemValue(item, 'finishes')">
                         {{ formatEventTime(item, day.date) }}
                       </span>
+                      <span v-else-if="getItemValue(item, 'starts')">
+                        {{ formatTimeOrNoTime(getItemValue(item, 'starts')) }}
+                      </span>
                       <span v-else-if="getItemValue(item, 'calendar_date')">
                         All day
                       </span>
                       <span v-else-if="getItemValue(item, 'sr_created')">
-                        {{ new Date(Number(getItemValue(item, 'sr_created')) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }}
+                        {{ formatTimeOrNoTime(new Date(Number(getItemValue(item, 'sr_created')) * 1000)) }}
                       </span>
                       <span v-else>No time</span>
                     </div>

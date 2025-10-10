@@ -215,7 +215,13 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 		additionalFields := make(map[string]string)
 		for key, value := range it.Fields {
 			if value != nil {
-				additionalFields[key] = fmt.Sprintf("%v", value)
+				// Special handling for time.Time values to ensure consistent formatting
+				if timeVal, ok := value.(time.Time); ok {
+					// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
+					additionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
+				} else {
+					additionalFields[key] = fmt.Sprintf("%v", value)
+				}
 			}
 		}
 
@@ -247,7 +253,13 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 	additionalFields := make(map[string]string)
 	for key, value := range it.Fields {
 		if value != nil {
-			additionalFields[key] = fmt.Sprintf("%v", value)
+			// Special handling for time.Time values to ensure consistent formatting
+			if timeVal, ok := value.(time.Time); ok {
+				// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
+				additionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
+			} else {
+				additionalFields[key] = fmt.Sprintf("%v", value)
+			}
 		}
 	}
 
@@ -270,7 +282,12 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 		return nil, err
 	}
 
-	it, err := s.repo.GetItemInTable(ctx, table, req.Msg.GetId())
+	tc, err := s.repo.GetTableConfiguration(ctx, table)
+	if err != nil {
+		return nil, err
+	}
+
+	it, err := s.repo.GetItemInTable(ctx, tc, req.Msg.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -288,7 +305,13 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 	additionalFields := make(map[string]string)
 	for key, value := range it.Fields {
 		if value != nil {
-			additionalFields[key] = fmt.Sprintf("%v", value)
+			// Special handling for time.Time values to ensure consistent formatting
+			if timeVal, ok := value.(time.Time); ok {
+				// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
+				additionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
+			} else {
+				additionalFields[key] = fmt.Sprintf("%v", value)
+			}
 		}
 	}
 
@@ -327,7 +350,13 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 	responseAdditionalFields := make(map[string]string)
 	for key, value := range it.Fields {
 		if value != nil {
-			responseAdditionalFields[key] = fmt.Sprintf("%v", value)
+			// Special handling for time.Time values to ensure consistent formatting
+			if timeVal, ok := value.(time.Time); ok {
+				// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
+				responseAdditionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
+			} else {
+				responseAdditionalFields[key] = fmt.Sprintf("%v", value)
+			}
 		}
 	}
 

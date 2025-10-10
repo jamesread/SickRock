@@ -633,7 +633,7 @@ function cancel() {
         </template>
       </template>
 
-      <div class="form-actions">
+      <div class="form-actions grid-span-32">
         <button
           v-if="isEditMode"
           type="button"
@@ -677,6 +677,10 @@ function cancel() {
   font-size: 0.9rem;
   color: #666;
   font-style: italic;
+}
+
+.grid-span-32 {
+  grid-column: 2;
 }
 
 form {
