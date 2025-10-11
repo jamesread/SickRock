@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-
+import Calendar, { type CalendarEvent } from 'picocrank/vue/components/Calendar.vue'
+import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
-import { SickRock } from '../gen/sickrock_pb'
-import RowActionsDropdown from '../components/RowActionsDropdown.vue'
 
 const props = defineProps<{
   tableId: string
@@ -22,6 +21,8 @@ const error = ref<string | null>(null)
 const editingItem = ref<{ id: string; value: string } | null>(null)
 const editingValue = ref('')
 const saving = ref(false)
+
+const selectedDate = ref('')
 
 // Context menu state
 const contextMenu = ref<{ visible: boolean; x: number; y: number; item: Item | null }>({
@@ -42,9 +43,8 @@ const quickAdd = ref<{ visible: boolean; date: Date | null; name: string; icon: 
 const creating = ref(false)
 
 // Calendar state
-const currentDate = ref(new Date())
-const currentMonth = computed(() => currentDate.value.getMonth())
-const currentYear = computed(() => currentDate.value.getFullYear())
+const currentMonth = ref(new Date().getMonth())
+const currentYear = ref(new Date().getFullYear())
 
 // Table structure state
 const tableStructure = ref<any>(null)
@@ -71,222 +71,84 @@ function getItemValue(item: any, column: string): any {
   return item[column]
 }
 
-// Get items for a specific date using calendar_date field
-function getItemsForDate(date: Date): Item[] {
-  const targetDate = new Date(date)
-  targetDate.setHours(0, 0, 0, 0)
+// Helper function to parse MySQL datetime/date strings as local time
+function parseServerDateTime(dateStr: any): Date | null {
+  if (!dateStr) return null
 
-  return items.value.filter(item => {
-    const calendarDate = getItemValue(item, 'calendar_date')
+  const str = String(dateStr).trim()
 
-    // If we have calendar_date field, use it for date checking
-    if (calendarDate) {
-      const itemDate = new Date(calendarDate)
-      const itemDateOnly = new Date(itemDate)
-      itemDateOnly.setHours(0, 0, 0, 0)
+  // Match MySQL datetime format: YYYY-MM-DD HH:MM:SS or YYYY-MM-DD
+  const datetimeMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/)
 
-      return targetDate.getTime() === itemDateOnly.getTime()
-    }
+  if (!datetimeMatch) {
+    // Fallback to standard Date parsing
+    const date = new Date(str)
+    return isNaN(date.getTime()) ? null : date
+  }
 
-    // Fallback to starts/finishes fields for backward compatibility
+  const [, year, month, day, hour = '0', minute = '0', second = '0'] = datetimeMatch
+
+  // Create date in local timezone by using the Date constructor with components
+  const date = new Date(
+    parseInt(year, 10),
+    parseInt(month, 10) - 1, // Month is 0-indexed
+    parseInt(day, 10),
+    parseInt(hour, 10),
+    parseInt(minute, 10),
+    parseInt(second, 10)
+  )
+
+  return isNaN(date.getTime()) ? null : date
+}
+
+// Convert SickRock items to CalendarEvents
+const calendarEvents = computed<CalendarEvent[]>(() => {
+  return items.value.map(item => {
+    const id = getItemValue(item, 'id')
+    const name = getItemValue(item, 'name')
     const starts = getItemValue(item, 'starts')
     const finishes = getItemValue(item, 'finishes')
+    const calendarDate = getItemValue(item, 'calendar_date')
+    const srCreated = getItemValue(item, 'sr_created')
 
-    if (starts) {
-      const startDate = new Date(starts)
-      const startDateOnly = new Date(startDate)
-      startDateOnly.setHours(0, 0, 0, 0)
+    let startDate: Date | null = null
+    let endDate: Date | null = null
+    let date: Date | null = null
 
-      // If we also have finishes, check if the target date falls within the range
+    if (calendarDate) {
+      date = parseServerDateTime(calendarDate)
+    } else if (starts) {
+      startDate = parseServerDateTime(starts)
       if (finishes) {
-        const endDate = new Date(finishes)
-        const endDateOnly = new Date(endDate)
-        endDateOnly.setHours(0, 0, 0, 0)
-
-        return targetDate >= startDateOnly && targetDate <= endDateOnly
-      } else {
-        // Only starts field - show on the start date
-        return targetDate.getTime() === startDateOnly.getTime()
+        endDate = parseServerDateTime(finishes)
       }
+    } else if (srCreated) {
+      date = new Date(Number(srCreated) * 1000)
     }
 
-    // Final fallback to sr_created for backward compatibility
-    const createdAt = getItemValue(item, 'sr_created')
-    if (createdAt) {
-      const itemDate = new Date(Number(createdAt) * 1000)
-      itemDate.setHours(0, 0, 0, 0)
-      return itemDate.getTime() === targetDate.getTime()
-    }
 
-    // If no date fields at all, don't show the item
-    return false
+    return {
+      id: String(id),
+      title: name ? String(name) : `Item ${id || 'Unknown'}`,
+      startDate,
+      endDate,
+      date,
+      _originalItem: item // Keep reference to original item for callbacks
+    }
   })
-}
-
-// Check if an item is a multi-day event
-function isMultiDayEvent(item: Item): boolean {
-  const starts = getItemValue(item, 'starts')
-  const finishes = getItemValue(item, 'finishes')
-
-  if (!starts || !finishes) return false
-
-  const startDate = new Date(starts)
-  const endDate = new Date(finishes)
-
-  // Set times to start/end of day for proper comparison
-  startDate.setHours(0, 0, 0, 0)
-  endDate.setHours(0, 0, 0, 0)
-
-  return startDate.getTime() !== endDate.getTime()
-}
-
-// Get the position of an item within a multi-day event for a specific date
-function getMultiDayPosition(item: Item, date: Date): 'start' | 'middle' | 'end' | 'single' {
-  const starts = getItemValue(item, 'starts')
-  const finishes = getItemValue(item, 'finishes')
-
-  if (!starts || !finishes) return 'single'
-
-  const startDate = new Date(starts)
-  const endDate = new Date(finishes)
-  const targetDate = new Date(date)
-
-  // Set times to start/end of day for proper comparison
-  startDate.setHours(0, 0, 0, 0)
-  endDate.setHours(0, 0, 0, 0)
-  targetDate.setHours(0, 0, 0, 0)
-
-  if (startDate.getTime() === endDate.getTime()) return 'single'
-  if (targetDate.getTime() === startDate.getTime()) return 'start'
-  if (targetDate.getTime() === endDate.getTime()) return 'end'
-  if (targetDate > startDate && targetDate < endDate) return 'middle'
-
-  return 'single'
-}
-
-// Helper function to check if a time is midnight (00:00)
-function isMidnight(dateValue: any): boolean {
-  if (!dateValue) return false
-  const date = new Date(dateValue)
-  return date.getHours() === 0 && date.getMinutes() === 0
-}
-
-// Helper function to format time, returning "No time" if midnight
-function formatTimeOrNoTime(dateValue: any): string {
-  if (!dateValue) return 'No time'
-  if (isMidnight(dateValue)) return 'No time'
-  const date = new Date(dateValue)
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-// Format event time based on position in multi-day event
-function formatEventTime(item: Item, date: Date): string {
-  const starts = getItemValue(item, 'starts')
-  const finishes = getItemValue(item, 'finishes')
-  const position = getMultiDayPosition(item, date)
-
-  if (!starts || !finishes) return 'No time'
-
-  const startDate = new Date(starts)
-  const endDate = new Date(finishes)
-  const targetDate = new Date(date)
-
-  // Set times to start/end of day for proper comparison
-  startDate.setHours(0, 0, 0, 0)
-  endDate.setHours(0, 0, 0, 0)
-  targetDate.setHours(0, 0, 0, 0)
-
-  if (position === 'start') {
-    return formatTimeOrNoTime(starts)
-  } else if (position === 'end') {
-    return formatTimeOrNoTime(finishes)
-  } else if (position === 'middle') {
-    return 'All day'
-  } else if (position === 'single') {
-    return formatTimeOrNoTime(starts)
-  }
-
-  return 'All day'
-}
-
-// Calendar generation
-const calendarDays = computed(() => {
-  const year = currentYear.value
-  const month = currentMonth.value
-
-  // Get first day of month and number of days
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const daysInMonth = lastDay.getDate()
-
-  // Get starting day of week (0 = Sunday, 1 = Monday, etc.)
-  // Adjust for Monday as first day: Sunday (0) becomes 6, Monday (1) becomes 0, etc.
-  const startDay = (firstDay.getDay() + 6) % 7
-
-  const days = []
-
-  // Add days from previous month to fill the first row
-  const prevMonth = month === 0 ? 11 : month - 1
-  const prevYear = month === 0 ? year - 1 : year
-  const prevMonthLastDay = new Date(prevYear, prevMonth + 1, 0).getDate()
-
-  for (let i = 0; i < startDay; i++) {
-    const day = prevMonthLastDay - startDay + i + 1
-    const date = new Date(prevYear, prevMonth, day)
-    days.push({
-      date,
-      items: getItemsForDate(date)
-    })
-  }
-
-  // Add days of the month
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month, day)
-    days.push({
-      date,
-      items: getItemsForDate(date)
-    })
-  }
-
-  // Add days from next month to complete the last row
-  // Calculate how many more days we need to reach 42 total cells (6 rows × 7 columns)
-  const totalCells = 42
-  const remainingCells = totalCells - days.length
-
-  for (let day = 1; day <= remainingCells; day++) {
-    const date = new Date(year, month + 1, day)
-    days.push({
-      date,
-      items: getItemsForDate(date)
-    })
-  }
-
-  return days
 })
-
-// Navigation functions
-function previousMonth() {
-  currentDate.value = new Date(currentYear.value, currentMonth.value - 1, 1)
-}
-
-function nextMonth() {
-  currentDate.value = new Date(currentYear.value, currentMonth.value + 1, 1)
-}
-
-function goToToday() {
-  currentDate.value = new Date()
-}
-
-// Month names
-const monthNames = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
-]
-
-const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 // Load data
 async function load() {
+  const now = new Date()
+  const newMonth = now.getMonth()
+  const newYear = now.getFullYear()
+
+  currentMonth.value = newMonth
+  currentYear.value = newYear
+
+  selectedDate.value = `${newYear}-${String(newMonth + 1).padStart(2, '0')}`
+
   loading.value = true
   error.value = null
   try {
@@ -304,11 +166,82 @@ async function load() {
   }
 }
 
-// Navigation functions
-function openRow(item: Item) {
+// Custom date range extractor to avoid date re-parsing issues
+function getEventDateRange(event: CalendarEvent): { start: Date | null; end: Date | null } {
+  // Return the Date objects directly without re-parsing
+  return {
+    start: event.startDate instanceof Date ? event.startDate : (event.date instanceof Date ? event.date : null),
+    end: event.endDate instanceof Date ? event.endDate : null
+  }
+}
+
+// Custom event time formatter
+function formatEventTime(event: CalendarEvent, date: Date): string {
+  const { start, end } = getEventDateRange(event)
+
+  if (!start) return 'No time'
+
+  // Check if start time is midnight (00:00)
+  if (start.getHours() === 0 && start.getMinutes() === 0) {
+    return 'No time'
+  }
+
+  // For events with both start and end (date ranges)
+  if (end) {
+    const startDateOnly = new Date(start)
+    startDateOnly.setHours(0, 0, 0, 0)
+    const endDateOnly = new Date(end)
+    endDateOnly.setHours(0, 0, 0, 0)
+    const targetDateOnly = new Date(date)
+    targetDateOnly.setHours(0, 0, 0, 0)
+
+    // Multi-day event logic
+    if (startDateOnly.getTime() !== endDateOnly.getTime()) {
+      if (targetDateOnly.getTime() === startDateOnly.getTime()) {
+        // Start day - show start time
+        return start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      } else if (targetDateOnly.getTime() === endDateOnly.getTime()) {
+        // End day - show end time
+        if (end.getHours() === 0 && end.getMinutes() === 0) {
+          return 'No time'
+        }
+        return end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      } else {
+        // Middle day
+        return 'All day'
+      }
+    }
+  }
+
+  // Single-time event - show the start time
+  return start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+}
+
+// Event handlers
+function handleEventClick(event: CalendarEvent) {
+  const item = (event as any)._originalItem
   const itemId = getItemValue(item, 'id')
   if (itemId) {
     window.location.href = `/table/${props.tableId}/${itemId}`
+  }
+}
+
+function handleDateClick(date: Date) {
+  showQuickAdd(date)
+}
+
+function handleMonthChange(month: number, year: number) {
+  currentMonth.value = month
+  currentYear.value = year
+}
+
+function handleEventContextMenu(event: CalendarEvent, mouseEvent: MouseEvent) {
+  const item = (event as any)._originalItem
+  contextMenu.value = {
+    visible: true,
+    x: mouseEvent.clientX,
+    y: mouseEvent.clientY,
+    item: item
   }
 }
 
@@ -454,107 +387,58 @@ async function saveAndEdit() {
   }
 }
 
-// Inline editing functions
-function startEdit(item: Item) {
-  const itemId = getItemValue(item, 'id')
-  const currentName = getItemValue(item, 'name') || `Item ${itemId || 'Unknown'}`
+function goToToday() {
+  const now = new Date()
+  const newMonth = now.getMonth()
+  const newYear = now.getFullYear()
 
-  editingItem.value = { id: String(itemId), value: String(currentName) }
-  editingValue.value = String(currentName)
+  currentMonth.value = newMonth
+  currentYear.value = newYear
 
-  // Focus the input after the DOM updates
-  setTimeout(() => {
-    const input = document.querySelector('.edit-input') as HTMLInputElement
-    if (input) {
-      input.focus()
-      input.select()
-    }
-  }, 0)
+  updateDatePicker(newMonth, newYear)
 }
 
-function cancelEdit() {
-  editingItem.value = null
-  editingValue.value = ''
+function prevMonth() {
+  const newMonth = currentMonth.value === 0 ? 11 : currentMonth.value - 1
+  const newYear = currentMonth.value === 0 ? currentYear.value - 1 : currentYear.value
+
+  currentMonth.value = newMonth
+  currentYear.value = newYear
+
+  updateDatePicker(newMonth, newYear)
 }
 
-async function saveEdit() {
-  if (!editingItem.value) return
+function nextMonth() {
+  const newMonth = currentMonth.value === 11 ? 0 : currentMonth.value + 1
+  const newYear = currentMonth.value === 11 ? currentYear.value + 1 : currentYear.value
 
-  saving.value = true
-  try {
-    const { id } = editingItem.value
+  currentMonth.value = newMonth
+  currentYear.value = newYear
 
-    // Prepare the update data - all fields go into additionalFields
-    const additionalFields: Record<string, string> = {}
-
-    // Get all current values and update just the name field
-    const currentItem = items.value.find(it => String(getItemValue(it, 'id')) === id)
-    if (currentItem) {
-      // Get all additional fields from the current item
-      if (currentItem.additionalFields) {
-        Object.entries(currentItem.additionalFields).forEach(([key, value]) => {
-          additionalFields[key] = String(value)
-        })
-      }
-      // Update the name field
-      additionalFields['name'] = editingValue.value
-
-      await client.editItem({
-        id: id,
-        additionalFields: additionalFields,
-        pageId: props.tableId
-      })
-    }
-
-    // Reload the data to reflect changes
-    await load()
-    cancelEdit()
-  } catch (e) {
-    console.error('Failed to save edit:', e)
-    error.value = `Failed to save edit: ${e}`
-  } finally {
-    saving.value = false
-  }
+  updateDatePicker(newMonth, newYear)
 }
 
-function isEditing(item: Item): boolean {
-  const itemId = getItemValue(item, 'id')
-  return editingItem.value?.id === String(itemId)
+function goToSelectedDate() {
+  if (!selectedDate.value) return
+
+  const [year, month] = selectedDate.value.split('-').map(Number)
+
+  currentMonth.value = month - 1 // Convert from 1-indexed to 0-indexed
+  currentYear.value = year
 }
 
-function handleKeydown(event: KeyboardEvent) {
-  if (event.key === 'Enter') {
-    event.preventDefault()
-    saveEdit()
-  } else if (event.key === 'Escape') {
-    event.preventDefault()
-    cancelEdit()
-  }
+function updateDatePicker(month: number, year: number) {
+  const monthX = String(month + 1).padStart(2, '0')
+  selectedDate.value = `${year}-${monthX}`
 }
 
 // Context menu functions
-function showContextMenu(event: MouseEvent, item: Item) {
-  event.preventDefault()
-  event.stopPropagation()
-
-  console.log('Context menu triggered for item:', item)
-
-  contextMenu.value = {
-    visible: true,
-    x: event.clientX,
-    y: event.clientY,
-    item: item
-  }
-}
-
 function hideContextMenu() {
   contextMenu.value.visible = false
   contextMenu.value.item = null
 }
 
 async function deleteItem() {
-  console.log('Delete item clicked, contextMenu:', contextMenu.value)
-
   if (!contextMenu.value.item) {
     console.log('No item in context menu')
     return
@@ -589,114 +473,40 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="with-header-and-content">
-    <div class="section-header">
-      <h2 class="calendar-title">{{ monthNames[currentMonth] }} {{ currentYear }}</h2>
-
-      <div class = "toolbar">
+  <Section title="Calendar" :padding="false">
+    <template #toolbar>
+      <div class="toolbar">
         <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
-        <button @click="previousMonth" class="button neutral">‹</button>
         <button @click="goToToday" class="button neutral">Today</button>
+        <button @click="prevMonth" class="button neutral">‹</button>
+         <div class="date-picker-container">
+           <input
+             id="goto-date"
+             type="month"
+             v-model="selectedDate"
+             @change="goToSelectedDate"
+             class="date-picker-input"
+           />
+         </div>
         <button @click="nextMonth" class="button neutral">›</button>
       </div>
-    </div>
+    </template>
 
-    <div v-if="error" class="error">{{ error }}</div>
-    <div v-else-if="loading">Loading…</div>
-      <div v-else class="section-content md:p-8">
-      <div class="calendar-container">
-        <div class="calendar-grid">
-          <div v-for="day in dayNames" :key="day" class="day-header">{{ day }}</div>
-
-          <div
-            v-for="(day, index) in calendarDays"
-            :key="index"
-            class="calendar-day"
-            :class="{
-              'empty': !day,
-              'today': day && day.date.toDateString() === new Date().toDateString(),
-              'weekend': day && (day.date.getDay() === 0 || day.date.getDay() === 6),
-              'prev-month': day && day.date.getMonth() !== currentMonth && day.date.getMonth() !== (currentMonth + 1) % 12,
-              'next-month': day && day.date.getMonth() !== currentMonth && day.date.getMonth() === (currentMonth + 1) % 12
-            }"
-          >
-            <div v-if="day" class="day-content" @click="showQuickAdd(day.date)">
-              <div
-                class="day-number clickable"
-              >
-                {{ day.date.getDate() }}
-              </div>
-              <div class="day-items">
-                <div
-                  v-for="item in day.items.sort((a, b) => {
-                    const aMultiDay = isMultiDayEvent(a);
-                    const bMultiDay = isMultiDayEvent(b);
-                    if (aMultiDay && !bMultiDay) return -1;
-                    if (!aMultiDay && bMultiDay) return 1;
-                    return 0;
-                  }).slice(0, 3)"
-                  :key="getItemValue(item, 'id')"
-                  class="calendar-item"
-                  :class="{
-                    'editing': isEditing(item),
-                    'multi-day': isMultiDayEvent(item),
-                    'multi-day-start': isMultiDayEvent(item) && getMultiDayPosition(item, day.date) === 'start',
-                    'multi-day-middle': isMultiDayEvent(item) && getMultiDayPosition(item, day.date) === 'middle',
-                    'multi-day-end': isMultiDayEvent(item) && getMultiDayPosition(item, day.date) === 'end'
-                  }"
-                  @click.stop
-                >
-                  <div v-if="isEditing(item)" class="edit-container" @click.stop>
-                    <input
-                      v-model="editingValue"
-                      class="edit-input"
-                      @keydown="handleKeydown"
-                      @blur="saveEdit"
-                      :disabled="saving"
-                    />
-                    <div class="edit-actions">
-                      <button @click="saveEdit" class="save-btn" :disabled="saving" title="Save (Enter)">
-                        ✓
-                      </button>
-                      <button @click="cancelEdit" class="cancel-btn" :disabled="saving" title="Cancel (Esc)">
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                  <div v-else class="item-content" @click.stop="openRow(item)" @dblclick.stop="startEdit(item)" @contextmenu.stop="showContextMenu($event, item)">
-                    <div class="item-title">
-                      {{ getItemValue(item, 'name') || `Item ${getItemValue(item, 'id') || 'Unknown'}` }}
-                      <span v-if="isMultiDayEvent(item)" class="multi-day-indicator">
-                        {{ getMultiDayPosition(item, day.date) === 'start' ? '▶' :
-                           getMultiDayPosition(item, day.date) === 'end' ? '◀' :
-                           getMultiDayPosition(item, day.date) === 'middle' ? '▬' : '' }}
-                      </span>
-                    </div>
-                    <div class="item-time">
-                      <span v-if="getItemValue(item, 'starts') && getItemValue(item, 'finishes')">
-                        {{ formatEventTime(item, day.date) }}
-                      </span>
-                      <span v-else-if="getItemValue(item, 'starts')">
-                        {{ formatTimeOrNoTime(getItemValue(item, 'starts')) }}
-                      </span>
-                      <span v-else-if="getItemValue(item, 'calendar_date')">
-                        All day
-                      </span>
-                      <span v-else-if="getItemValue(item, 'sr_created')">
-                        {{ formatTimeOrNoTime(new Date(Number(getItemValue(item, 'sr_created')) * 1000)) }}
-                      </span>
-                      <span v-else>No time</span>
-                    </div>
-                  </div>
-                </div>
-                <div v-if="day.items.length > 3" class="more-items">
-                  +{{ day.items.length - 3 }} more
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="calendar-content">
+      <Calendar
+        :events="calendarEvents"
+        :loading="loading"
+        :error="error"
+        :current-month="currentMonth"
+        :show-navigation="false"
+        :current-year="currentYear"
+        :get-event-date-range="getEventDateRange"
+        :format-event-time="formatEventTime"
+        @event-click="handleEventClick"
+        @date-click="handleDateClick"
+        @month-change="handleMonthChange"
+        @event-context-menu="handleEventContextMenu"
+      />
     </div>
 
     <!-- Context Menu -->
@@ -774,284 +584,43 @@ onMounted(load)
       class="quick-add-backdrop"
       @click="hideQuickAdd"
     ></div>
-  </section>
+  </Section>
 </template>
 
 <style scoped>
-.toolbar {
+.date-picker-container {
   display: flex;
   align-items: center;
-  gap: .5rem;
 }
 
-.calendar-title {
-  margin: 0;
-}
-
-.error {
-  color: #b00020;
-  padding: 1rem;
-}
-
-.calendar-nav {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
-}
-
-.section-header .button {
-  background: #fff;
-}
-
-.section-header .button:hover {
-  background: #c9ccd4;
-}
-
-.month-year {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 600;
-  min-width: 200px;
-  text-align: center;
-}
-
-.calendar-container {
-  background: white;
-  border: 1px solid #e0e0e0;
-  overflow: hidden;
-}
-
-.calendar-header {
-  display: grid;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.day-header {
-  padding: 1rem;
-  text-align: center;
-  font-weight: 600;
-  color: #666;
-  border-right: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
-  background: #f8f9fa;
-}
-
-.day-header:last-child {
-  border-right: none;
-}
-
-.calendar-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr)); /* Fixed width columns */
-  min-height: 400px;
-}
-
-.calendar-day {
-  border-right: 1px solid #e0e0e0;
-  border-bottom: 1px solid #e0e0e0;
-  min-height: 120px;
-  position: relative;
-  transition: background-color 0.2s ease;
-  cursor: pointer;
-}
-
-.calendar-day:hover {
-  background-color: #f0f8ff;
-}
-
-.calendar-day:last-child {
-  border-right: none;
-}
-
-.calendar-day.empty {
-  background: #f8f9fa;
-}
-
-.calendar-day.empty:hover {
-  background: #e9ecef;
-}
-
-.calendar-day.today {
-  background: #f7f8d7;
-}
-
-.calendar-day.today:hover {
-  background: #bbdefb;
-}
-
-.calendar-day.weekend {
-  background: #f8f9fa;
-}
-
-.calendar-day.weekend:hover {
-  background: #e9ecef;
-}
-
-.calendar-day.next-month {
-  background: #f8f9fa;
-  opacity: 0.6;
-}
-
-.calendar-day.next-month:hover {
-  background: #e9ecef;
-  opacity: 0.8;
-}
-
-.calendar-day.prev-month {
-  background: #f8f9fa;
-  opacity: 0.6;
-}
-
-.calendar-day.prev-month:hover {
-  background: #e9ecef;
-  opacity: 0.8;
-}
-
-.day-content {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.day-number {
-  font-size: .9rem;
-  margin-bottom: 0.25rem;
-  color: #333;
-  text-decoration: none;
-  display: inline-block;
-  padding: 0.1rem;
+.date-picker-input {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  transition: all 0.2s;
-  min-width: 1.5rem;
-  text-align: center;
-}
-
-.day-number.clickable {
-  cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.day-content:hover .day-number.clickable {
-  color: #007bff;
-}
-
-.day-items {
-  flex: 1;
-  overflow: hidden;
-}
-
-.calendar-item {
-  background: #d6f1aa;
-  border: 1px solid #c4db96;
-  margin-bottom: 0.25rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-  padding: 0.1rem 0.1rem;
-}
-
-.calendar-item:hover {
-  background: #b3de6e;
-  border-color: #c4db96;
-
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
-}
-
-.calendar-item.editing {
-  background: #fff3cd;
-  border-color: #ffc107;
-  cursor: default;
-}
-
-
-.calendar-item.multi-day-start {
-  border-top-left-radius: 4px;
-  border-bottom-left-radius: 4px;
-}
-
-.calendar-item.multi-day-middle {
-  border-radius: 0;
-}
-
-.calendar-item.multi-day-end {
-  border-top-right-radius: 4px;
-  border-bottom-right-radius: 4px;
-}
-
-.item-content {
-  cursor: pointer;
-}
-
-.edit-container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.edit-input {
-  width: 100%;
-  padding: 0.25rem;
-  border: 1px solid #007bff;
-  border-radius: 3px;
-  font-size: 0.85rem;
-  background: white;
-}
-
-.edit-input:focus {
+  font-size: 1rem;
   outline: none;
-  border-color: #0056b3;
+  cursor: pointer;
+  min-width: 150px;
+}
+
+.date-picker-input:focus {
+  border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
-.edit-actions {
+.date-picker-input:hover {
+  border-color: #999;
+}
+
+.toolbar {
   display: flex;
-  gap: 0.25rem;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.save-btn, .cancel-btn {
-  background: none;
-  border: none;
-  padding: 0.125rem 0.25rem;
-  border-radius: 3px;
-  cursor: pointer;
-  font-size: 0.75rem;
-  font-weight: bold;
-  transition: all 0.2s;
+.calendar-content {
+  padding: 1rem;
 }
-
-.save-btn {
-  color: #28a745;
-}
-
-.save-btn:hover:not(:disabled) {
-  background: #28a745;
-  color: white;
-}
-
-.cancel-btn {
-  color: #dc3545;
-}
-
-.cancel-btn:hover:not(:disabled) {
-  background: #dc3545;
-  color: white;
-}
-
-.save-btn:disabled, .cancel-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 
 /* Context Menu Styles */
 .context-menu {
@@ -1096,88 +665,6 @@ onMounted(load)
   bottom: 0;
   z-index: 1001;
   background: transparent;
-}
-
-.item-title {
-  font-weight: bold;
-  font-size: 0.85rem;
-  color: #333;
-  white-space: normal;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.multi-day-indicator {
-  font-size: 0.7rem;
-  color: #007bff;
-  font-weight: bold;
-}
-
-.item-time {
-  font-size: 0.75rem;
-  color: #666;
-  margin-top: 0.125rem;
-}
-
-.more-items {
-  font-size: 0.75rem;
-  color: #666;
-  text-align: center;
-  padding: 0.25rem;
-  background: #f8f9fa;
-  border-radius: 4px;
-  margin-top: 0.25rem;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .calendar-nav {
-    flex-wrap: wrap;
-    gap: 0.5rem;
-  }
-
-  .month-year {
-    font-size: 1.2rem;
-    min-width: 150px;
-  }
-
-  .calendar-day {
-    min-height: 80px;
-  }
-
-  .day-number {
-    font-size: 1rem;
-  }
-
-  .item-title {
-    font-size: 0.8rem;
-  }
-
-  .item-time {
-    font-size: 0.7rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .calendar-grid {
-    min-height: 300px;
-  }
-
-  .calendar-day {
-    min-height: 60px;
-  }
-
-  .day-header {
-    padding: 0.5rem 0.25rem;
-    font-size: 0.8rem;
-  }
-  section {
-    margin-top: 0;
-  }
-
 }
 
 /* Quick Add Modal */
@@ -1245,22 +732,9 @@ onMounted(load)
   z-index: 1000;
 }
 
-@media (min-width: 768px) {
-  .section-content {
-    padding: 1em;
-  }
-
-  .day-content {
-    padding: 0.45rem;
-  }
-
-  .calendar-item {
-    border-radius: 4px;
-    padding: 0.25rem 0.5rem;
-  }
-
-  .calendar-container {
-    border-radius: 8px;
+@media (max-width: 768px) {
+  .calendar-content {
+    padding: 0.5rem;
   }
 }
 </style>
