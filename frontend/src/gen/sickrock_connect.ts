@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
+import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableConfigurationRequest, CreateTableConfigurationResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDatabaseTablesRequest, GetDatabaseTablesResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -126,6 +126,24 @@ export const SickRock = {
       name: "GetTableConfigurations",
       I: GetTableConfigurationsRequest,
       O: GetTableConfigurationsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.CreateTableConfiguration
+     */
+    createTableConfiguration: {
+      name: "CreateTableConfiguration",
+      I: CreateTableConfigurationRequest,
+      O: CreateTableConfigurationResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetDatabaseTables
+     */
+    getDatabaseTables: {
+      name: "GetDatabaseTables",
+      I: GetDatabaseTablesRequest,
+      O: GetDatabaseTablesResponse,
       kind: MethodKind.Unary,
     },
     /**

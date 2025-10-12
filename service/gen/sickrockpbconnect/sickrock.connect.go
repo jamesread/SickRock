@@ -64,6 +64,12 @@ const (
 	// SickRockGetTableConfigurationsProcedure is the fully-qualified name of the SickRock's
 	// GetTableConfigurations RPC.
 	SickRockGetTableConfigurationsProcedure = "/sickrock.SickRock/GetTableConfigurations"
+	// SickRockCreateTableConfigurationProcedure is the fully-qualified name of the SickRock's
+	// CreateTableConfiguration RPC.
+	SickRockCreateTableConfigurationProcedure = "/sickrock.SickRock/CreateTableConfiguration"
+	// SickRockGetDatabaseTablesProcedure is the fully-qualified name of the SickRock's
+	// GetDatabaseTables RPC.
+	SickRockGetDatabaseTablesProcedure = "/sickrock.SickRock/GetDatabaseTables"
 	// SickRockGetNavigationProcedure is the fully-qualified name of the SickRock's GetNavigation RPC.
 	SickRockGetNavigationProcedure = "/sickrock.SickRock/GetNavigation"
 	// SickRockListItemsProcedure is the fully-qualified name of the SickRock's ListItems RPC.
@@ -150,6 +156,8 @@ type SickRockClient interface {
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
 	// Table configurations available in the application
 	GetTableConfigurations(context.Context, *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error)
+	CreateTableConfiguration(context.Context, *connect.Request[proto.CreateTableConfigurationRequest]) (*connect.Response[proto.CreateTableConfigurationResponse], error)
+	GetDatabaseTables(context.Context, *connect.Request[proto.GetDatabaseTablesRequest]) (*connect.Response[proto.GetDatabaseTablesResponse], error)
 	// Navigation items from table_navigation
 	GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error)
 	// Generic CRUD over items on a page
@@ -271,6 +279,18 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockGetTableConfigurationsProcedure,
 			connect.WithSchema(sickRockMethods.ByName("GetTableConfigurations")),
+			connect.WithClientOptions(opts...),
+		),
+		createTableConfiguration: connect.NewClient[proto.CreateTableConfigurationRequest, proto.CreateTableConfigurationResponse](
+			httpClient,
+			baseURL+SickRockCreateTableConfigurationProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateTableConfiguration")),
+			connect.WithClientOptions(opts...),
+		),
+		getDatabaseTables: connect.NewClient[proto.GetDatabaseTablesRequest, proto.GetDatabaseTablesResponse](
+			httpClient,
+			baseURL+SickRockGetDatabaseTablesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetDatabaseTables")),
 			connect.WithClientOptions(opts...),
 		),
 		getNavigation: connect.NewClient[proto.GetNavigationRequest, proto.GetNavigationResponse](
@@ -446,6 +466,8 @@ type sickRockClient struct {
 	getDeviceCodeSession         *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
 	getNavigationLinks           *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
 	getTableConfigurations       *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
+	createTableConfiguration     *connect.Client[proto.CreateTableConfigurationRequest, proto.CreateTableConfigurationResponse]
+	getDatabaseTables            *connect.Client[proto.GetDatabaseTablesRequest, proto.GetDatabaseTablesResponse]
 	getNavigation                *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
 	listItems                    *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
 	createItem                   *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
@@ -532,6 +554,16 @@ func (c *sickRockClient) GetNavigationLinks(ctx context.Context, req *connect.Re
 // GetTableConfigurations calls sickrock.SickRock.GetTableConfigurations.
 func (c *sickRockClient) GetTableConfigurations(ctx context.Context, req *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error) {
 	return c.getTableConfigurations.CallUnary(ctx, req)
+}
+
+// CreateTableConfiguration calls sickrock.SickRock.CreateTableConfiguration.
+func (c *sickRockClient) CreateTableConfiguration(ctx context.Context, req *connect.Request[proto.CreateTableConfigurationRequest]) (*connect.Response[proto.CreateTableConfigurationResponse], error) {
+	return c.createTableConfiguration.CallUnary(ctx, req)
+}
+
+// GetDatabaseTables calls sickrock.SickRock.GetDatabaseTables.
+func (c *sickRockClient) GetDatabaseTables(ctx context.Context, req *connect.Request[proto.GetDatabaseTablesRequest]) (*connect.Response[proto.GetDatabaseTablesResponse], error) {
+	return c.getDatabaseTables.CallUnary(ctx, req)
 }
 
 // GetNavigation calls sickrock.SickRock.GetNavigation.
@@ -682,6 +714,8 @@ type SickRockHandler interface {
 	GetNavigationLinks(context.Context, *connect.Request[proto.GetNavigationLinksRequest]) (*connect.Response[proto.GetNavigationLinksResponse], error)
 	// Table configurations available in the application
 	GetTableConfigurations(context.Context, *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error)
+	CreateTableConfiguration(context.Context, *connect.Request[proto.CreateTableConfigurationRequest]) (*connect.Response[proto.CreateTableConfigurationResponse], error)
+	GetDatabaseTables(context.Context, *connect.Request[proto.GetDatabaseTablesRequest]) (*connect.Response[proto.GetDatabaseTablesResponse], error)
 	// Navigation items from table_navigation
 	GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error)
 	// Generic CRUD over items on a page
@@ -799,6 +833,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockGetTableConfigurationsProcedure,
 		svc.GetTableConfigurations,
 		connect.WithSchema(sickRockMethods.ByName("GetTableConfigurations")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateTableConfigurationHandler := connect.NewUnaryHandler(
+		SickRockCreateTableConfigurationProcedure,
+		svc.CreateTableConfiguration,
+		connect.WithSchema(sickRockMethods.ByName("CreateTableConfiguration")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetDatabaseTablesHandler := connect.NewUnaryHandler(
+		SickRockGetDatabaseTablesProcedure,
+		svc.GetDatabaseTables,
+		connect.WithSchema(sickRockMethods.ByName("GetDatabaseTables")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockGetNavigationHandler := connect.NewUnaryHandler(
@@ -983,6 +1029,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetNavigationLinksHandler.ServeHTTP(w, r)
 		case SickRockGetTableConfigurationsProcedure:
 			sickRockGetTableConfigurationsHandler.ServeHTTP(w, r)
+		case SickRockCreateTableConfigurationProcedure:
+			sickRockCreateTableConfigurationHandler.ServeHTTP(w, r)
+		case SickRockGetDatabaseTablesProcedure:
+			sickRockGetDatabaseTablesHandler.ServeHTTP(w, r)
 		case SickRockGetNavigationProcedure:
 			sickRockGetNavigationHandler.ServeHTTP(w, r)
 		case SickRockListItemsProcedure:
@@ -1090,6 +1140,14 @@ func (UnimplementedSickRockHandler) GetNavigationLinks(context.Context, *connect
 
 func (UnimplementedSickRockHandler) GetTableConfigurations(context.Context, *connect.Request[proto.GetTableConfigurationsRequest]) (*connect.Response[proto.GetTableConfigurationsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetTableConfigurations is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateTableConfiguration(context.Context, *connect.Request[proto.CreateTableConfigurationRequest]) (*connect.Response[proto.CreateTableConfigurationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateTableConfiguration is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetDatabaseTables(context.Context, *connect.Request[proto.GetDatabaseTablesRequest]) (*connect.Response[proto.GetDatabaseTablesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetDatabaseTables is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error) {

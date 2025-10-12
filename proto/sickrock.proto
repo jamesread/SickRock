@@ -41,6 +41,32 @@ message GetTableConfigurationsResponse {
   repeated Page pages = 1;
 }
 
+message CreateTableConfigurationRequest {
+  string name = 1;
+  string database = 2;
+  string table = 3;
+}
+
+message CreateTableConfigurationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetDatabaseTablesRequest {
+  string database = 1;
+}
+
+message DatabaseTable {
+  string table_name = 1;
+  bool has_configuration = 2;
+  string configuration_name = 3;
+  string view = 4;
+}
+
+message GetDatabaseTablesResponse {
+  repeated DatabaseTable tables = 1;
+}
+
 // Navigation
 message GetNavigationRequest {}
 
@@ -488,6 +514,8 @@ service SickRock {
 
   // Table configurations available in the application
   rpc GetTableConfigurations(GetTableConfigurationsRequest) returns (GetTableConfigurationsResponse);
+  rpc CreateTableConfiguration(CreateTableConfigurationRequest) returns (CreateTableConfigurationResponse);
+  rpc GetDatabaseTables(GetDatabaseTablesRequest) returns (GetDatabaseTablesResponse);
 
   // Navigation items from table_navigation
   rpc GetNavigation(GetNavigationRequest) returns (GetNavigationResponse);

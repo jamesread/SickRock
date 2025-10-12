@@ -1,26 +1,93 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
-import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 
 const router = useRouter()
+const route = useRoute()
 const name = ref('')
+const database = ref('main')
+const table = ref('')
+const createConfiguration = ref(true)
 const loading = ref(false)
 const error = ref<string | null>(null)
+const success = ref<string | null>(null)
+
+// Track if user has manually edited the name field
+const nameManuallyEdited = ref(false)
 
 // Transport handled by authenticated client
 const client = createApiClient()
 
+// Pre-fill from URL query parameters if present
+onMounted(() => {
+  if (route.query.table) {
+    table.value = String(route.query.table)
+  }
+  if (route.query.database) {
+    database.value = String(route.query.database)
+  }
+})
+
+// Watch table and automatically update name unless manually edited
+watch(table, (newTable) => {
+  if (!nameManuallyEdited.value) {
+    name.value = newTable
+  }
+})
+
+// Track manual edits to the name field
+function onNameInput() {
+  nameManuallyEdited.value = true
+}
+
+// Auto-fill table name if not specified
+function ensureTableName() {
+  if (!table.value && name.value) {
+    table.value = name.value
+  }
+}
+
 async function submit() {
-  if (!name.value || loading.value) return
+  if (!table.value || loading.value) return
+
+  ensureTableName()
+
   loading.value = true
   error.value = null
+  success.value = null
+
   try {
-    await client.getTableStructure({ pageId: name.value })
-    await router.push(`/table/${encodeURIComponent(name.value)}`)
+    if (createConfiguration.value) {
+      if (!name.value) {
+        throw new Error('Configuration name is required when creating a table configuration')
+      }
+
+      // Create the table configuration entry first
+      const response = await client.createTableConfiguration({
+        name: name.value,
+        database: database.value,
+        table: table.value
+      })
+
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to create table configuration')
+      }
+
+      success.value = 'Table configuration created successfully'
+
+      // Ensure the actual table exists in the database
+      await client.getTableStructure({ pageId: name.value })
+
+      // Navigate to the table view
+      await router.push(`/table/${encodeURIComponent(name.value)}`)
+    } else {
+      // If not creating configuration, just use the table name directly
+      await client.getTableStructure({ pageId: table.value })
+      await router.push(`/table/${encodeURIComponent(table.value)}`)
+    }
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -30,9 +97,140 @@ async function submit() {
 </script>
 
 <template>
-  <Section title = "Create Table">
-    <input v-model="name" type="text" placeholder="Table name" @keyup.enter="submit" />
-    <button @click="submit" :disabled="loading || !name">Create</button>
-    <div v-if="error">{{ error }}</div>
+  <Section title="Create Table">
+    <form @submit.prevent="submit" class="create-table-form">
+      <div class="form-group">
+        <label for="table">Physical Table Name *</label>
+        <input
+          id="table"
+          v-model="table"
+          type="text"
+          placeholder="Start typing here to set both fields"
+          @keyup.enter="submit"
+          required
+        />
+        <small>The actual table name in the database</small>
+      </div>
+
+      <div class="form-group">
+        <label for="database">Database *</label>
+        <input
+          id="database"
+          v-model="database"
+          type="text"
+          placeholder="Database name (default: main)"
+          @keyup.enter="submit"
+        />
+        <small>The database where the table will be created</small>
+      </div>
+
+      <div class="form-group checkbox-group">
+        <label>
+          <input
+            type="checkbox"
+            v-model="createConfiguration"
+          />
+          Create table configuration entry
+        </label>
+        <small>Recommended: Adds the table to SickRock's navigation and configuration system</small>
+      </div>
+
+      <div v-if="createConfiguration" class="form-group">
+        <label for="name">Configuration Name *</label>
+        <input
+          id="name"
+          v-model="name"
+          type="text"
+          placeholder="e.g., employees, tasks, projects"
+          @input="onNameInput"
+          @keyup.enter="submit"
+          :required="createConfiguration"
+        />
+        <small>This is the name used in URLs and references</small>
+      </div>
+
+      <div class="form-actions">
+        <button type="submit" class="button primary" :disabled="loading || !table || (createConfiguration && !name)">
+          {{ loading ? 'Creating...' : 'Create Table' }}
+        </button>
+      </div>
+
+      <div v-if="success" class="success-message">✓ {{ success }}</div>
+      <div v-if="error" class="error-message">✗ {{ error }}</div>
+    </form>
   </Section>
 </template>
+
+<style scoped>
+.create-table-form {
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #333;
+}
+
+.form-group input[type="text"] {
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.form-group input[type="text"]:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-group small {
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: normal;
+  cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  cursor: pointer;
+}
+
+.form-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.success-message {
+  padding: 1rem;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 4px;
+  color: #155724;
+}
+
+.error-message {
+  padding: 1rem;
+  background: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 4px;
+  color: #721c24;
+}
+</style>

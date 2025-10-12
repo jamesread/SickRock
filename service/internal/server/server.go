@@ -97,6 +97,64 @@ func (s *SickRockServer) GetTableConfigurations(ctx context.Context, req *connec
 	return res, nil
 }
 
+func (s *SickRockServer) CreateTableConfiguration(ctx context.Context, req *connect.Request[sickrockpb.CreateTableConfigurationRequest]) (*connect.Response[sickrockpb.CreateTableConfigurationResponse], error) {
+	name := req.Msg.GetName()
+	database := req.Msg.GetDatabase()
+	table := req.Msg.GetTable()
+
+	// Validate required fields
+	if name == "" {
+		return connect.NewResponse(&sickrockpb.CreateTableConfigurationResponse{
+			Success: false,
+			Message: "Configuration name is required",
+		}), nil
+	}
+
+	if database == "" {
+		database = "main" // Default database
+	}
+
+	// Create the table configuration
+	err := s.repo.CreateTableConfiguration(ctx, name, database, table)
+	if err != nil {
+		log.Errorf("Failed to create table configuration: %v", err)
+		return connect.NewResponse(&sickrockpb.CreateTableConfigurationResponse{
+			Success: false,
+			Message: fmt.Sprintf("Failed to create table configuration: %v", err),
+		}), nil
+	}
+
+	return connect.NewResponse(&sickrockpb.CreateTableConfigurationResponse{
+		Success: true,
+		Message: "Table configuration created successfully",
+	}), nil
+}
+
+func (s *SickRockServer) GetDatabaseTables(ctx context.Context, req *connect.Request[sickrockpb.GetDatabaseTablesRequest]) (*connect.Response[sickrockpb.GetDatabaseTablesResponse], error) {
+	database := req.Msg.GetDatabase()
+	if database == "" {
+		database = "main"
+	}
+
+	tables, err := s.repo.GetDatabaseTables(ctx, database)
+	if err != nil {
+		return nil, err
+	}
+
+	dbTables := make([]*sickrockpb.DatabaseTable, 0, len(tables))
+	for _, table := range tables {
+		dbTables = append(dbTables, &sickrockpb.DatabaseTable{
+			TableName:         table.TableName,
+			HasConfiguration:  table.HasConfiguration,
+			ConfigurationName: table.ConfigurationName.String,
+			View:              table.View.String,
+		})
+	}
+
+	res := connect.NewResponse(&sickrockpb.GetDatabaseTablesResponse{Tables: dbTables})
+	return res, nil
+}
+
 func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request[sickrockpb.GetNavigationRequest]) (*connect.Response[sickrockpb.GetNavigationResponse], error) {
 	items, err := s.repo.GetNavigation(ctx)
 	if err != nil {
@@ -751,10 +809,10 @@ func (s *SickRockServer) DropColumn(ctx context.Context, req *connect.Request[si
 	}
 
 	// Prevent dropping system columns
-	if columnName == "id" || columnName == "sr_created" {
+	if columnName == "id" {
 		return connect.NewResponse(&sickrockpb.DropColumnResponse{
 			Success: false,
-			Message: "Cannot drop system columns (id, sr_created)",
+			Message: "Cannot drop system columns (id)",
 		}), nil
 	}
 

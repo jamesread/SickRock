@@ -1048,6 +1048,85 @@ func (r *Repository) GetTableConfigurationByID(ctx context.Context, tcID int) (*
 	return &config, nil
 }
 
+// DatabaseTableInfo contains information about a table and its configuration status
+type DatabaseTableInfo struct {
+	TableName         string         `db:"table_name"`
+	HasConfiguration  bool           `db:"has_configuration"`
+	ConfigurationName sql.NullString `db:"configuration_name"`
+	View              sql.NullString `db:"view"`
+}
+
+// GetDatabaseTables returns all tables in the specified database with their configuration status
+func (r *Repository) GetDatabaseTables(ctx context.Context, database string) ([]DatabaseTableInfo, error) {
+	log.WithFields(log.Fields{
+		"database": database,
+	}).Infof("Getting database tables")
+
+	if database == "" {
+		database = "main"
+	}
+
+	// Query to get all tables from information_schema and join with table_configurations
+	query := `
+		SELECT
+			t.TABLE_NAME as table_name,
+			CASE WHEN tc.name IS NOT NULL THEN 1 ELSE 0 END as has_configuration,
+			tc.name as configuration_name,
+			tc.view as view
+		FROM information_schema.TABLES t
+		LEFT JOIN table_configurations tc ON t.TABLE_NAME = tc.table AND tc.db = ?
+		WHERE t.TABLE_SCHEMA = ?
+		AND t.TABLE_TYPE = 'BASE TABLE'
+		ORDER BY t.TABLE_NAME
+	`
+
+	var tables []DatabaseTableInfo
+	err := r.db.SelectContext(ctx, &tables, query, database, database)
+	if err != nil {
+		log.Errorf("Failed to get database tables: %v", err)
+		return nil, fmt.Errorf("failed to get database tables: %w", err)
+	}
+
+	log.Infof("Found %d tables in database %s", len(tables), database)
+	return tables, nil
+}
+
+// CreateTableConfiguration creates a new table configuration entry
+func (r *Repository) CreateTableConfiguration(ctx context.Context, name, database, table string) error {
+	log.WithFields(log.Fields{
+		"name":     name,
+		"database": database,
+		"table":    table,
+	}).Infof("Creating table configuration")
+
+	// If table is empty, use name as table
+	if table == "" {
+		table = name
+	}
+
+	// Check if configuration already exists
+	var exists int
+	checkQuery := "SELECT COUNT(*) FROM table_configurations WHERE name = ?"
+	err := r.db.GetContext(ctx, &exists, checkQuery, name)
+	if err != nil {
+		return fmt.Errorf("failed to check existing configuration: %w", err)
+	}
+	if exists > 0 {
+		return fmt.Errorf("table configuration '%s' already exists", name)
+	}
+
+	// Insert the new configuration with view set to 'table'
+	query := "INSERT INTO table_configurations (name, `db`, `table`, view) VALUES (?, ?, ?, 'table')"
+	_, err = r.db.ExecContext(ctx, query, name, database, table)
+	if err != nil {
+		log.Errorf("Failed to create table configuration: %v", err)
+		return fmt.Errorf("failed to insert table configuration: %w", err)
+	}
+
+	log.Infof("Created table configuration: %s (db: %s, table: %s, view: table)", name, database, table)
+	return nil
+}
+
 // GetTableConfiguration returns the structure information for a table
 func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (*TableConfig, error) {
 	log.WithFields(log.Fields{

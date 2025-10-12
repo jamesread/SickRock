@@ -16,6 +16,7 @@ import ControlPanel from './views/ControlPanel.vue'
 import LoginView from './views/LoginView.vue'
 import NotFoundView from './views/NotFoundView.vue'
 import DeviceCodeClaimerView from './views/DeviceCodeClaimerView.vue'
+import DatabaseBrowser from './views/DatabaseBrowser.vue'
 import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
 import DashboardListView from './views/DashboardListView.vue'
 import Dashboard from './views/Dashboard.vue'
@@ -218,6 +219,16 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         title: 'Create Table',
+        icon: DatabaseAddIcon
+      },
+    },
+    {
+      path: '/admin/database-browser',
+      name: 'database-browser',
+      component: DatabaseBrowser,
+      meta: {
+        requiresAuth: true,
+        title: 'Database Browser',
         icon: DatabaseAddIcon
       },
     },

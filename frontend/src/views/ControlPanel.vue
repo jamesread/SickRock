@@ -12,7 +12,8 @@ import {
   BashIcon,
   HomeIcon,
   UserIcon,
-  KeyIcon
+  KeyIcon,
+  DatabaseIcon
 } from '@hugeicons/core-free-icons'
 
 const router = useRouter()
@@ -305,6 +306,10 @@ async function resetUserPassword() {
           <router-link to="/admin/table/create" class="button">
             <HugeiconsIcon :icon="AddIcon" width="18" height="18" class="action-icon" />
             Create New Table
+          </router-link>
+          <router-link to="/admin/database-browser" class="button">
+            <HugeiconsIcon :icon="DatabaseIcon" width="18" height="18" class="action-icon" />
+            Database Browser
           </router-link>
           <button @click="refreshData" class="button" :disabled="loading">
             <HugeiconsIcon :icon="RefreshIcon" width="18" height="18" class="action-icon" />

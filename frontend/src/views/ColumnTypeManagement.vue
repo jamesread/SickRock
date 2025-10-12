@@ -108,7 +108,7 @@ const canChangeType = computed(() => {
 
 const canDropColumn = (columnName: string) => {
   // Prevent dropping system columns
-  return columnName !== 'id' && columnName !== 'name' && columnName !== 'sr_created'
+  return columnName !== 'id' && columnName !== 'name'
 }
 
 // Methods
