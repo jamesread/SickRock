@@ -152,6 +152,16 @@ func main() {
 	// Log database engine version after migrations
 	logDatabaseEngineVersion(db)
 
+	// Reset admin password if environment variable is set
+	if os.Getenv("SICKROCK_RESET_ADMIN_PASSWORD") != "" {
+		log.Info("SICKROCK_RESET_ADMIN_PASSWORD environment variable is set, resetting admin password to 'admin'")
+		if err := repo.UpdateUserPassword(context.Background(), "admin", "admin"); err != nil {
+			log.Warnf("Failed to reset admin password: %v", err)
+		} else {
+			log.Info("Admin password has been reset to 'admin'")
+		}
+	}
+
 	// Create default admin user if no users exist
 	hasUsers, err := repo.HasUsers(context.Background())
 	if err != nil {
