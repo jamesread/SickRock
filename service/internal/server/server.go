@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
@@ -1162,4 +1165,153 @@ func (s *SickRockServer) DeleteUserBookmark(ctx context.Context, req *connect.Re
 	}
 
 	return connect.NewResponse(&sickrockpb.DeleteUserBookmarkResponse{Deleted: true}), nil
+}
+
+// API Key Management Methods
+
+// CreateAPIKey creates a new API key for the authenticated user
+func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[sickrockpb.CreateAPIKeyRequest]) (*connect.Response[sickrockpb.CreateAPIKeyResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	name := strings.TrimSpace(req.Msg.GetName())
+	if name == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
+	}
+
+	expiresAt := req.Msg.GetExpiresAt()
+	var expiresAtTime *time.Time
+	if expiresAt > 0 {
+		t := time.Unix(expiresAt, 0)
+		expiresAtTime = &t
+	}
+
+	// Generate a secure API key
+	apiKey, err := s.generateSecureAPIKey()
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to generate API key: %w", err))
+	}
+
+	// Hash the API key for storage
+	keyHash, err := s.hashAPIKey(apiKey)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to hash API key: %w", err))
+	}
+
+	// Create the API key in the database
+	createdAPIKey, err := s.repo.CreateAPIKey(ctx, userID, name, keyHash, expiresAtTime)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create API key: %w", err))
+	}
+
+	return connect.NewResponse(&sickrockpb.CreateAPIKeyResponse{
+		Success:  true,
+		Message:  "API key created successfully",
+		ApiKey:   apiKey, // Return the plain text key only once
+		ApiKeyId: int32(createdAPIKey.ID),
+	}), nil
+}
+
+// GetAPIKeys retrieves all API keys for the authenticated user
+func (s *SickRockServer) GetAPIKeys(ctx context.Context, req *connect.Request[sickrockpb.GetAPIKeysRequest]) (*connect.Response[sickrockpb.GetAPIKeysResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	apiKeys, err := s.repo.GetUserAPIKeys(ctx, userID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve API keys: %w", err))
+	}
+
+	var pbAPIKeys []*sickrockpb.APIKey
+	for _, apiKey := range apiKeys {
+		pbAPIKeys = append(pbAPIKeys, &sickrockpb.APIKey{
+			Id:         int32(apiKey.ID),
+			UserId:     int32(apiKey.UserID),
+			Name:       apiKey.Name,
+			CreatedAt:  apiKey.CreatedAt.Unix(),
+			LastUsedAt: s.timeToUnixPtr(apiKey.LastUsedAt),
+			ExpiresAt:  s.timeToUnixPtr(apiKey.ExpiresAt),
+			IsActive:   apiKey.IsActive,
+		})
+	}
+
+	return connect.NewResponse(&sickrockpb.GetAPIKeysResponse{
+		ApiKeys: pbAPIKeys,
+	}), nil
+}
+
+// DeleteAPIKey permanently deletes an API key
+func (s *SickRockServer) DeleteAPIKey(ctx context.Context, req *connect.Request[sickrockpb.DeleteAPIKeyRequest]) (*connect.Response[sickrockpb.DeleteAPIKeyResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	apiKeyID := int(req.Msg.GetApiKeyId())
+	if apiKeyID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
+	}
+
+	err = s.repo.DeleteAPIKey(ctx, userID, apiKeyID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to delete API key: %w", err))
+	}
+
+	return connect.NewResponse(&sickrockpb.DeleteAPIKeyResponse{
+		Success: true,
+		Message: "API key deleted successfully",
+	}), nil
+}
+
+// DeactivateAPIKey deactivates an API key
+func (s *SickRockServer) DeactivateAPIKey(ctx context.Context, req *connect.Request[sickrockpb.DeactivateAPIKeyRequest]) (*connect.Response[sickrockpb.DeactivateAPIKeyResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	apiKeyID := int(req.Msg.GetApiKeyId())
+	if apiKeyID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
+	}
+
+	err = s.repo.DeactivateAPIKey(ctx, userID, apiKeyID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to deactivate API key: %w", err))
+	}
+
+	return connect.NewResponse(&sickrockpb.DeactivateAPIKeyResponse{
+		Success: true,
+		Message: "API key deactivated successfully",
+	}), nil
+}
+
+// Helper methods for API key generation and hashing
+
+func (s *SickRockServer) generateSecureAPIKey() (string, error) {
+	// Generate 32 random bytes
+	bytes := make([]byte, 32)
+	if _, err := rand.Read(bytes); err != nil {
+		return "", err
+	}
+
+	// Convert to hex string and add prefix
+	key := "sk_" + hex.EncodeToString(bytes)
+	return key, nil
+}
+
+func (s *SickRockServer) hashAPIKey(apiKey string) (string, error) {
+	hash := sha256.Sum256([]byte(apiKey))
+	return hex.EncodeToString(hash[:]), nil
+}
+
+func (s *SickRockServer) timeToUnixPtr(t *time.Time) int64 {
+	if t == nil {
+		return 0
+	}
+	return t.Unix()
 }

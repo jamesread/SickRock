@@ -136,6 +136,15 @@ const (
 	// SickRockDeleteUserBookmarkProcedure is the fully-qualified name of the SickRock's
 	// DeleteUserBookmark RPC.
 	SickRockDeleteUserBookmarkProcedure = "/sickrock.SickRock/DeleteUserBookmark"
+	// SickRockCreateAPIKeyProcedure is the fully-qualified name of the SickRock's CreateAPIKey RPC.
+	SickRockCreateAPIKeyProcedure = "/sickrock.SickRock/CreateAPIKey"
+	// SickRockGetAPIKeysProcedure is the fully-qualified name of the SickRock's GetAPIKeys RPC.
+	SickRockGetAPIKeysProcedure = "/sickrock.SickRock/GetAPIKeys"
+	// SickRockDeleteAPIKeyProcedure is the fully-qualified name of the SickRock's DeleteAPIKey RPC.
+	SickRockDeleteAPIKeyProcedure = "/sickrock.SickRock/DeleteAPIKey"
+	// SickRockDeactivateAPIKeyProcedure is the fully-qualified name of the SickRock's DeactivateAPIKey
+	// RPC.
+	SickRockDeactivateAPIKeyProcedure = "/sickrock.SickRock/DeactivateAPIKey"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -196,6 +205,11 @@ type SickRockClient interface {
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
+	// API Key Management
+	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
+	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
+	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
+	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -449,6 +463,30 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeleteUserBookmark")),
 			connect.WithClientOptions(opts...),
 		),
+		createAPIKey: connect.NewClient[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse](
+			httpClient,
+			baseURL+SickRockCreateAPIKeyProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateAPIKey")),
+			connect.WithClientOptions(opts...),
+		),
+		getAPIKeys: connect.NewClient[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse](
+			httpClient,
+			baseURL+SickRockGetAPIKeysProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetAPIKeys")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteAPIKey: connect.NewClient[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse](
+			httpClient,
+			baseURL+SickRockDeleteAPIKeyProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteAPIKey")),
+			connect.WithClientOptions(opts...),
+		),
+		deactivateAPIKey: connect.NewClient[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse](
+			httpClient,
+			baseURL+SickRockDeactivateAPIKeyProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeactivateAPIKey")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -494,6 +532,10 @@ type sickRockClient struct {
 	getUserBookmarks             *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
 	createUserBookmark           *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
 	deleteUserBookmark           *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
+	createAPIKey                 *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
+	getAPIKeys                   *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
+	deleteAPIKey                 *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
+	deactivateAPIKey             *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -696,6 +738,26 @@ func (c *sickRockClient) DeleteUserBookmark(ctx context.Context, req *connect.Re
 	return c.deleteUserBookmark.CallUnary(ctx, req)
 }
 
+// CreateAPIKey calls sickrock.SickRock.CreateAPIKey.
+func (c *sickRockClient) CreateAPIKey(ctx context.Context, req *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error) {
+	return c.createAPIKey.CallUnary(ctx, req)
+}
+
+// GetAPIKeys calls sickrock.SickRock.GetAPIKeys.
+func (c *sickRockClient) GetAPIKeys(ctx context.Context, req *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error) {
+	return c.getAPIKeys.CallUnary(ctx, req)
+}
+
+// DeleteAPIKey calls sickrock.SickRock.DeleteAPIKey.
+func (c *sickRockClient) DeleteAPIKey(ctx context.Context, req *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error) {
+	return c.deleteAPIKey.CallUnary(ctx, req)
+}
+
+// DeactivateAPIKey calls sickrock.SickRock.DeactivateAPIKey.
+func (c *sickRockClient) DeactivateAPIKey(ctx context.Context, req *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error) {
+	return c.deactivateAPIKey.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -754,6 +816,11 @@ type SickRockHandler interface {
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
+	// API Key Management
+	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
+	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
+	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
+	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -1003,6 +1070,30 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeleteUserBookmark")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockCreateAPIKeyHandler := connect.NewUnaryHandler(
+		SickRockCreateAPIKeyProcedure,
+		svc.CreateAPIKey,
+		connect.WithSchema(sickRockMethods.ByName("CreateAPIKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetAPIKeysHandler := connect.NewUnaryHandler(
+		SickRockGetAPIKeysProcedure,
+		svc.GetAPIKeys,
+		connect.WithSchema(sickRockMethods.ByName("GetAPIKeys")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteAPIKeyHandler := connect.NewUnaryHandler(
+		SickRockDeleteAPIKeyProcedure,
+		svc.DeleteAPIKey,
+		connect.WithSchema(sickRockMethods.ByName("DeleteAPIKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeactivateAPIKeyHandler := connect.NewUnaryHandler(
+		SickRockDeactivateAPIKeyProcedure,
+		svc.DeactivateAPIKey,
+		connect.WithSchema(sickRockMethods.ByName("DeactivateAPIKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -1085,6 +1176,14 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockCreateUserBookmarkHandler.ServeHTTP(w, r)
 		case SickRockDeleteUserBookmarkProcedure:
 			sickRockDeleteUserBookmarkHandler.ServeHTTP(w, r)
+		case SickRockCreateAPIKeyProcedure:
+			sickRockCreateAPIKeyHandler.ServeHTTP(w, r)
+		case SickRockGetAPIKeysProcedure:
+			sickRockGetAPIKeysHandler.ServeHTTP(w, r)
+		case SickRockDeleteAPIKeyProcedure:
+			sickRockDeleteAPIKeyHandler.ServeHTTP(w, r)
+		case SickRockDeactivateAPIKeyProcedure:
+			sickRockDeactivateAPIKeyHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1252,4 +1351,20 @@ func (UnimplementedSickRockHandler) CreateUserBookmark(context.Context, *connect
 
 func (UnimplementedSickRockHandler) DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserBookmark is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateAPIKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetAPIKeys is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteAPIKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeactivateAPIKey is not implemented"))
 }

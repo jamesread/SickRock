@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -157,4 +158,34 @@ func (a *AuthService) generateSessionID() (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(bytes), nil
+}
+
+// API Key validation methods
+
+// ValidateAPIKey validates an API key and returns the associated API key record
+func (a *AuthService) ValidateAPIKey(ctx context.Context, apiKey string) (*repo.APIKey, error) {
+	// Hash the provided API key
+	keyHash, err := a.hashAPIKey(apiKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Look up the API key by hash
+	return a.repo.GetAPIKeyByHash(ctx, keyHash)
+}
+
+// UpdateAPIKeyLastUsed updates the last used timestamp for an API key
+func (a *AuthService) UpdateAPIKeyLastUsed(ctx context.Context, apiKey string) error {
+	keyHash, err := a.hashAPIKey(apiKey)
+	if err != nil {
+		return err
+	}
+
+	return a.repo.UpdateAPIKeyLastUsed(ctx, keyHash)
+}
+
+// hashAPIKey hashes an API key using SHA256
+func (a *AuthService) hashAPIKey(apiKey string) (string, error) {
+	hash := sha256.Sum256([]byte(apiKey))
+	return hex.EncodeToString(hash[:]), nil
 }

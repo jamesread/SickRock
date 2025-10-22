@@ -274,6 +274,22 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*U
 	return &user, nil
 }
 
+// GetUserByID retrieves a user by their ID
+func (r *Repository) GetUserByID(ctx context.Context, userID int) (*User, error) {
+	query := "SELECT id, username, password, initial_route FROM table_users WHERE id = ?"
+
+	var user User
+	err := r.db.QueryRowxContext(ctx, query, userID).Scan(&user.ID, &user.Username, &user.Password, &user.InitialRoute)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // User not found
+		}
+		return nil, err
+	}
+
+	return &user, nil
+}
+
 func (r *Repository) HasUsers(ctx context.Context) (bool, error) {
 	query := "SELECT COUNT(*) FROM table_users"
 	var count int
@@ -1795,6 +1811,197 @@ func (r *Repository) DeleteUserBookmark(ctx context.Context, userID, bookmarkID 
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("bookmark not found or not owned by user")
+	}
+
+	return nil
+}
+
+// API Key related methods
+
+type APIKey struct {
+	ID         int
+	UserID     int
+	Name       string
+	KeyHash    string
+	CreatedAt  time.Time
+	LastUsedAt *time.Time
+	ExpiresAt  *time.Time
+	IsActive   bool
+}
+
+// CreateAPIKey creates a new API key for a user
+func (r *Repository) CreateAPIKey(ctx context.Context, userID int, name, keyHash string, expiresAt *time.Time) (*APIKey, error) {
+	query := `
+		INSERT INTO table_api_keys (user_id, name, key_hash, expires_at)
+		VALUES (?, ?, ?, ?)
+	`
+	result, err := r.db.ExecContext(ctx, query, userID, name, keyHash, expiresAt)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	// Retrieve the created API key
+	return r.GetAPIKeyByID(ctx, int(id))
+}
+
+// GetAPIKeyByID retrieves an API key by its ID
+func (r *Repository) GetAPIKeyByID(ctx context.Context, id int) (*APIKey, error) {
+	query := `
+		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active
+		FROM table_api_keys
+		WHERE id = ?
+	`
+
+	var apiKey APIKey
+	err := r.db.QueryRowxContext(ctx, query, id).Scan(
+		&apiKey.ID,
+		&apiKey.UserID,
+		&apiKey.Name,
+		&apiKey.KeyHash,
+		&apiKey.CreatedAt,
+		&apiKey.LastUsedAt,
+		&apiKey.ExpiresAt,
+		&apiKey.IsActive,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &apiKey, nil
+}
+
+// GetAPIKeyByHash retrieves an API key by its hash
+func (r *Repository) GetAPIKeyByHash(ctx context.Context, keyHash string) (*APIKey, error) {
+	query := `
+		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active
+		FROM table_api_keys
+		WHERE key_hash = ? AND is_active = 1
+	`
+
+	var apiKey APIKey
+	err := r.db.QueryRowxContext(ctx, query, keyHash).Scan(
+		&apiKey.ID,
+		&apiKey.UserID,
+		&apiKey.Name,
+		&apiKey.KeyHash,
+		&apiKey.CreatedAt,
+		&apiKey.LastUsedAt,
+		&apiKey.ExpiresAt,
+		&apiKey.IsActive,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	// Check if the key has expired
+	if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
+		return nil, nil // Treat expired keys as not found
+	}
+
+	return &apiKey, nil
+}
+
+// GetUserAPIKeys retrieves all API keys for a user
+func (r *Repository) GetUserAPIKeys(ctx context.Context, userID int) ([]APIKey, error) {
+	query := `
+		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active
+		FROM table_api_keys
+		WHERE user_id = ?
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var apiKeys []APIKey
+	for rows.Next() {
+		var apiKey APIKey
+		err := rows.Scan(
+			&apiKey.ID,
+			&apiKey.UserID,
+			&apiKey.Name,
+			&apiKey.KeyHash,
+			&apiKey.CreatedAt,
+			&apiKey.LastUsedAt,
+			&apiKey.ExpiresAt,
+			&apiKey.IsActive,
+		)
+		if err != nil {
+			return nil, err
+		}
+		apiKeys = append(apiKeys, apiKey)
+	}
+
+	return apiKeys, nil
+}
+
+// UpdateAPIKeyLastUsed updates the last used timestamp for an API key
+func (r *Repository) UpdateAPIKeyLastUsed(ctx context.Context, keyHash string) error {
+	query := `
+		UPDATE table_api_keys
+		SET last_used_at = CURRENT_TIMESTAMP
+		WHERE key_hash = ?
+	`
+	_, err := r.db.ExecContext(ctx, query, keyHash)
+	return err
+}
+
+// DeactivateAPIKey deactivates an API key
+func (r *Repository) DeactivateAPIKey(ctx context.Context, userID, apiKeyID int) error {
+	query := `
+		UPDATE table_api_keys
+		SET is_active = 0
+		WHERE id = ? AND user_id = ?
+	`
+	result, err := r.db.ExecContext(ctx, query, apiKeyID, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("API key not found or not owned by user")
+	}
+
+	return nil
+}
+
+// DeleteAPIKey permanently deletes an API key
+func (r *Repository) DeleteAPIKey(ctx context.Context, userID, apiKeyID int) error {
+	query := `
+		DELETE FROM table_api_keys
+		WHERE id = ? AND user_id = ?
+	`
+	result, err := r.db.ExecContext(ctx, query, apiKeyID, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("API key not found or not owned by user")
 	}
 
 	return nil

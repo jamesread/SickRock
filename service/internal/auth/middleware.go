@@ -4,9 +4,11 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -86,6 +88,46 @@ func ConnectAuthMiddleware(authService *AuthService) connect.UnaryInterceptorFun
 			}
 
 			token := parts[1]
+
+			// Check if this is an API key (starts with "sk_")
+			if strings.HasPrefix(token, "sk_") {
+				log.Trace("Attempting API key authentication")
+				apiKey, err := authService.ValidateAPIKey(ctx, token)
+				if err != nil {
+					log.Tracef("API key validation failed: %v", err)
+					return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+				}
+				if apiKey == nil {
+					log.Trace("API key not found or expired")
+					return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+				}
+
+				// Update last used timestamp
+				authService.UpdateAPIKeyLastUsed(ctx, token)
+
+				// Create a claims-like object for API key authentication
+				claims := &Claims{
+					Username:  "", // We'll get this from the API key
+					SessionID: "", // No session for API keys
+					RegisteredClaims: jwt.RegisteredClaims{
+						ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // API keys don't expire via JWT
+					},
+				}
+
+				// Get the user associated with this API key
+				user, err := authService.repo.GetUserByID(ctx, apiKey.UserID)
+				if err != nil || user == nil {
+					log.Tracef("Failed to get user for API key: %v", err)
+					return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+				}
+
+				claims.Username = user.Username
+				ctx = context.WithValue(ctx, "user", claims)
+				ctx = context.WithValue(ctx, "api_key", apiKey)
+				return next(ctx, req)
+			}
+
+			// Regular JWT token authentication
 			claims, err := authService.ValidateToken(ctx, token)
 			if err != nil {
 				log.Tracef("Token validation failed: %v", err)
