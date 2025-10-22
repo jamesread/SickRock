@@ -544,58 +544,6 @@ func (r *Repository) GenerateDeviceCode() (string, error) {
 	return fmt.Sprintf("%04d", n.Int64()), nil
 }
 
-// EnsureSchemaForTable creates the table if it doesn't exist.
-func (r *Repository) EnsureSchemaForTable(ctx context.Context, table string) error {
-	tc, err := r.GetTableConfiguration(ctx, table)
-	if err != nil {
-		return err
-	}
-
-	var schema string
-	switch r.db.DriverName() {
-	case "mysql":
-		schema = fmt.Sprintf(`
-CREATE TABLE IF NOT EXISTS %s.%s (
-    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP
-);`, tc.Db.String, tc.Table.String)
-	default:
-		schema = fmt.Sprintf(`
-CREATE TABLE IF NOT EXISTS %s.%s (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    sr_created DATETIME DEFAULT CURRENT_TIMESTAMP
-;`, tc.Db.String, tc.Table.String)
-	}
-	_, err = r.db.ExecContext(ctx, schema)
-	if err != nil {
-		return err
-	}
-
-	// Add sr_created column if it doesn't exist (for existing tables)
-	switch r.db.DriverName() {
-	case "mysql":
-		alterQuery := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN IF NOT EXISTS sr_created DATETIME DEFAULT CURRENT_TIMESTAMP", tc.Db.String, tc.Table.String)
-		_, err = r.db.ExecContext(ctx, alterQuery)
-		if err != nil {
-			log.Warnf("Failed to add sr_created column to table %s: %v", tc.Table.String, err)
-		}
-	default:
-		// SQLite doesn't support IF NOT EXISTS in ALTER TABLE, so we'll check if column exists first
-		var count int
-		checkQuery := fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name='sr_created'", tc.Table.String)
-		err = r.db.GetContext(ctx, &count, checkQuery)
-		if err == nil && count == 0 {
-			alterQuery := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN sr_created DATETIME DEFAULT CURRENT_TIMESTAMP", tc.Db.String, tc.Table.String)
-			_, err = r.db.ExecContext(ctx, alterQuery)
-			if err != nil {
-				log.Warnf("Failed to add sr_created column to table %s: %v", tc.Table.String, err)
-			}
-		}
-	}
-
-	return nil
-}
-
 func (r *Repository) AddColumn(ctx context.Context, db, table string, field FieldSpec) error {
 	t := sanitizeDatabaseIdentifier(table)
 	col := sanitizeDatabaseIdentifier(field.Name)

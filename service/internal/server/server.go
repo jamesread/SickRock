@@ -245,13 +245,7 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sickrockpb.ListItemsRequest]) (*connect.Response[sickrockpb.ListItemsResponse], error) {
 	// Use page_id as table name for this simple mapping
 	table := req.Msg.GetTcName()
-	if table == "" {
-		table = "items"
-	}
-	// Ensure table exists
-	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
-		return nil, err
-	}
+
 	// Build where map from request
 	where := map[string]string{}
 	for k, v := range req.Msg.GetWhere() {
@@ -299,9 +293,6 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 	if table == "" {
 		table = "items"
 	}
-	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
-		return nil, err
-	}
 
 	it, err := s.repo.CreateItemInTableWithTimestamp(ctx, table, req.Msg.GetAdditionalFields())
 	if err != nil {
@@ -333,11 +324,6 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 	table := req.Msg.GetPageId()
 	if table == "" {
 		table = "items"
-	}
-
-	// Ensure table exists
-	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
-		return nil, err
 	}
 
 	tc, err := s.repo.GetTableConfiguration(ctx, table)
@@ -387,11 +373,6 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 		table = "items"
 	}
 
-	// Ensure table exists
-	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
-		return nil, err
-	}
-
 	// Get additional fields from the request
 	additionalFields := req.Msg.GetAdditionalFields()
 	if additionalFields == nil {
@@ -427,12 +408,7 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 
 func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[sickrockpb.DeleteItemRequest]) (*connect.Response[sickrockpb.DeleteItemResponse], error) {
 	table := req.Msg.GetPageId()
-	if table == "" {
-		table = "items"
-	}
-	if err := s.repo.EnsureSchemaForTable(ctx, table); err != nil {
-		return nil, err
-	}
+
 	ok, err := s.repo.DeleteItemInTable(ctx, table, req.Msg.GetId())
 	if err != nil {
 		return nil, err
@@ -484,9 +460,6 @@ func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Reques
 		return nil, err
 	}
 
-	if err := s.repo.EnsureSchemaForTable(ctx, tc.Table.String); err != nil {
-		return nil, err
-	}
 	f := req.Msg.GetField()
 	if f == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("field required"))
