@@ -251,10 +251,13 @@ async function deleteTableView() {
 <template>
   <Section :title="pageTitle">
     <template #toolbar>
-      <button @click="goBack" class="button neutral">
-        <HugeiconsIcon :icon="ArrowLeft01Icon" />
+      <router-link
+        :to="`/table/${tableId}`"
+        class="button"
+      >
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
         Back to Table
-      </button>
+      </router-link>
     </template>
 
     <div v-if="error" class="error-message">

@@ -106,6 +106,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { createApiClient } from '../stores/api'
 import logo from '../resources/images/logo.png'
+import { formatUnixTimestamp } from '../utils/dateFormatting'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -219,7 +220,7 @@ const stopDeviceCodePolling = () => {
 }
 
 const formatTime = (timestamp: number) => {
-  return new Date(timestamp * 1000).toLocaleString()
+  return formatUnixTimestamp(timestamp)
 }
 
 // Clean up polling when component is unmounted

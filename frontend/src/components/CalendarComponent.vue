@@ -59,8 +59,8 @@ const client = createApiClient()
 
 // Helper function to get item value for a column
 function getItemValue(item: any, column: string): any {
-  // Check standard fields first (only id and sr_created are static now)
-  if (column === 'id' || column === 'sr_created') {
+  // Check standard fields first (id, sr_created, and sr_updated are static now)
+  if (column === 'id' || column === 'sr_created' || column === 'sr_updated') {
     return item[column]
   }
   // Check additional fields from protobuf (all other fields including name are dynamic)

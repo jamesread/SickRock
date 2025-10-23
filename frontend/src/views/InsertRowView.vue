@@ -68,7 +68,7 @@ onMounted(async () => {
   try {
     const res = await client.getTableStructure({ pageId: tableId })
     const defs = (res.fields ?? [])
-      .filter(f => f.name !== 'sr_created') // Hide sr_created field
+      .filter(f => f.name !== 'sr_created' && f.name !== 'sr_updated') // Hide sr_created and sr_updated fields
       .map(f => ({ name: f.name, type: f.type, required: !!f.required }))
 
     fieldDefs.value = defs
@@ -138,9 +138,6 @@ function handleCreated() {
   router.push({ name: 'after-insert', params: { tableName: tableId }, query: q })
 }
 
-function goBack() {
-  router.push(`/table/${tableId}`)
-}
 </script>
 
 <template>
@@ -160,10 +157,13 @@ function goBack() {
           </select>
         </div>
       </div>
-      <button @click="goBack" class="button back-button">
+      <router-link
+        :to="`/table/${tableId}`"
+        class="button"
+      >
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
         Back to Table
-      </button>
+      </router-link>
     </template>
     <InsertRow :table-id="tableId" :field-defs="displayFieldDefs" :selected-date="selectedDate" :initial-values="initialValues" @created="handleCreated" />
   </Section>

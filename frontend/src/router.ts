@@ -10,6 +10,7 @@ import AfterInsertView from './views/AfterInsertView.vue'
 import CreateTableView from './views/CreateTableView.vue'
 import ForeignKeyManagement from './views/ForeignKeyManagement.vue'
 import ColumnTypeManagement from './views/ColumnTypeManagement.vue'
+import ConditionalFormattingRules from './components/ConditionalFormattingRules.vue'
 import ExportView from './views/ExportView.vue'
 import TableCreate from './views/TableCreate.vue'
 import ControlPanel from './views/ControlPanel.vue'
@@ -209,6 +210,19 @@ const router = createRouter({
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Column Types' },
+        ],
+      },
+    },
+    {
+      path: '/table/:tableName/conditional-formatting',
+      name: 'conditional-formatting',
+      component: ConditionalFormattingRules,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Conditional Formatting' },
         ],
       },
     },

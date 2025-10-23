@@ -92,7 +92,10 @@ message GetNavigationResponse {
 message Item {
   string id = 1;
   int64 sr_created = 2;
-  map<string, string> additional_fields = 3;
+  int32 sr_created_relative = 3; // Relative time in seconds from current timestamp
+  int64 sr_updated = 4; // Updated timestamp (Unix)
+  int32 sr_updated_relative = 5; // Relative time in seconds from current timestamp
+  map<string, string> additional_fields = 6;
 }
 
 message ListItemsRequest {
@@ -540,6 +543,71 @@ message APIKey {
   bool is_active = 7;
 }
 
+// Conditional Formatting Rules
+message ConditionalFormattingRule {
+  int32 id = 1;
+  string table_name = 2;
+  string column_name = 3;
+  string condition_type = 4;
+  string condition_value = 5;
+  string format_type = 6;
+  string format_value = 7;
+  int32 priority = 8;
+  bool is_active = 9;
+  int64 sr_created = 10;
+  int64 updated_at_unix = 11;
+}
+
+message GetConditionalFormattingRulesRequest {
+  string table_name = 1; // Optional: filter by table name
+}
+
+message GetConditionalFormattingRulesResponse {
+  repeated ConditionalFormattingRule rules = 1;
+}
+
+message CreateConditionalFormattingRuleRequest {
+  string table_name = 1;
+  string column_name = 2;
+  string condition_type = 3;
+  string condition_value = 4;
+  string format_type = 5;
+  string format_value = 6;
+  int32 priority = 7;
+}
+
+message CreateConditionalFormattingRuleResponse {
+  bool success = 1;
+  string message = 2;
+  int32 rule_id = 3;
+}
+
+message DeleteConditionalFormattingRuleRequest {
+  int32 rule_id = 1;
+}
+
+message DeleteConditionalFormattingRuleResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message UpdateConditionalFormattingRuleRequest {
+  int32 rule_id = 1;
+  string table_name = 2;
+  string column_name = 3;
+  string condition_type = 4;
+  string condition_value = 5;
+  string format_type = 6;
+  string format_value = 7;
+  int32 priority = 8;
+  bool is_active = 9;
+}
+
+message UpdateConditionalFormattingRuleResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 service SickRock {
   rpc Init(InitRequest) returns (InitResponse);
   rpc Ping(PingRequest) returns (PingResponse);
@@ -619,4 +687,10 @@ service SickRock {
   rpc GetAPIKeys(GetAPIKeysRequest) returns (GetAPIKeysResponse);
   rpc DeleteAPIKey(DeleteAPIKeyRequest) returns (DeleteAPIKeyResponse);
   rpc DeactivateAPIKey(DeactivateAPIKeyRequest) returns (DeactivateAPIKeyResponse);
+
+  // Conditional Formatting Rules
+  rpc GetConditionalFormattingRules(GetConditionalFormattingRulesRequest) returns (GetConditionalFormattingRulesResponse);
+  rpc CreateConditionalFormattingRule(CreateConditionalFormattingRuleRequest) returns (CreateConditionalFormattingRuleResponse);
+  rpc UpdateConditionalFormattingRule(UpdateConditionalFormattingRuleRequest) returns (UpdateConditionalFormattingRuleResponse);
+  rpc DeleteConditionalFormattingRule(DeleteConditionalFormattingRuleRequest) returns (DeleteConditionalFormattingRuleResponse);
 }

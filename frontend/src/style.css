@@ -3,3 +3,18 @@ body {
   flex-direction: column;
   flex-grow: 1;
 }
+
+/* Date formatting styles */
+.date {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
+  font-size: 0.9em;
+  color: #666;
+  white-space: nowrap;
+}
+
+/* Responsive date formatting */
+@media (max-width: 768px) {
+  .date {
+    font-size: 0.8em;
+  }
+}

@@ -6,6 +6,7 @@ import * as Hugeicons from '@hugeicons/core-free-icons'
 import { DatabaseIcon } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import { formatUnixTimestamp } from '../utils/dateFormatting'
 
 // Use global API client
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
@@ -198,12 +199,12 @@ function copyToClipboard(text: string) {
 
 function formatDate(timestamp: number): string {
   if (timestamp === 0) return 'Never'
-  return new Date(timestamp * 1000).toLocaleString()
+  return formatUnixTimestamp(timestamp)
 }
 
 function formatExpirationDate(timestamp: number): string {
   if (timestamp === 0) return 'Never expires'
-  return new Date(timestamp * 1000).toLocaleString()
+  return formatUnixTimestamp(timestamp)
 }
 
 async function savePreferences() {

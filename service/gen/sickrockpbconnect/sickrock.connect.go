@@ -145,6 +145,18 @@ const (
 	// SickRockDeactivateAPIKeyProcedure is the fully-qualified name of the SickRock's DeactivateAPIKey
 	// RPC.
 	SickRockDeactivateAPIKeyProcedure = "/sickrock.SickRock/DeactivateAPIKey"
+	// SickRockGetConditionalFormattingRulesProcedure is the fully-qualified name of the SickRock's
+	// GetConditionalFormattingRules RPC.
+	SickRockGetConditionalFormattingRulesProcedure = "/sickrock.SickRock/GetConditionalFormattingRules"
+	// SickRockCreateConditionalFormattingRuleProcedure is the fully-qualified name of the SickRock's
+	// CreateConditionalFormattingRule RPC.
+	SickRockCreateConditionalFormattingRuleProcedure = "/sickrock.SickRock/CreateConditionalFormattingRule"
+	// SickRockUpdateConditionalFormattingRuleProcedure is the fully-qualified name of the SickRock's
+	// UpdateConditionalFormattingRule RPC.
+	SickRockUpdateConditionalFormattingRuleProcedure = "/sickrock.SickRock/UpdateConditionalFormattingRule"
+	// SickRockDeleteConditionalFormattingRuleProcedure is the fully-qualified name of the SickRock's
+	// DeleteConditionalFormattingRule RPC.
+	SickRockDeleteConditionalFormattingRuleProcedure = "/sickrock.SickRock/DeleteConditionalFormattingRule"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -210,6 +222,11 @@ type SickRockClient interface {
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
+	// Conditional Formatting Rules
+	GetConditionalFormattingRules(context.Context, *connect.Request[proto.GetConditionalFormattingRulesRequest]) (*connect.Response[proto.GetConditionalFormattingRulesResponse], error)
+	CreateConditionalFormattingRule(context.Context, *connect.Request[proto.CreateConditionalFormattingRuleRequest]) (*connect.Response[proto.CreateConditionalFormattingRuleResponse], error)
+	UpdateConditionalFormattingRule(context.Context, *connect.Request[proto.UpdateConditionalFormattingRuleRequest]) (*connect.Response[proto.UpdateConditionalFormattingRuleResponse], error)
+	DeleteConditionalFormattingRule(context.Context, *connect.Request[proto.DeleteConditionalFormattingRuleRequest]) (*connect.Response[proto.DeleteConditionalFormattingRuleResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -487,55 +504,83 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeactivateAPIKey")),
 			connect.WithClientOptions(opts...),
 		),
+		getConditionalFormattingRules: connect.NewClient[proto.GetConditionalFormattingRulesRequest, proto.GetConditionalFormattingRulesResponse](
+			httpClient,
+			baseURL+SickRockGetConditionalFormattingRulesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetConditionalFormattingRules")),
+			connect.WithClientOptions(opts...),
+		),
+		createConditionalFormattingRule: connect.NewClient[proto.CreateConditionalFormattingRuleRequest, proto.CreateConditionalFormattingRuleResponse](
+			httpClient,
+			baseURL+SickRockCreateConditionalFormattingRuleProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateConditionalFormattingRule")),
+			connect.WithClientOptions(opts...),
+		),
+		updateConditionalFormattingRule: connect.NewClient[proto.UpdateConditionalFormattingRuleRequest, proto.UpdateConditionalFormattingRuleResponse](
+			httpClient,
+			baseURL+SickRockUpdateConditionalFormattingRuleProcedure,
+			connect.WithSchema(sickRockMethods.ByName("UpdateConditionalFormattingRule")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteConditionalFormattingRule: connect.NewClient[proto.DeleteConditionalFormattingRuleRequest, proto.DeleteConditionalFormattingRuleResponse](
+			httpClient,
+			baseURL+SickRockDeleteConditionalFormattingRuleProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteConditionalFormattingRule")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // sickRockClient implements SickRockClient.
 type sickRockClient struct {
-	init                         *connect.Client[proto.InitRequest, proto.InitResponse]
-	ping                         *connect.Client[proto.PingRequest, proto.PingResponse]
-	login                        *connect.Client[proto.LoginRequest, proto.LoginResponse]
-	logout                       *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
-	validateToken                *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
-	resetUserPassword            *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
-	generateDeviceCode           *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
-	claimDeviceCode              *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
-	checkDeviceCode              *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
-	getDeviceCodeSession         *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
-	getNavigationLinks           *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
-	getTableConfigurations       *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
-	createTableConfiguration     *connect.Client[proto.CreateTableConfigurationRequest, proto.CreateTableConfigurationResponse]
-	getDatabaseTables            *connect.Client[proto.GetDatabaseTablesRequest, proto.GetDatabaseTablesResponse]
-	getNavigation                *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
-	listItems                    *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
-	createItem                   *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
-	getItem                      *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
-	editItem                     *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
-	deleteItem                   *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
-	getTableStructure            *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
-	addTableColumn               *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
-	createTableView              *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
-	updateTableView              *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
-	getTableViews                *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
-	deleteTableView              *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
-	createForeignKey             *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
-	getForeignKeys               *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
-	deleteForeignKey             *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
-	changeColumnType             *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
-	dropColumn                   *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
-	changeColumnName             *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
-	getMostRecentlyViewed        *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
-	getDashboards                *connect.Client[proto.GetDashboardsRequest, proto.GetDashboardsResponse]
-	getDashboardComponentRules   *connect.Client[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse]
-	createDashboardComponentRule *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
-	getSystemInfo                *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
-	getUserBookmarks             *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
-	createUserBookmark           *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
-	deleteUserBookmark           *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
-	createAPIKey                 *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
-	getAPIKeys                   *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
-	deleteAPIKey                 *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
-	deactivateAPIKey             *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
+	init                            *connect.Client[proto.InitRequest, proto.InitResponse]
+	ping                            *connect.Client[proto.PingRequest, proto.PingResponse]
+	login                           *connect.Client[proto.LoginRequest, proto.LoginResponse]
+	logout                          *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
+	validateToken                   *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
+	resetUserPassword               *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
+	generateDeviceCode              *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
+	claimDeviceCode                 *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
+	checkDeviceCode                 *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
+	getDeviceCodeSession            *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
+	getNavigationLinks              *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
+	getTableConfigurations          *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
+	createTableConfiguration        *connect.Client[proto.CreateTableConfigurationRequest, proto.CreateTableConfigurationResponse]
+	getDatabaseTables               *connect.Client[proto.GetDatabaseTablesRequest, proto.GetDatabaseTablesResponse]
+	getNavigation                   *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
+	listItems                       *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
+	createItem                      *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
+	getItem                         *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
+	editItem                        *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
+	deleteItem                      *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
+	getTableStructure               *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
+	addTableColumn                  *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
+	createTableView                 *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
+	updateTableView                 *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
+	getTableViews                   *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
+	deleteTableView                 *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
+	createForeignKey                *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
+	getForeignKeys                  *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
+	deleteForeignKey                *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
+	changeColumnType                *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
+	dropColumn                      *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
+	changeColumnName                *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
+	getMostRecentlyViewed           *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
+	getDashboards                   *connect.Client[proto.GetDashboardsRequest, proto.GetDashboardsResponse]
+	getDashboardComponentRules      *connect.Client[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse]
+	createDashboardComponentRule    *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
+	getSystemInfo                   *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
+	getUserBookmarks                *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
+	createUserBookmark              *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
+	deleteUserBookmark              *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
+	createAPIKey                    *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
+	getAPIKeys                      *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
+	deleteAPIKey                    *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
+	deactivateAPIKey                *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
+	getConditionalFormattingRules   *connect.Client[proto.GetConditionalFormattingRulesRequest, proto.GetConditionalFormattingRulesResponse]
+	createConditionalFormattingRule *connect.Client[proto.CreateConditionalFormattingRuleRequest, proto.CreateConditionalFormattingRuleResponse]
+	updateConditionalFormattingRule *connect.Client[proto.UpdateConditionalFormattingRuleRequest, proto.UpdateConditionalFormattingRuleResponse]
+	deleteConditionalFormattingRule *connect.Client[proto.DeleteConditionalFormattingRuleRequest, proto.DeleteConditionalFormattingRuleResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -758,6 +803,26 @@ func (c *sickRockClient) DeactivateAPIKey(ctx context.Context, req *connect.Requ
 	return c.deactivateAPIKey.CallUnary(ctx, req)
 }
 
+// GetConditionalFormattingRules calls sickrock.SickRock.GetConditionalFormattingRules.
+func (c *sickRockClient) GetConditionalFormattingRules(ctx context.Context, req *connect.Request[proto.GetConditionalFormattingRulesRequest]) (*connect.Response[proto.GetConditionalFormattingRulesResponse], error) {
+	return c.getConditionalFormattingRules.CallUnary(ctx, req)
+}
+
+// CreateConditionalFormattingRule calls sickrock.SickRock.CreateConditionalFormattingRule.
+func (c *sickRockClient) CreateConditionalFormattingRule(ctx context.Context, req *connect.Request[proto.CreateConditionalFormattingRuleRequest]) (*connect.Response[proto.CreateConditionalFormattingRuleResponse], error) {
+	return c.createConditionalFormattingRule.CallUnary(ctx, req)
+}
+
+// UpdateConditionalFormattingRule calls sickrock.SickRock.UpdateConditionalFormattingRule.
+func (c *sickRockClient) UpdateConditionalFormattingRule(ctx context.Context, req *connect.Request[proto.UpdateConditionalFormattingRuleRequest]) (*connect.Response[proto.UpdateConditionalFormattingRuleResponse], error) {
+	return c.updateConditionalFormattingRule.CallUnary(ctx, req)
+}
+
+// DeleteConditionalFormattingRule calls sickrock.SickRock.DeleteConditionalFormattingRule.
+func (c *sickRockClient) DeleteConditionalFormattingRule(ctx context.Context, req *connect.Request[proto.DeleteConditionalFormattingRuleRequest]) (*connect.Response[proto.DeleteConditionalFormattingRuleResponse], error) {
+	return c.deleteConditionalFormattingRule.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -821,6 +886,11 @@ type SickRockHandler interface {
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
+	// Conditional Formatting Rules
+	GetConditionalFormattingRules(context.Context, *connect.Request[proto.GetConditionalFormattingRulesRequest]) (*connect.Response[proto.GetConditionalFormattingRulesResponse], error)
+	CreateConditionalFormattingRule(context.Context, *connect.Request[proto.CreateConditionalFormattingRuleRequest]) (*connect.Response[proto.CreateConditionalFormattingRuleResponse], error)
+	UpdateConditionalFormattingRule(context.Context, *connect.Request[proto.UpdateConditionalFormattingRuleRequest]) (*connect.Response[proto.UpdateConditionalFormattingRuleResponse], error)
+	DeleteConditionalFormattingRule(context.Context, *connect.Request[proto.DeleteConditionalFormattingRuleRequest]) (*connect.Response[proto.DeleteConditionalFormattingRuleResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -1094,6 +1164,30 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeactivateAPIKey")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetConditionalFormattingRulesHandler := connect.NewUnaryHandler(
+		SickRockGetConditionalFormattingRulesProcedure,
+		svc.GetConditionalFormattingRules,
+		connect.WithSchema(sickRockMethods.ByName("GetConditionalFormattingRules")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateConditionalFormattingRuleHandler := connect.NewUnaryHandler(
+		SickRockCreateConditionalFormattingRuleProcedure,
+		svc.CreateConditionalFormattingRule,
+		connect.WithSchema(sickRockMethods.ByName("CreateConditionalFormattingRule")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockUpdateConditionalFormattingRuleHandler := connect.NewUnaryHandler(
+		SickRockUpdateConditionalFormattingRuleProcedure,
+		svc.UpdateConditionalFormattingRule,
+		connect.WithSchema(sickRockMethods.ByName("UpdateConditionalFormattingRule")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteConditionalFormattingRuleHandler := connect.NewUnaryHandler(
+		SickRockDeleteConditionalFormattingRuleProcedure,
+		svc.DeleteConditionalFormattingRule,
+		connect.WithSchema(sickRockMethods.ByName("DeleteConditionalFormattingRule")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -1184,6 +1278,14 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockDeleteAPIKeyHandler.ServeHTTP(w, r)
 		case SickRockDeactivateAPIKeyProcedure:
 			sickRockDeactivateAPIKeyHandler.ServeHTTP(w, r)
+		case SickRockGetConditionalFormattingRulesProcedure:
+			sickRockGetConditionalFormattingRulesHandler.ServeHTTP(w, r)
+		case SickRockCreateConditionalFormattingRuleProcedure:
+			sickRockCreateConditionalFormattingRuleHandler.ServeHTTP(w, r)
+		case SickRockUpdateConditionalFormattingRuleProcedure:
+			sickRockUpdateConditionalFormattingRuleHandler.ServeHTTP(w, r)
+		case SickRockDeleteConditionalFormattingRuleProcedure:
+			sickRockDeleteConditionalFormattingRuleHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1367,4 +1469,20 @@ func (UnimplementedSickRockHandler) DeleteAPIKey(context.Context, *connect.Reque
 
 func (UnimplementedSickRockHandler) DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeactivateAPIKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetConditionalFormattingRules(context.Context, *connect.Request[proto.GetConditionalFormattingRulesRequest]) (*connect.Response[proto.GetConditionalFormattingRulesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetConditionalFormattingRules is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateConditionalFormattingRule(context.Context, *connect.Request[proto.CreateConditionalFormattingRuleRequest]) (*connect.Response[proto.CreateConditionalFormattingRuleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateConditionalFormattingRule is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) UpdateConditionalFormattingRule(context.Context, *connect.Request[proto.UpdateConditionalFormattingRuleRequest]) (*connect.Response[proto.UpdateConditionalFormattingRuleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateConditionalFormattingRule is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteConditionalFormattingRule(context.Context, *connect.Request[proto.DeleteConditionalFormattingRuleRequest]) (*connect.Response[proto.DeleteConditionalFormattingRuleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteConditionalFormattingRule is not implemented"))
 }

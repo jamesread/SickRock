@@ -5,6 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import type { GetTableStructureResponse } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -202,9 +204,6 @@ watch(includeHeaders, () => {
   computeCsv()
 })
 
-function goBack() {
-  router.push({ name: 'table', params: { tableName: tableId.value } })
-}
 
 async function copyToClipboard() {
   try {
@@ -248,7 +247,13 @@ async function copyToClipboard() {
           <input type="checkbox" v-model="includeHeaders" />
           Column headers
         </label>
-        <button class="button" @click="goBack">Back to Table</button>
+        <router-link
+          :to="`/table/${tableId}`"
+          class="button"
+        >
+          <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
+          Back to Table
+        </router-link>
       </div>
     </template>
     <div class="section-content">

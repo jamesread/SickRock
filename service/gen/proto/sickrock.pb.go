@@ -890,12 +890,15 @@ func (x *GetNavigationResponse) GetBookmarks() []*UserBookmark {
 
 // Items
 type Item struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	SrCreated        int64                  `protobuf:"varint,2,opt,name=sr_created,json=srCreated,proto3" json:"sr_created,omitempty"`
-	AdditionalFields map[string]string      `protobuf:"bytes,3,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	SrCreated         int64                  `protobuf:"varint,2,opt,name=sr_created,json=srCreated,proto3" json:"sr_created,omitempty"`
+	SrCreatedRelative int32                  `protobuf:"varint,3,opt,name=sr_created_relative,json=srCreatedRelative,proto3" json:"sr_created_relative,omitempty"` // Relative time in seconds from current timestamp
+	SrUpdated         int64                  `protobuf:"varint,4,opt,name=sr_updated,json=srUpdated,proto3" json:"sr_updated,omitempty"`                           // Updated timestamp (Unix)
+	SrUpdatedRelative int32                  `protobuf:"varint,5,opt,name=sr_updated_relative,json=srUpdatedRelative,proto3" json:"sr_updated_relative,omitempty"` // Relative time in seconds from current timestamp
+	AdditionalFields  map[string]string      `protobuf:"bytes,6,rep,name=additional_fields,json=additionalFields,proto3" json:"additional_fields,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *Item) Reset() {
@@ -938,6 +941,27 @@ func (x *Item) GetId() string {
 func (x *Item) GetSrCreated() int64 {
 	if x != nil {
 		return x.SrCreated
+	}
+	return 0
+}
+
+func (x *Item) GetSrCreatedRelative() int32 {
+	if x != nil {
+		return x.SrCreatedRelative
+	}
+	return 0
+}
+
+func (x *Item) GetSrUpdated() int64 {
+	if x != nil {
+		return x.SrUpdated
+	}
+	return 0
+}
+
+func (x *Item) GetSrUpdatedRelative() int32 {
+	if x != nil {
+		return x.SrUpdatedRelative
 	}
 	return 0
 }
@@ -5520,6 +5544,627 @@ func (x *APIKey) GetIsActive() bool {
 	return false
 }
 
+// Conditional Formatting Rules
+type ConditionalFormattingRule struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	TableName      string                 `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
+	ColumnName     string                 `protobuf:"bytes,3,opt,name=column_name,json=columnName,proto3" json:"column_name,omitempty"`
+	ConditionType  string                 `protobuf:"bytes,4,opt,name=condition_type,json=conditionType,proto3" json:"condition_type,omitempty"`
+	ConditionValue string                 `protobuf:"bytes,5,opt,name=condition_value,json=conditionValue,proto3" json:"condition_value,omitempty"`
+	FormatType     string                 `protobuf:"bytes,6,opt,name=format_type,json=formatType,proto3" json:"format_type,omitempty"`
+	FormatValue    string                 `protobuf:"bytes,7,opt,name=format_value,json=formatValue,proto3" json:"format_value,omitempty"`
+	Priority       int32                  `protobuf:"varint,8,opt,name=priority,proto3" json:"priority,omitempty"`
+	IsActive       bool                   `protobuf:"varint,9,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
+	SrCreated      int64                  `protobuf:"varint,10,opt,name=sr_created,json=srCreated,proto3" json:"sr_created,omitempty"`
+	UpdatedAtUnix  int64                  `protobuf:"varint,11,opt,name=updated_at_unix,json=updatedAtUnix,proto3" json:"updated_at_unix,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ConditionalFormattingRule) Reset() {
+	*x = ConditionalFormattingRule{}
+	mi := &file_sickrock_proto_msgTypes[102]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ConditionalFormattingRule) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ConditionalFormattingRule) ProtoMessage() {}
+
+func (x *ConditionalFormattingRule) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[102]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ConditionalFormattingRule.ProtoReflect.Descriptor instead.
+func (*ConditionalFormattingRule) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{102}
+}
+
+func (x *ConditionalFormattingRule) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *ConditionalFormattingRule) GetTableName() string {
+	if x != nil {
+		return x.TableName
+	}
+	return ""
+}
+
+func (x *ConditionalFormattingRule) GetColumnName() string {
+	if x != nil {
+		return x.ColumnName
+	}
+	return ""
+}
+
+func (x *ConditionalFormattingRule) GetConditionType() string {
+	if x != nil {
+		return x.ConditionType
+	}
+	return ""
+}
+
+func (x *ConditionalFormattingRule) GetConditionValue() string {
+	if x != nil {
+		return x.ConditionValue
+	}
+	return ""
+}
+
+func (x *ConditionalFormattingRule) GetFormatType() string {
+	if x != nil {
+		return x.FormatType
+	}
+	return ""
+}
+
+func (x *ConditionalFormattingRule) GetFormatValue() string {
+	if x != nil {
+		return x.FormatValue
+	}
+	return ""
+}
+
+func (x *ConditionalFormattingRule) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+func (x *ConditionalFormattingRule) GetIsActive() bool {
+	if x != nil {
+		return x.IsActive
+	}
+	return false
+}
+
+func (x *ConditionalFormattingRule) GetSrCreated() int64 {
+	if x != nil {
+		return x.SrCreated
+	}
+	return 0
+}
+
+func (x *ConditionalFormattingRule) GetUpdatedAtUnix() int64 {
+	if x != nil {
+		return x.UpdatedAtUnix
+	}
+	return 0
+}
+
+type GetConditionalFormattingRulesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TableName     string                 `protobuf:"bytes,1,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"` // Optional: filter by table name
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetConditionalFormattingRulesRequest) Reset() {
+	*x = GetConditionalFormattingRulesRequest{}
+	mi := &file_sickrock_proto_msgTypes[103]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConditionalFormattingRulesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConditionalFormattingRulesRequest) ProtoMessage() {}
+
+func (x *GetConditionalFormattingRulesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[103]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConditionalFormattingRulesRequest.ProtoReflect.Descriptor instead.
+func (*GetConditionalFormattingRulesRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{103}
+}
+
+func (x *GetConditionalFormattingRulesRequest) GetTableName() string {
+	if x != nil {
+		return x.TableName
+	}
+	return ""
+}
+
+type GetConditionalFormattingRulesResponse struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Rules         []*ConditionalFormattingRule `protobuf:"bytes,1,rep,name=rules,proto3" json:"rules,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetConditionalFormattingRulesResponse) Reset() {
+	*x = GetConditionalFormattingRulesResponse{}
+	mi := &file_sickrock_proto_msgTypes[104]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetConditionalFormattingRulesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetConditionalFormattingRulesResponse) ProtoMessage() {}
+
+func (x *GetConditionalFormattingRulesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[104]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetConditionalFormattingRulesResponse.ProtoReflect.Descriptor instead.
+func (*GetConditionalFormattingRulesResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{104}
+}
+
+func (x *GetConditionalFormattingRulesResponse) GetRules() []*ConditionalFormattingRule {
+	if x != nil {
+		return x.Rules
+	}
+	return nil
+}
+
+type CreateConditionalFormattingRuleRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	TableName      string                 `protobuf:"bytes,1,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
+	ColumnName     string                 `protobuf:"bytes,2,opt,name=column_name,json=columnName,proto3" json:"column_name,omitempty"`
+	ConditionType  string                 `protobuf:"bytes,3,opt,name=condition_type,json=conditionType,proto3" json:"condition_type,omitempty"`
+	ConditionValue string                 `protobuf:"bytes,4,opt,name=condition_value,json=conditionValue,proto3" json:"condition_value,omitempty"`
+	FormatType     string                 `protobuf:"bytes,5,opt,name=format_type,json=formatType,proto3" json:"format_type,omitempty"`
+	FormatValue    string                 `protobuf:"bytes,6,opt,name=format_value,json=formatValue,proto3" json:"format_value,omitempty"`
+	Priority       int32                  `protobuf:"varint,7,opt,name=priority,proto3" json:"priority,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateConditionalFormattingRuleRequest) Reset() {
+	*x = CreateConditionalFormattingRuleRequest{}
+	mi := &file_sickrock_proto_msgTypes[105]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateConditionalFormattingRuleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateConditionalFormattingRuleRequest) ProtoMessage() {}
+
+func (x *CreateConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[105]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateConditionalFormattingRuleRequest.ProtoReflect.Descriptor instead.
+func (*CreateConditionalFormattingRuleRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{105}
+}
+
+func (x *CreateConditionalFormattingRuleRequest) GetTableName() string {
+	if x != nil {
+		return x.TableName
+	}
+	return ""
+}
+
+func (x *CreateConditionalFormattingRuleRequest) GetColumnName() string {
+	if x != nil {
+		return x.ColumnName
+	}
+	return ""
+}
+
+func (x *CreateConditionalFormattingRuleRequest) GetConditionType() string {
+	if x != nil {
+		return x.ConditionType
+	}
+	return ""
+}
+
+func (x *CreateConditionalFormattingRuleRequest) GetConditionValue() string {
+	if x != nil {
+		return x.ConditionValue
+	}
+	return ""
+}
+
+func (x *CreateConditionalFormattingRuleRequest) GetFormatType() string {
+	if x != nil {
+		return x.FormatType
+	}
+	return ""
+}
+
+func (x *CreateConditionalFormattingRuleRequest) GetFormatValue() string {
+	if x != nil {
+		return x.FormatValue
+	}
+	return ""
+}
+
+func (x *CreateConditionalFormattingRuleRequest) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+type CreateConditionalFormattingRuleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	RuleId        int32                  `protobuf:"varint,3,opt,name=rule_id,json=ruleId,proto3" json:"rule_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateConditionalFormattingRuleResponse) Reset() {
+	*x = CreateConditionalFormattingRuleResponse{}
+	mi := &file_sickrock_proto_msgTypes[106]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateConditionalFormattingRuleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateConditionalFormattingRuleResponse) ProtoMessage() {}
+
+func (x *CreateConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[106]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateConditionalFormattingRuleResponse.ProtoReflect.Descriptor instead.
+func (*CreateConditionalFormattingRuleResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{106}
+}
+
+func (x *CreateConditionalFormattingRuleResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *CreateConditionalFormattingRuleResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *CreateConditionalFormattingRuleResponse) GetRuleId() int32 {
+	if x != nil {
+		return x.RuleId
+	}
+	return 0
+}
+
+type DeleteConditionalFormattingRuleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RuleId        int32                  `protobuf:"varint,1,opt,name=rule_id,json=ruleId,proto3" json:"rule_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteConditionalFormattingRuleRequest) Reset() {
+	*x = DeleteConditionalFormattingRuleRequest{}
+	mi := &file_sickrock_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteConditionalFormattingRuleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteConditionalFormattingRuleRequest) ProtoMessage() {}
+
+func (x *DeleteConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteConditionalFormattingRuleRequest.ProtoReflect.Descriptor instead.
+func (*DeleteConditionalFormattingRuleRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{107}
+}
+
+func (x *DeleteConditionalFormattingRuleRequest) GetRuleId() int32 {
+	if x != nil {
+		return x.RuleId
+	}
+	return 0
+}
+
+type DeleteConditionalFormattingRuleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteConditionalFormattingRuleResponse) Reset() {
+	*x = DeleteConditionalFormattingRuleResponse{}
+	mi := &file_sickrock_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteConditionalFormattingRuleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteConditionalFormattingRuleResponse) ProtoMessage() {}
+
+func (x *DeleteConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteConditionalFormattingRuleResponse.ProtoReflect.Descriptor instead.
+func (*DeleteConditionalFormattingRuleResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *DeleteConditionalFormattingRuleResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DeleteConditionalFormattingRuleResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type UpdateConditionalFormattingRuleRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	RuleId         int32                  `protobuf:"varint,1,opt,name=rule_id,json=ruleId,proto3" json:"rule_id,omitempty"`
+	TableName      string                 `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
+	ColumnName     string                 `protobuf:"bytes,3,opt,name=column_name,json=columnName,proto3" json:"column_name,omitempty"`
+	ConditionType  string                 `protobuf:"bytes,4,opt,name=condition_type,json=conditionType,proto3" json:"condition_type,omitempty"`
+	ConditionValue string                 `protobuf:"bytes,5,opt,name=condition_value,json=conditionValue,proto3" json:"condition_value,omitempty"`
+	FormatType     string                 `protobuf:"bytes,6,opt,name=format_type,json=formatType,proto3" json:"format_type,omitempty"`
+	FormatValue    string                 `protobuf:"bytes,7,opt,name=format_value,json=formatValue,proto3" json:"format_value,omitempty"`
+	Priority       int32                  `protobuf:"varint,8,opt,name=priority,proto3" json:"priority,omitempty"`
+	IsActive       bool                   `protobuf:"varint,9,opt,name=is_active,json=isActive,proto3" json:"is_active,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) Reset() {
+	*x = UpdateConditionalFormattingRuleRequest{}
+	mi := &file_sickrock_proto_msgTypes[109]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateConditionalFormattingRuleRequest) ProtoMessage() {}
+
+func (x *UpdateConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[109]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateConditionalFormattingRuleRequest.ProtoReflect.Descriptor instead.
+func (*UpdateConditionalFormattingRuleRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{109}
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetRuleId() int32 {
+	if x != nil {
+		return x.RuleId
+	}
+	return 0
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetTableName() string {
+	if x != nil {
+		return x.TableName
+	}
+	return ""
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetColumnName() string {
+	if x != nil {
+		return x.ColumnName
+	}
+	return ""
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetConditionType() string {
+	if x != nil {
+		return x.ConditionType
+	}
+	return ""
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetConditionValue() string {
+	if x != nil {
+		return x.ConditionValue
+	}
+	return ""
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetFormatType() string {
+	if x != nil {
+		return x.FormatType
+	}
+	return ""
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetFormatValue() string {
+	if x != nil {
+		return x.FormatValue
+	}
+	return ""
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetPriority() int32 {
+	if x != nil {
+		return x.Priority
+	}
+	return 0
+}
+
+func (x *UpdateConditionalFormattingRuleRequest) GetIsActive() bool {
+	if x != nil {
+		return x.IsActive
+	}
+	return false
+}
+
+type UpdateConditionalFormattingRuleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateConditionalFormattingRuleResponse) Reset() {
+	*x = UpdateConditionalFormattingRuleResponse{}
+	mi := &file_sickrock_proto_msgTypes[110]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateConditionalFormattingRuleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateConditionalFormattingRuleResponse) ProtoMessage() {}
+
+func (x *UpdateConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[110]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateConditionalFormattingRuleResponse.ProtoReflect.Descriptor instead.
+func (*UpdateConditionalFormattingRuleResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{110}
+}
+
+func (x *UpdateConditionalFormattingRuleResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *UpdateConditionalFormattingRuleResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 var File_sickrock_proto protoreflect.FileDescriptor
 
 const file_sickrock_proto_rawDesc = "" +
@@ -5581,12 +6226,16 @@ const file_sickrock_proto_rawDesc = "" +
 	" \x01(\tR\x05title\"}\n" +
 	"\x15GetNavigationResponse\x12.\n" +
 	"\x05items\x18\x01 \x03(\v2\x18.sickrock.NavigationItemR\x05items\x124\n" +
-	"\tbookmarks\x18\x02 \x03(\v2\x16.sickrock.UserBookmarkR\tbookmarks\"\xcd\x01\n" +
+	"\tbookmarks\x18\x02 \x03(\v2\x16.sickrock.UserBookmarkR\tbookmarks\"\xcc\x02\n" +
 	"\x04Item\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
-	"sr_created\x18\x02 \x01(\x03R\tsrCreated\x12Q\n" +
-	"\x11additional_fields\x18\x03 \x03(\v2$.sickrock.Item.AdditionalFieldsEntryR\x10additionalFields\x1aC\n" +
+	"sr_created\x18\x02 \x01(\x03R\tsrCreated\x12.\n" +
+	"\x13sr_created_relative\x18\x03 \x01(\x05R\x11srCreatedRelative\x12\x1d\n" +
+	"\n" +
+	"sr_updated\x18\x04 \x01(\x03R\tsrUpdated\x12.\n" +
+	"\x13sr_updated_relative\x18\x05 \x01(\x05R\x11srUpdatedRelative\x12Q\n" +
+	"\x11additional_fields\x18\x06 \x03(\v2$.sickrock.Item.AdditionalFieldsEntryR\x10additionalFields\x1aC\n" +
 	"\x15AdditionalFieldsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa2\x01\n" +
@@ -5914,7 +6563,65 @@ const file_sickrock_proto_rawDesc = "" +
 	"lastUsedAt\x12\x1d\n" +
 	"\n" +
 	"expires_at\x18\x06 \x01(\x03R\texpiresAt\x12\x1b\n" +
-	"\tis_active\x18\a \x01(\bR\bisActive2\xe2\x1d\n" +
+	"\tis_active\x18\a \x01(\bR\bisActive\"\xff\x02\n" +
+	"\x19ConditionalFormattingRule\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x1d\n" +
+	"\n" +
+	"table_name\x18\x02 \x01(\tR\ttableName\x12\x1f\n" +
+	"\vcolumn_name\x18\x03 \x01(\tR\n" +
+	"columnName\x12%\n" +
+	"\x0econdition_type\x18\x04 \x01(\tR\rconditionType\x12'\n" +
+	"\x0fcondition_value\x18\x05 \x01(\tR\x0econditionValue\x12\x1f\n" +
+	"\vformat_type\x18\x06 \x01(\tR\n" +
+	"formatType\x12!\n" +
+	"\fformat_value\x18\a \x01(\tR\vformatValue\x12\x1a\n" +
+	"\bpriority\x18\b \x01(\x05R\bpriority\x12\x1b\n" +
+	"\tis_active\x18\t \x01(\bR\bisActive\x12\x1d\n" +
+	"\n" +
+	"sr_created\x18\n" +
+	" \x01(\x03R\tsrCreated\x12&\n" +
+	"\x0fupdated_at_unix\x18\v \x01(\x03R\rupdatedAtUnix\"E\n" +
+	"$GetConditionalFormattingRulesRequest\x12\x1d\n" +
+	"\n" +
+	"table_name\x18\x01 \x01(\tR\ttableName\"b\n" +
+	"%GetConditionalFormattingRulesResponse\x129\n" +
+	"\x05rules\x18\x01 \x03(\v2#.sickrock.ConditionalFormattingRuleR\x05rules\"\x98\x02\n" +
+	"&CreateConditionalFormattingRuleRequest\x12\x1d\n" +
+	"\n" +
+	"table_name\x18\x01 \x01(\tR\ttableName\x12\x1f\n" +
+	"\vcolumn_name\x18\x02 \x01(\tR\n" +
+	"columnName\x12%\n" +
+	"\x0econdition_type\x18\x03 \x01(\tR\rconditionType\x12'\n" +
+	"\x0fcondition_value\x18\x04 \x01(\tR\x0econditionValue\x12\x1f\n" +
+	"\vformat_type\x18\x05 \x01(\tR\n" +
+	"formatType\x12!\n" +
+	"\fformat_value\x18\x06 \x01(\tR\vformatValue\x12\x1a\n" +
+	"\bpriority\x18\a \x01(\x05R\bpriority\"v\n" +
+	"'CreateConditionalFormattingRuleResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x17\n" +
+	"\arule_id\x18\x03 \x01(\x05R\x06ruleId\"A\n" +
+	"&DeleteConditionalFormattingRuleRequest\x12\x17\n" +
+	"\arule_id\x18\x01 \x01(\x05R\x06ruleId\"]\n" +
+	"'DeleteConditionalFormattingRuleResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xce\x02\n" +
+	"&UpdateConditionalFormattingRuleRequest\x12\x17\n" +
+	"\arule_id\x18\x01 \x01(\x05R\x06ruleId\x12\x1d\n" +
+	"\n" +
+	"table_name\x18\x02 \x01(\tR\ttableName\x12\x1f\n" +
+	"\vcolumn_name\x18\x03 \x01(\tR\n" +
+	"columnName\x12%\n" +
+	"\x0econdition_type\x18\x04 \x01(\tR\rconditionType\x12'\n" +
+	"\x0fcondition_value\x18\x05 \x01(\tR\x0econditionValue\x12\x1f\n" +
+	"\vformat_type\x18\x06 \x01(\tR\n" +
+	"formatType\x12!\n" +
+	"\fformat_value\x18\a \x01(\tR\vformatValue\x12\x1a\n" +
+	"\bpriority\x18\b \x01(\x05R\bpriority\x12\x1b\n" +
+	"\tis_active\x18\t \x01(\bR\bisActive\"]\n" +
+	"'UpdateConditionalFormattingRuleResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage2\x80\"\n" +
 	"\bSickRock\x125\n" +
 	"\x04Init\x12\x15.sickrock.InitRequest\x1a\x16.sickrock.InitResponse\x125\n" +
 	"\x04Ping\x12\x15.sickrock.PingRequest\x1a\x16.sickrock.PingResponse\x128\n" +
@@ -5963,7 +6670,11 @@ const file_sickrock_proto_rawDesc = "" +
 	"\n" +
 	"GetAPIKeys\x12\x1b.sickrock.GetAPIKeysRequest\x1a\x1c.sickrock.GetAPIKeysResponse\x12M\n" +
 	"\fDeleteAPIKey\x12\x1d.sickrock.DeleteAPIKeyRequest\x1a\x1e.sickrock.DeleteAPIKeyResponse\x12Y\n" +
-	"\x10DeactivateAPIKey\x12!.sickrock.DeactivateAPIKeyRequest\x1a\".sickrock.DeactivateAPIKeyResponseB\x91\x01\n" +
+	"\x10DeactivateAPIKey\x12!.sickrock.DeactivateAPIKeyRequest\x1a\".sickrock.DeactivateAPIKeyResponse\x12\x80\x01\n" +
+	"\x1dGetConditionalFormattingRules\x12..sickrock.GetConditionalFormattingRulesRequest\x1a/.sickrock.GetConditionalFormattingRulesResponse\x12\x86\x01\n" +
+	"\x1fCreateConditionalFormattingRule\x120.sickrock.CreateConditionalFormattingRuleRequest\x1a1.sickrock.CreateConditionalFormattingRuleResponse\x12\x86\x01\n" +
+	"\x1fUpdateConditionalFormattingRule\x120.sickrock.UpdateConditionalFormattingRuleRequest\x1a1.sickrock.UpdateConditionalFormattingRuleResponse\x12\x86\x01\n" +
+	"\x1fDeleteConditionalFormattingRule\x120.sickrock.DeleteConditionalFormattingRuleRequest\x1a1.sickrock.DeleteConditionalFormattingRuleResponseB\x91\x01\n" +
 	"\fcom.sickrockB\rSickrockProtoP\x01Z2github.com/jamesread/SickRock/gen/proto;sickrockpb\xa2\x02\x03SXX\xaa\x02\bSickrock\xca\x02\bSickrock\xe2\x02\x14Sickrock\\GPBMetadata\xea\x02\bSickrockb\x06proto3"
 
 var (
@@ -5978,114 +6689,123 @@ func file_sickrock_proto_rawDescGZIP() []byte {
 	return file_sickrock_proto_rawDescData
 }
 
-var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 106)
+var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 115)
 var file_sickrock_proto_goTypes = []any{
-	(*PingRequest)(nil),                          // 0: sickrock.PingRequest
-	(*PingResponse)(nil),                         // 1: sickrock.PingResponse
-	(*GetNavigationLinksRequest)(nil),            // 2: sickrock.GetNavigationLinksRequest
-	(*NavigationLink)(nil),                       // 3: sickrock.NavigationLink
-	(*GetNavigationLinksResponse)(nil),           // 4: sickrock.GetNavigationLinksResponse
-	(*GetTableConfigurationsRequest)(nil),        // 5: sickrock.GetTableConfigurationsRequest
-	(*Page)(nil),                                 // 6: sickrock.Page
-	(*GetTableConfigurationsResponse)(nil),       // 7: sickrock.GetTableConfigurationsResponse
-	(*CreateTableConfigurationRequest)(nil),      // 8: sickrock.CreateTableConfigurationRequest
-	(*CreateTableConfigurationResponse)(nil),     // 9: sickrock.CreateTableConfigurationResponse
-	(*GetDatabaseTablesRequest)(nil),             // 10: sickrock.GetDatabaseTablesRequest
-	(*DatabaseTable)(nil),                        // 11: sickrock.DatabaseTable
-	(*GetDatabaseTablesResponse)(nil),            // 12: sickrock.GetDatabaseTablesResponse
-	(*GetNavigationRequest)(nil),                 // 13: sickrock.GetNavigationRequest
-	(*NavigationItem)(nil),                       // 14: sickrock.NavigationItem
-	(*GetNavigationResponse)(nil),                // 15: sickrock.GetNavigationResponse
-	(*Item)(nil),                                 // 16: sickrock.Item
-	(*ListItemsRequest)(nil),                     // 17: sickrock.ListItemsRequest
-	(*ListItemsResponse)(nil),                    // 18: sickrock.ListItemsResponse
-	(*CreateItemRequest)(nil),                    // 19: sickrock.CreateItemRequest
-	(*CreateItemResponse)(nil),                   // 20: sickrock.CreateItemResponse
-	(*GetItemRequest)(nil),                       // 21: sickrock.GetItemRequest
-	(*GetItemResponse)(nil),                      // 22: sickrock.GetItemResponse
-	(*EditItemRequest)(nil),                      // 23: sickrock.EditItemRequest
-	(*EditItemResponse)(nil),                     // 24: sickrock.EditItemResponse
-	(*DeleteItemRequest)(nil),                    // 25: sickrock.DeleteItemRequest
-	(*DeleteItemResponse)(nil),                   // 26: sickrock.DeleteItemResponse
-	(*GetTableStructureRequest)(nil),             // 27: sickrock.GetTableStructureRequest
-	(*Field)(nil),                                // 28: sickrock.Field
-	(*GetTableStructureResponse)(nil),            // 29: sickrock.GetTableStructureResponse
-	(*AddTableColumnRequest)(nil),                // 30: sickrock.AddTableColumnRequest
-	(*TableViewColumn)(nil),                      // 31: sickrock.TableViewColumn
-	(*CreateTableViewRequest)(nil),               // 32: sickrock.CreateTableViewRequest
-	(*CreateTableViewResponse)(nil),              // 33: sickrock.CreateTableViewResponse
-	(*UpdateTableViewRequest)(nil),               // 34: sickrock.UpdateTableViewRequest
-	(*UpdateTableViewResponse)(nil),              // 35: sickrock.UpdateTableViewResponse
-	(*GetTableViewsRequest)(nil),                 // 36: sickrock.GetTableViewsRequest
-	(*TableView)(nil),                            // 37: sickrock.TableView
-	(*GetTableViewsResponse)(nil),                // 38: sickrock.GetTableViewsResponse
-	(*DeleteTableViewRequest)(nil),               // 39: sickrock.DeleteTableViewRequest
-	(*DeleteTableViewResponse)(nil),              // 40: sickrock.DeleteTableViewResponse
-	(*ForeignKey)(nil),                           // 41: sickrock.ForeignKey
-	(*CreateForeignKeyRequest)(nil),              // 42: sickrock.CreateForeignKeyRequest
-	(*CreateForeignKeyResponse)(nil),             // 43: sickrock.CreateForeignKeyResponse
-	(*GetForeignKeysRequest)(nil),                // 44: sickrock.GetForeignKeysRequest
-	(*GetForeignKeysResponse)(nil),               // 45: sickrock.GetForeignKeysResponse
-	(*DeleteForeignKeyRequest)(nil),              // 46: sickrock.DeleteForeignKeyRequest
-	(*DeleteForeignKeyResponse)(nil),             // 47: sickrock.DeleteForeignKeyResponse
-	(*ChangeColumnTypeRequest)(nil),              // 48: sickrock.ChangeColumnTypeRequest
-	(*ChangeColumnTypeResponse)(nil),             // 49: sickrock.ChangeColumnTypeResponse
-	(*DropColumnRequest)(nil),                    // 50: sickrock.DropColumnRequest
-	(*DropColumnResponse)(nil),                   // 51: sickrock.DropColumnResponse
-	(*ChangeColumnNameRequest)(nil),              // 52: sickrock.ChangeColumnNameRequest
-	(*ChangeColumnNameResponse)(nil),             // 53: sickrock.ChangeColumnNameResponse
-	(*GetMostRecentlyViewedRequest)(nil),         // 54: sickrock.GetMostRecentlyViewedRequest
-	(*RecentlyViewedItem)(nil),                   // 55: sickrock.RecentlyViewedItem
-	(*GetMostRecentlyViewedResponse)(nil),        // 56: sickrock.GetMostRecentlyViewedResponse
-	(*Dashboard)(nil),                            // 57: sickrock.Dashboard
-	(*GetDashboardsRequest)(nil),                 // 58: sickrock.GetDashboardsRequest
-	(*GetDashboardsResponse)(nil),                // 59: sickrock.GetDashboardsResponse
-	(*DashboardComponent)(nil),                   // 60: sickrock.DashboardComponent
-	(*DashboardComponentRule)(nil),               // 61: sickrock.DashboardComponentRule
-	(*GetDashboardComponentRulesRequest)(nil),    // 62: sickrock.GetDashboardComponentRulesRequest
-	(*GetDashboardComponentRulesResponse)(nil),   // 63: sickrock.GetDashboardComponentRulesResponse
-	(*CreateDashboardComponentRuleRequest)(nil),  // 64: sickrock.CreateDashboardComponentRuleRequest
-	(*CreateDashboardComponentRuleResponse)(nil), // 65: sickrock.CreateDashboardComponentRuleResponse
-	(*InitRequest)(nil),                          // 66: sickrock.InitRequest
-	(*InitResponse)(nil),                         // 67: sickrock.InitResponse
-	(*LoginRequest)(nil),                         // 68: sickrock.LoginRequest
-	(*LoginResponse)(nil),                        // 69: sickrock.LoginResponse
-	(*LogoutRequest)(nil),                        // 70: sickrock.LogoutRequest
-	(*LogoutResponse)(nil),                       // 71: sickrock.LogoutResponse
-	(*ResetUserPasswordRequest)(nil),             // 72: sickrock.ResetUserPasswordRequest
-	(*ResetUserPasswordResponse)(nil),            // 73: sickrock.ResetUserPasswordResponse
-	(*ValidateTokenRequest)(nil),                 // 74: sickrock.ValidateTokenRequest
-	(*ValidateTokenResponse)(nil),                // 75: sickrock.ValidateTokenResponse
-	(*GenerateDeviceCodeRequest)(nil),            // 76: sickrock.GenerateDeviceCodeRequest
-	(*GenerateDeviceCodeResponse)(nil),           // 77: sickrock.GenerateDeviceCodeResponse
-	(*ClaimDeviceCodeRequest)(nil),               // 78: sickrock.ClaimDeviceCodeRequest
-	(*ClaimDeviceCodeResponse)(nil),              // 79: sickrock.ClaimDeviceCodeResponse
-	(*CheckDeviceCodeRequest)(nil),               // 80: sickrock.CheckDeviceCodeRequest
-	(*CheckDeviceCodeResponse)(nil),              // 81: sickrock.CheckDeviceCodeResponse
-	(*GetDeviceCodeSessionRequest)(nil),          // 82: sickrock.GetDeviceCodeSessionRequest
-	(*GetDeviceCodeSessionResponse)(nil),         // 83: sickrock.GetDeviceCodeSessionResponse
-	(*GetSystemInfoRequest)(nil),                 // 84: sickrock.GetSystemInfoRequest
-	(*GetSystemInfoResponse)(nil),                // 85: sickrock.GetSystemInfoResponse
-	(*GetUserBookmarksRequest)(nil),              // 86: sickrock.GetUserBookmarksRequest
-	(*GetUserBookmarksResponse)(nil),             // 87: sickrock.GetUserBookmarksResponse
-	(*CreateUserBookmarkRequest)(nil),            // 88: sickrock.CreateUserBookmarkRequest
-	(*CreateUserBookmarkResponse)(nil),           // 89: sickrock.CreateUserBookmarkResponse
-	(*DeleteUserBookmarkRequest)(nil),            // 90: sickrock.DeleteUserBookmarkRequest
-	(*DeleteUserBookmarkResponse)(nil),           // 91: sickrock.DeleteUserBookmarkResponse
-	(*UserBookmark)(nil),                         // 92: sickrock.UserBookmark
-	(*CreateAPIKeyRequest)(nil),                  // 93: sickrock.CreateAPIKeyRequest
-	(*CreateAPIKeyResponse)(nil),                 // 94: sickrock.CreateAPIKeyResponse
-	(*GetAPIKeysRequest)(nil),                    // 95: sickrock.GetAPIKeysRequest
-	(*GetAPIKeysResponse)(nil),                   // 96: sickrock.GetAPIKeysResponse
-	(*DeleteAPIKeyRequest)(nil),                  // 97: sickrock.DeleteAPIKeyRequest
-	(*DeleteAPIKeyResponse)(nil),                 // 98: sickrock.DeleteAPIKeyResponse
-	(*DeactivateAPIKeyRequest)(nil),              // 99: sickrock.DeactivateAPIKeyRequest
-	(*DeactivateAPIKeyResponse)(nil),             // 100: sickrock.DeactivateAPIKeyResponse
-	(*APIKey)(nil),                               // 101: sickrock.APIKey
-	nil,                                          // 102: sickrock.Item.AdditionalFieldsEntry
-	nil,                                          // 103: sickrock.ListItemsRequest.WhereEntry
-	nil,                                          // 104: sickrock.CreateItemRequest.AdditionalFieldsEntry
-	nil,                                          // 105: sickrock.EditItemRequest.AdditionalFieldsEntry
+	(*PingRequest)(nil),                             // 0: sickrock.PingRequest
+	(*PingResponse)(nil),                            // 1: sickrock.PingResponse
+	(*GetNavigationLinksRequest)(nil),               // 2: sickrock.GetNavigationLinksRequest
+	(*NavigationLink)(nil),                          // 3: sickrock.NavigationLink
+	(*GetNavigationLinksResponse)(nil),              // 4: sickrock.GetNavigationLinksResponse
+	(*GetTableConfigurationsRequest)(nil),           // 5: sickrock.GetTableConfigurationsRequest
+	(*Page)(nil),                                    // 6: sickrock.Page
+	(*GetTableConfigurationsResponse)(nil),          // 7: sickrock.GetTableConfigurationsResponse
+	(*CreateTableConfigurationRequest)(nil),         // 8: sickrock.CreateTableConfigurationRequest
+	(*CreateTableConfigurationResponse)(nil),        // 9: sickrock.CreateTableConfigurationResponse
+	(*GetDatabaseTablesRequest)(nil),                // 10: sickrock.GetDatabaseTablesRequest
+	(*DatabaseTable)(nil),                           // 11: sickrock.DatabaseTable
+	(*GetDatabaseTablesResponse)(nil),               // 12: sickrock.GetDatabaseTablesResponse
+	(*GetNavigationRequest)(nil),                    // 13: sickrock.GetNavigationRequest
+	(*NavigationItem)(nil),                          // 14: sickrock.NavigationItem
+	(*GetNavigationResponse)(nil),                   // 15: sickrock.GetNavigationResponse
+	(*Item)(nil),                                    // 16: sickrock.Item
+	(*ListItemsRequest)(nil),                        // 17: sickrock.ListItemsRequest
+	(*ListItemsResponse)(nil),                       // 18: sickrock.ListItemsResponse
+	(*CreateItemRequest)(nil),                       // 19: sickrock.CreateItemRequest
+	(*CreateItemResponse)(nil),                      // 20: sickrock.CreateItemResponse
+	(*GetItemRequest)(nil),                          // 21: sickrock.GetItemRequest
+	(*GetItemResponse)(nil),                         // 22: sickrock.GetItemResponse
+	(*EditItemRequest)(nil),                         // 23: sickrock.EditItemRequest
+	(*EditItemResponse)(nil),                        // 24: sickrock.EditItemResponse
+	(*DeleteItemRequest)(nil),                       // 25: sickrock.DeleteItemRequest
+	(*DeleteItemResponse)(nil),                      // 26: sickrock.DeleteItemResponse
+	(*GetTableStructureRequest)(nil),                // 27: sickrock.GetTableStructureRequest
+	(*Field)(nil),                                   // 28: sickrock.Field
+	(*GetTableStructureResponse)(nil),               // 29: sickrock.GetTableStructureResponse
+	(*AddTableColumnRequest)(nil),                   // 30: sickrock.AddTableColumnRequest
+	(*TableViewColumn)(nil),                         // 31: sickrock.TableViewColumn
+	(*CreateTableViewRequest)(nil),                  // 32: sickrock.CreateTableViewRequest
+	(*CreateTableViewResponse)(nil),                 // 33: sickrock.CreateTableViewResponse
+	(*UpdateTableViewRequest)(nil),                  // 34: sickrock.UpdateTableViewRequest
+	(*UpdateTableViewResponse)(nil),                 // 35: sickrock.UpdateTableViewResponse
+	(*GetTableViewsRequest)(nil),                    // 36: sickrock.GetTableViewsRequest
+	(*TableView)(nil),                               // 37: sickrock.TableView
+	(*GetTableViewsResponse)(nil),                   // 38: sickrock.GetTableViewsResponse
+	(*DeleteTableViewRequest)(nil),                  // 39: sickrock.DeleteTableViewRequest
+	(*DeleteTableViewResponse)(nil),                 // 40: sickrock.DeleteTableViewResponse
+	(*ForeignKey)(nil),                              // 41: sickrock.ForeignKey
+	(*CreateForeignKeyRequest)(nil),                 // 42: sickrock.CreateForeignKeyRequest
+	(*CreateForeignKeyResponse)(nil),                // 43: sickrock.CreateForeignKeyResponse
+	(*GetForeignKeysRequest)(nil),                   // 44: sickrock.GetForeignKeysRequest
+	(*GetForeignKeysResponse)(nil),                  // 45: sickrock.GetForeignKeysResponse
+	(*DeleteForeignKeyRequest)(nil),                 // 46: sickrock.DeleteForeignKeyRequest
+	(*DeleteForeignKeyResponse)(nil),                // 47: sickrock.DeleteForeignKeyResponse
+	(*ChangeColumnTypeRequest)(nil),                 // 48: sickrock.ChangeColumnTypeRequest
+	(*ChangeColumnTypeResponse)(nil),                // 49: sickrock.ChangeColumnTypeResponse
+	(*DropColumnRequest)(nil),                       // 50: sickrock.DropColumnRequest
+	(*DropColumnResponse)(nil),                      // 51: sickrock.DropColumnResponse
+	(*ChangeColumnNameRequest)(nil),                 // 52: sickrock.ChangeColumnNameRequest
+	(*ChangeColumnNameResponse)(nil),                // 53: sickrock.ChangeColumnNameResponse
+	(*GetMostRecentlyViewedRequest)(nil),            // 54: sickrock.GetMostRecentlyViewedRequest
+	(*RecentlyViewedItem)(nil),                      // 55: sickrock.RecentlyViewedItem
+	(*GetMostRecentlyViewedResponse)(nil),           // 56: sickrock.GetMostRecentlyViewedResponse
+	(*Dashboard)(nil),                               // 57: sickrock.Dashboard
+	(*GetDashboardsRequest)(nil),                    // 58: sickrock.GetDashboardsRequest
+	(*GetDashboardsResponse)(nil),                   // 59: sickrock.GetDashboardsResponse
+	(*DashboardComponent)(nil),                      // 60: sickrock.DashboardComponent
+	(*DashboardComponentRule)(nil),                  // 61: sickrock.DashboardComponentRule
+	(*GetDashboardComponentRulesRequest)(nil),       // 62: sickrock.GetDashboardComponentRulesRequest
+	(*GetDashboardComponentRulesResponse)(nil),      // 63: sickrock.GetDashboardComponentRulesResponse
+	(*CreateDashboardComponentRuleRequest)(nil),     // 64: sickrock.CreateDashboardComponentRuleRequest
+	(*CreateDashboardComponentRuleResponse)(nil),    // 65: sickrock.CreateDashboardComponentRuleResponse
+	(*InitRequest)(nil),                             // 66: sickrock.InitRequest
+	(*InitResponse)(nil),                            // 67: sickrock.InitResponse
+	(*LoginRequest)(nil),                            // 68: sickrock.LoginRequest
+	(*LoginResponse)(nil),                           // 69: sickrock.LoginResponse
+	(*LogoutRequest)(nil),                           // 70: sickrock.LogoutRequest
+	(*LogoutResponse)(nil),                          // 71: sickrock.LogoutResponse
+	(*ResetUserPasswordRequest)(nil),                // 72: sickrock.ResetUserPasswordRequest
+	(*ResetUserPasswordResponse)(nil),               // 73: sickrock.ResetUserPasswordResponse
+	(*ValidateTokenRequest)(nil),                    // 74: sickrock.ValidateTokenRequest
+	(*ValidateTokenResponse)(nil),                   // 75: sickrock.ValidateTokenResponse
+	(*GenerateDeviceCodeRequest)(nil),               // 76: sickrock.GenerateDeviceCodeRequest
+	(*GenerateDeviceCodeResponse)(nil),              // 77: sickrock.GenerateDeviceCodeResponse
+	(*ClaimDeviceCodeRequest)(nil),                  // 78: sickrock.ClaimDeviceCodeRequest
+	(*ClaimDeviceCodeResponse)(nil),                 // 79: sickrock.ClaimDeviceCodeResponse
+	(*CheckDeviceCodeRequest)(nil),                  // 80: sickrock.CheckDeviceCodeRequest
+	(*CheckDeviceCodeResponse)(nil),                 // 81: sickrock.CheckDeviceCodeResponse
+	(*GetDeviceCodeSessionRequest)(nil),             // 82: sickrock.GetDeviceCodeSessionRequest
+	(*GetDeviceCodeSessionResponse)(nil),            // 83: sickrock.GetDeviceCodeSessionResponse
+	(*GetSystemInfoRequest)(nil),                    // 84: sickrock.GetSystemInfoRequest
+	(*GetSystemInfoResponse)(nil),                   // 85: sickrock.GetSystemInfoResponse
+	(*GetUserBookmarksRequest)(nil),                 // 86: sickrock.GetUserBookmarksRequest
+	(*GetUserBookmarksResponse)(nil),                // 87: sickrock.GetUserBookmarksResponse
+	(*CreateUserBookmarkRequest)(nil),               // 88: sickrock.CreateUserBookmarkRequest
+	(*CreateUserBookmarkResponse)(nil),              // 89: sickrock.CreateUserBookmarkResponse
+	(*DeleteUserBookmarkRequest)(nil),               // 90: sickrock.DeleteUserBookmarkRequest
+	(*DeleteUserBookmarkResponse)(nil),              // 91: sickrock.DeleteUserBookmarkResponse
+	(*UserBookmark)(nil),                            // 92: sickrock.UserBookmark
+	(*CreateAPIKeyRequest)(nil),                     // 93: sickrock.CreateAPIKeyRequest
+	(*CreateAPIKeyResponse)(nil),                    // 94: sickrock.CreateAPIKeyResponse
+	(*GetAPIKeysRequest)(nil),                       // 95: sickrock.GetAPIKeysRequest
+	(*GetAPIKeysResponse)(nil),                      // 96: sickrock.GetAPIKeysResponse
+	(*DeleteAPIKeyRequest)(nil),                     // 97: sickrock.DeleteAPIKeyRequest
+	(*DeleteAPIKeyResponse)(nil),                    // 98: sickrock.DeleteAPIKeyResponse
+	(*DeactivateAPIKeyRequest)(nil),                 // 99: sickrock.DeactivateAPIKeyRequest
+	(*DeactivateAPIKeyResponse)(nil),                // 100: sickrock.DeactivateAPIKeyResponse
+	(*APIKey)(nil),                                  // 101: sickrock.APIKey
+	(*ConditionalFormattingRule)(nil),               // 102: sickrock.ConditionalFormattingRule
+	(*GetConditionalFormattingRulesRequest)(nil),    // 103: sickrock.GetConditionalFormattingRulesRequest
+	(*GetConditionalFormattingRulesResponse)(nil),   // 104: sickrock.GetConditionalFormattingRulesResponse
+	(*CreateConditionalFormattingRuleRequest)(nil),  // 105: sickrock.CreateConditionalFormattingRuleRequest
+	(*CreateConditionalFormattingRuleResponse)(nil), // 106: sickrock.CreateConditionalFormattingRuleResponse
+	(*DeleteConditionalFormattingRuleRequest)(nil),  // 107: sickrock.DeleteConditionalFormattingRuleRequest
+	(*DeleteConditionalFormattingRuleResponse)(nil), // 108: sickrock.DeleteConditionalFormattingRuleResponse
+	(*UpdateConditionalFormattingRuleRequest)(nil),  // 109: sickrock.UpdateConditionalFormattingRuleRequest
+	(*UpdateConditionalFormattingRuleResponse)(nil), // 110: sickrock.UpdateConditionalFormattingRuleResponse
+	nil, // 111: sickrock.Item.AdditionalFieldsEntry
+	nil, // 112: sickrock.ListItemsRequest.WhereEntry
+	nil, // 113: sickrock.CreateItemRequest.AdditionalFieldsEntry
+	nil, // 114: sickrock.EditItemRequest.AdditionalFieldsEntry
 }
 var file_sickrock_proto_depIdxs = []int32{
 	3,   // 0: sickrock.GetNavigationLinksResponse.links:type_name -> sickrock.NavigationLink
@@ -6093,13 +6813,13 @@ var file_sickrock_proto_depIdxs = []int32{
 	11,  // 2: sickrock.GetDatabaseTablesResponse.tables:type_name -> sickrock.DatabaseTable
 	14,  // 3: sickrock.GetNavigationResponse.items:type_name -> sickrock.NavigationItem
 	92,  // 4: sickrock.GetNavigationResponse.bookmarks:type_name -> sickrock.UserBookmark
-	102, // 5: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
-	103, // 6: sickrock.ListItemsRequest.where:type_name -> sickrock.ListItemsRequest.WhereEntry
+	111, // 5: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
+	112, // 6: sickrock.ListItemsRequest.where:type_name -> sickrock.ListItemsRequest.WhereEntry
 	16,  // 7: sickrock.ListItemsResponse.items:type_name -> sickrock.Item
-	104, // 8: sickrock.CreateItemRequest.additional_fields:type_name -> sickrock.CreateItemRequest.AdditionalFieldsEntry
+	113, // 8: sickrock.CreateItemRequest.additional_fields:type_name -> sickrock.CreateItemRequest.AdditionalFieldsEntry
 	16,  // 9: sickrock.CreateItemResponse.item:type_name -> sickrock.Item
 	16,  // 10: sickrock.GetItemResponse.item:type_name -> sickrock.Item
-	105, // 11: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
+	114, // 11: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
 	16,  // 12: sickrock.EditItemResponse.item:type_name -> sickrock.Item
 	28,  // 13: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
 	28,  // 14: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
@@ -6117,99 +6837,108 @@ var file_sickrock_proto_depIdxs = []int32{
 	92,  // 26: sickrock.CreateUserBookmarkResponse.bookmark:type_name -> sickrock.UserBookmark
 	14,  // 27: sickrock.UserBookmark.navigation_item:type_name -> sickrock.NavigationItem
 	101, // 28: sickrock.GetAPIKeysResponse.api_keys:type_name -> sickrock.APIKey
-	66,  // 29: sickrock.SickRock.Init:input_type -> sickrock.InitRequest
-	0,   // 30: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
-	68,  // 31: sickrock.SickRock.Login:input_type -> sickrock.LoginRequest
-	70,  // 32: sickrock.SickRock.Logout:input_type -> sickrock.LogoutRequest
-	74,  // 33: sickrock.SickRock.ValidateToken:input_type -> sickrock.ValidateTokenRequest
-	72,  // 34: sickrock.SickRock.ResetUserPassword:input_type -> sickrock.ResetUserPasswordRequest
-	76,  // 35: sickrock.SickRock.GenerateDeviceCode:input_type -> sickrock.GenerateDeviceCodeRequest
-	78,  // 36: sickrock.SickRock.ClaimDeviceCode:input_type -> sickrock.ClaimDeviceCodeRequest
-	80,  // 37: sickrock.SickRock.CheckDeviceCode:input_type -> sickrock.CheckDeviceCodeRequest
-	82,  // 38: sickrock.SickRock.GetDeviceCodeSession:input_type -> sickrock.GetDeviceCodeSessionRequest
-	2,   // 39: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
-	5,   // 40: sickrock.SickRock.GetTableConfigurations:input_type -> sickrock.GetTableConfigurationsRequest
-	8,   // 41: sickrock.SickRock.CreateTableConfiguration:input_type -> sickrock.CreateTableConfigurationRequest
-	10,  // 42: sickrock.SickRock.GetDatabaseTables:input_type -> sickrock.GetDatabaseTablesRequest
-	13,  // 43: sickrock.SickRock.GetNavigation:input_type -> sickrock.GetNavigationRequest
-	17,  // 44: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
-	19,  // 45: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
-	21,  // 46: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
-	23,  // 47: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
-	25,  // 48: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
-	27,  // 49: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
-	30,  // 50: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
-	32,  // 51: sickrock.SickRock.CreateTableView:input_type -> sickrock.CreateTableViewRequest
-	34,  // 52: sickrock.SickRock.UpdateTableView:input_type -> sickrock.UpdateTableViewRequest
-	36,  // 53: sickrock.SickRock.GetTableViews:input_type -> sickrock.GetTableViewsRequest
-	39,  // 54: sickrock.SickRock.DeleteTableView:input_type -> sickrock.DeleteTableViewRequest
-	42,  // 55: sickrock.SickRock.CreateForeignKey:input_type -> sickrock.CreateForeignKeyRequest
-	44,  // 56: sickrock.SickRock.GetForeignKeys:input_type -> sickrock.GetForeignKeysRequest
-	46,  // 57: sickrock.SickRock.DeleteForeignKey:input_type -> sickrock.DeleteForeignKeyRequest
-	48,  // 58: sickrock.SickRock.ChangeColumnType:input_type -> sickrock.ChangeColumnTypeRequest
-	50,  // 59: sickrock.SickRock.DropColumn:input_type -> sickrock.DropColumnRequest
-	52,  // 60: sickrock.SickRock.ChangeColumnName:input_type -> sickrock.ChangeColumnNameRequest
-	54,  // 61: sickrock.SickRock.GetMostRecentlyViewed:input_type -> sickrock.GetMostRecentlyViewedRequest
-	58,  // 62: sickrock.SickRock.GetDashboards:input_type -> sickrock.GetDashboardsRequest
-	62,  // 63: sickrock.SickRock.GetDashboardComponentRules:input_type -> sickrock.GetDashboardComponentRulesRequest
-	64,  // 64: sickrock.SickRock.CreateDashboardComponentRule:input_type -> sickrock.CreateDashboardComponentRuleRequest
-	84,  // 65: sickrock.SickRock.GetSystemInfo:input_type -> sickrock.GetSystemInfoRequest
-	86,  // 66: sickrock.SickRock.GetUserBookmarks:input_type -> sickrock.GetUserBookmarksRequest
-	88,  // 67: sickrock.SickRock.CreateUserBookmark:input_type -> sickrock.CreateUserBookmarkRequest
-	90,  // 68: sickrock.SickRock.DeleteUserBookmark:input_type -> sickrock.DeleteUserBookmarkRequest
-	93,  // 69: sickrock.SickRock.CreateAPIKey:input_type -> sickrock.CreateAPIKeyRequest
-	95,  // 70: sickrock.SickRock.GetAPIKeys:input_type -> sickrock.GetAPIKeysRequest
-	97,  // 71: sickrock.SickRock.DeleteAPIKey:input_type -> sickrock.DeleteAPIKeyRequest
-	99,  // 72: sickrock.SickRock.DeactivateAPIKey:input_type -> sickrock.DeactivateAPIKeyRequest
-	67,  // 73: sickrock.SickRock.Init:output_type -> sickrock.InitResponse
-	1,   // 74: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
-	69,  // 75: sickrock.SickRock.Login:output_type -> sickrock.LoginResponse
-	71,  // 76: sickrock.SickRock.Logout:output_type -> sickrock.LogoutResponse
-	75,  // 77: sickrock.SickRock.ValidateToken:output_type -> sickrock.ValidateTokenResponse
-	73,  // 78: sickrock.SickRock.ResetUserPassword:output_type -> sickrock.ResetUserPasswordResponse
-	77,  // 79: sickrock.SickRock.GenerateDeviceCode:output_type -> sickrock.GenerateDeviceCodeResponse
-	79,  // 80: sickrock.SickRock.ClaimDeviceCode:output_type -> sickrock.ClaimDeviceCodeResponse
-	81,  // 81: sickrock.SickRock.CheckDeviceCode:output_type -> sickrock.CheckDeviceCodeResponse
-	83,  // 82: sickrock.SickRock.GetDeviceCodeSession:output_type -> sickrock.GetDeviceCodeSessionResponse
-	4,   // 83: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
-	7,   // 84: sickrock.SickRock.GetTableConfigurations:output_type -> sickrock.GetTableConfigurationsResponse
-	9,   // 85: sickrock.SickRock.CreateTableConfiguration:output_type -> sickrock.CreateTableConfigurationResponse
-	12,  // 86: sickrock.SickRock.GetDatabaseTables:output_type -> sickrock.GetDatabaseTablesResponse
-	15,  // 87: sickrock.SickRock.GetNavigation:output_type -> sickrock.GetNavigationResponse
-	18,  // 88: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
-	20,  // 89: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
-	22,  // 90: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
-	24,  // 91: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
-	26,  // 92: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
-	29,  // 93: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
-	29,  // 94: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
-	33,  // 95: sickrock.SickRock.CreateTableView:output_type -> sickrock.CreateTableViewResponse
-	35,  // 96: sickrock.SickRock.UpdateTableView:output_type -> sickrock.UpdateTableViewResponse
-	38,  // 97: sickrock.SickRock.GetTableViews:output_type -> sickrock.GetTableViewsResponse
-	40,  // 98: sickrock.SickRock.DeleteTableView:output_type -> sickrock.DeleteTableViewResponse
-	43,  // 99: sickrock.SickRock.CreateForeignKey:output_type -> sickrock.CreateForeignKeyResponse
-	45,  // 100: sickrock.SickRock.GetForeignKeys:output_type -> sickrock.GetForeignKeysResponse
-	47,  // 101: sickrock.SickRock.DeleteForeignKey:output_type -> sickrock.DeleteForeignKeyResponse
-	49,  // 102: sickrock.SickRock.ChangeColumnType:output_type -> sickrock.ChangeColumnTypeResponse
-	51,  // 103: sickrock.SickRock.DropColumn:output_type -> sickrock.DropColumnResponse
-	53,  // 104: sickrock.SickRock.ChangeColumnName:output_type -> sickrock.ChangeColumnNameResponse
-	56,  // 105: sickrock.SickRock.GetMostRecentlyViewed:output_type -> sickrock.GetMostRecentlyViewedResponse
-	59,  // 106: sickrock.SickRock.GetDashboards:output_type -> sickrock.GetDashboardsResponse
-	63,  // 107: sickrock.SickRock.GetDashboardComponentRules:output_type -> sickrock.GetDashboardComponentRulesResponse
-	65,  // 108: sickrock.SickRock.CreateDashboardComponentRule:output_type -> sickrock.CreateDashboardComponentRuleResponse
-	85,  // 109: sickrock.SickRock.GetSystemInfo:output_type -> sickrock.GetSystemInfoResponse
-	87,  // 110: sickrock.SickRock.GetUserBookmarks:output_type -> sickrock.GetUserBookmarksResponse
-	89,  // 111: sickrock.SickRock.CreateUserBookmark:output_type -> sickrock.CreateUserBookmarkResponse
-	91,  // 112: sickrock.SickRock.DeleteUserBookmark:output_type -> sickrock.DeleteUserBookmarkResponse
-	94,  // 113: sickrock.SickRock.CreateAPIKey:output_type -> sickrock.CreateAPIKeyResponse
-	96,  // 114: sickrock.SickRock.GetAPIKeys:output_type -> sickrock.GetAPIKeysResponse
-	98,  // 115: sickrock.SickRock.DeleteAPIKey:output_type -> sickrock.DeleteAPIKeyResponse
-	100, // 116: sickrock.SickRock.DeactivateAPIKey:output_type -> sickrock.DeactivateAPIKeyResponse
-	73,  // [73:117] is the sub-list for method output_type
-	29,  // [29:73] is the sub-list for method input_type
-	29,  // [29:29] is the sub-list for extension type_name
-	29,  // [29:29] is the sub-list for extension extendee
-	0,   // [0:29] is the sub-list for field type_name
+	102, // 29: sickrock.GetConditionalFormattingRulesResponse.rules:type_name -> sickrock.ConditionalFormattingRule
+	66,  // 30: sickrock.SickRock.Init:input_type -> sickrock.InitRequest
+	0,   // 31: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
+	68,  // 32: sickrock.SickRock.Login:input_type -> sickrock.LoginRequest
+	70,  // 33: sickrock.SickRock.Logout:input_type -> sickrock.LogoutRequest
+	74,  // 34: sickrock.SickRock.ValidateToken:input_type -> sickrock.ValidateTokenRequest
+	72,  // 35: sickrock.SickRock.ResetUserPassword:input_type -> sickrock.ResetUserPasswordRequest
+	76,  // 36: sickrock.SickRock.GenerateDeviceCode:input_type -> sickrock.GenerateDeviceCodeRequest
+	78,  // 37: sickrock.SickRock.ClaimDeviceCode:input_type -> sickrock.ClaimDeviceCodeRequest
+	80,  // 38: sickrock.SickRock.CheckDeviceCode:input_type -> sickrock.CheckDeviceCodeRequest
+	82,  // 39: sickrock.SickRock.GetDeviceCodeSession:input_type -> sickrock.GetDeviceCodeSessionRequest
+	2,   // 40: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
+	5,   // 41: sickrock.SickRock.GetTableConfigurations:input_type -> sickrock.GetTableConfigurationsRequest
+	8,   // 42: sickrock.SickRock.CreateTableConfiguration:input_type -> sickrock.CreateTableConfigurationRequest
+	10,  // 43: sickrock.SickRock.GetDatabaseTables:input_type -> sickrock.GetDatabaseTablesRequest
+	13,  // 44: sickrock.SickRock.GetNavigation:input_type -> sickrock.GetNavigationRequest
+	17,  // 45: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
+	19,  // 46: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
+	21,  // 47: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
+	23,  // 48: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
+	25,  // 49: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
+	27,  // 50: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
+	30,  // 51: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
+	32,  // 52: sickrock.SickRock.CreateTableView:input_type -> sickrock.CreateTableViewRequest
+	34,  // 53: sickrock.SickRock.UpdateTableView:input_type -> sickrock.UpdateTableViewRequest
+	36,  // 54: sickrock.SickRock.GetTableViews:input_type -> sickrock.GetTableViewsRequest
+	39,  // 55: sickrock.SickRock.DeleteTableView:input_type -> sickrock.DeleteTableViewRequest
+	42,  // 56: sickrock.SickRock.CreateForeignKey:input_type -> sickrock.CreateForeignKeyRequest
+	44,  // 57: sickrock.SickRock.GetForeignKeys:input_type -> sickrock.GetForeignKeysRequest
+	46,  // 58: sickrock.SickRock.DeleteForeignKey:input_type -> sickrock.DeleteForeignKeyRequest
+	48,  // 59: sickrock.SickRock.ChangeColumnType:input_type -> sickrock.ChangeColumnTypeRequest
+	50,  // 60: sickrock.SickRock.DropColumn:input_type -> sickrock.DropColumnRequest
+	52,  // 61: sickrock.SickRock.ChangeColumnName:input_type -> sickrock.ChangeColumnNameRequest
+	54,  // 62: sickrock.SickRock.GetMostRecentlyViewed:input_type -> sickrock.GetMostRecentlyViewedRequest
+	58,  // 63: sickrock.SickRock.GetDashboards:input_type -> sickrock.GetDashboardsRequest
+	62,  // 64: sickrock.SickRock.GetDashboardComponentRules:input_type -> sickrock.GetDashboardComponentRulesRequest
+	64,  // 65: sickrock.SickRock.CreateDashboardComponentRule:input_type -> sickrock.CreateDashboardComponentRuleRequest
+	84,  // 66: sickrock.SickRock.GetSystemInfo:input_type -> sickrock.GetSystemInfoRequest
+	86,  // 67: sickrock.SickRock.GetUserBookmarks:input_type -> sickrock.GetUserBookmarksRequest
+	88,  // 68: sickrock.SickRock.CreateUserBookmark:input_type -> sickrock.CreateUserBookmarkRequest
+	90,  // 69: sickrock.SickRock.DeleteUserBookmark:input_type -> sickrock.DeleteUserBookmarkRequest
+	93,  // 70: sickrock.SickRock.CreateAPIKey:input_type -> sickrock.CreateAPIKeyRequest
+	95,  // 71: sickrock.SickRock.GetAPIKeys:input_type -> sickrock.GetAPIKeysRequest
+	97,  // 72: sickrock.SickRock.DeleteAPIKey:input_type -> sickrock.DeleteAPIKeyRequest
+	99,  // 73: sickrock.SickRock.DeactivateAPIKey:input_type -> sickrock.DeactivateAPIKeyRequest
+	103, // 74: sickrock.SickRock.GetConditionalFormattingRules:input_type -> sickrock.GetConditionalFormattingRulesRequest
+	105, // 75: sickrock.SickRock.CreateConditionalFormattingRule:input_type -> sickrock.CreateConditionalFormattingRuleRequest
+	109, // 76: sickrock.SickRock.UpdateConditionalFormattingRule:input_type -> sickrock.UpdateConditionalFormattingRuleRequest
+	107, // 77: sickrock.SickRock.DeleteConditionalFormattingRule:input_type -> sickrock.DeleteConditionalFormattingRuleRequest
+	67,  // 78: sickrock.SickRock.Init:output_type -> sickrock.InitResponse
+	1,   // 79: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
+	69,  // 80: sickrock.SickRock.Login:output_type -> sickrock.LoginResponse
+	71,  // 81: sickrock.SickRock.Logout:output_type -> sickrock.LogoutResponse
+	75,  // 82: sickrock.SickRock.ValidateToken:output_type -> sickrock.ValidateTokenResponse
+	73,  // 83: sickrock.SickRock.ResetUserPassword:output_type -> sickrock.ResetUserPasswordResponse
+	77,  // 84: sickrock.SickRock.GenerateDeviceCode:output_type -> sickrock.GenerateDeviceCodeResponse
+	79,  // 85: sickrock.SickRock.ClaimDeviceCode:output_type -> sickrock.ClaimDeviceCodeResponse
+	81,  // 86: sickrock.SickRock.CheckDeviceCode:output_type -> sickrock.CheckDeviceCodeResponse
+	83,  // 87: sickrock.SickRock.GetDeviceCodeSession:output_type -> sickrock.GetDeviceCodeSessionResponse
+	4,   // 88: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
+	7,   // 89: sickrock.SickRock.GetTableConfigurations:output_type -> sickrock.GetTableConfigurationsResponse
+	9,   // 90: sickrock.SickRock.CreateTableConfiguration:output_type -> sickrock.CreateTableConfigurationResponse
+	12,  // 91: sickrock.SickRock.GetDatabaseTables:output_type -> sickrock.GetDatabaseTablesResponse
+	15,  // 92: sickrock.SickRock.GetNavigation:output_type -> sickrock.GetNavigationResponse
+	18,  // 93: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
+	20,  // 94: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
+	22,  // 95: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
+	24,  // 96: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
+	26,  // 97: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
+	29,  // 98: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
+	29,  // 99: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
+	33,  // 100: sickrock.SickRock.CreateTableView:output_type -> sickrock.CreateTableViewResponse
+	35,  // 101: sickrock.SickRock.UpdateTableView:output_type -> sickrock.UpdateTableViewResponse
+	38,  // 102: sickrock.SickRock.GetTableViews:output_type -> sickrock.GetTableViewsResponse
+	40,  // 103: sickrock.SickRock.DeleteTableView:output_type -> sickrock.DeleteTableViewResponse
+	43,  // 104: sickrock.SickRock.CreateForeignKey:output_type -> sickrock.CreateForeignKeyResponse
+	45,  // 105: sickrock.SickRock.GetForeignKeys:output_type -> sickrock.GetForeignKeysResponse
+	47,  // 106: sickrock.SickRock.DeleteForeignKey:output_type -> sickrock.DeleteForeignKeyResponse
+	49,  // 107: sickrock.SickRock.ChangeColumnType:output_type -> sickrock.ChangeColumnTypeResponse
+	51,  // 108: sickrock.SickRock.DropColumn:output_type -> sickrock.DropColumnResponse
+	53,  // 109: sickrock.SickRock.ChangeColumnName:output_type -> sickrock.ChangeColumnNameResponse
+	56,  // 110: sickrock.SickRock.GetMostRecentlyViewed:output_type -> sickrock.GetMostRecentlyViewedResponse
+	59,  // 111: sickrock.SickRock.GetDashboards:output_type -> sickrock.GetDashboardsResponse
+	63,  // 112: sickrock.SickRock.GetDashboardComponentRules:output_type -> sickrock.GetDashboardComponentRulesResponse
+	65,  // 113: sickrock.SickRock.CreateDashboardComponentRule:output_type -> sickrock.CreateDashboardComponentRuleResponse
+	85,  // 114: sickrock.SickRock.GetSystemInfo:output_type -> sickrock.GetSystemInfoResponse
+	87,  // 115: sickrock.SickRock.GetUserBookmarks:output_type -> sickrock.GetUserBookmarksResponse
+	89,  // 116: sickrock.SickRock.CreateUserBookmark:output_type -> sickrock.CreateUserBookmarkResponse
+	91,  // 117: sickrock.SickRock.DeleteUserBookmark:output_type -> sickrock.DeleteUserBookmarkResponse
+	94,  // 118: sickrock.SickRock.CreateAPIKey:output_type -> sickrock.CreateAPIKeyResponse
+	96,  // 119: sickrock.SickRock.GetAPIKeys:output_type -> sickrock.GetAPIKeysResponse
+	98,  // 120: sickrock.SickRock.DeleteAPIKey:output_type -> sickrock.DeleteAPIKeyResponse
+	100, // 121: sickrock.SickRock.DeactivateAPIKey:output_type -> sickrock.DeactivateAPIKeyResponse
+	104, // 122: sickrock.SickRock.GetConditionalFormattingRules:output_type -> sickrock.GetConditionalFormattingRulesResponse
+	106, // 123: sickrock.SickRock.CreateConditionalFormattingRule:output_type -> sickrock.CreateConditionalFormattingRuleResponse
+	110, // 124: sickrock.SickRock.UpdateConditionalFormattingRule:output_type -> sickrock.UpdateConditionalFormattingRuleResponse
+	108, // 125: sickrock.SickRock.DeleteConditionalFormattingRule:output_type -> sickrock.DeleteConditionalFormattingRuleResponse
+	78,  // [78:126] is the sub-list for method output_type
+	30,  // [30:78] is the sub-list for method input_type
+	30,  // [30:30] is the sub-list for extension type_name
+	30,  // [30:30] is the sub-list for extension extendee
+	0,   // [0:30] is the sub-list for field type_name
 }
 
 func init() { file_sickrock_proto_init() }
@@ -6223,7 +6952,7 @@ func file_sickrock_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sickrock_proto_rawDesc), len(file_sickrock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   106,
+			NumMessages:   115,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -12,6 +12,7 @@ import { GetTableStructureResponse } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon, Add01Icon, Download01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
+import { formatUnixTimestamp } from '../utils/dateFormatting'
 
 const router = useRouter()
 const tableStructure = ref<GetTableStructureResponse | null>(null)
@@ -29,6 +30,10 @@ const foreignKeys = ref<Array<{
 
 const referencedTableData = ref<Record<string, any[]>>({})
 const loadingForeignKeys = ref(false)
+
+// Conditional formatting state
+const conditionalFormattingRules = ref<any[]>([])
+const loadingFormattingRules = ref(false)
 
 const props = defineProps<{
   tableId: string;
@@ -244,6 +249,7 @@ const visibleColumns = computed(() =>
   columns.value
     .filter(c => selectedColumns.value.includes(c))
     .filter(c => getColumnType(c) !== 'unknown')
+    .filter(c => !c.endsWith('Markdown')) // Hide markdown fields from being displayed as separate columns
 )
 
 const sortBy = ref<string | null>(null)
@@ -489,6 +495,30 @@ async function loadReferencedTableData() {
   referencedTableData.value = data
 }
 
+// Load conditional formatting rules
+async function loadConditionalFormattingRules() {
+  try {
+    loadingFormattingRules.value = true
+    const response = await client.getConditionalFormattingRules({ tableName: props.tableId })
+    conditionalFormattingRules.value = response.rules.map(rule => ({
+      id: rule.id,
+      tableName: rule.tableName,
+      columnName: rule.columnName,
+      conditionType: rule.conditionType,
+      conditionValue: rule.conditionValue,
+      formatType: rule.formatType,
+      formatValue: rule.formatValue,
+      priority: rule.priority,
+      isActive: rule.isActive
+    }))
+  } catch (err) {
+    console.error('Error loading conditional formatting rules:', err)
+    conditionalFormattingRules.value = []
+  } finally {
+    loadingFormattingRules.value = false
+  }
+}
+
 // Check if a column is a foreign key
 function isForeignKey(columnName: string): boolean {
   return foreignKeys.value.some(fk => fk.columnName === columnName)
@@ -546,8 +576,8 @@ async function load() {
 
 // Inline editing functions
 function startEdit(item: any, column: string) {
-  // Don't allow editing of id, name, sr_created, or foreign key columns
-  if (column === 'id' || column === 'name' || column === 'sr_created' || isForeignKey(column)) {
+  // Don't allow editing of id, name, sr_created, sr_updated, or foreign key columns
+  if (column === 'id' || column === 'name' || column === 'sr_created' || column === 'sr_updated' || isForeignKey(column)) {
     return
   }
 
@@ -676,6 +706,14 @@ function getColumnType(column: string): string {
   return 'unknown'
 }
 
+// Helper function to get display label for a column
+function getColumnLabel(column: string): string {
+  if (column === 'id') return 'ID'
+  if (column === 'sr_created') return 'Created'
+  if (column === 'sr_updated') return 'Updated'
+  return column
+}
+
 // Helper function to get boolean value from tinyint column
 function getBooleanValue(item: any, column: string): boolean {
   const value = getItemValue(item, column)
@@ -683,6 +721,92 @@ function getBooleanValue(item: any, column: string): boolean {
   // Convert to number first, then to boolean
   const numValue = Number(value)
   return numValue === 1
+}
+
+// Helper function to check if a markdown field exists for a column
+function hasMarkdownField(columnName: string, item: any): boolean {
+  const markdownFieldName = columnName + 'Markdown'
+  return item.additionalFields && item.additionalFields[markdownFieldName]
+}
+
+// Helper function to get markdown content for a column
+function getMarkdownContent(columnName: string, item: any): string {
+  const markdownFieldName = columnName + 'Markdown'
+  return item.additionalFields?.[markdownFieldName] || ''
+}
+
+// Helper function to format relative time values
+function formatRelativeTime(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s ago`
+  } else if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60)
+    return `${minutes}m ago`
+  } else if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600)
+    return `${hours}h ago`
+  } else {
+    const days = Math.floor(seconds / 86400)
+    return `${days}d ago`
+  }
+}
+
+// Apply conditional formatting to cell content (non-markdown rules only)
+function applyConditionalFormatting(columnName: string, cellValue: any, item: any): { content: string; styles: Record<string, string> } {
+  const styles: Record<string, string> = {}
+  let content = cellValue == null ? '' : String(cellValue)
+
+  // Apply client-side conditional formatting (excluding markdown rules)
+  const applicableRules = conditionalFormattingRules.value
+    .filter(rule => rule.columnName === columnName && rule.isActive && rule.formatType !== 'markdown')
+    .sort((a, b) => b.priority - a.priority) // Sort by priority (highest first)
+
+  for (const rule of applicableRules) {
+    let shouldApply = false
+
+    // Check condition
+    switch (rule.conditionType) {
+      case 'always':
+        shouldApply = true
+        break
+      case 'equals':
+        shouldApply = content === rule.conditionValue
+        break
+      case 'contains':
+        shouldApply = content.toLowerCase().includes(rule.conditionValue.toLowerCase())
+        break
+      case 'greater_than':
+        shouldApply = Number(content) > Number(rule.conditionValue)
+        break
+      case 'less_than':
+        shouldApply = Number(content) < Number(rule.conditionValue)
+        break
+    }
+
+    if (shouldApply) {
+      // Apply formatting
+      switch (rule.formatType) {
+        case 'color':
+          styles['background-color'] = rule.formatValue
+          break
+        case 'text_color':
+          styles['color'] = rule.formatValue
+          break
+        case 'bold':
+          if (rule.formatValue === 'true') {
+            styles['font-weight'] = 'bold'
+          }
+          break
+        case 'italic':
+          if (rule.formatValue === 'true') {
+            styles['font-style'] = 'italic'
+          }
+          break
+      }
+    }
+  }
+
+  return { content, styles }
 }
 
 // Bulk delete functionality
@@ -798,6 +922,7 @@ onMounted(load)
 onMounted(loadStructure)
 onMounted(loadTableViews)
 onMounted(loadForeignKeys)
+onMounted(loadConditionalFormattingRules)
 </script>
 
 <template>
@@ -900,7 +1025,7 @@ onMounted(loadForeignKeys)
               />
             </th>
             <th v-for="col in visibleColumns" :key="col" @click="toggleSort(col)" :title="getColumnType(col)" :class="{ small: col === 'id' }">
-              {{ col }}<span v-if="sortBy === col"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              {{ getColumnLabel(col) }}<span v-if="sortBy === col"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span>
             </th>
             <th>
               <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
@@ -913,7 +1038,7 @@ onMounted(loadForeignKeys)
             <td class = "small">
               <input type="checkbox" :checked="isSelected(it)" @change="(e) => toggleSelected(it, e)" />
             </td>
-            <td v-for="col in visibleColumns" :key="col">
+            <td v-for="col in visibleColumns" :key="col" :style="applyConditionalFormatting(col, getItemValue(it, col), it).styles">
               <!-- Inline editing input -->
               <div v-if="isEditing(it, col)" class="inline-edit">
                 <!-- Checkbox for tinyint columns -->
@@ -950,8 +1075,15 @@ onMounted(loadForeignKeys)
                 />
               </div>
               <!-- Display values -->
-              <div v-else @click="startEdit(it, col)" class="cell-content" :class="{ 'editable': col !== 'id' && col !== 'name' && col !== 'sr_created' && !isForeignKey(col) }">
-                <span v-if="col === 'sr_created' && getItemValue(it, col) != null">{{ new Date(Number(getItemValue(it, col)) * 1000).toLocaleString() }}</span>
+              <div v-else @click="startEdit(it, col)" class="cell-content" :class="{ 'editable': col !== 'id' && col !== 'name' && col !== 'sr_created' && col !== 'sr_updated' && !isForeignKey(col) }">
+                <span v-if="col === 'sr_created' && getItemValue(it, col) != null" class="date">
+                  {{ formatUnixTimestamp(getItemValue(it, col)) }}
+                  <span v-if="it.srCreatedRelative != null" class="relative-time">({{ formatRelativeTime(Number(it.srCreatedRelative)) }})</span>
+                </span>
+                <span v-else-if="col === 'sr_updated' && getItemValue(it, col) != null" class="date">
+                  {{ formatUnixTimestamp(getItemValue(it, col)) }}
+                  <span v-if="it.srUpdatedRelative != null" class="relative-time">({{ formatRelativeTime(Number(it.srUpdatedRelative)) }})</span>
+                </span>
                 <span v-else-if="col === 'id'">
                   <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
                 </span>
@@ -976,7 +1108,17 @@ onMounted(loadForeignKeys)
                 <span v-else-if="isDatetimeColumn(col) && getItemValue(it, col) != null">
                   {{ new Date(getItemValue(it, col)).toLocaleString() }}
                 </span>
-                <span v-else>{{ getItemValue(it, col) }}</span>
+                <span v-else>
+                  <!-- Check if server-rendered markdown field exists -->
+                  <template v-if="hasMarkdownField(col, it)">
+                    <div v-html="getMarkdownContent(col, it)" 
+                         class="markdown-content"></div>
+                  </template>
+                  <!-- Apply client-side conditional formatting (non-markdown) -->
+                  <template v-else>
+                    {{ applyConditionalFormatting(col, getItemValue(it, col), it).content }}
+                  </template>
+                </span>
               </div>
             </td>
             <td style = "width: 5%">
@@ -1091,14 +1233,6 @@ onMounted(loadForeignKeys)
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.section-header .button {
-  background: #fff;
-}
-
-.section-header .button:hover {
-  background: #c9ccd4;
 }
 
 .cell-content {
@@ -1763,6 +1897,95 @@ onMounted(loadForeignKeys)
   outline: none;
   border-color: #007bff;
   box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Relative time styling */
+.relative-time {
+  font-size: 0.8em;
+  color: #888;
+  font-weight: normal;
+  margin-left: 0.5em;
+}
+
+/* Markdown content styling */
+.markdown-content {
+  line-height: 1.4;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3,
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 {
+  margin: 0.5em 0 0.25em 0;
+  font-weight: bold;
+}
+
+.markdown-content h1 { font-size: 1.2em; }
+.markdown-content h2 { font-size: 1.1em; }
+.markdown-content h3 { font-size: 1.05em; }
+.markdown-content h4,
+.markdown-content h5,
+.markdown-content h6 { font-size: 1em; }
+
+.markdown-content p {
+  margin: 0.25em 0;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 0.25em 0;
+  padding-left: 1.5em;
+}
+
+.markdown-content li {
+  margin: 0.1em 0;
+}
+
+.markdown-content code {
+  background: #f5f5f5;
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.markdown-content pre {
+  background: #f5f5f5;
+  padding: 0.5em;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 0.25em 0;
+}
+
+.markdown-content pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid #ddd;
+  padding-left: 0.5em;
+  margin: 0.25em 0;
+  color: #666;
+}
+
+.markdown-content a {
+  color: #007bff;
+  text-decoration: none;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+.markdown-content strong {
+  font-weight: bold;
+}
+
+.markdown-content em {
+  font-style: italic;
 }
 
 </style>

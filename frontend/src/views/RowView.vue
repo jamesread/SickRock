@@ -8,6 +8,23 @@ import { ArrowLeft01Icon, Edit01Icon, Delete01Icon } from '@hugeicons/core-free-
 import Table from '../components/TableComponent.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import type { createApiClient } from '../stores/api'
+import { formatUnixTimestamp } from '../utils/dateFormatting'
+
+// Helper function to format relative time values
+function formatRelativeTime(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds}s ago`
+  } else if (seconds < 3600) {
+    const minutes = Math.floor(seconds / 60)
+    return `${minutes}m ago`
+  } else if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600)
+    return `${hours}h ago`
+  } else {
+    const days = Math.floor(seconds / 86400)
+    return `${days}d ago`
+  }
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -197,6 +214,8 @@ const entries = computed(() => {
     if (key === 'additionalFields') continue
     // Remove internal/system fields
     if (key === '$typeName') continue
+    // Skip relative time fields - they're displayed inline with srCreated/srUpdated
+    if (key === 'srCreatedRelative' || key === 'srUpdatedRelative') continue
 
     let displayValue = value
     let valueClass = ''
@@ -205,6 +224,26 @@ const entries = computed(() => {
     if (value === null || value === undefined) {
       displayValue = '(empty)'
       valueClass = 'empty'
+    } else if (key === 'srCreated' || key === 'sr_created' || key === 'srUpdated' || key === 'sr_updated') {
+      // Format sr_created/sr_updated timestamp as locale-aware date
+      if (typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint') {
+        displayValue = formatUnixTimestamp(value)
+        // Add relative time if available
+        if (key === 'srCreated' || key === 'sr_created') {
+          const relativeValue = item.value.srCreatedRelative
+          if (relativeValue != null) {
+            displayValue += ` (${formatRelativeTime(Number(relativeValue))})`
+          }
+        } else if (key === 'srUpdated' || key === 'sr_updated') {
+          const relativeValue = item.value.srUpdatedRelative
+          if (relativeValue != null) {
+            displayValue += ` (${formatRelativeTime(Number(relativeValue))})`
+          }
+        }
+        valueClass = 'date'
+      } else {
+        displayValue = String(value)
+      }
     } else if (typeof value === 'bigint') {
       displayValue = Number(value)
     } else if (typeof value === 'object') {
@@ -223,29 +262,62 @@ const entries = computed(() => {
     for (const [key, value] of Object.entries(item.value.additionalFields)) {
       // Remove internal/system fields
       if (key === '$typeName') continue
+      // Skip markdown fields - they're handled by their base field
+      if (key.endsWith('Markdown')) continue
+      
       let displayValue = value
       let valueClass = ''
 
-      // Handle different data types for additional fields
-      if (value === null || value === undefined || value === '') {
-        displayValue = '(empty)'
-        valueClass = 'empty'
-      } else if (typeof value === 'string') {
-        // Try to detect if it's a JSON string
-        try {
-          const parsed = JSON.parse(value)
-          if (typeof parsed === 'object' && parsed !== null) {
-            displayValue = JSON.stringify(parsed, null, 2)
-            valueClass = 'json'
+      // Check if there's a corresponding markdown field
+      const markdownFieldName = key + 'Markdown'
+      const markdownValue = item.value.additionalFields[markdownFieldName]
+      
+      if (markdownValue) {
+        // Use markdown content instead of original value
+        displayValue = markdownValue
+        valueClass = 'markdown-content'
+      } else {
+        // Handle different data types for additional fields
+        if (value === null || value === undefined || value === '') {
+          displayValue = '(empty)'
+          valueClass = 'empty'
+        } else if (key === 'srCreated' || key === 'sr_created' || key === 'srUpdated' || key === 'sr_updated') {
+          // Format sr_created/sr_updated timestamp as locale-aware date
+          if (typeof value === 'number' || typeof value === 'string' || typeof value === 'bigint') {
+            displayValue = formatUnixTimestamp(value)
+            // Add relative time if available
+            if (key === 'srCreated' || key === 'sr_created') {
+              const relativeValue = item.value.srCreatedRelative
+              if (relativeValue != null) {
+                displayValue += ` (${formatRelativeTime(Number(relativeValue))})`
+              }
+            } else if (key === 'srUpdated' || key === 'sr_updated') {
+              const relativeValue = item.value.srUpdatedRelative
+              if (relativeValue != null) {
+                displayValue += ` (${formatRelativeTime(Number(relativeValue))})`
+              }
+            }
+            valueClass = 'date'
           } else {
+            displayValue = String(value)
+          }
+        } else if (typeof value === 'string') {
+          // Try to detect if it's a JSON string
+          try {
+            const parsed = JSON.parse(value)
+            if (typeof parsed === 'object' && parsed !== null) {
+              displayValue = JSON.stringify(parsed, null, 2)
+              valueClass = 'json'
+            } else {
+              displayValue = value
+            }
+          } catch {
+            // Not JSON, treat as regular string
             displayValue = value
           }
-        } catch {
-          // Not JSON, treat as regular string
-          displayValue = value
+        } else {
+          displayValue = String(value)
         }
-      } else {
-        displayValue = String(value)
       }
 
       entries.push([key, displayValue, valueClass])
@@ -325,6 +397,7 @@ const sectionTitle = computed(() => `Table: ${tableName}`)
 function displayFieldLabel(key: string): string {
   if (key === 'id') return 'ID'
   if (key === 'srCreated') return 'Created'
+  if (key === 'srUpdated') return 'Updated'
   return key
 }
 
@@ -355,74 +428,68 @@ function cancelDelete() {
 <template>
   <div>
     <!-- Main Row Section -->
-    <section class="with-header-and-content">
-      <div class="section-header">
-        <h2>{{ sectionTitle }}</h2>
-        <div class="header-actions">
-          <router-link
-            :to="`/table/${tableName}`"
-            class="button back-button"
-          >
-            <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
-            Back to Table
-          </router-link>
-          <router-link
-            :to="`/table/${tableName}/${rowId}/edit`"
-            class="button neutral"
-          >
-            <HugeiconsIcon :icon="Edit01Icon" width="16" height="16" />
-            Edit Row
-          </router-link>
-          <button
-            @click="confirmDelete"
-            class="button bad"
-            :disabled="deleting"
-          >
-            <HugeiconsIcon :icon="Delete01Icon" width="16" height="16" />
-            Delete Row
-          </button>
-        </div>
+    <Section :title="sectionTitle">
+      <template #toolbar>
+        <router-link
+          :to="`/table/${tableName}`"
+          class="button"
+        >
+          <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
+          Back to Table
+        </router-link>
+        <router-link
+          :to="`/table/${tableName}/${rowId}/edit`"
+          class="button"
+        >
+          <HugeiconsIcon :icon="Edit01Icon" width="16" height="16" />
+          Edit Row
+        </router-link>
+        <button
+          @click="confirmDelete"
+          class="button bad"
+          :disabled="deleting"
+        >
+          <HugeiconsIcon :icon="Delete01Icon" width="16" height="16" />
+          Delete Row
+        </button>
+      </template>
+      
+      <div v-if="error">{{ error }}</div>
+      <div v-else-if="loading">Loading…</div>
+      <dl v-else-if="entries.length > 0">
+        <template v-for="[k, v, valueClass] in entries" :key="k">
+          <dt>{{ displayFieldLabel(k) }}</dt>
+          <dd :class="valueClass">
+            <template v-if="getFkDisplay(k).to">
+              <router-link :to="getFkDisplay(k).to">{{ getFkDisplay(k).label }}</router-link>
+            </template>
+            <template v-else-if="valueClass === 'markdown-content'">
+              <div v-html="v"></div>
+            </template>
+            <template v-else>
+              {{ v }}
+            </template>
+          </dd>
+        </template>
+      </dl>
+      <div v-else class="no-data">
+        <p>No data available for this row.</p>
       </div>
-      <div class="section-content padding">
-        <div v-if="error">{{ error }}</div>
-        <div v-else-if="loading">Loading…</div>
-        <dl v-else-if="entries.length > 0">
-          <template v-for="[k, v, valueClass] in entries" :key="k">
-            <dt>{{ displayFieldLabel(k) }}</dt>
-            <dd :class="valueClass">
-              <template v-if="getFkDisplay(k).to">
-                <router-link :to="getFkDisplay(k).to">{{ getFkDisplay(k).label }}</router-link>
-              </template>
-              <template v-else>
-                {{ v }}
-              </template>
-            </dd>
-          </template>
-        </dl>
-        <div v-else class="no-data">
-          <p>No data available for this row.</p>
-        </div>
-      </div>
-    </section>
+    </Section>
 
     <!-- Related Tables as Top-Level Sections -->
     <template v-if="foreignKeys.length > 0">
       <template v-for="table in relatedTables" :key="`${table.tableName}.${table.columnName}`">
-          <div class="section-header">
-            <h3>
-              <span :title="table.relationName">{{ table.tableName }}</span>
-              &nbsp;
-              <span class="subtle"> {{ table.rowCountText }}</span>
-            </h3>
-            <div class="header-actions">
-              <router-link :to="`/table/${table.tableName}`" class="button neutral">Open Table</router-link>
-              <router-link :to="{ path: `/table/${table.tableName}/export`, query: { where: JSON.stringify(table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) } }" class="button neutral">Export</router-link>
-                <router-link :to="{ path: `/table/${table.tableName}/insert-row`, query: Object.assign({ fromTable: tableName, fromRowId: rowId }, table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) }" class="button neutral">Insert</router-link>
-            </div>
-          </div>
-          <Section v-if="loadingRelated" class="loading-related">
+        <Section :title="`${table.tableName} ${table.rowCountText}`">
+          <template #toolbar>
+            <router-link :to="`/table/${table.tableName}`" class="button">Open Table</router-link>
+            <router-link :to="{ path: `/table/${table.tableName}/export`, query: { where: JSON.stringify(table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) } }" class="button">Export</router-link>
+            <router-link :to="{ path: `/table/${table.tableName}/insert-row`, query: Object.assign({ fromTable: tableName, fromRowId: rowId }, table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) }" class="button neutral">Insert</router-link>
+          </template>
+          
+          <div v-if="loadingRelated" class="loading-related">
             Loading related rows...
-          </Section>
+          </div>
           <div v-else-if="table.rows.length > 0">
             <Table
               :key="`${table.tableName}.${table.columnName}.${table.rows.length}`"
@@ -444,9 +511,10 @@ function cancelDelete() {
               }"
             />
           </div>
-          <Section v-else :title="table.title">
+          <div v-else>
             <p>No related rows found in this table.</p>
-          </Section>
+          </div>
+        </Section>
       </template>
     </template>
 
@@ -456,7 +524,7 @@ function cancelDelete() {
         <h3>Confirm Delete</h3>
         <p>Are you sure you want to delete this row? This action cannot be undone.</p>
         <div class="modal-actions">
-          <button @click="cancelDelete" class="button cancel-button" :disabled="deleting">
+          <button @click="cancelDelete" class="button" :disabled="deleting">
             Cancel
           </button>
           <button @click="deleteItem" class="button bad" :disabled="deleting">
@@ -469,37 +537,6 @@ function cancelDelete() {
 </template>
 
 <style scoped>
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.section-header h2 {
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .header-actions {
-    width: 100%;
-    justify-content: flex-end;
-  }
-}
-
 /* Modal Dialog Styles */
 .modal-overlay {
   position: fixed;
@@ -539,35 +576,6 @@ function cancelDelete() {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-}
-
-.cancel-button {
-  background: #6c757d;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.cancel-button:hover:not(:disabled) {
-  background: #545b62;
-}
-
-.cancel-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.button:not(.bad) {
-  background: #efefef;
-}
-
-.button:hover:not(:disabled) {
-  background: #e0e0e0;
 }
 
 @media (max-width: 768px) {

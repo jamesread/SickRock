@@ -8,11 +8,16 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
 	"connectrpc.com/connect"
 	"github.com/expr-lang/expr"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/parser"
+	"github.com/yuin/goldmark/renderer/html"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/auth"
@@ -23,6 +28,32 @@ import (
 
 type SickRockServer struct {
 	repo *repo.Repository
+}
+
+// markdownRenderer is a configured goldmark instance for rendering markdown
+var markdownRenderer = goldmark.New(
+	goldmark.WithExtensions(extension.GFM),
+	goldmark.WithParserOptions(
+		parser.WithAutoHeadingID(),
+	),
+	goldmark.WithRendererOptions(
+		html.WithHardWraps(),
+		html.WithXHTML(),
+	),
+)
+
+// renderMarkdown converts markdown content to HTML
+func renderMarkdown(content string) string {
+	if content == "" {
+		return ""
+	}
+
+	var buf strings.Builder
+	if err := markdownRenderer.Convert([]byte(content), &buf); err != nil {
+		log.WithError(err).Error("Failed to render markdown")
+		return content // Return original content if rendering fails
+	}
+	return buf.String()
 }
 
 func NewSickRockServer(r *repo.Repository) *SickRockServer {
@@ -46,6 +77,17 @@ func (s *SickRockServer) getUserIDFromContext(ctx context.Context) (int, error) 
 	}
 
 	return user.ID, nil
+}
+
+// safeInt64ToInt32 converts an int64 to int32, clamping to int32 max/min values if overflow occurs
+func safeInt64ToInt32(value int64) int32 {
+	if value > math.MaxInt32 {
+		return math.MaxInt32
+	}
+	if value < math.MinInt32 {
+		return math.MinInt32
+	}
+	return int32(value)
 }
 
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
@@ -280,10 +322,115 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 			}
 		}
 
+		// Process markdown formatting rules
+		userID, err := s.getUserIDFromContext(ctx)
+		if err == nil {
+			// Get conditional formatting rules for this table
+			rules, err := s.repo.GetConditionalFormattingRules(ctx, userID, table)
+			if err == nil {
+				log.WithFields(log.Fields{
+					"table":     table,
+					"userID":    userID,
+					"ruleCount": len(rules),
+					"itemID":    it.ID,
+				}).Info("ListItems: Retrieved conditional formatting rules")
+
+				// Find markdown rules and render markdown for applicable fields
+				for _, rule := range rules {
+					if rule.FormatType == "markdown" && rule.IsActive {
+						// Check if this rule applies to the current item
+						fieldValue := ""
+						if val, exists := it.Fields[rule.ColumnName]; exists && val != nil {
+							fieldValue = fmt.Sprintf("%v", val)
+						}
+
+						log.WithFields(log.Fields{
+							"ruleID":         rule.ID,
+							"columnName":     rule.ColumnName,
+							"fieldValue":     fieldValue,
+							"conditionType":  rule.ConditionType,
+							"conditionValue": rule.ConditionValue,
+							"itemID":         it.ID,
+						}).Info("ListItems: Evaluating markdown rule condition")
+
+						shouldApply := false
+						switch rule.ConditionType {
+						case "always":
+							shouldApply = true
+						case "equals":
+							shouldApply = fieldValue == rule.ConditionValue
+						case "contains":
+							shouldApply = strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
+						case "greater_than":
+							if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
+								if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
+									shouldApply = fieldNum > conditionNum
+								}
+							}
+						case "less_than":
+							if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
+								if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
+									shouldApply = fieldNum < conditionNum
+								}
+							}
+						}
+
+						log.WithFields(log.Fields{
+							"ruleID":      rule.ID,
+							"shouldApply": shouldApply,
+							"itemID":      it.ID,
+						}).Info("ListItems: Markdown rule evaluation result")
+
+						if shouldApply {
+							// Prepare markdown content
+							markdownContent := fieldValue
+							if rule.FormatValue != "" {
+								markdownContent = fieldValue + "\n\n" + rule.FormatValue
+							}
+
+							// Render markdown and add to additional fields
+							markdownFieldName := rule.ColumnName + "Markdown"
+							renderedMarkdown := renderMarkdown(markdownContent)
+							additionalFields[markdownFieldName] = renderedMarkdown
+
+							log.WithFields(log.Fields{
+								"ruleID":            rule.ID,
+								"markdownFieldName": markdownFieldName,
+								"markdownContent":   markdownContent,
+								"renderedMarkdown":  renderedMarkdown,
+								"itemID":            it.ID,
+							}).Info("ListItems: Added markdown field to additional fields")
+						}
+					}
+				}
+			} else {
+				log.WithError(err).WithFields(log.Fields{
+					"table":  table,
+					"userID": userID,
+				}).Error("ListItems: Failed to get conditional formatting rules")
+			}
+		} else {
+			log.WithError(err).Error("ListItems: Failed to get user ID from context")
+		}
+
+		// Calculate relative time in seconds from now
+		var srCreatedRelative int32
+		if !it.SrCreated.IsZero() {
+			srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
+		}
+
+		var srUpdatedRelative int32
+		if !it.SrUpdated.IsZero() {
+			srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
+		}
+
 		item := &sickrockpb.Item{
-			Id:               it.ID,
-			SrCreated:        it.SrCreated.Unix(),
-			AdditionalFields: additionalFields,
+			Id:                it.ID,
+			SrCreated:         it.SrCreated.Unix(),
+			SrCreatedRelative: srCreatedRelative,
+			SrUpdated:         it.SrUpdated.Unix(),
+			SrUpdatedRelative: srUpdatedRelative,
+			AdditionalFields:  additionalFields,
 		}
 
 		out = append(out, item)
@@ -315,10 +462,24 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 		}
 	}
 
+	// Calculate relative time in seconds from now
+	var srCreatedRelative int32
+	if !it.SrCreated.IsZero() {
+		srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
+	}
+
+	var srUpdatedRelative int32
+	if !it.SrUpdated.IsZero() {
+		srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
+	}
+
 	return connect.NewResponse(&sickrockpb.CreateItemResponse{Item: &sickrockpb.Item{
-		Id:               it.ID,
-		SrCreated:        it.SrCreated.Unix(),
-		AdditionalFields: additionalFields,
+		Id:                it.ID,
+		SrCreated:         it.SrCreated.Unix(),
+		SrCreatedRelative: srCreatedRelative,
+		SrUpdated:         it.SrUpdated.Unix(),
+		SrUpdatedRelative: srUpdatedRelative,
+		AdditionalFields:  additionalFields,
 	}}), nil
 }
 
@@ -362,10 +523,133 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 		}
 	}
 
+	log.WithFields(log.Fields{
+		"table":  table,
+		"itemID": it.ID,
+		"fields": it.Fields,
+	}).Info("GetItem: Item fields before markdown processing")
+
+	// Process markdown formatting rules
+	userID, err := s.getUserIDFromContext(ctx)
+	if err == nil {
+		// Get conditional formatting rules for this table
+		rules, err := s.repo.GetConditionalFormattingRules(ctx, userID, table)
+		if err == nil {
+			log.WithFields(log.Fields{
+				"table":     table,
+				"userID":    userID,
+				"ruleCount": len(rules),
+			}).Info("Retrieved conditional formatting rules")
+
+			// Find markdown rules and render markdown for applicable fields
+			for _, rule := range rules {
+				log.WithFields(log.Fields{
+					"ruleID":         rule.ID,
+					"tableName":      rule.TableName,
+					"columnName":     rule.ColumnName,
+					"formatType":     rule.FormatType,
+					"isActive":       rule.IsActive,
+					"conditionType":  rule.ConditionType,
+					"conditionValue": rule.ConditionValue,
+				}).Info("Processing conditional formatting rule")
+
+				if rule.FormatType == "markdown" && rule.IsActive {
+					// Check if this rule applies to the current item
+					fieldValue := ""
+					if val, exists := it.Fields[rule.ColumnName]; exists && val != nil {
+						fieldValue = fmt.Sprintf("%v", val)
+					}
+
+					log.WithFields(log.Fields{
+						"ruleID":         rule.ID,
+						"columnName":     rule.ColumnName,
+						"fieldValue":     fieldValue,
+						"conditionType":  rule.ConditionType,
+						"conditionValue": rule.ConditionValue,
+					}).Info("Evaluating markdown rule condition")
+
+					shouldApply := false
+					switch rule.ConditionType {
+					case "always":
+						shouldApply = true
+					case "equals":
+						shouldApply = fieldValue == rule.ConditionValue
+					case "contains":
+						shouldApply = strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
+					case "greater_than":
+						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
+							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
+								shouldApply = fieldNum > conditionNum
+							}
+						}
+					case "less_than":
+						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
+							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
+								shouldApply = fieldNum < conditionNum
+							}
+						}
+					}
+
+					log.WithFields(log.Fields{
+						"ruleID":      rule.ID,
+						"shouldApply": shouldApply,
+					}).Info("Markdown rule evaluation result")
+
+					if shouldApply {
+						// Prepare markdown content
+						markdownContent := fieldValue
+						if rule.FormatValue != "" {
+							markdownContent = fieldValue + "\n\n" + rule.FormatValue
+						}
+
+						// Render markdown and add to additional fields
+						markdownFieldName := rule.ColumnName + "Markdown"
+						renderedMarkdown := renderMarkdown(markdownContent)
+						additionalFields[markdownFieldName] = renderedMarkdown
+
+						log.WithFields(log.Fields{
+							"ruleID":            rule.ID,
+							"markdownFieldName": markdownFieldName,
+							"markdownContent":   markdownContent,
+							"renderedMarkdown":  renderedMarkdown,
+						}).Info("Added markdown field to additional fields")
+					}
+				}
+			}
+		} else {
+			log.WithError(err).WithFields(log.Fields{
+				"table":  table,
+				"userID": userID,
+			}).Error("Failed to get conditional formatting rules")
+		}
+	} else {
+		log.WithError(err).Error("Failed to get user ID from context")
+	}
+
+	log.WithFields(log.Fields{
+		"table":            table,
+		"itemID":           it.ID,
+		"additionalFields": additionalFields,
+	}).Info("GetItem: Additional fields after markdown processing")
+
+	// Calculate relative time in seconds from now
+	var srCreatedRelative int32
+	if !it.SrCreated.IsZero() {
+		srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
+	}
+
+	var srUpdatedRelative int32
+	if !it.SrUpdated.IsZero() {
+		srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
+	}
+
 	return connect.NewResponse(&sickrockpb.GetItemResponse{Item: &sickrockpb.Item{
-		Id:               it.ID,
-		SrCreated:        it.SrCreated.Unix(),
-		AdditionalFields: additionalFields,
+		Id:                it.ID,
+		SrCreated:         it.SrCreated.Unix(),
+		SrCreatedRelative: srCreatedRelative,
+		SrUpdated:         it.SrUpdated.Unix(),
+		SrUpdatedRelative: srUpdatedRelative,
+		AdditionalFields:  additionalFields,
 	}}), nil
 }
 
@@ -402,10 +686,24 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 		}
 	}
 
+	// Calculate relative time in seconds from now
+	var srCreatedRelative int32
+	if !it.SrCreated.IsZero() {
+		srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
+	}
+
+	var srUpdatedRelative int32
+	if !it.SrUpdated.IsZero() {
+		srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
+	}
+
 	return connect.NewResponse(&sickrockpb.EditItemResponse{Item: &sickrockpb.Item{
-		Id:               it.ID,
-		SrCreated:        it.SrCreated.Unix(),
-		AdditionalFields: responseAdditionalFields,
+		Id:                it.ID,
+		SrCreated:         it.SrCreated.Unix(),
+		SrCreatedRelative: srCreatedRelative,
+		SrUpdated:         it.SrUpdated.Unix(),
+		SrUpdatedRelative: srUpdatedRelative,
+		AdditionalFields:  responseAdditionalFields,
 	}}), nil
 }
 
@@ -1287,6 +1585,125 @@ func (s *SickRockServer) DeactivateAPIKey(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&sickrockpb.DeactivateAPIKeyResponse{
 		Success: true,
 		Message: "API key deactivated successfully",
+	}), nil
+}
+
+// GetConditionalFormattingRules retrieves conditional formatting rules
+func (s *SickRockServer) GetConditionalFormattingRules(ctx context.Context, req *connect.Request[sickrockpb.GetConditionalFormattingRulesRequest]) (*connect.Response[sickrockpb.GetConditionalFormattingRulesResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	tableName := req.Msg.GetTableName()
+	rules, err := s.repo.GetConditionalFormattingRules(ctx, userID, tableName)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to get conditional formatting rules: %w", err))
+	}
+
+	var pbRules []*sickrockpb.ConditionalFormattingRule
+	for _, rule := range rules {
+		pbRules = append(pbRules, &sickrockpb.ConditionalFormattingRule{
+			Id:             int32(rule.ID),
+			TableName:      rule.TableName,
+			ColumnName:     rule.ColumnName,
+			ConditionType:  rule.ConditionType,
+			ConditionValue: rule.ConditionValue,
+			FormatType:     rule.FormatType,
+			FormatValue:    rule.FormatValue,
+			Priority:       int32(rule.Priority),
+			IsActive:       rule.IsActive,
+			SrCreated:      rule.SrCreated.Unix(),
+			UpdatedAtUnix:  rule.UpdatedAtUnix,
+		})
+	}
+
+	return connect.NewResponse(&sickrockpb.GetConditionalFormattingRulesResponse{
+		Rules: pbRules,
+	}), nil
+}
+
+// CreateConditionalFormattingRule creates a new conditional formatting rule
+func (s *SickRockServer) CreateConditionalFormattingRule(ctx context.Context, req *connect.Request[sickrockpb.CreateConditionalFormattingRuleRequest]) (*connect.Response[sickrockpb.CreateConditionalFormattingRuleResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	ruleID, err := s.repo.CreateConditionalFormattingRule(ctx, userID, &repo.ConditionalFormattingRule{
+		TableName:      req.Msg.GetTableName(),
+		ColumnName:     req.Msg.GetColumnName(),
+		ConditionType:  req.Msg.GetConditionType(),
+		ConditionValue: req.Msg.GetConditionValue(),
+		FormatType:     req.Msg.GetFormatType(),
+		FormatValue:    req.Msg.GetFormatValue(),
+		Priority:       int(req.Msg.GetPriority()),
+		IsActive:       true,
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create conditional formatting rule: %w", err))
+	}
+
+	return connect.NewResponse(&sickrockpb.CreateConditionalFormattingRuleResponse{
+		Success: true,
+		Message: "Conditional formatting rule created successfully",
+		RuleId:  int32(ruleID),
+	}), nil
+}
+
+// DeleteConditionalFormattingRule deletes a conditional formatting rule
+func (s *SickRockServer) DeleteConditionalFormattingRule(ctx context.Context, req *connect.Request[sickrockpb.DeleteConditionalFormattingRuleRequest]) (*connect.Response[sickrockpb.DeleteConditionalFormattingRuleResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	ruleID := int(req.Msg.GetRuleId())
+	if ruleID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("rule ID is required"))
+	}
+
+	err = s.repo.DeleteConditionalFormattingRule(ctx, userID, ruleID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to delete conditional formatting rule: %w", err))
+	}
+
+	return connect.NewResponse(&sickrockpb.DeleteConditionalFormattingRuleResponse{
+		Success: true,
+		Message: "Conditional formatting rule deleted successfully",
+	}), nil
+}
+
+// UpdateConditionalFormattingRule updates an existing conditional formatting rule
+func (s *SickRockServer) UpdateConditionalFormattingRule(ctx context.Context, req *connect.Request[sickrockpb.UpdateConditionalFormattingRuleRequest]) (*connect.Response[sickrockpb.UpdateConditionalFormattingRuleResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	ruleID := int(req.Msg.GetRuleId())
+	if ruleID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("rule ID is required"))
+	}
+
+	err = s.repo.UpdateConditionalFormattingRule(ctx, userID, &repo.ConditionalFormattingRule{
+		ID:             ruleID,
+		TableName:      req.Msg.GetTableName(),
+		ColumnName:     req.Msg.GetColumnName(),
+		ConditionType:  req.Msg.GetConditionType(),
+		ConditionValue: req.Msg.GetConditionValue(),
+		FormatType:     req.Msg.GetFormatType(),
+		FormatValue:    req.Msg.GetFormatValue(),
+		Priority:       int(req.Msg.GetPriority()),
+		IsActive:       req.Msg.GetIsActive(),
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to update conditional formatting rule: %w", err))
+	}
+
+	return connect.NewResponse(&sickrockpb.UpdateConditionalFormattingRuleResponse{
+		Success: true,
+		Message: "Conditional formatting rule updated successfully",
 	}), nil
 }
 

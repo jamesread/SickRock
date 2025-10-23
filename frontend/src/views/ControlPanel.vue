@@ -34,24 +34,10 @@ const resetStatus = ref<string>('')
 const totalTables = ref<number>(0)
 const totalItems = ref<number>(0)
 
-// Conditional formatting rules
-const formattingRules = ref<any[]>([])
-const showAddRuleForm = ref(false)
-const newRule = ref({
-  tableName: '',
-  columnName: '',
-  conditionType: 'equals',
-  conditionValue: '',
-  formatType: 'color',
-  formatValue: '#ff0000',
-  priority: 0
-})
-
 // Load initial data
 onMounted(async () => {
   await loadBuildInfo()
   await loadDatabaseStats()
-  await loadFormattingRules()
 })
 
 async function loadBuildInfo() {
@@ -79,51 +65,6 @@ async function loadDatabaseStats() {
   }
 }
 
-async function loadFormattingRules() {
-  // TODO: Implement when we have the RPC method
-  // For now, just show placeholder data
-  formattingRules.value = [
-    {
-      id: 1,
-      tableName: 'computers',
-      columnName: 'status',
-      conditionType: 'equals',
-      conditionValue: 'active',
-      formatType: 'color',
-      formatValue: '#00ff00',
-      priority: 1,
-      isActive: true
-    }
-  ]
-}
-
-function addFormattingRule() {
-  if (!newRule.value.tableName || !newRule.value.columnName) {
-    error.value = 'Table name and column name are required'
-    return
-  }
-
-  // TODO: Implement when we have the RPC method
-  console.log('Adding formatting rule:', newRule.value)
-
-  // Reset form
-  newRule.value = {
-    tableName: '',
-    columnName: '',
-    conditionType: 'equals',
-    conditionValue: '',
-    formatType: 'color',
-    formatValue: '#ff0000',
-    priority: 0
-  }
-  showAddRuleForm.value = false
-}
-
-function deleteFormattingRule(id: number) {
-  // TODO: Implement when we have the RPC method
-  console.log('Deleting formatting rule:', id)
-  formattingRules.value = formattingRules.value.filter(rule => rule.id !== id)
-}
 
 function refreshData() {
   loading.value = true
@@ -131,8 +72,7 @@ function refreshData() {
 
   Promise.all([
     loadBuildInfo(),
-    loadDatabaseStats(),
-    loadFormattingRules()
+    loadDatabaseStats()
   ]).finally(() => {
     loading.value = false
   })
@@ -213,89 +153,6 @@ async function resetUserPassword() {
           <div class="stat-card">
             <div class="stat-number">{{ totalItems }}</div>
             <div class="stat-label">Total Items</div>
-          </div>
-        </div>
-      </Section>
-
-      <!-- Conditional Formatting Rules -->
-      <Section title = "Conditional Formatting Rules">
-        <template #toolbar>
-          <button @click="showAddRuleForm = !showAddRuleForm" class="add-btn">
-            {{ showAddRuleForm ? 'Cancel' : '+ Add Rule' }}
-          </button>
-        </template>
-
-        <!-- Add Rule Form -->
-        <div v-if="showAddRuleForm" class="add-rule-form">
-          <h3>Add New Formatting Rule</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Table Name:</label>
-              <input v-model="newRule.tableName" type="text" placeholder="e.g., computers" />
-            </div>
-            <div class="form-group">
-              <label>Column Name:</label>
-              <input v-model="newRule.columnName" type="text" placeholder="e.g., status" />
-            </div>
-            <div class="form-group">
-              <label>Condition Type:</label>
-              <select v-model="newRule.conditionType">
-                <option value="equals">Equals</option>
-                <option value="contains">Contains</option>
-                <option value="greater_than">Greater Than</option>
-                <option value="less_than">Less Than</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Condition Value:</label>
-              <input v-model="newRule.conditionValue" type="text" placeholder="e.g., active" />
-            </div>
-            <div class="form-group">
-              <label>Format Type:</label>
-              <select v-model="newRule.formatType">
-                <option value="color">Background Color</option>
-                <option value="text_color">Text Color</option>
-                <option value="bold">Bold</option>
-                <option value="italic">Italic</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Format Value:</label>
-              <input v-model="newRule.formatValue" type="text" placeholder="e.g., #ff0000" />
-            </div>
-            <div class="form-group">
-              <label>Priority:</label>
-              <input v-model.number="newRule.priority" type="number" min="0" />
-            </div>
-          </div>
-          <div class="form-actions">
-            <button @click="addFormattingRule" class="save-btn">Save Rule</button>
-            <button @click="showAddRuleForm = false" class="cancel-btn">Cancel</button>
-          </div>
-        </div>
-
-        <!-- Rules List -->
-        <div class="rules-list">
-          <div v-if="formattingRules.length === 0" class="empty-state">
-            No formatting rules configured
-          </div>
-          <div v-else>
-            <div v-for="rule in formattingRules" :key="rule.id" class="rule-item">
-              <div class="rule-info">
-                <div class="rule-title">{{ rule.tableName }}.{{ rule.columnName }}</div>
-                <div class="rule-details">
-                  {{ rule.conditionType }} "{{ rule.conditionValue }}" → {{ rule.formatType }}: {{ rule.formatValue }}
-                </div>
-                <div class="rule-meta">
-                  Priority: {{ rule.priority }} | {{ rule.isActive ? 'Active' : 'Inactive' }}
-                </div>
-              </div>
-              <div class="rule-actions">
-                <button @click="deleteFormattingRule(rule.id)" class="delete-btn">
-                  <HugeiconsIcon :icon="BashIcon" width="16" height="16" />
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       </Section>

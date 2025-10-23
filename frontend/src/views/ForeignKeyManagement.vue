@@ -177,9 +177,6 @@ async function deleteForeignKey(constraintName: string) {
   }
 }
 
-function goBack() {
-  router.push({ name: 'table', params: { tableName: tableId } })
-}
 
 // Lifecycle
 onMounted(async () => {
@@ -202,10 +199,13 @@ onMounted(async () => {
 <template>
   <Section :title="`Foreign Keys: ${tableId}`">
     <template #toolbar>
-      <button @click="goBack" class="button neutral">
-        <HugeiconsIcon :icon="ArrowLeft01Icon" />
+      <router-link
+        :to="`/table/${tableId}`"
+        class="button"
+      >
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
         Back to Table
-      </button>
+      </router-link>
       <router-link :to="`/table/${tableId}/column-types`" class="button neutral">
         <HugeiconsIcon :icon="Edit03Icon" />
         Structure

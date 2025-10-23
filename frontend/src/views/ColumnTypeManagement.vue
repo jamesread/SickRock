@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import ConditionalFormattingRules from '../components/ConditionalFormattingRules.vue'
 import { HugeiconsIcon, ArrowLeft01Icon, Edit03Icon, CheckmarkSquare03Icon, Delete01Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
@@ -267,9 +268,6 @@ async function dropForeignKey(constraintName: string) {
   }
 }
 
-function goBack() {
-  router.push({ name: 'table', params: { tableName: tableId } })
-}
 
 // Lifecycle
 onMounted(async () => {
@@ -283,10 +281,13 @@ onMounted(async () => {
 <template>
   <Section :title="`Column Types: ${tableId}`">
     <template #toolbar>
-      <button @click="goBack" class="button neutral">
-        <HugeiconsIcon :icon="ArrowLeft01Icon" />
+      <router-link
+        :to="`/table/${tableId}`"
+        class="button"
+      >
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
         Back to Table
-      </button>
+      </router-link>
       <router-link :to="`/table/${tableId}/foreign-keys`" class="button neutral">
         <HugeiconsIcon :icon="Edit03Icon" />
         Foreign Keys
@@ -404,6 +405,14 @@ onMounted(async () => {
             <HugeiconsIcon :icon="Edit03Icon" />
             Add FK
           </router-link>
+          <router-link
+            v-if="!(column.name && column.name.startsWith('sr_'))"
+            :to="`/table/${tableId}/conditional-formatting?column=${encodeURIComponent(column.name)}`"
+            class="button small neutral"
+          >
+            <HugeiconsIcon :icon="Edit03Icon" />
+            Add Conditional Formatting Rule
+          </router-link>
           <button v-if="!(column.name && column.name.startsWith('sr_'))" @click="startEdit(column.name)" class="button small neutral">
             <HugeiconsIcon :icon="Edit03Icon" />
             Change Type
@@ -442,6 +451,9 @@ onMounted(async () => {
       </div>
     </div>
   </Section>
+
+  <!-- Conditional Formatting Rules Section -->
+  <ConditionalFormattingRules />
 
   <!-- Drop Foreign Key Confirmation Modal -->
   <div v-if="showDropFkConfirm" class="modal-overlay" @click="showDropFkConfirm = null">

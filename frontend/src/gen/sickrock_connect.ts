@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, CreateAPIKeyRequest, CreateAPIKeyResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableConfigurationRequest, CreateTableConfigurationResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, DeactivateAPIKeyRequest, DeactivateAPIKeyResponse, DeleteAPIKeyRequest, DeleteAPIKeyResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetAPIKeysRequest, GetAPIKeysResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDatabaseTablesRequest, GetDatabaseTablesResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
+import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, CreateAPIKeyRequest, CreateAPIKeyResponse, CreateConditionalFormattingRuleRequest, CreateConditionalFormattingRuleResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableConfigurationRequest, CreateTableConfigurationResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, DeactivateAPIKeyRequest, DeactivateAPIKeyResponse, DeleteAPIKeyRequest, DeleteAPIKeyResponse, DeleteConditionalFormattingRuleRequest, DeleteConditionalFormattingRuleResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetAPIKeysRequest, GetAPIKeysResponse, GetConditionalFormattingRulesRequest, GetConditionalFormattingRulesResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDatabaseTablesRequest, GetDatabaseTablesResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, UpdateConditionalFormattingRuleRequest, UpdateConditionalFormattingRuleResponse, UpdateTableViewRequest, UpdateTableViewResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -442,5 +442,44 @@ export const SickRock = {
       O: DeactivateAPIKeyResponse,
       kind: MethodKind.Unary,
     },
+    /**
+     * Conditional Formatting Rules
+     *
+     * @generated from rpc sickrock.SickRock.GetConditionalFormattingRules
+     */
+    getConditionalFormattingRules: {
+      name: "GetConditionalFormattingRules",
+      I: GetConditionalFormattingRulesRequest,
+      O: GetConditionalFormattingRulesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.CreateConditionalFormattingRule
+     */
+    createConditionalFormattingRule: {
+      name: "CreateConditionalFormattingRule",
+      I: CreateConditionalFormattingRuleRequest,
+      O: CreateConditionalFormattingRuleResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.UpdateConditionalFormattingRule
+     */
+    updateConditionalFormattingRule: {
+      name: "UpdateConditionalFormattingRule",
+      I: UpdateConditionalFormattingRuleRequest,
+      O: UpdateConditionalFormattingRuleResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.DeleteConditionalFormattingRule
+     */
+    deleteConditionalFormattingRule: {
+      name: "DeleteConditionalFormattingRule",
+      I: DeleteConditionalFormattingRuleRequest,
+      O: DeleteConditionalFormattingRuleResponse,
+      kind: MethodKind.Unary,
+    },
   }
 } as const;
+

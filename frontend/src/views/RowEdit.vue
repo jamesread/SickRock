@@ -71,9 +71,9 @@ onMounted(async () => {
 })
 
 const editableFields = computed(() => {
-  // Filter out non-editable fields like id and sr_created
+  // Filter out non-editable fields like id, sr_created, and sr_updated
   return tableStructure.value.filter(field =>
-    field.name !== 'id' && field.name !== 'sr_created'
+    field.name !== 'id' && field.name !== 'sr_created' && field.name !== 'sr_updated'
   )
 })
 

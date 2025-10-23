@@ -11,10 +11,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    allowedHosts: ['mindstorm', '0.0.0.0'],
+    allowedHosts: ['mindstorm', '0.0.0.0', "baneling.teratan.net"],
     proxy: {
       '/api': {
-        target: 'http://localhost:8081',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         secure: false,
       },

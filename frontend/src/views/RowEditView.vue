@@ -39,7 +39,7 @@ onMounted(async () => {
     // Load table structure
     const structureRes = await client.getTableStructure({ pageId: tableName })
     fieldDefs.value = (structureRes.fields ?? [])
-      .filter(f => f.name !== 'sr_created') // Hide sr_created field
+      .filter(f => f.name !== 'sr_created' && f.name !== 'sr_updated') // Hide sr_created and sr_updated fields
       .map(f => ({ name: f.name, type: f.type, required: !!f.required }))
 
     // Set the create button text as the title

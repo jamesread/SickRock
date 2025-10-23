@@ -37,6 +37,7 @@ func sanitizeDatabaseIdentifier(input string) string {
 type Item struct {
 	ID        string                 `db:"id"`
 	SrCreated time.Time              `db:"sr_created"`
+	SrUpdated time.Time              `db:"sr_updated"`
 	Fields    map[string]interface{} `db:"-"` // All dynamic fields including name
 }
 
@@ -698,10 +699,24 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 				log.Warnf("sr_created field is not time.Time or string, got type: %T, value: %v", createdAt, createdAt)
 			}
 		}
+		if updatedAt, ok := rowMap["sr_updated"]; ok {
+			if updatedAtTime, ok := updatedAt.(time.Time); ok {
+				item.SrUpdated = updatedAtTime
+			} else if updatedAtStr, ok := updatedAt.(string); ok {
+				// Handle string datetime from MySQL
+				if parsedTime, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
+					item.SrUpdated = parsedTime
+				} else {
+					log.Warnf("failed to parse sr_updated datetime string: %v", err)
+				}
+			} else {
+				log.Warnf("sr_updated field is not time.Time or string, got type: %T, value: %v", updatedAt, updatedAt)
+			}
+		}
 
 		// Add all other fields to the dynamic Fields map (including name now)
 		for colName, value := range rowMap {
-			if colName != "id" && colName != "sr_created" {
+			if colName != "id" && colName != "sr_created" && colName != "sr_updated" {
 				// Handle MySQL byte slice conversion for all fields
 				if valueBytes, ok := value.([]uint8); ok {
 					item.Fields[colName] = string(valueBytes)
@@ -729,18 +744,48 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 		return Item{}, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
 	}
 
+	// Check if sr_created and sr_updated columns exist
+	columns, err := r.ListColumns(ctx, tc)
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+	}
+
+	hasSrCreated := false
+	hasSrUpdated := false
+	for _, col := range columns {
+		if col.Name == "sr_created" {
+			hasSrCreated = true
+		}
+		if col.Name == "sr_updated" {
+			hasSrUpdated = true
+		}
+	}
+
 	// Build dynamic INSERT query
-	columns := []string{}
+	insertColumns := []string{}
 	placeholders := []string{}
 	values := []interface{}{}
 
+	// Add sr_created if the column exists
+	if hasSrCreated {
+		insertColumns = append(insertColumns, "`sr_created`")
+		placeholders = append(placeholders, "NOW()")
+	}
+
+	// Add sr_updated if the column exists (set to same value as sr_created)
+	if hasSrUpdated {
+		insertColumns = append(insertColumns, "`sr_updated`")
+		placeholders = append(placeholders, "NOW()")
+	}
+
+	// Add additional fields
 	for key, value := range additionalFields {
-		columns = append(columns, fmt.Sprintf("`%s`", key))
+		insertColumns = append(insertColumns, fmt.Sprintf("`%s`", key))
 		placeholders = append(placeholders, "?")
 		values = append(values, value)
 	}
 
-	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)", tc.Db.String, tc.Table.String, strings.Join(columns, ", "), strings.Join(placeholders, ", "))
+	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)", tc.Db.String, tc.Table.String, strings.Join(insertColumns, ", "), strings.Join(placeholders, ", "))
 	// Log the SQL used (without parameter values)
 	log.WithFields(log.Fields{"table": tc.Table.String}).Infof("CreateItem SQL: %s", query)
 
@@ -751,15 +796,15 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 	}
 	lastID, _ := res.LastInsertId()
 
-	// Convert additionalFields to interface{} map for the Item
-	fields := make(map[string]interface{})
-	for key, value := range additionalFields {
-		fields[key] = value
+	// Fetch the created item to get the populated timestamp fields
+	createdItem, err := r.GetItemInTable(ctx, tc, strconv.FormatInt(lastID, 10))
+	if err != nil {
+		log.Errorf("Failed to fetch created item: %v", err)
+		return Item{}, err
 	}
 
-	item := Item{ID: strconv.FormatInt(lastID, 10), Fields: fields}
-	log.Infof("Created item: %+v", item)
-	return item, nil
+	log.Infof("Created item: %+v", createdItem)
+	return createdItem, nil
 }
 
 func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
@@ -870,10 +915,20 @@ func (r *Repository) GetItemInTable(ctx context.Context, tc *TableConfig, id str
 			}
 		}
 	}
+	if updatedAt, ok := rowMap["sr_updated"]; ok {
+		if updatedAtTime, ok := updatedAt.(time.Time); ok {
+			item.SrUpdated = updatedAtTime
+		} else if updatedAtStr, ok := updatedAt.(string); ok {
+			// Handle string datetime from MySQL
+			if parsedTime, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
+				item.SrUpdated = parsedTime
+			}
+		}
+	}
 
 	// Add all other fields to the dynamic Fields map (including name now)
 	for colName, value := range rowMap {
-		if colName != "id" && colName != "sr_created" {
+		if colName != "id" && colName != "sr_created" && colName != "sr_updated" {
 			// Handle MySQL byte slice conversion for all fields
 			if valueBytes, ok := value.([]uint8); ok {
 				item.Fields[colName] = string(valueBytes)
@@ -893,15 +948,48 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 		return Item{}, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
 	}
 
+	// Check if sr_updated column exists
+	columns, err := r.ListColumns(ctx, tc)
+	if err != nil {
+		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+	}
+
+	hasSrUpdated := false
+	hasName := false
+	for _, col := range columns {
+		if col.Name == "sr_updated" {
+			hasSrUpdated = true
+		}
+		if col.Name == "name" {
+			hasName = true
+		}
+	}
+
 	// Build dynamic UPDATE query
-	setParts := []string{"name = ?"}
-	args := []interface{}{name}
+	setParts := []string{}
+	args := []interface{}{}
+
+	// Add name field if the column exists and name is provided
+	if hasName && name != "" {
+		setParts = append(setParts, "`name` = ?")
+		args = append(args, name)
+	}
+
+	// Add sr_updated if the column exists
+	if hasSrUpdated {
+		setParts = append(setParts, "`sr_updated` = NOW()")
+	}
 
 	for fieldName, fieldValue := range additionalFields {
 		// Sanitize field name to prevent SQL injection
 		sanitizedFieldName := sanitizeDatabaseIdentifier(fieldName)
 		setParts = append(setParts, fmt.Sprintf("`%s` = ?", sanitizedFieldName))
 		args = append(args, fieldValue)
+	}
+
+	// Ensure we have at least one field to update
+	if len(setParts) == 0 {
+		return Item{}, fmt.Errorf("no fields to update")
 	}
 
 	args = append(args, id) // Add id for WHERE clause
@@ -1386,6 +1474,8 @@ func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]Fo
 	switch r.db.DriverName() {
 	case "mysql":
 		// Query MySQL information schema for foreign keys in both directions
+		// We need to find foreign keys where the current table is either the source or target
+		// Foreign keys can span across different databases, so we search globally
 		query := `
 			SELECT
 				kcu.CONSTRAINT_NAME as constraint_name,
@@ -1399,15 +1489,14 @@ func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]Fo
 			LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
 				ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
 				AND kcu.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
-			WHERE kcu.TABLE_SCHEMA = DATABASE()
-			AND (kcu.TABLE_NAME = ? OR kcu.REFERENCED_TABLE_NAME = ?)
-			AND kcu.TABLE_SCHEMA = ?
+			WHERE ((kcu.TABLE_SCHEMA = ? AND kcu.TABLE_NAME = ?)
+			OR (kcu.REFERENCED_TABLE_SCHEMA = ? AND kcu.REFERENCED_TABLE_NAME = ?))
 			AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
 			ORDER BY kcu.CONSTRAINT_NAME`
 
 		log.Tracef("GetForeignKeys Query: %v", query)
 
-		rows, err := r.db.QueryxContext(ctx, query, tc.Table.String, tc.Table.String, tc.Db.String)
+		rows, err := r.db.QueryxContext(ctx, query, tc.Db.String, tc.Table.String, tc.Db.String, tc.Table.String)
 		if err != nil {
 			return nil, err
 		}
@@ -1445,8 +1534,7 @@ func (r *Repository) DeleteForeignKey(ctx context.Context, constraintName string
 		query := `
 			SELECT TABLE_NAME
 			FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-			WHERE TABLE_SCHEMA = DATABASE()
-			AND CONSTRAINT_NAME = ?
+			WHERE CONSTRAINT_NAME = ?
 			LIMIT 1`
 
 		err := r.db.GetContext(ctx, &tableName, query, constraintName)
@@ -1829,6 +1917,20 @@ type APIKey struct {
 	IsActive   bool
 }
 
+type ConditionalFormattingRule struct {
+	ID             int
+	TableName      string
+	ColumnName     string
+	ConditionType  string
+	ConditionValue string
+	FormatType     string
+	FormatValue    string
+	Priority       int
+	IsActive       bool
+	SrCreated      time.Time
+	UpdatedAtUnix  int64
+}
+
 // CreateAPIKey creates a new API key for a user
 func (r *Repository) CreateAPIKey(ctx context.Context, userID int, name, keyHash string, expiresAt *time.Time) (*APIKey, error) {
 	query := `
@@ -2002,6 +2104,169 @@ func (r *Repository) DeleteAPIKey(ctx context.Context, userID, apiKeyID int) err
 
 	if rowsAffected == 0 {
 		return fmt.Errorf("API key not found or not owned by user")
+	}
+
+	return nil
+}
+
+// Conditional Formatting Rule related methods
+
+// GetConditionalFormattingRules retrieves conditional formatting rules
+func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID int, tableName string) ([]*ConditionalFormattingRule, error) {
+	var query string
+	var args []interface{}
+
+	if tableName != "" {
+		query = `
+			SELECT id, table_name, column_name, condition_type, condition_value,
+			       format_type, format_value, priority, is_active, sr_created, updated_at_unix
+			FROM table_conditional_formatting_rules
+			WHERE table_name = ?
+			ORDER BY priority ASC, id ASC
+		`
+		args = []interface{}{tableName}
+	} else {
+		query = `
+			SELECT id, table_name, column_name, condition_type, condition_value,
+			       format_type, format_value, priority, is_active, sr_created, updated_at_unix
+			FROM table_conditional_formatting_rules
+			ORDER BY table_name ASC, priority ASC, id ASC
+		`
+		args = []interface{}{}
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rules []*ConditionalFormattingRule
+	for rows.Next() {
+		var rule ConditionalFormattingRule
+		var srCreatedStr string
+		err := rows.Scan(
+			&rule.ID,
+			&rule.TableName,
+			&rule.ColumnName,
+			&rule.ConditionType,
+			&rule.ConditionValue,
+			&rule.FormatType,
+			&rule.FormatValue,
+			&rule.Priority,
+			&rule.IsActive,
+			&srCreatedStr,
+			&rule.UpdatedAtUnix,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// Parse sr_created timestamp - try multiple formats
+		if srCreatedStr != "" {
+			// Try ISO 8601 format first (RFC3339) - used by SQLite
+			rule.SrCreated, err = time.Parse(time.RFC3339, srCreatedStr)
+			if err != nil {
+				// Fallback to MySQL datetime format
+				rule.SrCreated, err = time.Parse("2006-01-02 15:04:05", srCreatedStr)
+				if err != nil {
+					// Try ISO 8601 without timezone
+					rule.SrCreated, err = time.Parse("2006-01-02T15:04:05", srCreatedStr)
+					if err != nil {
+						return nil, fmt.Errorf("failed to parse sr_created timestamp '%s' (tried RFC3339, MySQL datetime, and ISO without timezone): %w", srCreatedStr, err)
+					}
+				}
+			}
+		}
+
+		rules = append(rules, &rule)
+	}
+
+	return rules, nil
+}
+
+// CreateConditionalFormattingRule creates a new conditional formatting rule
+func (r *Repository) CreateConditionalFormattingRule(ctx context.Context, userID int, rule *ConditionalFormattingRule) (int, error) {
+	query := `
+		INSERT INTO table_conditional_formatting_rules 
+		(table_name, column_name, condition_type, condition_value, format_type, format_value, priority, is_active, sr_created, updated_at_unix)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), UNIX_TIMESTAMP())
+	`
+
+	result, err := r.db.ExecContext(ctx, query,
+		rule.TableName,
+		rule.ColumnName,
+		rule.ConditionType,
+		rule.ConditionValue,
+		rule.FormatType,
+		rule.FormatValue,
+		rule.Priority,
+		rule.IsActive,
+	)
+	if err != nil {
+		return 0, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	return int(id), nil
+}
+
+// DeleteConditionalFormattingRule deletes a conditional formatting rule
+func (r *Repository) DeleteConditionalFormattingRule(ctx context.Context, userID int, ruleID int) error {
+	query := `DELETE FROM table_conditional_formatting_rules WHERE id = ?`
+
+	result, err := r.db.ExecContext(ctx, query, ruleID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("conditional formatting rule not found")
+	}
+
+	return nil
+}
+
+// UpdateConditionalFormattingRule updates an existing conditional formatting rule
+func (r *Repository) UpdateConditionalFormattingRule(ctx context.Context, userID int, rule *ConditionalFormattingRule) error {
+	query := `
+		UPDATE table_conditional_formatting_rules 
+		SET table_name = ?, column_name = ?, condition_type = ?, condition_value = ?, 
+		    format_type = ?, format_value = ?, priority = ?, is_active = ?, updated_at_unix = UNIX_TIMESTAMP()
+		WHERE id = ?
+	`
+
+	result, err := r.db.ExecContext(ctx, query,
+		rule.TableName,
+		rule.ColumnName,
+		rule.ConditionType,
+		rule.ConditionValue,
+		rule.FormatType,
+		rule.FormatValue,
+		rule.Priority,
+		rule.IsActive,
+		rule.ID,
+	)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("conditional formatting rule not found")
 	}
 
 	return nil
