@@ -26,6 +26,8 @@ const foreignKeys = ref<Array<{
   referencedColumn: string
   onDeleteAction: string
   onUpdateAction: string
+  tableTcName?: string
+  referencedTableTcName?: string
 }>>([])
 
 const referencedTableData = ref<Record<string, any[]>>({})
@@ -458,15 +460,17 @@ const client = createApiClient()
 async function loadForeignKeys() {
   try {
     loadingForeignKeys.value = true
-    const response = await client.getForeignKeys({ tableName: props.tableId })
-    foreignKeys.value = response.foreignKeys.map(fk => ({
+    const response = await client.getTableStructure({ pageId: props.tableId })
+    foreignKeys.value = (response.foreignKeys || []).map(fk => ({
       constraintName: fk.constraintName,
       tableName: fk.tableName,
       columnName: fk.columnName,
       referencedTable: fk.referencedTable,
       referencedColumn: fk.referencedColumn,
       onDeleteAction: fk.onDeleteAction,
-      onUpdateAction: fk.onUpdateAction
+      onUpdateAction: fk.onUpdateAction,
+      tableTcName: fk.tableTcName,
+      referencedTableTcName: fk.referencedTableTcName
     }))
 
     // Load referenced table data for each foreign key
@@ -484,7 +488,9 @@ async function loadReferencedTableData() {
 
   for (const fk of foreignKeys.value) {
     try {
-      const response = await client.listItems({ tcName: fk.referencedTable })
+      // Use referencedTableTcName if available, otherwise fall back to referencedTable
+      const tcName = fk.referencedTableTcName || fk.referencedTable
+      const response = await client.listItems({ tcName })
       data[fk.columnName] = response.items || []
     } catch (err) {
       console.error(`Error loading data for table ${fk.referencedTable}:`, err)
@@ -1111,7 +1117,7 @@ onMounted(loadConditionalFormattingRules)
                 <span v-else>
                   <!-- Check if server-rendered markdown field exists -->
                   <template v-if="hasMarkdownField(col, it)">
-                    <div v-html="getMarkdownContent(col, it)" 
+                    <div v-html="getMarkdownContent(col, it)"
                          class="markdown-content"></div>
                   </template>
                   <!-- Apply client-side conditional formatting (non-markdown) -->

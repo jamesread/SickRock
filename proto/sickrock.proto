@@ -162,6 +162,7 @@ message GetTableStructureResponse {
   repeated Field fields = 1;
   string CreateButtonText = 2;
   string view = 3;
+  repeated ForeignKey foreign_keys = 4;
 }
 
 message AddTableColumnRequest {
@@ -234,6 +235,8 @@ message ForeignKey {
   string referenced_column = 5;
   string on_delete_action = 6;
   string on_update_action = 7;
+  string table_tc_name = 8; // Table configuration name for the table
+  string referenced_table_tc_name = 9; // Table configuration name for the referenced table
 }
 
 message CreateForeignKeyRequest {

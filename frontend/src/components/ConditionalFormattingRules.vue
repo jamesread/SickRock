@@ -226,7 +226,7 @@ onMounted(async () => {
     loadColumns(),
     loadFormattingRules(),
   ])
-  
+
   // Preselect column from query string
   const preselect = route.query.column as string
   if (preselect) {
@@ -253,7 +253,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"
-        class="button"
+        class="button neutral"
       >
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
         Back to Table
@@ -300,11 +300,11 @@ watch(() => newRule.value.formatType, (newFormatType) => {
         </div>
         <div class="form-group">
           <label>Condition Value:</label>
-          <input 
-            v-model="newRule.conditionValue" 
-            type="text" 
-            :placeholder="newRule.conditionType === 'always' ? 'Not needed for always condition' : 'e.g., active'" 
-            :disabled="newRule.conditionType === 'always'" 
+          <input
+            v-model="newRule.conditionValue"
+            type="text"
+            :placeholder="newRule.conditionType === 'always' ? 'Not needed for always condition' : 'e.g., active'"
+            :disabled="newRule.conditionType === 'always'"
           />
         </div>
         <div class="form-group">
@@ -319,17 +319,17 @@ watch(() => newRule.value.formatType, (newFormatType) => {
         </div>
         <div class="form-group">
           <label>Format Value:</label>
-          <input 
+          <input
             v-if="newRule.formatType === 'color' || newRule.formatType === 'text_color'"
-            v-model="newRule.formatValue" 
-            type="color" 
+            v-model="newRule.formatValue"
+            type="color"
             class="color-input"
           />
-          <input 
+          <input
             v-else
-            v-model="newRule.formatValue" 
-            type="text" 
-            :placeholder="getFormatValuePlaceholder(newRule.formatType)" 
+            v-model="newRule.formatValue"
+            type="text"
+            :placeholder="getFormatValuePlaceholder(newRule.formatType)"
             :disabled="newRule.formatType === 'markdown'"
           />
         </div>
@@ -375,11 +375,11 @@ watch(() => newRule.value.formatType, (newFormatType) => {
         </div>
         <div class="form-group">
           <label>Condition Value:</label>
-          <input 
-            v-model="newRule.conditionValue" 
-            type="text" 
-            :placeholder="newRule.conditionType === 'always' ? 'Not needed for always condition' : 'e.g., active'" 
-            :disabled="newRule.conditionType === 'always'" 
+          <input
+            v-model="newRule.conditionValue"
+            type="text"
+            :placeholder="newRule.conditionType === 'always' ? 'Not needed for always condition' : 'e.g., active'"
+            :disabled="newRule.conditionType === 'always'"
           />
         </div>
         <div class="form-group">
@@ -394,17 +394,17 @@ watch(() => newRule.value.formatType, (newFormatType) => {
         </div>
         <div class="form-group">
           <label>Format Value:</label>
-          <input 
+          <input
             v-if="newRule.formatType === 'color' || newRule.formatType === 'text_color'"
-            v-model="newRule.formatValue" 
-            type="color" 
+            v-model="newRule.formatValue"
+            type="color"
             class="color-input"
           />
-          <input 
+          <input
             v-else
-            v-model="newRule.formatValue" 
-            type="text" 
-            :placeholder="getFormatValuePlaceholder(newRule.formatType)" 
+            v-model="newRule.formatValue"
+            type="text"
+            :placeholder="getFormatValuePlaceholder(newRule.formatType)"
             :disabled="newRule.formatType === 'markdown'"
           />
         </div>

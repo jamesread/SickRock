@@ -45,6 +45,11 @@ type Repository struct {
 	db *sqlx.DB
 }
 
+// DB returns the underlying database connection
+func (r *Repository) DB() *sqlx.DB {
+	return r.db
+}
+
 // Dashboard represents a row in table_dashboards
 type Dashboard struct {
 	ID   int    `db:"id"`
@@ -1411,8 +1416,10 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 // ForeignKey represents a foreign key constraint
 type ForeignKey struct {
 	ConstraintName   string `db:"constraint_name"`
+	TableSchema      string `db:"table_schema"`
 	TableName        string `db:"table_name"`
 	ColumnName       string `db:"column_name"`
+	ReferencedSchema string `db:"referenced_schema"`
 	ReferencedTable  string `db:"referenced_table"`
 	ReferencedColumn string `db:"referenced_column"`
 	OnDeleteAction   string `db:"on_delete_action"`
@@ -1479,8 +1486,10 @@ func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]Fo
 		query := `
 			SELECT
 				kcu.CONSTRAINT_NAME as constraint_name,
+				kcu.TABLE_SCHEMA as table_schema,
 				kcu.TABLE_NAME as table_name,
 				kcu.COLUMN_NAME as column_name,
+				kcu.REFERENCED_TABLE_SCHEMA as referenced_schema,
 				kcu.REFERENCED_TABLE_NAME as referenced_table,
 				kcu.REFERENCED_COLUMN_NAME as referenced_column,
 				COALESCE(rc.DELETE_RULE, 'NO ACTION') as on_delete_action,
@@ -2188,7 +2197,7 @@ func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID i
 // CreateConditionalFormattingRule creates a new conditional formatting rule
 func (r *Repository) CreateConditionalFormattingRule(ctx context.Context, userID int, rule *ConditionalFormattingRule) (int, error) {
 	query := `
-		INSERT INTO table_conditional_formatting_rules 
+		INSERT INTO table_conditional_formatting_rules
 		(table_name, column_name, condition_type, condition_value, format_type, format_value, priority, is_active, sr_created, updated_at_unix)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), UNIX_TIMESTAMP())
 	`
@@ -2239,8 +2248,8 @@ func (r *Repository) DeleteConditionalFormattingRule(ctx context.Context, userID
 // UpdateConditionalFormattingRule updates an existing conditional formatting rule
 func (r *Repository) UpdateConditionalFormattingRule(ctx context.Context, userID int, rule *ConditionalFormattingRule) error {
 	query := `
-		UPDATE table_conditional_formatting_rules 
-		SET table_name = ?, column_name = ?, condition_type = ?, condition_value = ?, 
+		UPDATE table_conditional_formatting_rules
+		SET table_name = ?, column_name = ?, condition_type = ?, condition_value = ?,
 		    format_type = ?, format_value = ?, priority = ?, is_active = ?, updated_at_unix = UNIX_TIMESTAMP()
 		WHERE id = ?
 	`

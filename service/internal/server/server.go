@@ -90,6 +90,27 @@ func safeInt64ToInt32(value int64) int32 {
 	return int32(value)
 }
 
+// lookupTableConfigName looks up the table configuration name for a given database and table
+func (s *SickRockServer) lookupTableConfigName(ctx context.Context, database, table string) string {
+	// Query table_configurations for a match
+	var tcName string
+	query := "SELECT name FROM table_configurations WHERE `db` = ? AND `table` = ? LIMIT 1"
+	err := s.repo.DB().GetContext(ctx, &tcName, query, database, table)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"database": database,
+			"table":    table,
+		}).Debug("No table configuration found")
+		return ""
+	}
+	log.WithFields(log.Fields{
+		"database": database,
+		"table":    table,
+		"tcName":   tcName,
+	}).Debug("Found table configuration")
+	return tcName
+}
+
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
@@ -459,6 +480,9 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 			} else {
 				additionalFields[key] = fmt.Sprintf("%v", value)
 			}
+		} else {
+			// Include null values as empty strings so they appear in JSON output
+			additionalFields[key] = ""
 		}
 	}
 
@@ -520,6 +544,9 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 			} else {
 				additionalFields[key] = fmt.Sprintf("%v", value)
 			}
+		} else {
+			// Include null values as empty strings so they appear in JSON output
+			additionalFields[key] = ""
 		}
 	}
 
@@ -683,6 +710,9 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 			} else {
 				responseAdditionalFields[key] = fmt.Sprintf("%v", value)
 			}
+		} else {
+			// Include null values as empty strings so they appear in JSON output
+			responseAdditionalFields[key] = ""
 		}
 	}
 
@@ -748,10 +778,74 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		createButtonText = tc.CreateButtonText.String
 	}
 
+	// Get foreign keys for this table
+	foreignKeys, err := s.repo.GetForeignKeys(ctx, tcName)
+	var pbForeignKeys []*sickrockpb.ForeignKey
+	if err != nil {
+		log.Errorf("Failed to get foreign keys: %v", err)
+		pbForeignKeys = []*sickrockpb.ForeignKey{}
+	} else {
+		log.WithFields(log.Fields{
+			"tcName": tcName,
+			"numFks": len(foreignKeys),
+			"fks":    foreignKeys,
+		}).Debug("Retrieved foreign keys")
+
+		// Convert repository foreign keys to protobuf foreign keys
+		pbForeignKeys = make([]*sickrockpb.ForeignKey, 0, len(foreignKeys))
+		for _, fk := range foreignKeys {
+			// Look up table configuration names for both tables
+			// Use TableSchema for the table, ReferencedSchema for the referenced table
+			tableDb := fk.TableSchema
+			if tableDb == "" {
+				tableDb = tc.Db.String
+			}
+			referencedDb := fk.ReferencedSchema
+			if referencedDb == "" {
+				referencedDb = tc.Db.String
+			}
+
+			log.WithFields(log.Fields{
+				"tableSchema":      fk.TableSchema,
+				"tableName":        fk.TableName,
+				"referencedSchema": fk.ReferencedSchema,
+				"referencedTable":  fk.ReferencedTable,
+				"tableDb":          tableDb,
+				"referencedDb":     referencedDb,
+				"currentTcDb":      tc.Db.String,
+			}).Debug("Looking up table config names for foreign key")
+
+			tableTcName := s.lookupTableConfigName(ctx, tableDb, fk.TableName)
+			referencedTcName := s.lookupTableConfigName(ctx, referencedDb, fk.ReferencedTable)
+
+			log.WithFields(log.Fields{
+				"tableTcName":        tableTcName,
+				"referencedTcName":   referencedTcName,
+				"fk_TableName":       fk.TableName,
+				"fk_ReferencedTable": fk.ReferencedTable,
+				"tableDb":            tableDb,
+				"referencedDb":       referencedDb,
+			}).Info("Completed table config lookup")
+
+			pbForeignKeys = append(pbForeignKeys, &sickrockpb.ForeignKey{
+				ConstraintName:        fk.ConstraintName,
+				TableName:             fk.TableName,
+				ColumnName:            fk.ColumnName,
+				ReferencedTable:       fk.ReferencedTable,
+				ReferencedColumn:      fk.ReferencedColumn,
+				OnDeleteAction:        fk.OnDeleteAction,
+				OnUpdateAction:        fk.OnUpdateAction,
+				TableTcName:           tableTcName,
+				ReferencedTableTcName: referencedTcName,
+			})
+		}
+	}
+
 	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
 		Fields:           fields,
 		CreateButtonText: createButtonText,
 		View:             tc.View.String,
+		ForeignKeys:      pbForeignKeys,
 	}), nil
 }
 

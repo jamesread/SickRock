@@ -66,8 +66,8 @@ const droppingFk = ref(false)
 
 async function loadForeignKeys() {
   try {
-    const res = await client.getForeignKeys({ tableName: tableId })
-    foreignKeys.value = res.foreignKeys.map(fk => ({
+    const res = await client.getTableStructure({ pageId: tableId })
+    foreignKeys.value = (res.foreignKeys || []).map(fk => ({
       constraintName: fk.constraintName,
       tableName: fk.tableName,
       columnName: fk.columnName,
@@ -283,7 +283,7 @@ onMounted(async () => {
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"
-        class="button"
+        class="button neutral"
       >
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
         Back to Table
@@ -292,7 +292,7 @@ onMounted(async () => {
         <HugeiconsIcon :icon="Edit03Icon" />
         Foreign Keys
       </router-link>
-      <router-link :to="`/table/${tableId}/add-column`" class="button">
+      <router-link :to="`/table/${tableId}/add-column`" class="button neutral">
         <HugeiconsIcon :icon="Edit03Icon" />
         Create Column
       </router-link>

@@ -61,8 +61,8 @@ const canCreateForeignKey = computed(() => {
 // Methods
 async function loadForeignKeys() {
   try {
-    const response = await client.getForeignKeys({ tableName: tableId })
-    foreignKeys.value = response.foreignKeys.map(fk => ({
+    const response = await client.getTableStructure({ pageId: tableId })
+    foreignKeys.value = (response.foreignKeys || []).map(fk => ({
       constraintName: fk.constraintName,
       tableName: fk.tableName,
       columnName: fk.columnName,

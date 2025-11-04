@@ -14,6 +14,9 @@ import (
 	"github.com/jamesread/golure/pkg/dirs"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
+
+	connectproto "go.akshayshah.org/connectproto"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database"
@@ -183,7 +186,17 @@ func main() {
 	go startSessionCleanupJob(repo)
 
 	interceptors := connect.WithInterceptors(auth.ConnectAuthMiddleware(authService))
-	path, handler := sickrockpbconnect.NewSickRockHandler(srv, interceptors)
+	jsonOpt := connectproto.WithJSON(
+		protojson.MarshalOptions{
+			EmitUnpopulated:   true,
+			EmitDefaultValues: true,
+			UseProtoNames:     false,
+		},
+		protojson.UnmarshalOptions{
+			DiscardUnknown: true,
+		},
+	)
+	path, handler := sickrockpbconnect.NewSickRockHandler(srv, interceptors, jsonOpt)
 
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)

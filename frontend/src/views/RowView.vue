@@ -105,11 +105,11 @@ function getFkDisplay(key: string): { to?: string; label?: string } {
   return { to: `/table/${table}/${id}`, label }
 }
 
-// Load foreign keys for the current table
+// Load foreign keys for the current table from GetTableStructure
 async function loadForeignKeys() {
   try {
-    const response = await client.getForeignKeys({ tableName })
-    foreignKeys.value = response.foreignKeys.map(fk => ({
+    const response = await client.getTableStructure({ pageId: tableName })
+    foreignKeys.value = (response.foreignKeys || []).map(fk => ({
       constraintName: fk.constraintName,
       tableName: fk.tableName,
       columnName: fk.columnName,
@@ -162,18 +162,8 @@ async function loadRelatedRows() {
       const currentValue = item.value[fk.columnName] || (item.value.additionalFields && item.value.additionalFields[fk.columnName])
       console.log(`Direction 2 - Looking for ${fk.columnName} = ${currentValue} in table ${fk.referencedTable}`)
 
-      if (currentValue !== null && currentValue !== undefined) {
-        try {
-          const res = await client.listItems({ tcName: fk.referencedTable, where: { [fk.referencedColumn]: String(currentValue) } })
-          relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = res.items || []
-        } catch (err) {
-          console.error(`Error loading referenced rows for ${fk.referencedTable}:`, err)
-          relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = []
-        }
-      } else {
-        // Include empty array for referenced table even if current value is null
-        relatedData[`${fk.referencedTable}.${fk.referencedColumn}`] = []
-      }
+      // Skip Direction 2 - only show related rows in the referencing table (Direction 1)
+      // The referenced row would typically be displayed as a foreign key link in the main row view
     }
 
     console.log('Final related data:', relatedData)
@@ -264,14 +254,14 @@ const entries = computed(() => {
       if (key === '$typeName') continue
       // Skip markdown fields - they're handled by their base field
       if (key.endsWith('Markdown')) continue
-      
+
       let displayValue = value
       let valueClass = ''
 
       // Check if there's a corresponding markdown field
       const markdownFieldName = key + 'Markdown'
       const markdownValue = item.value.additionalFields[markdownFieldName]
-      
+
       if (markdownValue) {
         // Use markdown content instead of original value
         displayValue = markdownValue
@@ -355,7 +345,7 @@ const relatedTables = computed(() => {
     // Create a descriptive title including relation name (constraint or column)
     const rowCount = `${rows.length} related row${rows.length !== 1 ? 's' : ''}`
     const relationName = fk?.constraintName || columnName
-    const title = `${tableName} (${rowCount})`
+    const title = `${tableName} - ${relationName} (${rowCount})`
     const rowCountText = `(${rowCount})`
 
     // Determine filter column (on the related table) and value (from the current item)
@@ -453,7 +443,7 @@ function cancelDelete() {
           Delete Row
         </button>
       </template>
-      
+
       <div v-if="error">{{ error }}</div>
       <div v-else-if="loading">Loading…</div>
       <dl v-else-if="entries.length > 0">
@@ -480,13 +470,13 @@ function cancelDelete() {
     <!-- Related Tables as Top-Level Sections -->
     <template v-if="foreignKeys.length > 0">
       <template v-for="table in relatedTables" :key="`${table.tableName}.${table.columnName}`">
-        <Section :title="`${table.tableName} ${table.rowCountText}`">
+        <Section :title="table.title">
           <template #toolbar>
             <router-link :to="`/table/${table.tableName}`" class="button">Open Table</router-link>
             <router-link :to="{ path: `/table/${table.tableName}/export`, query: { where: JSON.stringify(table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) } }" class="button">Export</router-link>
             <router-link :to="{ path: `/table/${table.tableName}/insert-row`, query: Object.assign({ fromTable: tableName, fromRowId: rowId }, table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) }" class="button neutral">Insert</router-link>
           </template>
-          
+
           <div v-if="loadingRelated" class="loading-related">
             Loading related rows...
           </div>
