@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import './style.css'
 import 'femtocrank/style.css'
+import 'femtocrank/dark.css'
 import router from './router'
 import { useAuthStore } from './stores/auth'
 

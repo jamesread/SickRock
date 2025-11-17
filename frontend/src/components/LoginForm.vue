@@ -172,7 +172,7 @@ const checkDeviceCodeStatus = async () => {
 
     if (response.claimed && response.token) {
       // Device code was claimed and we have the session information
-      localStorage.setItem('auth_token', response.token)
+      localStorage.setItem('session-token', response.token)
       const userData = {
         username: response.username,
         token: response.token,

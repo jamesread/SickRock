@@ -205,6 +205,21 @@ func main() {
 	router := gin.New()
 	router.Use(ginLogrusLogger())
 	router.Use(gin.Recovery())
+	router.Use(func(c *gin.Context) {
+		headers := c.Writer.Header()
+		headers.Set("Access-Control-Allow-Origin", "*")
+		headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+		headers.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With, Accept, connect-protocol-version")
+		headers.Set("Access-Control-Allow-Credentials", "true")
+		headers.Set("Access-Control-Max-Age", "86400")
+
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	})
 	router.Any("/api/*any", gin.WrapH(http.StripPrefix("/api", mux)))
 
 	// SPA fallback for non-API routes

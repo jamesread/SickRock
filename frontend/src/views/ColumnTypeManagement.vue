@@ -100,6 +100,34 @@ const columnTypes = [
   { value: 'TIMESTAMP', label: 'TIMESTAMP', description: 'Timestamp with timezone' }
 ]
 
+// Standard fields definition
+const standardFields = [
+  {
+    name: 'name',
+    type: 'string' as const,
+    description: 'Recommended for better table organization and display. Used as the primary identifier for rows.',
+    recommended: true
+  },
+  {
+    name: 'sr_created',
+    type: 'datetime' as const,
+    description: 'Automatically tracks when a row was created. Useful for auditing and sorting by creation time.',
+    recommended: true
+  },
+  {
+    name: 'sr_updated',
+    type: 'datetime' as const,
+    description: 'Automatically tracks when a row was last updated. Useful for auditing and tracking changes.',
+    recommended: true
+  },
+  {
+    name: 'uuid',
+    type: 'string' as const,
+    description: 'Universally unique identifier. Useful for distributed systems and external integrations.',
+    recommended: false
+  }
+]
+
 // Computed
 const canChangeType = computed(() => {
   const currentType = getCurrentColumnType(editingColumn.value)
@@ -107,9 +135,17 @@ const canChangeType = computed(() => {
   return editingColumn.value && selectedType && selectedType !== currentType
 })
 
+const missingStandardFields = computed(() => {
+  return standardFields.filter(field => {
+    const exists = columns.value.some(col => col.name === field.name)
+    return !exists
+  })
+})
+
 const canDropColumn = (columnName: string) => {
-  // Prevent dropping system columns
-  return columnName !== 'id' && columnName !== 'name'
+  // Prevent dropping system columns and standard fields
+  const isStandardField = standardFields.some(f => f.name === columnName)
+  return columnName !== 'id' && !isStandardField
 }
 
 // Methods
@@ -452,6 +488,30 @@ onMounted(async () => {
     </div>
   </Section>
 
+  <!-- Standard Fields Section -->
+  <Section v-if="!loading && missingStandardFields.length > 0 && columns.length > 0" title="Standard Fields">
+    <p class="section-description">Standard fields are recommended columns that improve table organization and functionality.</p>
+    <div class="standard-fields-list">
+      <div v-for="field in missingStandardFields" :key="field.name" class="standard-field-item">
+        <div class="field-info">
+          <strong class="field-name">{{ field.name }}</strong>
+          <p class="field-description">{{ field.description }}</p>
+        </div>
+        <router-link
+          :to="{
+            name: 'add-column',
+            params: { tableName: tableId },
+            query: { name: field.name, type: field.type }
+          }"
+          class="button good"
+        >
+          <HugeiconsIcon :icon="Edit03Icon" />
+          Create "{{ field.name }}" Column
+        </router-link>
+      </div>
+    </div>
+  </Section>
+
   <!-- Conditional Formatting Rules Section -->
   <ConditionalFormattingRules />
 
@@ -504,6 +564,48 @@ onMounted(async () => {
   color: #666;
 }
 
+.section-description {
+  margin: 0 0 1rem 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.standard-fields-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.standard-field-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  background: var(--background-color);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+.field-info {
+  flex: 1;
+}
+
+.field-name {
+  display: block;
+  color: var(--text-color);
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.field-description {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
 .columns-list {
   margin-bottom: 2rem;
 }
@@ -518,10 +620,11 @@ onMounted(async () => {
   justify-content: space-between;
   align-items: flex-start;
   padding: 1rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 0.5rem;
-  background: #f9f9f9;
+  color: var(--text-color);
+  background: var(--background-color);
 }
 
 .column-info {

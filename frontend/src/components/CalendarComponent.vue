@@ -138,6 +138,56 @@ const calendarEvents = computed<CalendarEvent[]>(() => {
   })
 })
 
+const upcomingVisibleEventsCount = computed(() => {
+  const now = new Date()
+  const monthStart = new Date(currentYear.value, currentMonth.value, 1)
+  const nextMonthStart = new Date(currentYear.value, currentMonth.value + 1, 1)
+
+  const nowTime = now.getTime()
+  const monthStartTime = monthStart.getTime()
+  const nextMonthStartTime = nextMonthStart.getTime()
+
+  return calendarEvents.value.filter(event => {
+    const { start, end } = getEventDateRange(event)
+    const eventStart = start || (event.date instanceof Date ? event.date : null)
+    if (!eventStart) return false
+
+    const eventEnd = end || eventStart
+    const eventStartTime = eventStart.getTime()
+    const eventEndTime = eventEnd.getTime()
+
+    const isUpcoming = eventEndTime >= nowTime
+    const overlapsVisibleMonth =
+      eventEndTime >= monthStartTime && eventStartTime < nextMonthStartTime
+
+    return isUpcoming && overlapsVisibleMonth
+  }).length
+})
+
+const upcomingEventsMessage = computed(() => {
+  const count = upcomingVisibleEventsCount.value
+  if (count === 0) return 'No upcoming events'
+  if (count === 1) return '1 upcoming event'
+  return `${count} upcoming events`
+})
+
+function getEventTooltip(event: CalendarEvent): string {
+  const { start, end } = getEventDateRange(event)
+  const reference = start || end
+  if (!reference) return ''
+
+  const eventDate = new Date(reference)
+  eventDate.setHours(0, 0, 0, 0)
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+  const msPerDay = 24 * 60 * 60 * 1000
+  const diffDays = Math.max(0, Math.floor((eventDate.getTime() - today.getTime()) / msPerDay))
+
+  return `in ${diffDays} ${diffDays === 1 ? 'day' : 'days'}`
+}
+
 // Load data
 async function load() {
   const now = new Date()
@@ -506,7 +556,21 @@ onMounted(load)
         @date-click="handleDateClick"
         @month-change="handleMonthChange"
         @event-context-menu="handleEventContextMenu"
-      />
+      >
+        <template #event="{ event, date, position }">
+          <div class="event-content" :title="getEventTooltip(event)">
+            <div class="event-title">
+              {{ event.title }}
+              <span v-if="position !== 'single'" class="multi-day-indicator">
+                {{ position === 'start' ? '▶' : position === 'end' ? '◀' : position === 'middle' ? '▬' : '' }}
+              </span>
+            </div>
+            <div class="event-time">
+              {{ formatEventTime(event, date) }}
+            </div>
+          </div>
+        </template>
+      </Calendar>
     </div>
 
     <!-- Context Menu -->
@@ -578,6 +642,10 @@ onMounted(load)
       </div>
     </div>
 
+    <p class="padding" style="margin-top: 0">
+      <small>{{ upcomingEventsMessage }}</small>
+    </p>
+
     <!-- Backdrop to close quick add -->
     <div
       v-if="quickAdd.visible"
@@ -591,6 +659,10 @@ onMounted(load)
 .date-picker-container {
   display: flex;
   align-items: center;
+}
+
+.calendar-wrapper {
+  border-radius: 0;
 }
 
 .date-picker-input {
@@ -616,10 +688,6 @@ onMounted(load)
   display: flex;
   align-items: center;
   gap: 0.5rem;
-}
-
-.calendar-content {
-  padding: 1rem;
 }
 
 /* Context Menu Styles */

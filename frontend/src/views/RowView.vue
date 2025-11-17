@@ -422,14 +422,14 @@ function cancelDelete() {
       <template #toolbar>
         <router-link
           :to="`/table/${tableName}`"
-          class="button"
+          class="button neutral"
         >
           <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
           Back to Table
         </router-link>
         <router-link
           :to="`/table/${tableName}/${rowId}/edit`"
-          class="button"
+          class="button neutral"
         >
           <HugeiconsIcon :icon="Edit01Icon" width="16" height="16" />
           Edit Row

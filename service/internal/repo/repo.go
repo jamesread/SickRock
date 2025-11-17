@@ -1148,6 +1148,64 @@ func (r *Repository) GetDatabaseTables(ctx context.Context, database string) ([]
 	return tables, nil
 }
 
+// CreateTable creates a physical table in the database
+func (r *Repository) CreateTable(ctx context.Context, database, table string) error {
+	log.WithFields(log.Fields{
+		"database": database,
+		"table":    table,
+	}).Infof("Creating physical table")
+
+	if database == "" {
+		database = "main"
+	}
+
+	if table == "" {
+		return fmt.Errorf("table name is required")
+	}
+
+	t := sanitizeDatabaseIdentifier(table)
+
+	// Check if table already exists
+	var exists int
+	var err error
+	if r.db.DriverName() == "mysql" {
+		checkQuery := "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?"
+		err = r.db.GetContext(ctx, &exists, checkQuery, database, t)
+	} else {
+		// SQLite
+		checkQuery := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?"
+		err = r.db.GetContext(ctx, &exists, checkQuery, t)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to check if table exists: %w", err)
+	}
+	if exists > 0 {
+		return fmt.Errorf("table '%s' already exists in database '%s'", t, database)
+	}
+
+	// Create table with id, sr_created, and sr_updated columns
+	var createQuery string
+	if r.db.DriverName() == "mysql" {
+		createQuery = fmt.Sprintf(
+			"CREATE TABLE %s.%s (id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, sr_created DATETIME DEFAULT CURRENT_TIMESTAMP, sr_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
+			database, t)
+	} else {
+		// SQLite - doesn't support database qualifiers in CREATE TABLE
+		createQuery = fmt.Sprintf(
+			"CREATE TABLE %s (id INTEGER PRIMARY KEY AUTOINCREMENT, sr_created TEXT DEFAULT (datetime('now')), sr_updated TEXT DEFAULT (datetime('now')))",
+			t)
+	}
+
+	_, err = r.db.ExecContext(ctx, createQuery)
+	if err != nil {
+		log.Errorf("Failed to create table: %v", err)
+		return fmt.Errorf("failed to create table: %w", err)
+	}
+
+	log.Infof("Created physical table: %s.%s", database, t)
+	return nil
+}
+
 // CreateTableConfiguration creates a new table configuration entry
 func (r *Repository) CreateTableConfiguration(ctx context.Context, name, database, table string) error {
 	log.WithFields(log.Fields{
@@ -1174,10 +1232,28 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 
 	// Insert the new configuration with view set to 'table'
 	query := "INSERT INTO table_configurations (name, `db`, `table`, view) VALUES (?, ?, ?, 'table')"
-	_, err = r.db.ExecContext(ctx, query, name, database, table)
+	result, err := r.db.ExecContext(ctx, query, name, database, table)
 	if err != nil {
 		log.Errorf("Failed to create table configuration: %v", err)
 		return fmt.Errorf("failed to insert table configuration: %w", err)
+	}
+
+	// Get the ID of the newly created configuration
+	configID, err := result.LastInsertId()
+	if err != nil {
+		log.Errorf("Failed to get last insert ID: %v", err)
+		return fmt.Errorf("failed to get configuration ID: %w", err)
+	}
+
+	// Create a navigation entry for the new table configuration
+	navQuery := "INSERT INTO table_navigation (ordinal, table_configuration) VALUES (99, ?)"
+	_, err = r.db.ExecContext(ctx, navQuery, configID)
+	if err != nil {
+		log.Warnf("Failed to create navigation entry for table configuration %s: %v", name, err)
+		// Don't fail the whole operation if navigation entry creation fails
+		// The table configuration was created successfully
+	} else {
+		log.Infof("Created navigation entry for table configuration: %s", name)
 	}
 
 	log.Infof("Created table configuration: %s (db: %s, table: %s, view: table)", name, database, table)

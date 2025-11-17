@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 
-const props = defineProps<{ tableId: string }>()
+const props = defineProps<{
+  tableId: string
+  initialName?: string
+  initialType?: 'string' | 'int64' | 'tinyint' | 'datetime'
+}>()
 const emit = defineEmits<{ added: [] }>()
 
 const router = useRouter()
@@ -16,6 +20,16 @@ const required = ref(false)
 const defaultToCurrentTimestamp = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+// Initialize from props if provided
+onMounted(() => {
+  if (props.initialName) {
+    name.value = props.initialName
+  }
+  if (props.initialType) {
+    type.value = props.initialType
+  }
+})
 
 // Transport handled by authenticated client
 const client = createApiClient()

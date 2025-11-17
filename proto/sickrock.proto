@@ -41,6 +41,16 @@ message GetTableConfigurationsResponse {
   repeated Page pages = 1;
 }
 
+message CreateTableRequest {
+  string database = 1;
+  string table = 2;
+}
+
+message CreateTableResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 message CreateTableConfigurationRequest {
   string name = 1;
   string database = 2;
@@ -379,6 +389,7 @@ message InitResponse {
   string commit = 2;
   string date = 3;
   string db_name = 4;
+  string current_username = 5;
 }
 
 // Authentication
@@ -632,6 +643,7 @@ service SickRock {
 
   // Table configurations available in the application
   rpc GetTableConfigurations(GetTableConfigurationsRequest) returns (GetTableConfigurationsResponse);
+  rpc CreateTable(CreateTableRequest) returns (CreateTableResponse);
   rpc CreateTableConfiguration(CreateTableConfigurationRequest) returns (CreateTableConfigurationResponse);
   rpc GetDatabaseTables(GetDatabaseTablesRequest) returns (GetDatabaseTablesResponse);
 

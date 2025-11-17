@@ -60,12 +60,22 @@ async function submit() {
   success.value = null
 
   try {
+    // First, create the physical table in the database
+    const createTableResponse = await client.createTable({
+      database: database.value,
+      table: table.value
+    })
+
+    if (!createTableResponse.success) {
+      throw new Error(createTableResponse.message || 'Failed to create table')
+    }
+
     if (createConfiguration.value) {
       if (!name.value) {
         throw new Error('Configuration name is required when creating a table configuration')
       }
 
-      // Create the table configuration entry first
+      // Create the table configuration entry
       const response = await client.createTableConfiguration({
         name: name.value,
         database: database.value,
@@ -76,16 +86,12 @@ async function submit() {
         throw new Error(response.message || 'Failed to create table configuration')
       }
 
-      success.value = 'Table configuration created successfully'
-
-      // Ensure the actual table exists in the database
-      await client.getTableStructure({ pageId: name.value })
+      success.value = 'Table and configuration created successfully'
 
       // Navigate to the table view
       await router.push(`/table/${encodeURIComponent(name.value)}`)
     } else {
-      // If not creating configuration, just use the table name directly
-      await client.getTableStructure({ pageId: table.value })
+      // If not creating configuration, just navigate to the table
       await router.push(`/table/${encodeURIComponent(table.value)}`)
     }
   } catch (e) {

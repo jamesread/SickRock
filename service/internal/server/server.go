@@ -114,11 +114,17 @@ func (s *SickRockServer) lookupTableConfigName(ctx context.Context, database, ta
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
+	var currentUsername string
+	if claims, ok := ctx.Value("user").(*auth.Claims); ok && claims != nil {
+		currentUsername = claims.Username
+	}
+
 	res := connect.NewResponse(&sickrockpb.InitResponse{
-		Version: buildinfo.Version,
-		Commit:  buildinfo.Commit,
-		Date:    buildinfo.Date,
-		DbName:  dbName,
+		Version:         buildinfo.Version,
+		Commit:          buildinfo.Commit,
+		Date:            buildinfo.Date,
+		DbName:          dbName,
+		CurrentUsername: currentUsername,
 	})
 	return res, nil
 }
@@ -161,6 +167,37 @@ func (s *SickRockServer) GetTableConfigurations(ctx context.Context, req *connec
 	}
 	res := connect.NewResponse(&sickrockpb.GetTableConfigurationsResponse{Pages: pages})
 	return res, nil
+}
+
+func (s *SickRockServer) CreateTable(ctx context.Context, req *connect.Request[sickrockpb.CreateTableRequest]) (*connect.Response[sickrockpb.CreateTableResponse], error) {
+	database := req.Msg.GetDatabase()
+	table := req.Msg.GetTable()
+
+	if table == "" {
+		return connect.NewResponse(&sickrockpb.CreateTableResponse{
+			Success: false,
+			Message: "Table name is required",
+		}), nil
+	}
+
+	if database == "" {
+		database = "main" // Default database
+	}
+
+	// Create the physical table
+	err := s.repo.CreateTable(ctx, database, table)
+	if err != nil {
+		log.Errorf("Failed to create table: %v", err)
+		return connect.NewResponse(&sickrockpb.CreateTableResponse{
+			Success: false,
+			Message: fmt.Sprintf("Failed to create table: %v", err),
+		}), nil
+	}
+
+	return connect.NewResponse(&sickrockpb.CreateTableResponse{
+		Success: true,
+		Message: "Table created successfully",
+	}), nil
 }
 
 func (s *SickRockServer) CreateTableConfiguration(ctx context.Context, req *connect.Request[sickrockpb.CreateTableConfigurationRequest]) (*connect.Response[sickrockpb.CreateTableConfigurationResponse], error) {

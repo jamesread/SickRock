@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { createApiClient } from './api'
 
+const SESSION_TOKEN_KEY = 'session-token'
+const LEGACY_TOKEN_KEY = 'auth_token'
+
 export interface User {
   username: string
   token: string
@@ -18,7 +21,8 @@ export const useAuthStore = defineStore('auth', () => {
     if (user.value.expiresAt < Date.now() / 1000) {
       // Token expired
       user.value = null
-      localStorage.removeItem('auth_token')
+      localStorage.removeItem(SESSION_TOKEN_KEY)
+      localStorage.removeItem(LEGACY_TOKEN_KEY)
       return false
     }
     return true
@@ -42,7 +46,8 @@ export const useAuthStore = defineStore('auth', () => {
           expiresAt: Number(response.expiresAt)
         }
         user.value = userData
-        localStorage.setItem('auth_token', response.token)
+        localStorage.setItem(SESSION_TOKEN_KEY, response.token)
+        localStorage.removeItem(LEGACY_TOKEN_KEY)
         return true
       } else {
         error.value = response.message || 'Login failed'
@@ -67,13 +72,22 @@ export const useAuthStore = defineStore('auth', () => {
       console.error('Logout error:', err)
     } finally {
       user.value = null
-      localStorage.removeItem('auth_token')
+      localStorage.removeItem(SESSION_TOKEN_KEY)
+      localStorage.removeItem(LEGACY_TOKEN_KEY)
     }
   }
 
   const validateToken = async () => {
-    const token = localStorage.getItem('auth_token')
-    if (!token) return false
+    let token = localStorage.getItem(SESSION_TOKEN_KEY)
+    if (!token) {
+      token = localStorage.getItem(LEGACY_TOKEN_KEY)
+      if (token) {
+        localStorage.setItem(SESSION_TOKEN_KEY, token)
+        localStorage.removeItem(LEGACY_TOKEN_KEY)
+      } else {
+        return false
+      }
+    }
 
     try {
       const client = createApiClient()
@@ -87,12 +101,14 @@ export const useAuthStore = defineStore('auth', () => {
         }
         return true
       } else {
-        localStorage.removeItem('auth_token')
+        localStorage.removeItem(SESSION_TOKEN_KEY)
+        localStorage.removeItem(LEGACY_TOKEN_KEY)
         return false
       }
     } catch (err) {
       console.error('Token validation error:', err)
-      localStorage.removeItem('auth_token')
+      localStorage.removeItem(SESSION_TOKEN_KEY)
+      localStorage.removeItem(LEGACY_TOKEN_KEY)
       return false
     }
   }
@@ -100,7 +116,8 @@ export const useAuthStore = defineStore('auth', () => {
   const getAuthHeaders = () => {
     if (!user.value) return {}
     return {
-      'Authorization': `Bearer ${user.value.token}`
+      'Authorization': `Bearer ${user.value.token}`,
+      'Session-Token': user.value.token
     }
   }
 
