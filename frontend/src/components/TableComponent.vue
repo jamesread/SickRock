@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, ref, computed, watch, inject, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import Pagination from 'picocrank/vue/components/Pagination.vue'
 import ColumnVisibilityDropdown from './ColumnVisibilityDropdown.vue'
@@ -13,6 +13,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon, Add01Icon, Download01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
+import { useKeyboardShortcuts, type KeyboardShortcut } from '../composables/useKeyboardShortcuts'
 
 const router = useRouter()
 const tableStructure = ref<GetTableStructureResponse | null>(null)
@@ -391,6 +392,23 @@ const deleting = ref(false)
 const showQuickAddDialog = ref(false)
 const quickAddLoading = ref(false)
 const quickAddSelectedViewId = ref<number | null>(null)
+
+// Table navigation state
+const currentRowIndex = ref<number | null>(null)
+const currentColumnIndex = ref<number | null>(null)
+const lastSelectedRowIndex = ref<number | null>(null)
+
+// Provide table filter focus function
+const tableFilterFocusRequest = inject<{ value: (() => void) | null } | null>('tableFilterFocusRequest', null)
+if (tableFilterFocusRequest) {
+  tableFilterFocusRequest.value = () => {
+    // Try to focus any filter input in the table
+    const filterInput = document.querySelector('input[type="search"], input[placeholder*="filter" i]') as HTMLInputElement
+    if (filterInput) {
+      filterInput.focus()
+    }
+  }
+}
 
 // Computed property for quick add field definitions based on selected view
 const quickAddFieldDefs = computed(() => {
@@ -924,11 +942,245 @@ function toggleSelectAll() {
   }
 }
 
-onMounted(load)
-onMounted(loadStructure)
-onMounted(loadTableViews)
-onMounted(loadForeignKeys)
-onMounted(loadConditionalFormattingRules)
+// Table navigation functions
+function navigateToCell(rowIndex: number, columnIndex: number) {
+  if (rowIndex >= 0 && rowIndex < pagedItems.value.length) {
+    currentRowIndex.value = rowIndex
+    if (columnIndex >= 0 && columnIndex < visibleColumns.value.length) {
+      currentColumnIndex.value = columnIndex
+    }
+    // Scroll the cell into view
+    nextTick(() => {
+      const cell = document.querySelector(`tbody tr:nth-child(${rowIndex + 1}) td:nth-child(${columnIndex + 2})`) as HTMLElement
+      if (cell) {
+        cell.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      }
+    })
+  }
+}
+
+function navigateUp() {
+  if (currentRowIndex.value === null) {
+    currentRowIndex.value = 0
+    currentColumnIndex.value = 0
+  } else if (currentRowIndex.value > 0) {
+    navigateToCell(currentRowIndex.value - 1, currentColumnIndex.value ?? 0)
+  }
+}
+
+function navigateDown() {
+  if (currentRowIndex.value === null) {
+    currentRowIndex.value = 0
+    currentColumnIndex.value = 0
+  } else if (currentRowIndex.value < pagedItems.value.length - 1) {
+    navigateToCell(currentRowIndex.value + 1, currentColumnIndex.value ?? 0)
+  }
+}
+
+function navigateLeft() {
+  if (currentColumnIndex.value === null || currentColumnIndex.value === 0) {
+    return
+  }
+  navigateToCell(currentRowIndex.value ?? 0, currentColumnIndex.value - 1)
+}
+
+function navigateRight() {
+  if (currentColumnIndex.value === null) {
+    currentColumnIndex.value = 0
+  } else if (currentColumnIndex.value < visibleColumns.value.length - 1) {
+    navigateToCell(currentRowIndex.value ?? 0, currentColumnIndex.value + 1)
+  }
+}
+
+function navigateNext() {
+  if (currentColumnIndex.value === null) {
+    currentColumnIndex.value = 0
+    currentRowIndex.value = 0
+  } else if (currentColumnIndex.value < visibleColumns.value.length - 1) {
+    navigateRight()
+  } else if (currentRowIndex.value !== null && currentRowIndex.value < pagedItems.value.length - 1) {
+    navigateToCell(currentRowIndex.value + 1, 0)
+  }
+}
+
+function navigatePrevious() {
+  if (currentColumnIndex.value === null || currentColumnIndex.value === 0) {
+    if (currentRowIndex.value !== null && currentRowIndex.value > 0) {
+      navigateToCell(currentRowIndex.value - 1, visibleColumns.value.length - 1)
+    }
+  } else {
+    navigateLeft()
+  }
+}
+
+function editCurrentCell() {
+  if (currentRowIndex.value !== null && currentColumnIndex.value !== null) {
+    const item = pagedItems.value[currentRowIndex.value]
+    const column = visibleColumns.value[currentColumnIndex.value]
+    if (item && column) {
+      startEdit(item, column)
+    }
+  }
+}
+
+function handleDeleteKey() {
+  if (selectedKeys.value.size > 0) {
+    confirmDeleteSelected()
+  }
+}
+
+// Handle Ctrl+Click and Shift+Click for multi-select
+function handleRowClick(item: any, event: MouseEvent) {
+  const key = keyOf(item)
+  if (key === '') return
+
+  if (event.ctrlKey || event.metaKey) {
+    // Multi-select: toggle this row
+    if (selectedKeys.value.has(key)) {
+      selectedKeys.value.delete(key)
+    } else {
+      selectedKeys.value.add(key)
+    }
+    lastSelectedRowIndex.value = pagedItems.value.findIndex(it => keyOf(it) === key)
+  } else if (event.shiftKey && lastSelectedRowIndex.value !== null) {
+    // Range select: select from last selected to current
+    const currentIndex = pagedItems.value.findIndex(it => keyOf(it) === key)
+    if (currentIndex !== -1) {
+      const start = Math.min(lastSelectedRowIndex.value, currentIndex)
+      const end = Math.max(lastSelectedRowIndex.value, currentIndex)
+      for (let i = start; i <= end; i++) {
+        const itemKey = keyOf(pagedItems.value[i])
+        if (itemKey !== '') {
+          selectedKeys.value.add(itemKey)
+        }
+      }
+    }
+  } else {
+    // Single select: clear and select this row
+    selectedKeys.value.clear()
+    selectedKeys.value.add(key)
+    lastSelectedRowIndex.value = pagedItems.value.findIndex(it => keyOf(it) === key)
+  }
+}
+
+// Table keyboard shortcuts
+const tableShortcuts = ref<KeyboardShortcut[]>([
+  {
+    key: 'ArrowUp',
+    handler: (e) => {
+      if (!editingCell.value) {
+        e.preventDefault()
+        navigateUp()
+      }
+    },
+    description: 'Navigate to previous row'
+  },
+  {
+    key: 'ArrowDown',
+    handler: (e) => {
+      if (!editingCell.value) {
+        e.preventDefault()
+        navigateDown()
+      }
+    },
+    description: 'Navigate to next row'
+  },
+  {
+    key: 'ArrowLeft',
+    handler: (e) => {
+      if (!editingCell.value) {
+        e.preventDefault()
+        navigateLeft()
+      }
+    },
+    description: 'Navigate to previous column'
+  },
+  {
+    key: 'ArrowRight',
+    handler: (e) => {
+      if (!editingCell.value) {
+        e.preventDefault()
+        navigateRight()
+      }
+    },
+    description: 'Navigate to next column'
+  },
+  {
+    key: 'Tab',
+    handler: (e) => {
+      if (!editingCell.value) {
+        e.preventDefault()
+        if (e.shiftKey) {
+          navigatePrevious()
+        } else {
+          navigateNext()
+        }
+      }
+    },
+    description: 'Navigate to next/previous cell'
+  },
+  {
+    key: 'Enter',
+    handler: (e) => {
+      if (!editingCell.value && currentRowIndex.value !== null && currentColumnIndex.value !== null) {
+        e.preventDefault()
+        editCurrentCell()
+      }
+    },
+    description: 'Edit current cell'
+  },
+  {
+    key: 'Delete',
+    handler: (e) => {
+      if (!editingCell.value) {
+        e.preventDefault()
+        handleDeleteKey()
+      }
+    },
+    description: 'Delete selected rows'
+  },
+  {
+    key: 'Backspace',
+    handler: (e) => {
+      if (!editingCell.value) {
+        e.preventDefault()
+        handleDeleteKey()
+      }
+    },
+    description: 'Delete selected rows'
+  },
+])
+
+useKeyboardShortcuts(tableShortcuts)
+
+// Listen for global events
+function handleOpenQuickAdd() {
+  openQuickAddDialog()
+}
+
+function handleSaveCurrentEdit() {
+  if (editingCell.value) {
+    const item = items.value.find(it => String(it.id) === editingCell.value!.rowId)
+    if (item) {
+      saveEdit(item)
+    }
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('open-quick-add', handleOpenQuickAdd)
+  window.addEventListener('save-current-edit', handleSaveCurrentEdit)
+  load()
+  loadStructure()
+  loadTableViews()
+  loadForeignKeys()
+  loadConditionalFormattingRules()
+})
+
+onUnmounted(() => {
+  window.removeEventListener('open-quick-add', handleOpenQuickAdd)
+  window.removeEventListener('save-current-edit', handleSaveCurrentEdit)
+})
 </script>
 
 <template>
@@ -1039,10 +1291,12 @@ onMounted(loadConditionalFormattingRules)
           </tr>
         </thead>
         <tbody>
-          <tr v-for="it in pagedItems" :key="String((it as any).id ?? Math.random())"
-            :class="{ selected: isSelected(it) }">
+          <tr v-for="(it, rowIdx) in pagedItems" :key="String((it as any).id ?? Math.random())"
+            :class="{ selected: isSelected(it), 'current-row': currentRowIndex === rowIdx }"
+            @click="(e) => handleRowClick(it, e)"
+            @mousedown="currentRowIndex = rowIdx; currentColumnIndex = 0">
             <td class = "small">
-              <input type="checkbox" :checked="isSelected(it)" @change="(e) => toggleSelected(it, e)" />
+              <input type="checkbox" :checked="isSelected(it)" @change="(e) => toggleSelected(it, e)" @click.stop />
             </td>
             <td v-for="col in visibleColumns" :key="col" :style="applyConditionalFormatting(col, getItemValue(it, col), it).styles">
               <!-- Inline editing input -->
@@ -1375,6 +1629,14 @@ onMounted(loadConditionalFormattingRules)
 .no-items {
   padding: .75rem;
   color: #666;
+}
+
+.current-row {
+  background-color: #e3f2fd !important;
+}
+
+.current-row td {
+  background-color: #e3f2fd !important;
 }
 
 .selected {
