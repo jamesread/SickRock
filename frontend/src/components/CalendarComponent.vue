@@ -656,6 +656,16 @@ onMounted(load)
 </template>
 
 <style scoped>
+
+.event-title {
+  font-weight: bold;
+}
+
+.event-time {
+  font-size: 0.8em;
+  color: #666;
+}
+
 .date-picker-container {
   display: flex;
   align-items: center;

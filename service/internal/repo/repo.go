@@ -208,6 +208,8 @@ type NavigationItem struct {
 	DashboardID        sql.NullInt64
 	DashboardName      sql.NullString
 	Navigation         sql.NullString
+	WorkflowID         sql.NullInt64
+	WorkflowName       sql.NullString
 }
 
 func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error) {
@@ -222,10 +224,13 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
             tc.view as table_view,
             tn.dashboard_id as dashboard_id,
             td.name as dashboard_name,
-            tn.name as navigation
+            tn.name as navigation,
+            tn.workflow_id as workflow_id,
+            tw.name as workflow_name
 		FROM table_navigation tn
 		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
         LEFT JOIN table_dashboards td ON tn.dashboard_id = td.id
+        LEFT JOIN table_workflows tw ON tn.workflow_id = tw.id
 		ORDER BY tn.ordinal ASC, tc.name ASC
 	`
 
@@ -249,6 +254,8 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			&item.DashboardID,
 			&item.DashboardName,
 			&item.Navigation,
+			&item.WorkflowID,
+			&item.WorkflowName,
 		); err != nil {
 			return nil, err
 		}
@@ -256,6 +263,47 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 	}
 
 	return items, rows.Err()
+}
+
+type Workflow struct {
+	ID      int
+	Name    string
+	Ordinal int
+	Icon    sql.NullString
+}
+
+func (r *Repository) GetWorkflows(ctx context.Context) ([]Workflow, error) {
+	query := `
+		SELECT
+			id,
+			name,
+			ordinal,
+			icon
+		FROM table_workflows
+		ORDER BY ordinal ASC, name ASC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var workflows []Workflow
+	for rows.Next() {
+		var workflow Workflow
+		if err := rows.Scan(
+			&workflow.ID,
+			&workflow.Name,
+			&workflow.Ordinal,
+			&workflow.Icon,
+		); err != nil {
+			return nil, err
+		}
+		workflows = append(workflows, workflow)
+	}
+
+	return workflows, rows.Err()
 }
 
 type User struct {
@@ -641,15 +689,21 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 		sortColumn = "id"
 	}
 
-	// Build WHERE clause from provided filters (exact match)
+	// Build WHERE clause from provided filters.
+	// If a value contains '%' we treat it as a LIKE pattern for server-assisted contains search.
 	var whereClause string
 	var args []interface{}
 	if len(where) > 0 {
 		parts := make([]string, 0, len(where))
 		for k, v := range where {
 			col := sanitizeDatabaseIdentifier(k)
-			parts = append(parts, fmt.Sprintf("`%s` = ?", col))
-			args = append(args, v)
+			if strings.Contains(v, "%") {
+				parts = append(parts, fmt.Sprintf("`%s` LIKE ?", col))
+				args = append(args, v)
+			} else {
+				parts = append(parts, fmt.Sprintf("`%s` = ?", col))
+				args = append(args, v)
+			}
 		}
 		whereClause = " WHERE " + strings.Join(parts, " AND ")
 	}
@@ -988,8 +1042,42 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 	for fieldName, fieldValue := range additionalFields {
 		// Sanitize field name to prevent SQL injection
 		sanitizedFieldName := sanitizeDatabaseIdentifier(fieldName)
-		setParts = append(setParts, fmt.Sprintf("`%s` = ?", sanitizedFieldName))
-		args = append(args, fieldValue)
+
+		// Check if this field is nullable and if the value is empty or "0"
+		// If so, set it to NULL instead of the empty string
+		shouldSetNull := false
+
+		// Special handling for workflow_id (nullable foreign key)
+		if fieldName == "workflow_id" && (fieldValue == "" || fieldValue == "0") {
+			shouldSetNull = true
+		} else {
+			// Check column metadata for other nullable fields
+			var col *FieldSpec
+			for i := range columns {
+				// Try exact match first
+				if columns[i].Name == fieldName {
+					col = &columns[i]
+					break
+				}
+				// Try case-insensitive match
+				if strings.EqualFold(columns[i].Name, fieldName) {
+					col = &columns[i]
+					break
+				}
+			}
+
+			// If field is nullable and value is empty or "0", set to NULL
+			if col != nil && !col.Required && (fieldValue == "" || fieldValue == "0") {
+				shouldSetNull = true
+			}
+		}
+
+		if shouldSetNull {
+			setParts = append(setParts, fmt.Sprintf("`%s` = NULL", sanitizedFieldName))
+		} else {
+			setParts = append(setParts, fmt.Sprintf("`%s` = ?", sanitizedFieldName))
+			args = append(args, fieldValue)
+		}
 	}
 
 	// Ensure we have at least one field to update

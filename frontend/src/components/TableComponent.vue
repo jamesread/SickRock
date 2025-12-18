@@ -77,10 +77,10 @@ const sectionTitle = computed(() => {
   return props.title || `Table: ${props.tableId}`
 })
 
-// Computed property for view options (including default)
+// Computed property for view options (including default) for other parts of the UI
 const viewOptions = computed(() => {
   const options = [...tableViews.value]
-  // Add a default option if no views exist or if we want to show "All Columns"
+  // Preserve previous behavior: only inject synthetic "All Columns" when no view is marked default
   if (options.length === 0 || !options.some(v => v.isDefault)) {
     options.unshift({
       id: -1,
@@ -91,6 +91,20 @@ const viewOptions = computed(() => {
     })
   }
   return options
+})
+
+// Dedicated list for the Views dialog: always show "All Columns" plus every saved view
+const viewsForDialog = computed(() => {
+  return [
+    {
+      id: -1,
+      tableName: props.tableId,
+      viewName: 'All Columns',
+      isDefault: !tableViews.value.length || !!defaultView.value,
+      columns: []
+    },
+    ...tableViews.value
+  ]
 })
 
 type Item = Record<string, unknown>
@@ -213,21 +227,39 @@ function onViewChange() {
   // This will trigger reactivity in the column configuration
   const view = currentView.value
   console.log('[Table] View changed to:', selectedViewId.value, view?.viewName)
-  if (view) {
-    const ordered = view.columns
-      .slice()
-      .sort((a, b) => a.columnOrder - b.columnOrder)
-      .map(c => ({ column: c.columnName, order: c.columnOrder, isVisible: c.isVisible, sort: c.sortOrder }))
-    console.log('[Table] View column order:', ordered)
 
-    // Apply sort from the selected view on change
-    const sortColumn = view.columns.find(c => c.sortOrder === 'asc' || c.sortOrder === 'desc')
-    if (sortColumn) {
-      sortBy.value = sortColumn.columnName
-      sortDir.value = (sortColumn.sortOrder === 'desc' ? 'desc' : 'asc')
-      console.log('[Table] Applied sort from changed view:', sortBy.value, sortDir.value)
-    }
+  // If no view (e.g. "All Columns" option), reset to all fields
+  if (!view) {
+    const allNames = localFieldDefs.value.map(f => f.name)
+    localFields.value = allNames
+    selectedColumns.value = [...allNames]
+    sortBy.value = null
+    sortDir.value = 'asc'
+    console.log('[Table] Reset to All Columns view')
+    return
   }
+
+  const ordered = view.columns
+    .slice()
+    .sort((a, b) => a.columnOrder - b.columnOrder)
+    .map(c => ({ column: c.columnName, order: c.columnOrder, isVisible: c.isVisible, sort: c.sortOrder }))
+  console.log('[Table] View column order:', ordered)
+
+  // Apply sort from the selected view on change
+  const sortColumn = view.columns.find(c => c.sortOrder === 'asc' || c.sortOrder === 'desc')
+  if (sortColumn) {
+    sortBy.value = sortColumn.columnName
+    sortDir.value = (sortColumn.sortOrder === 'desc' ? 'desc' : 'asc')
+    console.log('[Table] Applied sort from changed view:', sortBy.value, sortDir.value)
+  }
+}
+
+function selectView(viewId: number) {
+  selectedViewId.value = viewId
+  nextTick(() => {
+    onViewChange()
+  })
+  closeViewsDialog()
 }
 
 function createTableView() {
@@ -257,6 +289,19 @@ const visibleColumns = computed(() =>
 
 const sortBy = ref<string | null>(null)
 const sortDir = ref<'asc' | 'desc'>('asc')
+const columnMenu = ref<{ visible: boolean; x: number; y: number; column: string | null }>({
+  visible: false,
+  x: 0,
+  y: 0,
+  column: null,
+})
+const columnFilters = ref<Record<string, string>>({})
+const columnFilterInput = ref('')
+const hasFilters = computed(() => Object.keys(columnFilters.value).length > 0)
+function isColumnFiltered(col: string) {
+  return !!columnFilters.value[col]
+}
+const showViewsDialog = ref(false)
 
 // Natural sort function for alphanumeric strings
 function naturalSort(a: string, b: string): number {
@@ -303,6 +348,74 @@ function toggleSort(col: string) {
     sortBy.value = col
     sortDir.value = 'asc'
   }
+}
+
+function sortAscending(col: string) {
+  sortBy.value = col
+  sortDir.value = 'asc'
+  hideColumnMenu()
+}
+
+function sortDescending(col: string) {
+  sortBy.value = col
+  sortDir.value = 'desc'
+  hideColumnMenu()
+}
+
+function showColumnMenu(event: MouseEvent, col: string) {
+  event.preventDefault()
+  columnMenu.value = {
+    visible: true,
+    x: event.clientX,
+    y: event.clientY,
+    column: col,
+  }
+  const current = columnFilters.value[col] ?? ''
+  // Strip surrounding wildcards for a cleaner input display
+  columnFilterInput.value = current.replace(/^%/, '').replace(/%$/, '')
+}
+
+function hideColumnMenu() {
+  columnMenu.value = { visible: false, x: 0, y: 0, column: null }
+}
+
+async function applyColumnFilter() {
+  if (!columnMenu.value.column) return
+  const col = columnMenu.value.column
+  const value = columnFilterInput.value.trim()
+  if (value) {
+    // Wrap with wildcards so the server performs a contains match
+    columnFilters.value = { ...columnFilters.value, [col]: `%${value}%` }
+  } else {
+    const { [col]: _, ...rest } = columnFilters.value
+    columnFilters.value = rest
+  }
+  hideColumnMenu()
+  await load()
+}
+
+async function clearAllFilters() {
+  columnFilters.value = {}
+  await load()
+}
+
+async function clearColumnFilter(col: string | null) {
+  if (!col || !columnFilters.value[col]) {
+    hideColumnMenu()
+    return
+  }
+  const { [col]: _, ...rest } = columnFilters.value
+  columnFilters.value = rest
+  hideColumnMenu()
+  await load()
+}
+
+function openViewsDialog() {
+  showViewsDialog.value = true
+}
+
+function closeViewsDialog() {
+  showViewsDialog.value = false
 }
 const sortedItems = computed(() => {
   const col = sortBy.value
@@ -589,7 +702,15 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await client.listItems({ tcName: props.tableId })
+    const where: Record<string, string> = {}
+    Object.entries(columnFilters.value).forEach(([k, v]) => {
+      if (v && v.trim() !== '') {
+        // If the value already includes % assume caller set it; otherwise wrap.
+        const hasWildcard = v.includes('%')
+        where[k] = hasWildcard ? v : `%${v}%`
+      }
+    })
+    const res = await client.listItems({ tcName: props.tableId, where })
     items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
   } catch (e) {
     error.value = String(e)
@@ -1187,34 +1308,14 @@ onUnmounted(() => {
   <Section :title="sectionTitle" :padding="false">
     <template v-if="showToolbar" #toolbar>
       <div class="toolbar-group">
-        <div v-if="showViewSwitcher" class="view-selector">
-          <label for="view-select" class="ss-large">View:</label>
-          <select
-            id="view-select"
-            v-model="selectedViewId"
-            @change="onViewChange"
-            class="view-dropdown"
-          >
-            <option
-              v-for="view in viewOptions"
-              :key="view.id"
-              :value="view.id"
-            >
-              {{ view.viewName }}
-            </option>
-          </select>
-        </div>
         <button
-          v-if="showViewEdit && currentView && currentView.id !== -1"
-          @click="editTableView"
+          v-if="showViewSwitcher || showViewEdit || showViewCreate"
+          @click="openViewsDialog"
           class="button neutral ss-large"
+          title="Manage views"
         >
-          <HugeiconsIcon :icon="Edit03Icon" />
-          Edit View
-        </button>
-        <button v-if="showViewCreate && showViewSwitcher" @click="createTableView" class="button neutral ss-large">
-          <HugeiconsIcon :icon="ViewIcon" />
-          Create View
+          <HugeiconsIcon :icon="Settings01Icon" />
+          Views
         </button>
         <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button neutral ss-large">
           <HugeiconsIcon :icon="Download01Icon" />
@@ -1240,22 +1341,68 @@ onUnmounted(() => {
     </template>
     <div v-if="error" class="error">{{ error }}</div>
     <div v-else-if="loading">Loading…</div>
-    <div v-else-if="items.length === 0" class="empty-state">
-      <div class="empty-state-content">
-        <div class="empty-state-icon">📋</div>
-        <h3>No items in this table</h3>
-        <p>This table is empty. Get started by adding your first item.</p>
-        <router-link class="button" :to="`/table/${props.tableId}/insert-row`">
-          ➕ Insert First Item
-        </router-link>
-        <div class="empty-state-actions">
-          <router-link class="button" :to="`/table/${props.tableId}/add-column`">
-            Add Column
+    <div v-else>
+      <div v-if="items.length === 0 && hasFilters" class="filtered-empty-wrapper">
+        <table class="table row-hover">
+          <colgroup>
+            <col class="checkbox-col">
+            <col v-for="col in visibleColumns" :key="col" :class="{ 'id-col': col === 'id' }">
+            <col class="actions-col">
+          </colgroup>
+          <thead>
+            <tr>
+              <th class="small">
+                <input
+                  type="checkbox"
+                  :checked="isAllSelected"
+                  :indeterminate="isIndeterminate"
+                  @change="toggleSelectAll"
+                />
+              </th>
+              <th
+                v-for="col in visibleColumns"
+                :key="col"
+                @click="toggleSort(col)"
+                @contextmenu="(e) => showColumnMenu(e, col)"
+                :title="getColumnType(col)"
+                :class="{ small: col === 'id' }"
+              >
+                {{ getColumnLabel(col) }}<span v-if="sortBy === col"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+                <span v-if="isColumnFiltered(col)" class="filter-indicator" title="Filter applied">●</span>
+              </th>
+              <th>
+                <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td :colspan="visibleColumns.length + 2" class="filtered-empty">
+                <div class="filtered-empty-message">
+                  <div>No items match this filter.</div>
+                  <button class="button" @click="clearAllFilters">Clear filters</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else-if="items.length === 0" class="empty-state">
+        <div class="empty-state-content">
+          <div class="empty-state-icon">📋</div>
+          <h3>No items in this table</h3>
+          <p>This table is empty. Get started by adding your first item.</p>
+          <router-link class="button" :to="`/table/${props.tableId}/insert-row`">
+            ➕ Insert First Item
           </router-link>
+          <div class="empty-state-actions">
+            <router-link class="button" :to="`/table/${props.tableId}/add-column`">
+              Add Column
+            </router-link>
+          </div>
         </div>
       </div>
-    </div>
-    <div v-else class="section-content">
+      <div v-else class="section-content">
       <!-- Selection controls -->
       <div v-if="pagedItems.length > 0 && hasSelectedItems" class="selection-controls padding">
         <button
@@ -1282,8 +1429,16 @@ onUnmounted(() => {
                 @change="toggleSelectAll"
               />
             </th>
-            <th v-for="col in visibleColumns" :key="col" @click="toggleSort(col)" :title="getColumnType(col)" :class="{ small: col === 'id' }">
+            <th
+              v-for="col in visibleColumns"
+              :key="col"
+              @click="toggleSort(col)"
+              @contextmenu="(e) => showColumnMenu(e, col)"
+              :title="getColumnType(col)"
+              :class="{ small: col === 'id' }"
+            >
               {{ getColumnLabel(col) }}<span v-if="sortBy === col"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span>
+              <span v-if="isColumnFiltered(col)" class="filter-indicator" title="Filter applied">●</span>
             </th>
             <th>
               <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
@@ -1397,6 +1552,53 @@ onUnmounted(() => {
 		  />
 	  </div>
     </div>
+    </div>
+
+    <!-- Views Dialog -->
+    <div v-if="showViewsDialog" class="modal-overlay" @click="closeViewsDialog" @keydown.escape="closeViewsDialog" tabindex="0">
+      <div class="modal-content views-modal" @click.stop>
+        <div class="modal-header">
+          <div class="modal-header-left">
+            <h3>Views</h3>
+          </div>
+          <button @click="closeViewsDialog" class="button neutral" title="Close">
+            ✕
+          </button>
+        </div>
+        <div class="modal-body views-body">
+          <div class="views-list">
+            <div
+              v-for="view in viewsForDialog"
+              :key="view.id"
+              class="view-row"
+              :class="{ active: selectedViewId === view.id }"
+              @click="selectView(view.id)"
+            >
+              <div class="view-name">{{ view.viewName }}</div>
+              <div class="view-meta" v-if="view.isDefault">Default</div>
+            </div>
+          </div>
+          <div class="views-actions">
+            <button
+              v-if="showViewCreate"
+              class="button primary"
+              @click="() => { closeViewsDialog(); createTableView(); }"
+            >
+              <HugeiconsIcon :icon="Add01Icon" />
+              Create View
+            </button>
+            <button
+              v-if="showViewEdit && currentView && currentView.id !== -1"
+              class="button neutral"
+              @click="() => { closeViewsDialog(); editTableView(); }"
+            >
+              <HugeiconsIcon :icon="Edit03Icon" />
+              Edit View
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Bulk Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDeleteSelected">
@@ -1459,6 +1661,38 @@ onUnmounted(() => {
       </div>
     </div>
   </Section>
+
+  <!-- Column context menu -->
+  <div
+    v-if="columnMenu.visible && columnMenu.column"
+    class="column-context-menu"
+    :style="{ left: columnMenu.x + 'px', top: columnMenu.y + 'px' }"
+    @click="hideColumnMenu"
+  >
+    <button class="menu-item" @click.stop="sortAscending(columnMenu.column)">Sort Ascending</button>
+    <button class="menu-item" @click.stop="sortDescending(columnMenu.column)">Sort Descending</button>
+    <button
+      v-if="columnMenu.column && columnFilters[columnMenu.column]"
+      class="menu-item"
+      @click.stop="clearColumnFilter(columnMenu.column)"
+    >
+      Clear Filter
+    </button>
+    <div class="menu-separator"></div>
+    <div class="menu-filter">
+      <label>Filter</label>
+      <input
+        type="text"
+        v-model="columnFilterInput"
+        placeholder="Contains…"
+        @keyup.enter="applyColumnFilter"
+        @click.stop
+      />
+      <div class="filter-actions">
+        <button class="btn small" @click.stop="applyColumnFilter">Apply</button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -2254,6 +2488,170 @@ onUnmounted(() => {
 
 .markdown-content em {
   font-style: italic;
+}
+
+/* Column context menu */
+.column-context-menu {
+  position: fixed;
+  background: white;
+  border: 1px solid #e9ecef;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 4px 0;
+}
+
+.column-context-menu .menu-item {
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  text-align: left;
+  width: 100%;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.column-context-menu .menu-item:hover {
+  background: #f6f7fb;
+}
+
+.filter-indicator {
+  color: #007bff;
+  margin-left: 6px;
+  font-size: 10px;
+  vertical-align: middle;
+}
+
+.column-context-menu .menu-separator {
+  height: 1px;
+  background: #e9ecef;
+  margin: 4px 0;
+}
+
+.column-context-menu .menu-filter {
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.column-context-menu .menu-filter label {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.column-context-menu .menu-filter input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.column-context-menu .menu-filter input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
+}
+
+.column-context-menu .filter-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.column-context-menu .btn.small {
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid #007bff;
+  background: #007bff;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.column-context-menu .btn.small:hover {
+  background: #0056b3;
+}
+
+.filter-indicator {
+  color: #007bff;
+  margin-left: 6px;
+  font-size: 10px;
+  vertical-align: middle;
+}
+
+.filtered-empty-wrapper {
+  padding: 1rem;
+}
+
+.filtered-empty {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+}
+
+.filtered-empty .button {
+  margin-top: 8px;
+}
+
+.views-modal {
+  max-width: 520px;
+  width: 100%;
+}
+
+.views-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.views-list {
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid #f1f3f5;
+  transition: background 0.15s;
+}
+
+.view-row:last-child {
+  border-bottom: none;
+}
+
+.view-row:hover {
+  background: #f8f9fb;
+}
+
+.view-row.active {
+  background: #e7f3ff;
+  border-left: 3px solid #007bff;
+}
+
+.view-name {
+  font-weight: 600;
+  color: #212529;
+}
+
+.view-meta {
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.views-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 </style>

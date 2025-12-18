@@ -21,6 +21,7 @@ import DatabaseBrowser from './views/DatabaseBrowser.vue'
 import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
 import DashboardListView from './views/DashboardListView.vue'
 import Dashboard from './views/Dashboard.vue'
+import WorkflowView from './views/WorkflowView.vue'
 import UserPreferences from './views/UserPreferences.vue'
 import { useAuthStore } from './stores/auth'
 
@@ -68,6 +69,18 @@ const router = createRouter({
         breadcrumbs: (route: any) => [
           { name: 'Dashboards', href: { name: 'dashboards' } },
           { name: String(route.params.dashboardName) },
+        ],
+      },
+    },
+    {
+      path: '/workflow/:workflowId',
+      name: 'workflow',
+      component: WorkflowView,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: () => [
+          { name: 'Workflow' },
         ],
       },
     },

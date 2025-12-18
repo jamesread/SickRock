@@ -18,6 +18,7 @@ import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
 const sidebar = ref(null)
 const isSidebarOpen = ref(true)
 const SIDEBAR_STATE_KEY = 'sickrock_sidebar_open'
+const PINNED_WORKFLOW_KEY = 'sickrock_pinned_workflow'
 const router = useRouter()
 const authStore = useAuthStore()
 
@@ -31,6 +32,14 @@ provide('apiClient', apiClient)
 function persistSidebarState() {
     try { localStorage.setItem(SIDEBAR_STATE_KEY, isSidebarOpen.value ? '1' : '0') } catch {}
 }
+
+// Keep sidebar state in sync with navigation (the Sidebar auto-closes on navigation,
+// so we mirror that in our local state to avoid the first toggle being a no-op).
+router.afterEach(() => {
+    isSidebarOpen.value = false
+    if (sidebar.value) sidebar.value.close()
+    persistSidebarState()
+})
 
 function toggleSidebar() {
     isSidebarOpen.value = !isSidebarOpen.value
@@ -66,8 +75,16 @@ const bookmarks = ref<Array<{
   };
 }>>([])
 
-// Toggle state for header toolbar
-const showBookmarks = ref(true) // Default to bookmarks view
+// Pinned workflow in header
+const pinnedWorkflowId = ref<number | null>(null)
+const pinnedWorkflowName = ref<string | null>(null)
+const pinnedWorkflowItems = ref<Array<{ id: number; title: string; path: string; icon: any }>>([])
+
+// Toggle state for bookmark dropdown
+const showBookmarks = ref(false)
+
+// QuickSearch dialog visibility
+const showQuickSearchDialog = ref(false)
 
 // Keyboard shortcuts state
 const showShortcutsHelp = ref(false)
@@ -133,6 +150,34 @@ async function loadAppData() {
             })
             .filter(pg => !!pg.slug)
 
+        // Build pinned workflow quick links, if any
+        pinnedWorkflowId.value = null
+        pinnedWorkflowName.value = null
+        pinnedWorkflowItems.value = []
+        let storedPinned: string | null = null
+        try {
+            storedPinned = localStorage.getItem(PINNED_WORKFLOW_KEY)
+        } catch {
+            storedPinned = null
+        }
+        if (storedPinned) {
+            const workflows = (navResponse as any).workflows || []
+            const wf = workflows.find((w: any) => (w.name || '') === storedPinned)
+            if (wf && wf.items && wf.items.length) {
+                pinnedWorkflowId.value = wf.id
+                pinnedWorkflowName.value = wf.name || storedPinned
+                pinnedWorkflowItems.value = (wf.items as any[]).map((item: any) => {
+                    const title = item.title || item.tableTitle || item.tableName || String(item.id)
+                    const path = item.dashboardId > 0
+                        ? `/dashboard/${item.dashboardName}`
+                        : `/table/${item.tableName}`
+                    const iconName = item.icon || 'DatabaseIcon'
+                    const icon = (Hugeicons as any)[iconName] || DatabaseIcon
+                    return { id: item.id, title, path, icon }
+                })
+            }
+        }
+
         sidebar.value.clearNavigationLinks()
         if (quickSearch.value) {
             quickSearch.value.clearItems()
@@ -160,6 +205,37 @@ async function loadAppData() {
             })
         }
 
+        // Add workflows to sidebar and quick search (if present)
+        const workflows = (navResponse as any).workflows || []
+        const sortedWorkflows = [...workflows].sort((a: any, b: any) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+
+        sortedWorkflows.forEach((workflow: any) => {
+            const workflowIconName = workflow.icon || 'DatabaseIcon'
+            const workflowIcon = (Hugeicons as any)[workflowIconName] || DatabaseIcon
+            const workflowPath = `/workflow/${workflow.id}`
+
+            sidebar.value?.addNavigationLink({
+                id: `workflow-${workflow.id}`,
+                name: workflow.name || '',
+                title: workflow.name || '',
+                path: workflowPath,
+                icon: workflowIcon
+            })
+
+            if (quickSearch.value) {
+                quickSearch.value.addItem({
+                    id: `workflow-${workflow.id}`,
+                    name: workflow.name || '',
+                    title: workflow.name || '',
+                    description: `Workflow with ${workflow.items?.length || 0} items`,
+                    category: 'Workflows',
+                    path: workflowPath,
+                    type: 'route',
+                    icon: workflowIcon
+                })
+            }
+        })
+
         pages.value.forEach(pg => {
             const icon = Hugeicons[pg.icon] || DatabaseIcon
 
@@ -177,7 +253,7 @@ async function loadAppData() {
                 title: pg.title,
                 description: 'Table: ' + pg.title,
                 category: 'Navigation',
-                path: `/table/${pg.id}`,
+                path: pg.path,
                 type: 'route',
                 icon: icon
             })
@@ -199,15 +275,82 @@ async function loadAppData() {
 
         if (sidebar.value) {
             sidebar.value.addSeparator()
+
+            // Table configurations
             sidebar.value.addNavigationLink({
                 id: 'table-configurations',
-                name: 'Table Configurations', title: 'Table Configurations', path: '/table/table_configurations', icon: DatabaseSettingIcon })
+                name: 'Table Configurations',
+                title: 'Table Configurations',
+                path: '/table/table_configurations',
+                icon: DatabaseSettingIcon
+            })
+            quickSearch.value?.addItem({
+                id: 'table-configurations',
+                name: 'Table Configurations',
+                title: 'Table Configurations',
+                description: 'Manage table configurations',
+                category: 'Navigation',
+                path: '/table/table_configurations',
+                type: 'route',
+                icon: DatabaseSettingIcon
+            })
+
+            // Navigation items
             sidebar.value.addNavigationLink({
                 id: 'nav-items',
-                name: 'Navigation', title: 'Navigation', path: '/table/table_navigation', icon: DatabaseSettingIcon })
+                name: 'Navigation',
+                title: 'Navigation',
+                path: '/table/table_navigation',
+                icon: DatabaseSettingIcon
+            })
+            quickSearch.value?.addItem({
+                id: 'nav-items',
+                name: 'Navigation',
+                title: 'Navigation',
+                description: 'Manage navigation items',
+                category: 'Navigation',
+                path: '/table/table_navigation',
+                type: 'route',
+                icon: DatabaseSettingIcon
+            })
+
+            // Admin routes: table-create, control-panel, device-code-claimer
             sidebar.value.addRouterLink('table-create')
+            quickSearch.value?.addItem({
+                id: 'table-create',
+                name: 'Create Table',
+                title: 'Create Table',
+                description: 'Create a new table',
+                category: 'Navigation',
+                path: '/admin/table/create',
+                type: 'route',
+                icon: DatabaseSettingIcon
+            })
+
             sidebar.value.addRouterLink('control-panel')
+            quickSearch.value?.addItem({
+                id: 'control-panel',
+                name: 'Control Panel',
+                title: 'Control Panel',
+                description: 'Administrative control panel',
+                category: 'Navigation',
+                path: '/admin/control-panel',
+                type: 'route',
+                icon: DatabaseSettingIcon
+            })
+
             sidebar.value.addRouterLink('device-code-claimer')
+            quickSearch.value?.addItem({
+                id: 'device-code-claimer',
+                name: 'Device Code Claimer',
+                title: 'Device Code Claimer',
+                description: 'Complete device code authentication',
+                category: 'Navigation',
+                path: '/device-code-claimer',
+                type: 'route',
+                icon: DatabaseSettingIcon
+            })
+
             sidebar.value.addCallback('Logout', async () => { await handleLogout() }, LogoutIcon)
             sidebar.value.stick()
             // Restore sidebar state from localStorage (default open)
@@ -312,33 +455,22 @@ async function toggleCurrentPageBookmark() {
 }
 
 function toggleToolbarView() {
-    showBookmarks.value = !showBookmarks.value
+    // Use the toolbar button purely as a search trigger
+    focusQuickSearch()
 }
 
 // Keyboard shortcuts handlers
 function focusQuickSearch() {
-    // Switch to search view if showing bookmarks
-    if (showBookmarks.value) {
-        showBookmarks.value = false
-        nextTick(() => {
-            // Try to focus the QuickSearch input
-            const searchInput = document.querySelector('.quick-search input, [class*="quick-search"] input') as HTMLInputElement
-            if (searchInput) {
-                searchInput.focus()
-            } else if (quickSearch.value && typeof (quickSearch.value as any).focus === 'function') {
-                (quickSearch.value as any).focus()
-            }
-        })
-    } else {
-        nextTick(() => {
-            const searchInput = document.querySelector('.quick-search input, [class*="quick-search"] input') as HTMLInputElement
-            if (searchInput) {
-                searchInput.focus()
-            } else if (quickSearch.value && typeof (quickSearch.value as any).focus === 'function') {
-                (quickSearch.value as any).focus()
-            }
-        })
-    }
+    // Ensure the QuickSearch dialog is visible, then focus its input
+    showQuickSearchDialog.value = true
+    nextTick(() => {
+        const searchInput = document.querySelector('.quick-search input, [class*="quick-search"] input') as HTMLInputElement
+        if (searchInput) {
+            searchInput.focus()
+        } else if (quickSearch.value && typeof (quickSearch.value as any).focus === 'function') {
+            (quickSearch.value as any).focus()
+        }
+    })
 }
 
 function openQuickAdd() {
@@ -508,12 +640,6 @@ const shortcuts = ref<KeyboardShortcut[]>([
         description: 'Insert new row (open quick add)'
     },
     {
-        key: 'f',
-        ctrl: true,
-        handler: () => focusTableFilter(),
-        description: 'Focus table filter/search'
-    },
-    {
         key: 's',
         ctrl: true,
         handler: () => saveCurrentEdit(),
@@ -629,13 +755,21 @@ const handleAnyKeyAfterG = (e: KeyboardEvent) => {
     }
 }
 
-// Add global keydown listener for catch-all
+// Global listeners
 onMounted(() => {
     window.addEventListener('keydown', handleAnyKeyAfterG)
+    // Refresh header when pinned workflow changes (e.g., from HomeView)
+    window.addEventListener('pinned-workflow-changed', () => {
+        // Re-fetch navigation to rebuild pinnedWorkflow state
+        loadAppData()
+    })
 })
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleAnyKeyAfterG)
+    window.removeEventListener('pinned-workflow-changed', () => {
+        loadAppData()
+    })
 })
 
 useKeyboardShortcuts(shortcuts)
@@ -655,58 +789,47 @@ onMounted(async () => {
 
         <template #toolbar>
             <div class="toolbar-content">
-                <!-- Toggle Button -->
+                <!-- Search Button -->
                 <button
                     @click="toggleToolbarView"
                     class="toolbar-toggle-button"
-                    :title="showBookmarks ? 'Switch to Search' : 'Switch to Bookmarks'"
+                    title="Search"
                 >
-                    <HugeiconsIcon :icon="showBookmarks ? Hugeicons.SearchIcon : Hugeicons.BookmarkIcon" />
+                    <HugeiconsIcon :icon="Hugeicons.SearchIcon" />
                 </button>
 
-                <!-- Bookmarks List -->
-                <div v-if="showBookmarks" class="bookmarks-toolbar">
-                    <div v-if="bookmarks.length === 0" class="no-bookmarks-toolbar">
-                        No bookmarks yet
-                    </div>
-                    <div v-else class="bookmarks-list-toolbar">
+                <!-- Pinned workflow quick links, styled like bookmarks -->
+                <div v-if="pinnedWorkflowItems.length" class="pinned-workflow-toolbar">
+                    <router-link
+                        v-if="pinnedWorkflowId != null"
+                        :to="`/workflow/${pinnedWorkflowId}`"
+                        class="pinned-workflow-label"
+                        :title="pinnedWorkflowName || 'Workflow'"
+                    >
+                        <span class="pinned-workflow-label-text">{{ pinnedWorkflowName }}</span>
+                    </router-link>
+                    <span v-else class="pinned-workflow-label">
+                        <span class="pinned-workflow-label-text">{{ pinnedWorkflowName }}</span>
+                    </span>
+                    <div class="bookmarks-list-toolbar">
                         <router-link
-                            v-for="bookmark in bookmarks.slice(0, 5)"
-                            :key="bookmark.id"
-                            :to="bookmark.navigationItem?.dashboardId > 0
-                                ? `/dashboard/${bookmark.navigationItem.dashboardName}`
-                                : `/table/${bookmark.navigationItem?.tableName}`"
+                            v-for="item in pinnedWorkflowItems"
+                            :key="item.id"
+                            :to="item.path"
                             class="bookmark-toolbar-item"
-                            :title="bookmark.title || bookmark.navigationItem?.tableName"
+                            :title="item.title"
                         >
                             <HugeiconsIcon
-                                :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
-                                    ? (Hugeicons as any)[bookmark.navigationItem.icon]
-                                    : DatabaseIcon"
+                                :icon="item.icon"
                                 class="bookmark-toolbar-icon"
                             />
                             <span class="bookmark-toolbar-text">
-                                {{ bookmark.title || bookmark.navigationItem?.tableName }}
+                                {{ item.title }}
                             </span>
                         </router-link>
                     </div>
                 </div>
 
-                <!-- Search Component -->
-                <div v-if="!showBookmarks" class="search-toolbar">
-                    <QuickSearch
-                        ref="quickSearch"
-                        :search-fields="['title']"
-                    />
-                </div>
-
-                <!-- Hidden QuickSearch for initialization -->
-                <div v-else style="display: none;">
-                    <QuickSearch
-                        ref="quickSearch"
-                        :search-fields="['title']"
-                    />
-                </div>
             </div>
         </template>
 
@@ -719,7 +842,7 @@ onMounted(async () => {
                 <HugeiconsIcon :icon="Hugeicons.QuestionIcon" />
             </button>
             <button
-                @click="toggleCurrentPageBookmark"
+                @click="showBookmarks = !showBookmarks"
                 class="bookmark-button"
                 :class="{ 'bookmarked': isCurrentPageBookmarked }"
                 :title="isCurrentPageBookmarked ? 'Remove bookmark' : 'Add bookmark'"
@@ -747,6 +870,81 @@ onMounted(async () => {
                 <span>SickRock</span>
                 <span>{{ version }}</span>
             </footer>
+        </div>
+    </div>
+
+    <!-- QuickSearch Dialog -->
+    <div
+        v-if="showQuickSearchDialog"
+        class="modal-overlay"
+        @click="showQuickSearchDialog = false"
+        @keydown.escape="showQuickSearchDialog = false"
+        tabindex="0"
+    >
+        <div class="modal-content quicksearch-modal" @click.stop>
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <h3>Search</h3>
+                </div>
+                <button @click="showQuickSearchDialog = false" class="button neutral" title="Close">
+                    ✕
+                </button>
+            </div>
+            <div class="modal-body">
+                <QuickSearch
+                    ref="quickSearch"
+                    :search-fields="['title']"
+                />
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookmarks Dialog -->
+    <div
+        v-if="showBookmarks"
+        class="modal-overlay"
+        @click="showBookmarks = false"
+        @keydown.escape="showBookmarks = false"
+        tabindex="0"
+    >
+        <div class="modal-content bookmarks-modal" @click.stop>
+            <div class="modal-header">
+                <div class="modal-header-left">
+                    <h3>Bookmarks</h3>
+                </div>
+                <button @click="showBookmarks = false" class="button neutral" title="Close">
+                    ✕
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="bookmarks-toolbar">
+                    <div v-if="bookmarks.length === 0" class="no-bookmarks-toolbar">
+                        No bookmarks yet
+                    </div>
+                    <div v-else class="bookmarks-list-toolbar">
+                        <router-link
+                            v-for="bookmark in bookmarks.slice(0, 10)"
+                            :key="bookmark.id"
+                            :to="bookmark.navigationItem?.dashboardId > 0
+                                ? `/dashboard/${bookmark.navigationItem.dashboardName}`
+                                : `/table/${bookmark.navigationItem?.tableName}`"
+                            class="bookmark-toolbar-item"
+                            :title="bookmark.title || bookmark.navigationItem?.tableName"
+                            @click="showBookmarks = false"
+                        >
+                            <HugeiconsIcon
+                                :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
+                                    ? (Hugeicons as any)[bookmark.navigationItem.icon]
+                                    : DatabaseIcon"
+                                class="bookmark-toolbar-icon"
+                            />
+                            <span class="bookmark-toolbar-text">
+                                {{ bookmark.title || bookmark.navigationItem?.tableName }}
+                            </span>
+                        </router-link>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -858,6 +1056,7 @@ onMounted(async () => {
     display: flex;
     align-items: center;
     gap: 0.75rem;
+    position: relative;
 }
 
 .toolbar-toggle-button {
@@ -922,7 +1121,6 @@ onMounted(async () => {
     border-color: rgba(255, 255, 255, 0.3);
     color: white;
     text-decoration: none;
-    transform: translateY(-1px);
 }
 
 .bookmark-toolbar-icon {
@@ -934,6 +1132,140 @@ onMounted(async () => {
     max-width: 120px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Pinned workflow label inline style */
+.pinned-workflow-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pinned-workflow-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.75);
+    color: white;
+    text-decoration: none;
+    border: 1px solid rgba(15, 118, 110, 0.9);
+    font-size: 0.8rem;
+}
+
+.pinned-workflow-label-text {
+    font-weight: 500;
+}
+
+.pinned-workflow-label-badge {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(15, 118, 110, 0.9);
+    color: white;
+}
+
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3000;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.modal-content {
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    max-width: 600px;
+    width: 90%;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.modal-header-left h3 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #212529;
+}
+
+.modal-body {
+    padding: 16px 20px 20px;
+}
+
+.bookmarks-modal {
+    max-width: 520px;
+}
+
+.bookmarks-modal .modal-body {
+    padding-top: 0;
+}
+
+.quicksearch-modal {
+    max-width: 600px;
+}
+
+.bookmarks-modal .bookmarks-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+}
+
+.bookmarks-modal .bookmarks-list-toolbar {
+    flex-direction: column;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.bookmarks-modal .bookmark-toolbar-item {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #111827;
+    padding: 8px 10px;
+    border-radius: 6px;
+    transition: background-color 0.15s ease;
+}
+
+.bookmarks-modal .bookmark-toolbar-item:hover {
+    background-color: #f3f4f6;
+    color: #111827;
+}
+
+.bookmarks-modal .bookmark-toolbar-icon {
+    color: #4b5563;
+}
+
+.bookmarks-modal .bookmark-toolbar-text {
+    max-width: none;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+}
+
+.bookmarks-modal .no-bookmarks-toolbar {
+    color: #6c757d;
+    font-style: italic;
 }
 
 .search-toolbar {

@@ -287,6 +287,13 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 			}(),
 			DashboardName: item.DashboardName.String,
 			Title:         item.Navigation.String,
+			WorkflowId: func() int32 {
+				if item.WorkflowID.Valid {
+					return int32(item.WorkflowID.Int64)
+				}
+				return 0
+			}(),
+			WorkflowName: item.WorkflowName.String,
 		})
 	}
 
@@ -324,6 +331,13 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 						}(),
 						DashboardName: bookmark.NavigationItem.DashboardName.String,
 						Title:         bookmark.NavigationItem.Navigation.String,
+						WorkflowId: func() int32 {
+							if bookmark.NavigationItem.WorkflowID.Valid {
+								return int32(bookmark.NavigationItem.WorkflowID.Int64)
+							}
+							return 0
+						}(),
+						WorkflowName: bookmark.NavigationItem.WorkflowName.String,
 					}
 				}
 
@@ -338,9 +352,38 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 		}
 	}
 
+	// Get workflows and group navigation items by workflow
+	workflows, err := s.repo.GetWorkflows(ctx)
+	if err != nil {
+		log.Warnf("Failed to load workflows: %v", err)
+		workflows = []repo.Workflow{}
+	}
+
+	// Create a map of workflow ID to navigation items
+	workflowItemsMap := make(map[int32][]*sickrockpb.NavigationItem)
+	for _, item := range navigationItems {
+		if item.WorkflowId > 0 {
+			workflowItemsMap[item.WorkflowId] = append(workflowItemsMap[item.WorkflowId], item)
+		}
+	}
+
+	// Convert workflows to protobuf format
+	workflowProtos := make([]*sickrockpb.Workflow, 0, len(workflows))
+	for _, workflow := range workflows {
+		workflowProto := &sickrockpb.Workflow{
+			Id:      int32(workflow.ID),
+			Name:    workflow.Name,
+			Ordinal: int32(workflow.Ordinal),
+			Icon:    workflow.Icon.String,
+			Items:   workflowItemsMap[int32(workflow.ID)],
+		}
+		workflowProtos = append(workflowProtos, workflowProto)
+	}
+
 	res := connect.NewResponse(&sickrockpb.GetNavigationResponse{
 		Items:     navigationItems,
 		Bookmarks: bookmarks,
+		Workflows: workflowProtos,
 	})
 	return res, nil
 }

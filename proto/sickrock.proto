@@ -91,11 +91,22 @@ message NavigationItem {
   int32 dashboard_id = 8; // optional, 0 if not set
   string dashboard_name = 9; // optional
   string title = 10; // navigation field from table_navigation
+  int32 workflow_id = 11; // optional, 0 if not set
+  string workflow_name = 12; // optional
+}
+
+message Workflow {
+  int32 id = 1;
+  string name = 2;
+  int32 ordinal = 3;
+  string icon = 4;
+  repeated NavigationItem items = 5; // Navigation items in this workflow
 }
 
 message GetNavigationResponse {
   repeated NavigationItem items = 1;
   repeated UserBookmark bookmarks = 2;
+  repeated Workflow workflows = 3;
 }
 
 // Items
