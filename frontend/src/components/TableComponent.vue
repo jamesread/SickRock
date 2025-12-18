@@ -14,6 +14,8 @@ import { HugeiconsIcon } from '@hugeicons/vue'
 import { ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon, Add01Icon, Download01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../composables/useKeyboardShortcuts'
+import { useTableViewManager } from '../composables/useTableViewManager'
+import ViewsButton from './ViewsButton.vue'
 
 const router = useRouter()
 const tableStructure = ref<GetTableStructureResponse | null>(null)
@@ -59,10 +61,11 @@ const emit = defineEmits<{
   'view-created': []
   'rows-updated': []
   'row-deleted': [id: string]
+  'view-changed': [viewType: string]
 }>()
 
 // View management state
-const tableViews = ref<Array<{ id: number; tableName: string; viewName: string; isDefault: boolean; columns: Array<{ columnName: string; isVisible: boolean; columnOrder: number; sortOrder: string }> }>>([])
+const tableViews = ref<Array<{ id: number; tableName: string; viewName: string; isDefault: boolean; viewType: string; columns: Array<{ columnName: string; isVisible: boolean; columnOrder: number; sortOrder: string }> }>>([])
 const selectedViewId = ref<number | null>(null)
 
 // Computed property for the current view
@@ -82,13 +85,14 @@ const viewOptions = computed(() => {
   const options = [...tableViews.value]
   // Preserve previous behavior: only inject synthetic "All Columns" when no view is marked default
   if (options.length === 0 || !options.some(v => v.isDefault)) {
-    options.unshift({
-      id: -1,
-      tableName: props.tableId,
-      viewName: 'All Columns',
-      isDefault: true,
-      columns: []
-    })
+      options.unshift({
+        id: -1,
+        tableName: props.tableId,
+        viewName: 'All Columns',
+        isDefault: true,
+        viewType: 'table',
+        columns: []
+      })
   }
   return options
 })
@@ -101,6 +105,7 @@ const viewsForDialog = computed(() => {
       tableName: props.tableId,
       viewName: 'All Columns',
       isDefault: !tableViews.value.length || !!defaultView.value,
+      viewType: 'table',
       columns: []
     },
     ...tableViews.value
@@ -198,6 +203,7 @@ async function loadTableViews() {
       tableName: view.tableName,
       viewName: view.viewName,
       isDefault: view.isDefault,
+      viewType: view.viewType || 'table', // Default to "table" if not set
       columns: view.columns.map(col => ({
         columnName: col.columnName,
         isVisible: col.isVisible,
@@ -206,15 +212,27 @@ async function loadTableViews() {
       }))
     }))
 
-    // Select the default view or first view
-    const defaultView = tableViews.value.find(v => v.isDefault)
-    if (defaultView) {
-      selectedViewId.value = defaultView.id
-    } else if (tableViews.value.length > 0) {
-      selectedViewId.value = tableViews.value[0].id
-    } else {
-      // No views exist, use the default "All Columns" view
-      selectedViewId.value = -1
+    // Find default view or first view
+    const defaultView = tableViews.value.find(v => v.isDefault) || (tableViews.value.length > 0 ? tableViews.value[0] : null)
+
+    // Only set default view if no view is currently selected (null), or if the currently selected view no longer exists
+    // Note: viewId === -1 means "All Columns" view, which is always valid
+    const hasValidSelection = selectedViewId.value === -1 || (selectedViewId.value !== null && tableViews.value.some(v => v.id === selectedViewId.value))
+
+    if (!hasValidSelection) {
+      // Emit view type change when views are loaded (only if we're setting a new default)
+      if (defaultView) {
+        emit('view-changed', defaultView.viewType)
+      }
+
+      // Select the default view or first view
+      if (defaultView) {
+        selectedViewId.value = defaultView.id
+      } else {
+        // No views exist, use the default "All Columns" view
+        selectedViewId.value = -1
+        emit('view-changed', 'table')
+      }
     }
   } catch (error) {
     console.error('Failed to load table views:', error)
@@ -258,8 +276,21 @@ function selectView(viewId: number) {
   selectedViewId.value = viewId
   nextTick(() => {
     onViewChange()
+    // Get view directly from tableViews array to ensure we have the latest data
+    const view = tableViews.value.find(v => v.id === viewId) || null
+    console.log('[TableComponent] View selected, viewId:', viewId, 'view:', view)
+    if (view && view.viewType) {
+      console.log('[TableComponent] Emitting view-changed with viewType:', view.viewType)
+      emit('view-changed', view.viewType)
+    } else if (viewId === -1) {
+      // "All Columns" view
+      console.log('[TableComponent] "All Columns" view selected, emitting "table"')
+      emit('view-changed', 'table')
+    } else {
+      console.log('[TableComponent] No viewType found, emitting default "table"')
+      emit('view-changed', 'table')
+    }
   })
-  closeViewsDialog()
 }
 
 function createTableView() {
@@ -301,7 +332,6 @@ const hasFilters = computed(() => Object.keys(columnFilters.value).length > 0)
 function isColumnFiltered(col: string) {
   return !!columnFilters.value[col]
 }
-const showViewsDialog = ref(false)
 
 // Natural sort function for alphanumeric strings
 function naturalSort(a: string, b: string): number {
@@ -410,13 +440,6 @@ async function clearColumnFilter(col: string | null) {
   await load()
 }
 
-function openViewsDialog() {
-  showViewsDialog.value = true
-}
-
-function closeViewsDialog() {
-  showViewsDialog.value = false
-}
 const sortedItems = computed(() => {
   const col = sortBy.value
   const source = (props.items || items.value)
@@ -1308,15 +1331,16 @@ onUnmounted(() => {
   <Section :title="sectionTitle" :padding="false">
     <template v-if="showToolbar" #toolbar>
       <div class="toolbar-group">
-        <button
+        <ViewsButton
           v-if="showViewSwitcher || showViewEdit || showViewCreate"
-          @click="openViewsDialog"
-          class="button neutral ss-large"
-          title="Manage views"
-        >
-          <HugeiconsIcon :icon="Settings01Icon" />
-          Views
-        </button>
+          :table-id="props.tableId"
+          :show-view-create="showViewCreate"
+          :show-view-edit="showViewEdit"
+          :external-views="tableViews"
+          :external-selected-view-id="selectedViewId"
+          :external-current-view="currentView"
+          @view-selected="selectView"
+        />
         <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button neutral ss-large">
           <HugeiconsIcon :icon="Download01Icon" />
           Export
@@ -1554,51 +1578,6 @@ onUnmounted(() => {
     </div>
     </div>
 
-    <!-- Views Dialog -->
-    <div v-if="showViewsDialog" class="modal-overlay" @click="closeViewsDialog" @keydown.escape="closeViewsDialog" tabindex="0">
-      <div class="modal-content views-modal" @click.stop>
-        <div class="modal-header">
-          <div class="modal-header-left">
-            <h3>Views</h3>
-          </div>
-          <button @click="closeViewsDialog" class="button neutral" title="Close">
-            ✕
-          </button>
-        </div>
-        <div class="modal-body views-body">
-          <div class="views-list">
-            <div
-              v-for="view in viewsForDialog"
-              :key="view.id"
-              class="view-row"
-              :class="{ active: selectedViewId === view.id }"
-              @click="selectView(view.id)"
-            >
-              <div class="view-name">{{ view.viewName }}</div>
-              <div class="view-meta" v-if="view.isDefault">Default</div>
-            </div>
-          </div>
-          <div class="views-actions">
-            <button
-              v-if="showViewCreate"
-              class="button primary"
-              @click="() => { closeViewsDialog(); createTableView(); }"
-            >
-              <HugeiconsIcon :icon="Add01Icon" />
-              Create View
-            </button>
-            <button
-              v-if="showViewEdit && currentView && currentView.id !== -1"
-              class="button neutral"
-              @click="() => { closeViewsDialog(); editTableView(); }"
-            >
-              <HugeiconsIcon :icon="Edit03Icon" />
-              Edit View
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Bulk Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDeleteSelected">
@@ -2597,61 +2576,6 @@ onUnmounted(() => {
   margin-top: 8px;
 }
 
-.views-modal {
-  max-width: 520px;
-  width: 100%;
-}
-
-.views-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.views-list {
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.view-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
-  cursor: pointer;
-  border-bottom: 1px solid #f1f3f5;
-  transition: background 0.15s;
-}
-
-.view-row:last-child {
-  border-bottom: none;
-}
-
-.view-row:hover {
-  background: #f8f9fb;
-}
-
-.view-row.active {
-  background: #e7f3ff;
-  border-left: 3px solid #007bff;
-}
-
-.view-name {
-  font-weight: 600;
-  color: #212529;
-}
-
-.view-meta {
-  font-size: 12px;
-  color: #6c757d;
-}
-
-.views-actions {
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end;
-}
+/* Views dialog styles moved to ViewsButton.vue to avoid duplication */
 
 </style>

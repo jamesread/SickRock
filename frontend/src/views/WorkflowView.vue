@@ -27,7 +27,9 @@ const items = ref<Array<{
   dashboardId: number;
   icon: string;
   path: string;
+  ordinal: number;
 }>>([])
+const reordering = ref(false)
 
 // Modal state
 const showAddModal = ref(false)
@@ -77,9 +79,13 @@ async function load() {
         dashboardName: item.dashboardName,
         dashboardId: item.dashboardId,
         icon,
-        path
+        path,
+        ordinal: item.ordinal || 0
       }
     })
+
+    // Sort by ordinal to ensure correct order
+    items.value.sort((a, b) => a.ordinal - b.ordinal)
 
     // Sync pin state for this workflow
     try {
@@ -206,6 +212,108 @@ function togglePin() {
   }
 }
 
+async function moveItemUp(index: number) {
+  if (index === 0 || reordering.value) return
+
+  reordering.value = true
+  error.value = null
+
+  try {
+    // Swap items in the array
+    const item = items.value[index]
+    const previousItem = items.value[index - 1]
+    items.value[index] = previousItem
+    items.value[index - 1] = item
+
+    // Reassign ordinals based on new positions (multiply by 10 for spacing)
+    const updates = items.value.map((it, idx) => ({
+      id: it.id,
+      ordinal: (idx + 1) * 10
+    }))
+
+    // Update all items in the database with new ordinals
+    const updatePromises = updates.map(update =>
+      client.editItem({
+        id: String(update.id),
+        pageId: 'table_navigation',
+        additionalFields: {
+          ordinal: String(update.ordinal)
+        }
+      })
+    )
+
+    await Promise.all(updatePromises)
+
+    // Update local ordinals
+    items.value.forEach((it, idx) => {
+      it.ordinal = (idx + 1) * 10
+    })
+
+    // Small delay to ensure database has committed
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Reload to ensure consistency
+    await load()
+  } catch (e: any) {
+    error.value = String(e?.message || e)
+    // Reload on error to restore correct state
+    await load()
+  } finally {
+    reordering.value = false
+  }
+}
+
+async function moveItemDown(index: number) {
+  if (index === items.value.length - 1 || reordering.value) return
+
+  reordering.value = true
+  error.value = null
+
+  try {
+    // Swap items in the array
+    const item = items.value[index]
+    const nextItem = items.value[index + 1]
+    items.value[index] = nextItem
+    items.value[index + 1] = item
+
+    // Reassign ordinals based on new positions (multiply by 10 for spacing)
+    const updates = items.value.map((it, idx) => ({
+      id: it.id,
+      ordinal: (idx + 1) * 10
+    }))
+
+    // Update all items in the database with new ordinals
+    const updatePromises = updates.map(update =>
+      client.editItem({
+        id: String(update.id),
+        pageId: 'table_navigation',
+        additionalFields: {
+          ordinal: String(update.ordinal)
+        }
+      })
+    )
+
+    await Promise.all(updatePromises)
+
+    // Update local ordinals
+    items.value.forEach((it, idx) => {
+      it.ordinal = (idx + 1) * 10
+    })
+
+    // Small delay to ensure database has committed
+    await new Promise(resolve => setTimeout(resolve, 100))
+
+    // Reload to ensure consistency
+    await load()
+  } catch (e: any) {
+    error.value = String(e?.message || e)
+    // Reload on error to restore correct state
+    await load()
+  } finally {
+    reordering.value = false
+  }
+}
+
 onMounted(load)
 </script>
 
@@ -244,18 +352,39 @@ onMounted(load)
         </div>
         <div v-else class="workflow-items">
           <div
-            v-for="item in items"
+            v-for="(item, index) in items"
             :key="item.id"
             class="workflow-item"
-            @click="router.push(item.path)"
           >
-            <div class="workflow-item-icon">
-              <HugeiconsIcon :icon="Hugeicons[item.icon] || DatabaseIcon" />
+            <div class="workflow-item-reorder">
+              <button
+                @click.stop="moveItemUp(index)"
+                :disabled="index === 0 || reordering"
+                class="reorder-button reorder-up"
+                title="Move up"
+                aria-label="Move up"
+              >
+                ↑
+              </button>
+              <button
+                @click.stop="moveItemDown(index)"
+                :disabled="index === items.length - 1 || reordering"
+                class="reorder-button reorder-down"
+                title="Move down"
+                aria-label="Move down"
+              >
+                ↓
+              </button>
             </div>
-            <div class="workflow-item-content">
-              <div class="workflow-item-title">{{ item.title }}</div>
-              <div class="workflow-item-subtitle">
-                {{ item.dashboardId > 0 ? 'Dashboard' : 'Table' }}
+            <div class="workflow-item-main" @click="router.push(item.path)">
+              <div class="workflow-item-icon">
+                <HugeiconsIcon :icon="Hugeicons[item.icon] || DatabaseIcon" />
+              </div>
+              <div class="workflow-item-content">
+                <div class="workflow-item-title">{{ item.title }}</div>
+                <div class="workflow-item-subtitle">
+                  {{ item.dashboardId > 0 ? 'Dashboard' : 'Table' }}
+                </div>
               </div>
             </div>
           </div>
@@ -322,29 +451,74 @@ onMounted(load)
 
 <style scoped>
 .workflow-items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-top: 20px;
 }
 
 .workflow-item {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 16px;
+  gap: 12px;
   background: #f8f9fa;
   border: 1px solid #e9ecef;
   border-radius: 8px;
-  cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.workflow-item:hover {
+.workflow-item-reorder {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.reorder-button {
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  width: 32px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  color: #495057;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.reorder-button:hover:not(:disabled) {
   background: #e9ecef;
   border-color: #007bff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 123, 255, 0.1);
+  color: #007bff;
+}
+
+.reorder-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.workflow-item-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.workflow-item-main:hover {
+  background: #e9ecef;
+}
+
+.workflow-item:hover {
+  border-color: #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
 }
 
 .workflow-item-icon {

@@ -16,6 +16,7 @@ const viewId = route.params.viewId as string
 const client = createApiClient()
 
 const viewName = ref('')
+const viewType = ref<'table' | 'calendar' | 'ticklist'>('table')
 const availableColumns = ref<Array<{ name: string; type: string }>>([])
 const selectedColumns = ref<Array<{ name: string; isVisible: boolean; columnOrder: number; sortOrder: string }>>([])
 const loading = ref(false)
@@ -89,6 +90,14 @@ onMounted(async () => {
       name: field.name,
       type: field.type
     })) || []
+
+    // Load current view type from existing view if editing
+    if (isEditMode.value) {
+      // Will be loaded in loadExistingView()
+    } else {
+      // Default to "table" for new views
+      viewType.value = 'table'
+    }
 
     if (isEditMode.value) {
       // Load existing view data
@@ -173,23 +182,27 @@ async function saveTableView() {
   error.value = null
 
   try {
-    const visibleColumns = selectedColumns.value.filter(col => col.isVisible)
-
     let response
-    if (isEditMode.value) {
-      // Update existing view
-      response = await client.updateTableView({
-        viewId: parseInt(viewId),
-        tableName: tableId,
-        viewName: viewName.value,
-        columns: visibleColumns.map(col => ({
-          columnName: col.name,
-          isVisible: col.isVisible,
-          columnOrder: col.columnOrder,
-          sortOrder: col.sortOrder
-        }))
-      })
-    } else {
+
+    // Only save table view columns if view type is table
+    if (viewType.value === 'table') {
+      const visibleColumns = selectedColumns.value.filter(col => col.isVisible)
+
+      if (isEditMode.value) {
+        // Update existing view
+        response = await client.updateTableView({
+          viewId: parseInt(viewId),
+          tableName: tableId,
+          viewName: viewName.value,
+          columns: visibleColumns.map(col => ({
+            columnName: col.name,
+            isVisible: col.isVisible,
+            columnOrder: col.columnOrder,
+            sortOrder: col.sortOrder
+          })),
+          viewType: viewType.value
+        })
+      } else {
       // Create new view
       response = await client.createTableView({
         tableName: tableId,
@@ -199,8 +212,29 @@ async function saveTableView() {
           isVisible: col.isVisible,
           columnOrder: col.columnOrder,
           sortOrder: col.sortOrder
-        }))
+        })),
+        viewType: viewType.value
       })
+      }
+    } else {
+      // For calendar and ticklist views, we still create/update the view record
+      // Column configurations are not used for these views, but the view record is still needed
+      if (isEditMode.value) {
+        response = await client.updateTableView({
+          viewId: parseInt(viewId),
+          tableName: tableId,
+          viewName: viewName.value,
+          columns: [], // No columns for calendar/ticklist views
+          viewType: viewType.value
+        })
+      } else {
+        response = await client.createTableView({
+          tableName: tableId,
+          viewName: viewName.value,
+          columns: [], // No columns for calendar/ticklist views
+          viewType: viewType.value
+        })
+      }
     }
 
     if (response.success) {
@@ -274,8 +308,25 @@ async function deleteTableView() {
           required
         />
 
-        <label>Column Configuration</label>
-        <div class="columns-list" @dragover="onListDragOver">
+        <label for="view-type">View Type</label>
+        <select
+          id="view-type"
+          v-model="viewType"
+          class="view-type-select"
+        >
+          <option value="table">Table</option>
+          <option value="calendar">Calendar</option>
+          <option value="ticklist">Tick List</option>
+        </select>
+        <small class="view-type-help">
+          <span v-if="viewType === 'table'">Table view displays data in rows and columns with sorting and filtering.</span>
+          <span v-else-if="viewType === 'calendar'">Calendar view displays data as events on a calendar based on date fields.</span>
+          <span v-else-if="viewType === 'ticklist'">Tick List view displays items as large tiles that can be checked off as completed.</span>
+        </small>
+
+        <div v-if="viewType === 'table'">
+          <label>Column Configuration</label>
+          <div class="columns-list" @dragover="onListDragOver">
           <!-- Drag indicators -->
           <div v-if="dragIndex !== null" class="drag-status">
             Dragging: <code>{{ selectedColumns[dragIndex].name }}</code>
@@ -347,8 +398,13 @@ async function deleteTableView() {
                 <option value="desc">Descending</option>
               </select>
             </div>
+          </div>
+          </div>
         </div>
-      </div>
+        <div v-else class="calendar-view-info">
+          <p>Calendar views display data as events on a calendar. The calendar automatically detects date fields (calendar_date, starts, finishes, or sr_created) to display events.</p>
+          <p>No column configuration is needed for calendar views.</p>
+        </div>
 
       <div class="form-actions" style = "grid-column: 1 / -1;">
         <button type="button" @click="goBack" class="button neutral">
@@ -413,6 +469,49 @@ async function deleteTableView() {
   border: 1px solid #ddd;
   border-radius: 4px;
   font-size: 1rem;
+}
+
+.view-type-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background: white;
+  cursor: pointer;
+}
+
+.view-type-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.view-type-help {
+  display: block;
+  margin-top: 0.5rem;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.calendar-view-info {
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  color: #495057;
+}
+
+.calendar-view-info p {
+  margin: 0.5rem 0;
+}
+
+.calendar-view-info p:first-child {
+  margin-top: 0;
+}
+
+.calendar-view-info p:last-child {
+  margin-bottom: 0;
 }
 
 .columns-list {

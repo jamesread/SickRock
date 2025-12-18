@@ -156,13 +156,19 @@ func (s *SickRockServer) GetTableConfigurations(ctx context.Context, req *connec
 	}
 	pages := make([]*sickrockpb.Page, 0, len(configs))
 	for _, config := range configs {
+		// Default to "main" if database is NULL or empty
+		dbName := "main"
+		if config.Db.Valid && config.Db.String != "" {
+			dbName = config.Db.String
+		}
 		pages = append(pages, &sickrockpb.Page{
-			Id:      config.Name,
-			Title:   config.Title,
-			Slug:    config.Name,
-			Ordinal: int32(config.Ordinal),
-			Icon:    config.Icon.String,
-			View:    config.View.String,
+			Id:       config.Name,
+			Title:    config.Title,
+			Slug:     config.Name,
+			Ordinal:  int32(config.Ordinal),
+			Icon:     config.Icon.String,
+			View:     "table", // Default view type is always "table" for table configurations
+			Database: dbName,
 		})
 	}
 	res := connect.NewResponse(&sickrockpb.GetTableConfigurationsResponse{Pages: pages})
@@ -250,7 +256,7 @@ func (s *SickRockServer) GetDatabaseTables(ctx context.Context, req *connect.Req
 			TableName:         table.TableName,
 			HasConfiguration:  table.HasConfiguration,
 			ConfigurationName: table.ConfigurationName.String,
-			View:              table.View.String,
+			View:              "table", // Default view type is always "table"
 		})
 	}
 
@@ -278,7 +284,7 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 			TableName:  item.TableName.String,
 			TableTitle: item.TableTitle.String,
 			Icon:       item.Icon.String,
-			TableView:  item.TableView.String,
+			TableView:  "", // View type is now stored on views, not table configurations
 			DashboardId: func() int32 {
 				if item.DashboardID.Valid {
 					return int32(item.DashboardID.Int64)
@@ -921,10 +927,26 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		}
 	}
 
+	// Get view type from default view if it exists, otherwise default to "table"
+	viewType := "table"
+	views, err := s.repo.GetTableViews(ctx, tcName)
+	if err == nil && len(views) > 0 {
+		defaultView := views[0] // GetTableViews returns views ordered, first is usually default
+		for _, v := range views {
+			if v.IsDefault {
+				defaultView = v
+				break
+			}
+		}
+		if defaultView.ViewType != "" {
+			viewType = defaultView.ViewType
+		}
+	}
+
 	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
 		Fields:           fields,
 		CreateButtonText: createButtonText,
-		View:             tc.View.String,
+		View:             viewType,
 		ForeignKeys:      pbForeignKeys,
 	}), nil
 }
@@ -973,7 +995,12 @@ func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Reque
 		})
 	}
 
-	err := s.repo.CreateTableView(ctx, tableName, viewName, columns)
+	viewType := req.Msg.GetViewType()
+	if viewType == "" {
+		viewType = "table" // Default to "table"
+	}
+
+	err := s.repo.CreateTableView(ctx, tableName, viewName, viewType, columns)
 	if err != nil {
 		log.Errorf("Failed to create table view: %v", err)
 		return connect.NewResponse(&sickrockpb.CreateTableViewResponse{
@@ -1011,7 +1038,12 @@ func (s *SickRockServer) UpdateTableView(ctx context.Context, req *connect.Reque
 		})
 	}
 
-	err := s.repo.UpdateTableView(ctx, viewID, tableName, viewName, columns)
+	viewType := req.Msg.GetViewType()
+	if viewType == "" {
+		viewType = "table" // Default to "table"
+	}
+
+	err := s.repo.UpdateTableView(ctx, viewID, tableName, viewName, viewType, columns)
 	if err != nil {
 		log.Errorf("Failed to update table view: %v", err)
 		return connect.NewResponse(&sickrockpb.UpdateTableViewResponse{
@@ -1055,12 +1087,18 @@ func (s *SickRockServer) GetTableViews(ctx context.Context, req *connect.Request
 			})
 		}
 
+		viewType := view.ViewType
+		if viewType == "" {
+			viewType = "table" // Default to "table"
+		}
+
 		pbViews = append(pbViews, &sickrockpb.TableView{
 			Id:        int32(view.ID),
 			TableName: view.TableName,
 			ViewName:  view.ViewName,
 			IsDefault: view.IsDefault,
 			Columns:   pbColumns,
+			ViewType:  viewType,
 		})
 	}
 

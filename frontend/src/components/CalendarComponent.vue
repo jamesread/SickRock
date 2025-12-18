@@ -4,9 +4,14 @@ import { useRouter } from 'vue-router'
 import Calendar, { type CalendarEvent } from 'picocrank/vue/components/Calendar.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
+import ViewsButton from './ViewsButton.vue'
 
 const props = defineProps<{
   tableId: string
+}>()
+
+const emit = defineEmits<{
+  'view-changed': [viewType: string]
 }>()
 
 const router = useRouter()
@@ -48,10 +53,16 @@ const currentYear = ref(new Date().getFullYear())
 
 // Table structure state
 const tableStructure = ref<any>(null)
+const tableTitle = ref<string>('')
 
 // Check if table has icon field
 const hasIconField = computed(() => {
   return tableStructure.value?.fields?.some((f: any) => f.name === 'icon')
+})
+
+// Computed property for the section title
+const sectionTitle = computed(() => {
+  return tableTitle.value || `Table: ${props.tableId}`
 })
 
 // Transport handled by authenticated client
@@ -188,7 +199,7 @@ function getEventTooltip(event: CalendarEvent): string {
   return `in ${diffDays} ${diffDays === 1 ? 'day' : 'days'}`
 }
 
-// Load data
+// Load data (initial load - resets to today)
 async function load() {
   const now = new Date()
   const newMonth = now.getMonth()
@@ -199,6 +210,11 @@ async function load() {
 
   selectedDate.value = `${newYear}-${String(newMonth + 1).padStart(2, '0')}`
 
+  await reloadItems()
+}
+
+// Reload items without changing the calendar view
+async function reloadItems() {
   loading.value = true
   error.value = null
   try {
@@ -206,9 +222,24 @@ async function load() {
     const res = await client.listItems({ tcName: props.tableId })
     items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
 
-    // Load table structure
-    const structureRes = await client.getTableStructure({ pageId: props.tableId })
-    tableStructure.value = structureRes
+    // Load table structure (only on first load or if not already loaded)
+    if (!tableStructure.value) {
+      const structureRes = await client.getTableStructure({ pageId: props.tableId })
+      tableStructure.value = structureRes
+    }
+
+    // Load table configuration title
+    if (!tableTitle.value) {
+      try {
+        const configs = await client.getTableConfigurations({})
+        const config = configs.pages?.find(p => p.id === props.tableId)
+        if (config && config.title) {
+          tableTitle.value = config.title
+        }
+      } catch (e) {
+        console.warn('Failed to load table configuration title:', e)
+      }
+    }
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -366,8 +397,8 @@ async function saveItem() {
       additionalFields: additionalFields
     })
 
-    // Reload the calendar data to show the new item
-    await load()
+    // Reload the calendar data to show the new item (without resetting view)
+    await reloadItems()
 
     // Close the modal
     hideQuickAdd()
@@ -508,8 +539,8 @@ async function deleteItem() {
       pageId: props.tableId
     })
 
-    // Reload the data to reflect changes
-    await load()
+    // Reload the data to reflect changes (without resetting view)
+    await reloadItems()
     hideContextMenu()
   } catch (e) {
     console.error('Failed to delete item:', e)
@@ -523,9 +554,21 @@ onMounted(load)
 </script>
 
 <template>
-  <Section title="Calendar" :padding="false">
+  <Section :title="sectionTitle" :padding="false">
     <template #toolbar>
       <div class="toolbar">
+        <ViewsButton
+          :table-id="props.tableId"
+          :show-view-create="true"
+          :show-view-edit="true"
+          @view-changed="(viewType: string) => {
+            emit('view-changed', viewType)
+            // Reload if still on calendar view
+            if (viewType === 'calendar') {
+              reloadItems()
+            }
+          }"
+        />
         <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
         <button @click="goToToday" class="button neutral">Today</button>
         <button @click="prevMonth" class="button neutral">‹</button>

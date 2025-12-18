@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
-import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon, CheckListIcon } from '@hugeicons/core-free-icons'
 import { createApiClient } from './stores/api'
 import Header from 'picocrank/vue/components/Header.vue'
 import logo from './resources/images/logo.png'
@@ -39,6 +39,8 @@ router.afterEach(() => {
     isSidebarOpen.value = false
     if (sidebar.value) sidebar.value.close()
     persistSidebarState()
+    // Close QuickSearch dialog when navigation occurs (e.g., item selected)
+    showQuickSearchDialog.value = false
 })
 
 function toggleSidebar() {
@@ -141,7 +143,9 @@ async function loadAppData() {
             .map(item => {
                 const title = item.title || String(item.id)
                 const slug = item.tableName || item.dashboardName || ''
-                const icon = item.icon || 'DatabaseIcon'
+                // Use CheckListIcon as default for workflow items, DatabaseIcon for table configurations
+                const defaultIcon = (item.workflowId && item.workflowId > 0) ? 'CheckListIcon' : 'DatabaseIcon'
+                const icon = item.icon || defaultIcon
                 const view = item.tableView || ''
                 const id = title
                 const name = title
@@ -882,14 +886,6 @@ onMounted(async () => {
         tabindex="0"
     >
         <div class="modal-content quicksearch-modal" @click.stop>
-            <div class="modal-header">
-                <div class="modal-header-left">
-                    <h3>Search</h3>
-                </div>
-                <button @click="showQuickSearchDialog = false" class="button neutral" title="Close">
-                    ✕
-                </button>
-            </div>
             <div class="modal-body">
                 <QuickSearch
                     ref="quickSearch"
@@ -1223,6 +1219,20 @@ onMounted(async () => {
 
 .quicksearch-modal {
     max-width: 600px;
+}
+
+.quicksearch-modal .modal-body {
+    padding: 16px 20px 20px;
+}
+
+.quicksearch-modal :deep(.quick-search),
+.quicksearch-modal :deep([class*="quick-search"]) {
+    width: 100%;
+}
+
+.quicksearch-modal :deep(input) {
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .bookmarks-modal .bookmarks-toolbar {

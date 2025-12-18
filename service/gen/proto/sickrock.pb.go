@@ -295,6 +295,7 @@ type Page struct {
 	Ordinal       int32                  `protobuf:"varint,4,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
 	Icon          string                 `protobuf:"bytes,5,opt,name=icon,proto3" json:"icon,omitempty"`
 	View          string                 `protobuf:"bytes,6,opt,name=view,proto3" json:"view,omitempty"`
+	Database      string                 `protobuf:"bytes,7,opt,name=database,proto3" json:"database,omitempty"` // Database name for this table configuration
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -367,6 +368,13 @@ func (x *Page) GetIcon() string {
 func (x *Page) GetView() string {
 	if x != nil {
 		return x.View
+	}
+	return ""
+}
+
+func (x *Page) GetDatabase() string {
+	if x != nil {
+		return x.Database
 	}
 	return ""
 }
@@ -1981,6 +1989,7 @@ type CreateTableViewRequest struct {
 	TableName     string                 `protobuf:"bytes,1,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
 	ViewName      string                 `protobuf:"bytes,2,opt,name=view_name,json=viewName,proto3" json:"view_name,omitempty"`
 	Columns       []*TableViewColumn     `protobuf:"bytes,3,rep,name=columns,proto3" json:"columns,omitempty"`
+	ViewType      string                 `protobuf:"bytes,4,opt,name=view_type,json=viewType,proto3" json:"view_type,omitempty"` // "table" or "calendar", defaults to "table"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2034,6 +2043,13 @@ func (x *CreateTableViewRequest) GetColumns() []*TableViewColumn {
 		return x.Columns
 	}
 	return nil
+}
+
+func (x *CreateTableViewRequest) GetViewType() string {
+	if x != nil {
+		return x.ViewType
+	}
+	return ""
 }
 
 type CreateTableViewResponse struct {
@@ -2094,6 +2110,7 @@ type UpdateTableViewRequest struct {
 	TableName     string                 `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
 	ViewName      string                 `protobuf:"bytes,3,opt,name=view_name,json=viewName,proto3" json:"view_name,omitempty"`
 	Columns       []*TableViewColumn     `protobuf:"bytes,4,rep,name=columns,proto3" json:"columns,omitempty"`
+	ViewType      string                 `protobuf:"bytes,5,opt,name=view_type,json=viewType,proto3" json:"view_type,omitempty"` // "table" or "calendar", defaults to "table"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2154,6 +2171,13 @@ func (x *UpdateTableViewRequest) GetColumns() []*TableViewColumn {
 		return x.Columns
 	}
 	return nil
+}
+
+func (x *UpdateTableViewRequest) GetViewType() string {
+	if x != nil {
+		return x.ViewType
+	}
+	return ""
 }
 
 type UpdateTableViewResponse struct {
@@ -2259,6 +2283,7 @@ type TableView struct {
 	ViewName      string                 `protobuf:"bytes,3,opt,name=view_name,json=viewName,proto3" json:"view_name,omitempty"`
 	IsDefault     bool                   `protobuf:"varint,4,opt,name=is_default,json=isDefault,proto3" json:"is_default,omitempty"`
 	Columns       []*TableViewColumn     `protobuf:"bytes,5,rep,name=columns,proto3" json:"columns,omitempty"`
+	ViewType      string                 `protobuf:"bytes,6,opt,name=view_type,json=viewType,proto3" json:"view_type,omitempty"` // "table" or "calendar", defaults to "table"
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2326,6 +2351,13 @@ func (x *TableView) GetColumns() []*TableViewColumn {
 		return x.Columns
 	}
 	return nil
+}
+
+func (x *TableView) GetViewType() string {
+	if x != nil {
+		return x.ViewType
+	}
+	return ""
 }
 
 type GetTableViewsResponse struct {
@@ -6417,14 +6449,15 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x04path\x18\x02 \x01(\tR\x04path\"L\n" +
 	"\x1aGetNavigationLinksResponse\x12.\n" +
 	"\x05links\x18\x01 \x03(\v2\x18.sickrock.NavigationLinkR\x05links\"\x1f\n" +
-	"\x1dGetTableConfigurationsRequest\"\x82\x01\n" +
+	"\x1dGetTableConfigurationsRequest\"\x9e\x01\n" +
 	"\x04Page\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x12\n" +
 	"\x04slug\x18\x03 \x01(\tR\x04slug\x12\x18\n" +
 	"\aordinal\x18\x04 \x01(\x05R\aordinal\x12\x12\n" +
 	"\x04icon\x18\x05 \x01(\tR\x04icon\x12\x12\n" +
-	"\x04view\x18\x06 \x01(\tR\x04view\"F\n" +
+	"\x04view\x18\x06 \x01(\tR\x04view\x12\x1a\n" +
+	"\bdatabase\x18\a \x01(\tR\bdatabase\"F\n" +
 	"\x1eGetTableConfigurationsResponse\x12$\n" +
 	"\x05pages\x18\x01 \x03(\v2\x0e.sickrock.PageR\x05pages\"F\n" +
 	"\x12CreateTableRequest\x12\x1a\n" +
@@ -6551,27 +6584,29 @@ const file_sickrock_proto_rawDesc = "" +
 	"is_visible\x18\x02 \x01(\bR\tisVisible\x12!\n" +
 	"\fcolumn_order\x18\x03 \x01(\x05R\vcolumnOrder\x12\x1d\n" +
 	"\n" +
-	"sort_order\x18\x04 \x01(\tR\tsortOrder\"\x89\x01\n" +
+	"sort_order\x18\x04 \x01(\tR\tsortOrder\"\xa6\x01\n" +
 	"\x16CreateTableViewRequest\x12\x1d\n" +
 	"\n" +
 	"table_name\x18\x01 \x01(\tR\ttableName\x12\x1b\n" +
 	"\tview_name\x18\x02 \x01(\tR\bviewName\x123\n" +
-	"\acolumns\x18\x03 \x03(\v2\x19.sickrock.TableViewColumnR\acolumns\"M\n" +
+	"\acolumns\x18\x03 \x03(\v2\x19.sickrock.TableViewColumnR\acolumns\x12\x1b\n" +
+	"\tview_type\x18\x04 \x01(\tR\bviewType\"M\n" +
 	"\x17CreateTableViewResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xa2\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xbf\x01\n" +
 	"\x16UpdateTableViewRequest\x12\x17\n" +
 	"\aview_id\x18\x01 \x01(\x05R\x06viewId\x12\x1d\n" +
 	"\n" +
 	"table_name\x18\x02 \x01(\tR\ttableName\x12\x1b\n" +
 	"\tview_name\x18\x03 \x01(\tR\bviewName\x123\n" +
-	"\acolumns\x18\x04 \x03(\v2\x19.sickrock.TableViewColumnR\acolumns\"M\n" +
+	"\acolumns\x18\x04 \x03(\v2\x19.sickrock.TableViewColumnR\acolumns\x12\x1b\n" +
+	"\tview_type\x18\x05 \x01(\tR\bviewType\"M\n" +
 	"\x17UpdateTableViewResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"5\n" +
 	"\x14GetTableViewsRequest\x12\x1d\n" +
 	"\n" +
-	"table_name\x18\x01 \x01(\tR\ttableName\"\xab\x01\n" +
+	"table_name\x18\x01 \x01(\tR\ttableName\"\xc8\x01\n" +
 	"\tTableView\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x1d\n" +
 	"\n" +
@@ -6579,7 +6614,8 @@ const file_sickrock_proto_rawDesc = "" +
 	"\tview_name\x18\x03 \x01(\tR\bviewName\x12\x1d\n" +
 	"\n" +
 	"is_default\x18\x04 \x01(\bR\tisDefault\x123\n" +
-	"\acolumns\x18\x05 \x03(\v2\x19.sickrock.TableViewColumnR\acolumns\"B\n" +
+	"\acolumns\x18\x05 \x03(\v2\x19.sickrock.TableViewColumnR\acolumns\x12\x1b\n" +
+	"\tview_type\x18\x06 \x01(\tR\bviewType\"B\n" +
 	"\x15GetTableViewsResponse\x12)\n" +
 	"\x05views\x18\x01 \x03(\v2\x13.sickrock.TableViewR\x05views\"1\n" +
 	"\x16DeleteTableViewRequest\x12\x17\n" +

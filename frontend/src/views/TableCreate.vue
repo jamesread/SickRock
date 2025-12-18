@@ -18,11 +18,48 @@ const success = ref<string | null>(null)
 // Track if user has manually edited the name field
 const nameManuallyEdited = ref(false)
 
+// Available databases from table configurations
+const availableDatabases = ref<string[]>([])
+
 // Transport handled by authenticated client
 const client = createApiClient()
 
+// Load available databases from table configurations
+async function loadAvailableDatabases() {
+  try {
+    const response = await client.getTableConfigurations({})
+    const databases = new Set<string>()
+
+    // Extract unique database names from table configurations
+    for (const page of response.pages || []) {
+      // Handle both null/undefined and empty strings, and trim whitespace
+      const dbName = page.database?.trim() || ''
+      if (dbName !== '') {
+        databases.add(dbName)
+      }
+    }
+
+    // Always include 'main' as it's the default
+    if (!databases.has('main')) {
+      databases.add('main')
+    }
+
+    availableDatabases.value = Array.from(databases).sort()
+
+    // Debug logging to help troubleshoot
+    console.log('Available databases loaded:', availableDatabases.value)
+    console.log('Table configurations:', response.pages?.map(p => ({ name: p.name, database: p.database })))
+  } catch (e) {
+    console.warn('Failed to load available databases:', e)
+    // Fallback to just 'main' if loading fails
+    availableDatabases.value = ['main']
+  }
+}
+
 // Pre-fill from URL query parameters if present
-onMounted(() => {
+onMounted(async () => {
+  await loadAvailableDatabases()
+
   if (route.query.table) {
     table.value = String(route.query.table)
   }
@@ -124,9 +161,15 @@ async function submit() {
           id="database"
           v-model="database"
           type="text"
+          list="database-list"
           placeholder="Database name (default: main)"
           @keyup.enter="submit"
         />
+        <datalist id="database-list">
+          <option v-for="db in availableDatabases" :key="db" :value="db">
+            {{ db }}
+          </option>
+        </datalist>
         <small>The database where the table will be created</small>
       </div>
 

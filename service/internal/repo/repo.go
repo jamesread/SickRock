@@ -161,7 +161,6 @@ type TableConfig struct {
 	Ordinal          int
 	Icon             sql.NullString
 	CreateButtonText sql.NullString `db:"create_button_text"`
-	View             sql.NullString `db:"view"`
 	Table            sql.NullString `db:"table"`
 	Db               sql.NullString `db:"db"`
 }
@@ -181,7 +180,7 @@ func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, err
 }
 
 func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]TableConfig, error) {
-	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal,0) as ordinal, create_button_text, icon, view, db FROM table_configurations ORDER BY name, ordinal ASC")
+	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal,0) as ordinal, create_button_text, icon, `db` FROM table_configurations ORDER BY name, ordinal ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +188,7 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 	var configs []TableConfig
 	for rows.Next() {
 		var config TableConfig
-		if err := rows.Scan(&config.Name, &config.Title, &config.Ordinal, &config.CreateButtonText, &config.Icon, &config.View, &config.Db); err != nil {
+		if err := rows.Scan(&config.Name, &config.Title, &config.Ordinal, &config.CreateButtonText, &config.Icon, &config.Db); err != nil {
 			return nil, err
 		}
 		configs = append(configs, config)
@@ -221,7 +220,6 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			tc.name as table_name,
 			COALESCE(tc.title, tc.name) as table_title,
 			tc.icon as icon,
-            tc.view as table_view,
             tn.dashboard_id as dashboard_id,
             td.name as dashboard_name,
             tn.name as navigation,
@@ -250,7 +248,6 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			&item.TableName,
 			&item.TableTitle,
 			&item.Icon,
-			&item.TableView,
 			&item.DashboardID,
 			&item.DashboardName,
 			&item.Navigation,
@@ -1182,7 +1179,7 @@ func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldS
 }
 
 func (r *Repository) GetTableConfigurationByID(ctx context.Context, tcID int) (*TableConfig, error) {
-	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon, view FROM table_configurations WHERE id = ?"
+	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon FROM table_configurations WHERE id = ?"
 	var config TableConfig
 	err := r.db.GetContext(ctx, &config, query, tcID)
 
@@ -1198,7 +1195,6 @@ type DatabaseTableInfo struct {
 	TableName         string         `db:"table_name"`
 	HasConfiguration  bool           `db:"has_configuration"`
 	ConfigurationName sql.NullString `db:"configuration_name"`
-	View              sql.NullString `db:"view"`
 }
 
 // GetDatabaseTables returns all tables in the specified database with their configuration status
@@ -1216,8 +1212,7 @@ func (r *Repository) GetDatabaseTables(ctx context.Context, database string) ([]
 		SELECT
 			t.TABLE_NAME as table_name,
 			CASE WHEN tc.name IS NOT NULL THEN 1 ELSE 0 END as has_configuration,
-			tc.name as configuration_name,
-			tc.view as view
+			tc.name as configuration_name
 		FROM information_schema.TABLES t
 		LEFT JOIN table_configurations tc ON t.TABLE_NAME = tc.table AND tc.db = ?
 		WHERE t.TABLE_SCHEMA = ?
@@ -1318,8 +1313,8 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 		return fmt.Errorf("table configuration '%s' already exists", name)
 	}
 
-	// Insert the new configuration with view set to 'table'
-	query := "INSERT INTO table_configurations (name, `db`, `table`, view) VALUES (?, ?, ?, 'table')"
+	// Insert the new configuration
+	query := "INSERT INTO table_configurations (name, `db`, `table`) VALUES (?, ?, ?)"
 	result, err := r.db.ExecContext(ctx, query, name, database, table)
 	if err != nil {
 		log.Errorf("Failed to create table configuration: %v", err)
@@ -1356,7 +1351,7 @@ func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (
 
 	// Query table_configurations for this table's metadata
 	var config TableConfig
-	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon, view FROM table_configurations WHERE name = ?"
+	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon FROM table_configurations WHERE name = ?"
 	err := r.db.GetContext(ctx, &config, query, tcName)
 
 	if err != nil {
@@ -1371,8 +1366,8 @@ func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (
 
 	log.Infof("TableConfiguration: %+v", config)
 
-	if !config.View.Valid || !config.Table.Valid || !config.Db.Valid {
-		return nil, fmt.Errorf("table structure is invalid, missing view, table or db: %+v", config)
+	if !config.Table.Valid || !config.Db.Valid {
+		return nil, fmt.Errorf("table structure is invalid, missing table or db: %+v", config)
 	}
 
 	return &config, nil
@@ -1392,12 +1387,18 @@ type TableView struct {
 	TableName string            `db:"table_name"`
 	ViewName  string            `db:"view_name"`
 	IsDefault bool              `db:"is_default"`
+	ViewType  string            `db:"view_type"` // "table" or "calendar", defaults to "table"
 	Columns   []TableViewColumn `db:"-"`
 }
 
 // CreateTableView creates a new table view with its column configurations
-func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName string, columns []TableViewColumn) error {
+func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName, viewType string, columns []TableViewColumn) error {
 	t := sanitizeDatabaseIdentifier(tableName)
+
+	// Default to "table" if viewType is empty
+	if viewType == "" {
+		viewType = "table"
+	}
 
 	// Start a transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -1411,8 +1412,8 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName st
 	switch r.db.DriverName() {
 	case "mysql":
 		result, err := tx.ExecContext(ctx,
-			"INSERT INTO table_views (table_name, view_name, is_default) VALUES (?, ?, ?)",
-			t, viewName, false)
+			"INSERT INTO table_views (table_name, view_name, is_default, view_type) VALUES (?, ?, ?, ?)",
+			t, viewName, false, viewType)
 		if err != nil {
 			return err
 		}
@@ -1422,8 +1423,8 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName st
 		}
 	default:
 		result, err := tx.ExecContext(ctx,
-			"INSERT INTO table_views (table_name, view_name, is_default) VALUES (?, ?, ?)",
-			t, viewName, false)
+			"INSERT INTO table_views (table_name, view_name, is_default, view_type) VALUES (?, ?, ?, ?)",
+			t, viewName, false, viewType)
 		if err != nil {
 			return err
 		}
@@ -1451,8 +1452,13 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName st
 }
 
 // UpdateTableView updates an existing table view with its column configurations
-func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName, viewName string, columns []TableViewColumn) error {
+func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName, viewName, viewType string, columns []TableViewColumn) error {
 	t := sanitizeDatabaseIdentifier(tableName)
+
+	// Default to "table" if viewType is empty
+	if viewType == "" {
+		viewType = "table"
+	}
 
 	// Start a transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -1463,8 +1469,8 @@ func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName,
 
 	// Update the table view
 	_, err = tx.ExecContext(ctx,
-		"UPDATE table_views SET view_name = ? WHERE id = ? AND table_name = ?",
-		viewName, viewID, t)
+		"UPDATE table_views SET view_name = ?, view_type = ? WHERE id = ? AND table_name = ?",
+		viewName, viewType, viewID, t)
 	if err != nil {
 		return err
 	}
@@ -1500,7 +1506,7 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 
 	// Get all views for the table
 	rows, err := r.db.QueryxContext(ctx,
-		"SELECT id, table_name, view_name, is_default FROM table_views WHERE table_name = ? ORDER BY view_name",
+		"SELECT id, table_name, view_name, is_default, COALESCE(view_type, 'table') as view_type FROM table_views WHERE table_name = ? ORDER BY view_name",
 		t)
 	if err != nil {
 		return nil, err
@@ -1510,7 +1516,7 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 	var views []TableView
 	for rows.Next() {
 		var view TableView
-		err := rows.Scan(&view.ID, &view.TableName, &view.ViewName, &view.IsDefault)
+		err := rows.Scan(&view.ID, &view.TableName, &view.ViewName, &view.IsDefault, &view.ViewType)
 		if err != nil {
 			return nil, err
 		}
@@ -1968,7 +1974,6 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			tn.table_configuration,
 			tc.name as table_name,
 			tc.icon as table_icon,
-			tc.view as table_view,
 			tn.dashboard_id as dashboard_id,
 			td.name as dashboard_name,
 			tn.name as title
@@ -2286,26 +2291,80 @@ func (r *Repository) DeleteAPIKey(ctx context.Context, userID, apiKeyID int) err
 
 // GetConditionalFormattingRules retrieves conditional formatting rules
 func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID int, tableName string) ([]*ConditionalFormattingRule, error) {
+	// First check if sr_created column exists in table_conditional_formatting_rules
+	hasSrCreated := false
+	if r.db.DriverName() == "mysql" {
+		var count int
+		checkQuery := `SELECT COUNT(*) FROM information_schema.COLUMNS
+			WHERE TABLE_SCHEMA = DATABASE()
+			AND TABLE_NAME = 'table_conditional_formatting_rules'
+			AND COLUMN_NAME = 'sr_created'`
+		err := r.db.GetContext(ctx, &count, checkQuery)
+		if err == nil && count > 0 {
+			hasSrCreated = true
+		}
+	} else {
+		// SQLite - check using PRAGMA
+		type colInfo struct {
+			Cid  int    `db:"cid"`
+			Name string  `db:"name"`
+			Type string  `db:"type"`
+		}
+		var cols []colInfo
+		err := r.db.SelectContext(ctx, &cols, "PRAGMA table_info(table_conditional_formatting_rules)")
+		if err == nil {
+			for _, col := range cols {
+				if col.Name == "sr_created" {
+					hasSrCreated = true
+					break
+				}
+			}
+		}
+	}
+
 	var query string
 	var args []interface{}
 
-	if tableName != "" {
-		query = `
-			SELECT id, table_name, column_name, condition_type, condition_value,
-			       format_type, format_value, priority, is_active, sr_created, updated_at_unix
-			FROM table_conditional_formatting_rules
-			WHERE table_name = ?
-			ORDER BY priority ASC, id ASC
-		`
-		args = []interface{}{tableName}
+	if hasSrCreated {
+		// Query with sr_created column
+		if tableName != "" {
+			query = `
+				SELECT id, table_name, column_name, condition_type, condition_value,
+				       format_type, format_value, priority, is_active, sr_created, updated_at_unix
+				FROM table_conditional_formatting_rules
+				WHERE table_name = ?
+				ORDER BY priority ASC, id ASC
+			`
+			args = []interface{}{tableName}
+		} else {
+			query = `
+				SELECT id, table_name, column_name, condition_type, condition_value,
+				       format_type, format_value, priority, is_active, sr_created, updated_at_unix
+				FROM table_conditional_formatting_rules
+				ORDER BY table_name ASC, priority ASC, id ASC
+			`
+			args = []interface{}{}
+		}
 	} else {
-		query = `
-			SELECT id, table_name, column_name, condition_type, condition_value,
-			       format_type, format_value, priority, is_active, sr_created, updated_at_unix
-			FROM table_conditional_formatting_rules
-			ORDER BY table_name ASC, priority ASC, id ASC
-		`
-		args = []interface{}{}
+		// Query without sr_created column (for older schema versions)
+		if tableName != "" {
+			query = `
+				SELECT id, table_name, column_name, condition_type, condition_value,
+				       format_type, format_value, priority, is_active, updated_at_unix
+				FROM table_conditional_formatting_rules
+				WHERE table_name = ?
+				ORDER BY priority ASC, id ASC
+			`
+			args = []interface{}{tableName}
+		} else {
+			query = `
+				SELECT id, table_name, column_name, condition_type, condition_value,
+				       format_type, format_value, priority, is_active, updated_at_unix
+				FROM table_conditional_formatting_rules
+				ORDER BY table_name ASC, priority ASC, id ASC
+			`
+			args = []interface{}{}
+		}
 	}
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
@@ -2318,38 +2377,60 @@ func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID i
 	for rows.Next() {
 		var rule ConditionalFormattingRule
 		var srCreatedStr string
-		err := rows.Scan(
-			&rule.ID,
-			&rule.TableName,
-			&rule.ColumnName,
-			&rule.ConditionType,
-			&rule.ConditionValue,
-			&rule.FormatType,
-			&rule.FormatValue,
-			&rule.Priority,
-			&rule.IsActive,
-			&srCreatedStr,
-			&rule.UpdatedAtUnix,
-		)
-		if err != nil {
-			return nil, err
-		}
 
-		// Parse sr_created timestamp - try multiple formats
-		if srCreatedStr != "" {
-			// Try ISO 8601 format first (RFC3339) - used by SQLite
-			rule.SrCreated, err = time.Parse(time.RFC3339, srCreatedStr)
+		if hasSrCreated {
+			err := rows.Scan(
+				&rule.ID,
+				&rule.TableName,
+				&rule.ColumnName,
+				&rule.ConditionType,
+				&rule.ConditionValue,
+				&rule.FormatType,
+				&rule.FormatValue,
+				&rule.Priority,
+				&rule.IsActive,
+				&srCreatedStr,
+				&rule.UpdatedAtUnix,
+			)
 			if err != nil {
-				// Fallback to MySQL datetime format
-				rule.SrCreated, err = time.Parse("2006-01-02 15:04:05", srCreatedStr)
+				return nil, err
+			}
+
+			// Parse sr_created timestamp - try multiple formats
+			if srCreatedStr != "" {
+				// Try ISO 8601 format first (RFC3339) - used by SQLite
+				rule.SrCreated, err = time.Parse(time.RFC3339, srCreatedStr)
 				if err != nil {
-					// Try ISO 8601 without timezone
-					rule.SrCreated, err = time.Parse("2006-01-02T15:04:05", srCreatedStr)
+					// Fallback to MySQL datetime format
+					rule.SrCreated, err = time.Parse("2006-01-02 15:04:05", srCreatedStr)
 					if err != nil {
-						return nil, fmt.Errorf("failed to parse sr_created timestamp '%s' (tried RFC3339, MySQL datetime, and ISO without timezone): %w", srCreatedStr, err)
+						// Try ISO 8601 without timezone
+						rule.SrCreated, err = time.Parse("2006-01-02T15:04:05", srCreatedStr)
+						if err != nil {
+							// Don't fail if parsing fails, just log and continue with zero time
+							log.Warnf("Failed to parse sr_created timestamp '%s': %v", srCreatedStr, err)
+						}
 					}
 				}
 			}
+		} else {
+			// Scan without sr_created
+			err := rows.Scan(
+				&rule.ID,
+				&rule.TableName,
+				&rule.ColumnName,
+				&rule.ConditionType,
+				&rule.ConditionValue,
+				&rule.FormatType,
+				&rule.FormatValue,
+				&rule.Priority,
+				&rule.IsActive,
+				&rule.UpdatedAtUnix,
+			)
+			if err != nil {
+				return nil, err
+			}
+			// sr_created will remain as zero time
 		}
 
 		rules = append(rules, &rule)
