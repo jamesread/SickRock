@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
-import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon, CheckListIcon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon, CheckListIcon, Delete01Icon, Download01Icon } from '@hugeicons/core-free-icons'
 import { createApiClient } from './stores/api'
 import Header from 'picocrank/vue/components/Header.vue'
 import logo from './resources/images/logo.png'
@@ -14,6 +14,8 @@ import { InitRequestSchema, ItemSchema } from './gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { useKeyboardShortcuts, type KeyboardShortcut } from './composables/useKeyboardShortcuts'
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
+import PWAInstallPrompt from './components/PWAInstallPrompt.vue'
+import { usePWAInstall } from './composables/usePWAInstall'
 
 const sidebar = ref(null)
 const isSidebarOpen = ref(true)
@@ -41,6 +43,8 @@ router.afterEach(() => {
     persistSidebarState()
     // Close QuickSearch dialog when navigation occurs (e.g., item selected)
     showQuickSearchDialog.value = false
+    // Check if current page can be bookmarked
+    checkCanBookmarkCurrentPage()
 })
 
 function toggleSidebar() {
@@ -58,6 +62,7 @@ async function handleLogout() {
 const pages = ref<Array<{ id: string; title: string; slug: string; view: string; icon: string, path: string }>>([])
 const version = ref<string>('')
 const quickSearch = ref(null)
+const appTitle = ref<string>('SickRock') // Default to 'SickRock', will be loaded from settings
 
 // Bookmarks state
 const bookmarks = ref<Array<{
@@ -74,6 +79,7 @@ const bookmarks = ref<Array<{
     tableView: string;
     dashboardId: number;
     dashboardName: string;
+    workflowId: number;
   };
 }>>([])
 
@@ -104,6 +110,21 @@ let gKeyOverlayTimeout: ReturnType<typeof setTimeout> | null = null
 const tableFilterFocusRequest = ref<(() => void) | null>(null)
 provide('tableFilterFocusRequest', tableFilterFocusRequest)
 
+// PWA Install
+const { isInstallable, isInstalled, promptInstall } = usePWAInstall()
+const installingPWA = ref(false)
+
+async function handlePWAInstall() {
+  installingPWA.value = true
+  try {
+    await promptInstall()
+  } catch (error) {
+    console.error('Failed to install PWA:', error)
+  } finally {
+    installingPWA.value = false
+  }
+}
+
 async function loadAppData() {
     // Only load data if authenticated
     if (!authStore.isAuthenticated) {
@@ -117,6 +138,21 @@ async function loadAppData() {
         // Get build info
         const initResponse = await apiClient.init(create(InitRequestSchema , {}))
         version.value = initResponse.version
+
+        // Load appTitle setting from table_settings
+        try {
+            const settingsResponse = await apiClient.listItems({ tcName: 'table_settings', where: { setting_key: 'appTitle' } })
+            if (settingsResponse.items && settingsResponse.items.length > 0) {
+                const appTitleItem = settingsResponse.items[0]
+                const stringVal = appTitleItem.additionalFields?.string_val
+                if (stringVal) {
+                    appTitle.value = stringVal
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load appTitle setting, using default:', e)
+            // Keep default 'SickRock' if loading fails
+        }
 
         const navResponse = await apiClient.getNavigation({})
 
@@ -134,7 +170,8 @@ async function loadAppData() {
             icon: bookmark.navigationItem.icon,
             tableView: bookmark.navigationItem.tableView,
             dashboardId: bookmark.navigationItem.dashboardId,
-            dashboardName: bookmark.navigationItem.dashboardName
+            dashboardName: bookmark.navigationItem.dashboardName,
+            workflowId: bookmark.navigationItem.workflowId || 0
           } : undefined
         }))
 
@@ -299,6 +336,44 @@ async function loadAppData() {
                 icon: DatabaseSettingIcon
             })
 
+            // Workflows
+            sidebar.value.addNavigationLink({
+                id: 'workflows',
+                name: 'Workflows',
+                title: 'Workflows',
+                path: '/table/table_workflows',
+                icon: DatabaseSettingIcon
+            })
+            quickSearch.value?.addItem({
+                id: 'workflows',
+                name: 'Workflows',
+                title: 'Workflows',
+                description: 'Manage workflows',
+                category: 'Navigation',
+                path: '/table/table_workflows',
+                type: 'route',
+                icon: DatabaseSettingIcon
+            })
+
+            // Settings
+            sidebar.value.addNavigationLink({
+                id: 'settings',
+                name: 'Settings',
+                title: 'Settings',
+                path: '/table/table_settings',
+                icon: DatabaseSettingIcon
+            })
+            quickSearch.value?.addItem({
+                id: 'settings',
+                name: 'Settings',
+                title: 'Settings',
+                description: 'Manage application settings',
+                category: 'Navigation',
+                path: '/table/table_settings',
+                type: 'route',
+                icon: DatabaseSettingIcon
+            })
+
             // Navigation items
             sidebar.value.addNavigationLink({
                 id: 'nav-items',
@@ -400,38 +475,108 @@ watch(() => router.currentRoute.value.hash, (hash) => {
     }
 })
 
+// Watch for bookmarks dialog opening to check if current page can be bookmarked
+watch(showBookmarks, async (isOpen) => {
+    if (isOpen) {
+        await checkCanBookmarkCurrentPage()
+    }
+})
+
 // Bookmark management
 const currentRoute = computed(() => router.currentRoute.value)
+const canBookmarkCurrentPage = ref(false)
 
 const isCurrentPageBookmarked = computed(() => {
-    if (!currentRoute.value.name) return false
+    if (!currentRoute.value.path) return false
 
     // Check if current route matches any bookmarked navigation item
     const currentPath = currentRoute.value.path
     return bookmarks.value.some(bookmark => {
         if (!bookmark.navigationItem) return false
 
+        // Check table/dashboard paths
         const bookmarkPath = bookmark.navigationItem.dashboardId > 0
             ? `/dashboard/${bookmark.navigationItem.dashboardName}`
             : `/table/${bookmark.navigationItem.tableName}`
 
-        return bookmarkPath === currentPath
+        if (bookmarkPath === currentPath) return true
+
+        // Check workflow path - if navigation item has workflowId, check if it matches
+        if (currentPath.startsWith('/workflow/') && bookmark.navigationItem.workflowId && bookmark.navigationItem.workflowId > 0) {
+            const workflowIdMatch = currentPath.match(/^\/workflow\/(\d+)$/)
+            if (workflowIdMatch) {
+                const workflowId = Number(workflowIdMatch[1])
+                return bookmark.navigationItem.workflowId === workflowId
+            }
+        }
+
+        return false
     })
 })
 
+// Check if current page can be bookmarked (has a matching navigation item)
+async function checkCanBookmarkCurrentPage() {
+    if (!currentRoute.value.path) {
+        canBookmarkCurrentPage.value = false
+        return
+    }
+
+    const currentPath = currentRoute.value.path
+
+    try {
+        const navResponse = await apiClient.getNavigation({})
+
+        // Check if path matches a navigation item (table/dashboard)
+        let matchingItem = navResponse.items?.find(item => {
+            const itemPath = item.dashboardId > 0
+                ? `/dashboard/${item.dashboardName}`
+                : `/table/${item.tableName}`
+            return itemPath === currentPath
+        })
+
+        // If no direct match, check if it's a workflow route
+        if (!matchingItem && currentPath.startsWith('/workflow/')) {
+            const workflowIdMatch = currentPath.match(/^\/workflow\/(\d+)$/)
+            if (workflowIdMatch) {
+                const workflowId = Number(workflowIdMatch[1])
+                // Find navigation item that references this workflow
+                matchingItem = navResponse.items?.find(item => item.workflowId === workflowId)
+            }
+        }
+
+        canBookmarkCurrentPage.value = !!matchingItem
+        console.log('[Bookmarks] Can bookmark current page:', canBookmarkCurrentPage.value, 'for path:', currentPath, 'matching item:', matchingItem)
+    } catch (e) {
+        console.warn('Failed to check if current page can be bookmarked:', e)
+        canBookmarkCurrentPage.value = false
+    }
+}
+
 async function toggleCurrentPageBookmark() {
-    if (!currentRoute.value.name) return
+    if (!currentRoute.value.path) return
 
     const currentPath = currentRoute.value.path
 
     // Find matching navigation item
     const navResponse = await apiClient.getNavigation({})
-    const matchingItem = navResponse.items?.find(item => {
+
+    // Check if path matches a navigation item (table/dashboard)
+    let matchingItem = navResponse.items?.find(item => {
         const itemPath = item.dashboardId > 0
             ? `/dashboard/${item.dashboardName}`
             : `/table/${item.tableName}`
         return itemPath === currentPath
     })
+
+    // If no direct match, check if it's a workflow route
+    if (!matchingItem && currentPath.startsWith('/workflow/')) {
+        const workflowIdMatch = currentPath.match(/^\/workflow\/(\d+)$/)
+        if (workflowIdMatch) {
+            const workflowId = Number(workflowIdMatch[1])
+            // Find navigation item that references this workflow
+            matchingItem = navResponse.items?.find(item => item.workflowId === workflowId)
+        }
+    }
 
     if (!matchingItem) {
         console.warn('No matching navigation item found for current page')
@@ -443,18 +588,28 @@ async function toggleCurrentPageBookmark() {
             // Remove bookmark
             const bookmark = bookmarks.value.find(b => b.navigationItemId === matchingItem.id)
             if (bookmark) {
-                await apiClient.deleteUserBookmark({ bookmarkId: bookmark.id })
-                // Reload bookmarks
-                await loadAppData()
+                await removeBookmark(bookmark.id)
             }
         } else {
             // Add bookmark
             await apiClient.createUserBookmark({ navigationItemId: matchingItem.id })
             // Reload bookmarks
             await loadAppData()
+            // Update canBookmarkCurrentPage state
+            canBookmarkCurrentPage.value = true
         }
     } catch (error) {
         console.error('Failed to toggle bookmark:', error)
+    }
+}
+
+async function removeBookmark(bookmarkId: number) {
+    try {
+        await apiClient.deleteUserBookmark({ bookmarkId })
+        // Reload bookmarks
+        await loadAppData()
+    } catch (error) {
+        console.error('Failed to remove bookmark:', error)
     }
 }
 
@@ -780,12 +935,13 @@ useKeyboardShortcuts(shortcuts)
 
 onMounted(async () => {
     await loadAppData()
+    await checkCanBookmarkCurrentPage()
 })
 </script>
 
 <template>
     <Header
-        title = "SickRock"
+        :title = "appTitle"
         :logoUrl = "logo"
         :username = "user?.username"
         @toggleSidebar = "toggleSidebar"
@@ -839,6 +995,15 @@ onMounted(async () => {
 
         <template #user-info>
             <button
+                v-if="isInstallable && !isInstalled"
+                @click="handlePWAInstall"
+                :disabled="installingPWA"
+                class="pwa-install-header-button"
+                :title="installingPWA ? 'Installing...' : 'Install App'"
+            >
+                <HugeiconsIcon :icon="Hugeicons.Download01Icon" />
+            </button>
+            <button
                 @click="showShortcutsHelp = true"
                 class="help-button"
                 title="Keyboard Shortcuts (g then ?)"
@@ -871,7 +1036,17 @@ onMounted(async () => {
                 <router-view :key="$route.path" />
             </main>
             <footer v-if="version">
-                <span>SickRock</span>
+                <span>
+                    <a
+                        href="https://github.com/jamesread/SickRock"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        class="github-link"
+                        title="View on GitHub"
+                    >
+                        SickRock
+                    </a>
+                </span>
                 <span>{{ version }}</span>
             </footer>
         </div>
@@ -914,30 +1089,54 @@ onMounted(async () => {
             </div>
             <div class="modal-body">
                 <div class="bookmarks-toolbar">
+                    <!-- Bookmark this page button -->
+                    <div v-if="!isCurrentPageBookmarked && canBookmarkCurrentPage" class="bookmark-this-page-section">
+                        <button
+                            @click="toggleCurrentPageBookmark"
+                            class="button primary bookmark-this-page-button"
+                        >
+                            <HugeiconsIcon :icon="Hugeicons.BookmarkIcon" />
+                            Bookmark this page
+                        </button>
+                    </div>
                     <div v-if="bookmarks.length === 0" class="no-bookmarks-toolbar">
-                        No bookmarks yet
+                        <p v-if="isCurrentPageBookmarked">No other bookmarks</p>
+                        <p v-else>No bookmarks yet</p>
                     </div>
                     <div v-else class="bookmarks-list-toolbar">
-                        <router-link
+                        <div
                             v-for="bookmark in bookmarks.slice(0, 10)"
                             :key="bookmark.id"
-                            :to="bookmark.navigationItem?.dashboardId > 0
-                                ? `/dashboard/${bookmark.navigationItem.dashboardName}`
-                                : `/table/${bookmark.navigationItem?.tableName}`"
-                            class="bookmark-toolbar-item"
-                            :title="bookmark.title || bookmark.navigationItem?.tableName"
-                            @click="showBookmarks = false"
+                            class="bookmark-item-wrapper"
                         >
-                            <HugeiconsIcon
-                                :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
-                                    ? (Hugeicons as any)[bookmark.navigationItem.icon]
-                                    : DatabaseIcon"
-                                class="bookmark-toolbar-icon"
-                            />
-                            <span class="bookmark-toolbar-text">
-                                {{ bookmark.title || bookmark.navigationItem?.tableName }}
-                            </span>
-                        </router-link>
+                            <router-link
+                                :to="bookmark.navigationItem?.dashboardId > 0
+                                    ? `/dashboard/${bookmark.navigationItem.dashboardName}`
+                                    : bookmark.navigationItem?.workflowId && bookmark.navigationItem.workflowId > 0
+                                    ? `/workflow/${bookmark.navigationItem.workflowId}`
+                                    : `/table/${bookmark.navigationItem?.tableName}`"
+                                class="bookmark-toolbar-item"
+                                :title="bookmark.title || bookmark.navigationItem?.tableName"
+                                @click="showBookmarks = false"
+                            >
+                                <HugeiconsIcon
+                                    :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
+                                        ? (Hugeicons as any)[bookmark.navigationItem.icon]
+                                        : DatabaseIcon"
+                                    class="bookmark-toolbar-icon"
+                                />
+                                <span class="bookmark-toolbar-text">
+                                    {{ bookmark.title || bookmark.navigationItem?.tableName }}
+                                </span>
+                            </router-link>
+                            <button
+                                @click.stop="removeBookmark(bookmark.id)"
+                                class="bookmark-delete-button"
+                                :title="'Remove bookmark'"
+                            >
+                                <HugeiconsIcon :icon="Hugeicons.Delete01Icon" />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -958,6 +1157,9 @@ onMounted(async () => {
             <span v-else class="g-key-waiting">Waiting for second key...</span>
         </div>
     </div>
+
+    <!-- PWA Install Prompt -->
+    <PWAInstallPrompt v-if="isAuthenticated" />
 </template>
 
 <style scoped>
@@ -1005,6 +1207,34 @@ onMounted(async () => {
     border-color: rgba(255, 255, 255, 0.2);
     color: white;
     transform: translateY(-1px);
+}
+
+.pwa-install-header-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: transparent;
+    color: white;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-right: 0.5rem;
+}
+
+.pwa-install-header-button:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: white;
+    transform: translateY(-1px);
+}
+
+.pwa-install-header-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .bookmark-button.bookmarked {
@@ -1273,9 +1503,59 @@ onMounted(async () => {
     overflow: hidden;
 }
 
+.bookmark-item-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.bookmark-item-wrapper .bookmark-toolbar-item {
+    flex: 1;
+}
+
+.bookmark-delete-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.bookmark-delete-button:hover {
+    background: #f3f4f6;
+    color: #dc2626;
+}
+
+.bookmark-delete-button :deep(svg) {
+    width: 16px;
+    height: 16px;
+}
+
 .bookmarks-modal .no-bookmarks-toolbar {
     color: #6c757d;
     font-style: italic;
+    padding: 8px 0;
+}
+
+.bookmark-this-page-section {
+    margin-bottom: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.bookmark-this-page-button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .search-toolbar {
@@ -1393,9 +1673,63 @@ onMounted(async () => {
         display: none;
     }
 
+    .help-button {
+        display: none;
+    }
+
     .g-key-content {
         font-size: 0.95rem;
         padding: 0.75rem 1.25rem;
+    }
+}
+
+/* Constrain main content area to prevent page scrolling */
+#layout {
+    display: flex;
+    height: calc(100vh - 60px); /* Subtract header height */
+    overflow: hidden;
+}
+
+#content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+#content main {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+footer span {
+    color: #666;
+}
+
+.github-link {
+    color: #007bff;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.github-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.github-link:visited {
+    color: #007bff;
+}
+
+@media (max-width: 768px) {
+    footer {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+        font-size: 0.8rem;
     }
 }
 </style>

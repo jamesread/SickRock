@@ -13,7 +13,8 @@ import {
   HomeIcon,
   UserIcon,
   KeyIcon,
-  DatabaseIcon
+  DatabaseIcon,
+  Download01Icon
 } from '@hugeicons/core-free-icons'
 
 const router = useRouter()
@@ -168,6 +169,10 @@ async function resetUserPassword() {
             <HugeiconsIcon :icon="DatabaseIcon" width="18" height="18" class="action-icon" />
             Database Browser
           </router-link>
+          <router-link to="/admin/pwa-installation" class="button">
+            <HugeiconsIcon :icon="Download01Icon" width="18" height="18" class="action-icon" />
+            PWA & Service Worker
+          </router-link>
           <button @click="refreshData" class="button" :disabled="loading">
             <HugeiconsIcon :icon="RefreshIcon" width="18" height="18" class="action-icon" />
             Refresh All Data
@@ -210,6 +215,16 @@ async function resetUserPassword() {
           <router-link to="/table/device_codes" class="button">
             <HugeiconsIcon :icon="KeyIcon" width="18" height="18" class="action-icon" />
             View Device Codes
+          </router-link>
+        </div>
+      </Section>
+
+      <!-- PWA & Service Worker -->
+      <Section title = "PWA & Service Worker">
+        <div class="quick-actions">
+          <router-link to="/admin/pwa-installation" class="button">
+            <HugeiconsIcon :icon="Download01Icon" width="18" height="18" class="action-icon" />
+            PWA Installation & Service Worker
           </router-link>
         </div>
       </Section>

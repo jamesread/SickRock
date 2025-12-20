@@ -1,8 +1,12 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    basicSsl()
+  ],
   build: {
     rollupOptions: {
       plugins: [
@@ -11,6 +15,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    https: true,
     allowedHosts: ['mindstorm', '0.0.0.0', "baneling.teratan.net"],
     proxy: {
       '/api': {

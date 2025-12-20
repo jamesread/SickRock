@@ -3,7 +3,7 @@ import { ref, onMounted, computed, inject } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import * as Hugeicons from '@hugeicons/core-free-icons'
-import { DatabaseIcon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, Download01Icon } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
@@ -207,6 +207,18 @@ function formatExpirationDate(timestamp: number): string {
   return formatUnixTimestamp(timestamp)
 }
 
+function formatSWState(state: string | null): string {
+  if (!state) return 'Unknown'
+  const stateMap: Record<string, string> = {
+    'installing': 'Installing',
+    'installed': 'Installed',
+    'activating': 'Activating',
+    'activated': 'Active',
+    'redundant': 'Redundant'
+  }
+  return stateMap[state] || state.charAt(0).toUpperCase() + state.slice(1)
+}
+
 async function savePreferences() {
   try {
     // TODO: Implement actual preferences saving to API
@@ -324,6 +336,18 @@ onMounted(async () => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- PWA & Service Worker Section -->
+        <div class="pwa-section">
+          <h3>PWA & Service Worker</h3>
+          <p>Manage Progressive Web App installation and service worker status.</p>
+          <div class="pwa-actions">
+            <router-link to="/admin/pwa-installation" class="pwa-link-button">
+              <HugeiconsIcon :icon="Hugeicons.Download01Icon" />
+              Open PWA Installation & Service Worker
+            </router-link>
           </div>
         </div>
 
@@ -858,5 +882,54 @@ onMounted(async () => {
 
 .delete-button:hover {
   background: #c82333;
+}
+
+/* PWA Section */
+.pwa-section {
+  margin-top: 2rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+}
+
+.pwa-section h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+}
+
+.pwa-section p {
+  margin: 0 0 1rem 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.pwa-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.pwa-link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #007bff;
+  color: white;
+  text-decoration: none;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
+}
+
+.pwa-link-button:hover {
+  background: #0056b3;
+  color: white;
+  text-decoration: none;
+}
+
+.pwa-link-button svg {
+  width: 18px;
+  height: 18px;
 }
 </style>

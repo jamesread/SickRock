@@ -1,5 +1,44 @@
-const CACHE_NAME = 'sickrock-v1';
-const STATIC_CACHE_NAME = 'sickrock-static-v1';
+const CACHE_NAME = 'sickrock-v3';
+const STATIC_CACHE_NAME = 'sickrock-static-v3';
+
+// Routes that should be cached for offline use (table views only)
+const CACHEABLE_ROUTES = [
+  '/',
+  '/table/'
+];
+
+// Routes that should NOT be cached (admin/control panel)
+const EXCLUDED_ROUTES = [
+  '/admin/',
+  '/control-panel',
+  '/user-preferences',
+  '/dashboards',
+  '/workflow/',
+  '/device-code-claimer'
+];
+
+// Check if a URL should be cached
+function shouldCache(url) {
+  const urlPath = new URL(url).pathname;
+
+  // Don't cache excluded routes
+  if (EXCLUDED_ROUTES.some(route => urlPath.startsWith(route))) {
+    return false;
+  }
+
+  // Don't cache API requests (we use IndexedDB for table data)
+  if (urlPath.startsWith('/api/')) {
+    return false;
+  }
+
+  // Cache table routes and home
+  if (urlPath === '/' || urlPath.startsWith('/table/')) {
+    return true;
+  }
+
+  // Don't cache other routes
+  return false;
+}
 
 // Install event - cache essential resources
 self.addEventListener('install', (event) => {
@@ -55,6 +94,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+
+  // Don't cache API requests - table data is handled via IndexedDB
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // Only cache specific routes (table views, not admin/control panel)
+  if (!shouldCache(event.request.url)) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -74,19 +125,23 @@ self.addEventListener('fetch', (event) => {
             // Clone the response
             const responseToCache = response.clone();
 
-            // Cache the response
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
+            // Cache the response (only for cacheable routes)
+            if (shouldCache(event.request.url)) {
+              caches.open(CACHE_NAME)
+                .then((cache) => {
+                  cache.put(event.request, responseToCache);
+                });
+            }
 
             return response;
           })
           .catch(() => {
             // Return offline page for navigation requests when offline
             if (event.request.mode === 'navigate') {
-              return caches.match('/offline.html');
+              return caches.match('/offline.html') || caches.match('/');
             }
+            // For other requests, return cached version if available
+            return caches.match(event.request);
           });
       })
   );

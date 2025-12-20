@@ -16,9 +16,11 @@ import { formatUnixTimestamp } from '../utils/dateFormatting'
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../composables/useKeyboardShortcuts'
 import { useTableViewManager } from '../composables/useTableViewManager'
 import ViewsButton from './ViewsButton.vue'
+import { hasUuidColumn, saveTableData, loadTableData, isOnline } from '../utils/indexedDB'
 
 const router = useRouter()
 const tableStructure = ref<GetTableStructureResponse | null>(null)
+const tableTitle = ref<string>('')
 
 // Foreign key lookup state
 const foreignKeys = ref<Array<{
@@ -77,7 +79,7 @@ const defaultView = computed(() => tableViews.value.find(v => v.isDefault) || nu
 
 // Computed property for the section title
 const sectionTitle = computed(() => {
-  return props.title || `Table: ${props.tableId}`
+  return props.title || tableTitle.value || props.tableId
 })
 
 // Computed property for view options (including default) for other parts of the UI
@@ -192,6 +194,17 @@ async function loadStructure() {
       localFields.value = names
       selectedColumns.value = [...names]
     }
+  }
+
+  // Load table configuration to get the title
+  try {
+    const configs = await client.getTableConfigurations({})
+    const config = configs.pages?.find(p => p.id === props.tableId)
+    if (config && config.title) {
+      tableTitle.value = config.title
+    }
+  } catch (e) {
+    console.warn('Failed to load table configuration for title:', e)
   }
 }
 
@@ -733,10 +746,76 @@ async function load() {
         where[k] = hasWildcard ? v : `%${v}%`
       }
     })
+
+    const online = isOnline()
+
+    // If offline, wait a bit for structure to load (in case load() was called before loadStructure())
+    if (!online && !tableStructure.value) {
+      // Wait up to 2 seconds for structure to load
+      for (let i = 0; i < 20 && !tableStructure.value; i++) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+
+    // Check if table has uuid column for offline caching
+    const fields = tableStructure.value?.fields ?? []
+    const canCacheOffline = hasUuidColumn(fields)
+
+    // If offline and table has uuid, try to load from IndexedDB
+    if (!online && canCacheOffline) {
+      const cachedItems = await loadTableData(props.tableId, where)
+      if (cachedItems && cachedItems.length > 0) {
+        items.value = cachedItems as Item[]
+        console.log(`[TableComponent] Loaded ${cachedItems.length} items from IndexedDB (offline)`)
+        return
+      } else {
+        // No cached data available offline
+        error.value = 'No offline data available. Please connect to the internet to load table data.'
+        items.value = []
+        return
+      }
+    }
+
+    // Fetch from API (online or table doesn't have uuid)
     const res = await client.listItems({ tcName: props.tableId, where })
     items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
+
+    // If table has uuid and we're online, save to IndexedDB for offline use
+    if (canCacheOffline && online) {
+      try {
+        await saveTableData(props.tableId, items.value, where)
+        console.log(`[TableComponent] Saved ${items.value.length} items to IndexedDB for offline use`)
+      } catch (cacheError) {
+        console.warn('[TableComponent] Failed to cache table data:', cacheError)
+        // Don't fail the load if caching fails
+      }
+    }
   } catch (e) {
     error.value = String(e)
+
+    // If online fetch failed and we have cached data, try to use it
+    if (isOnline() === false) {
+      const fields = tableStructure.value?.fields ?? []
+      if (hasUuidColumn(fields)) {
+        try {
+          const where: Record<string, string> = {}
+          Object.entries(columnFilters.value).forEach(([k, v]) => {
+            if (v && v.trim() !== '') {
+              const hasWildcard = v.includes('%')
+              where[k] = hasWildcard ? v : `%${v}%`
+            }
+          })
+          const cachedItems = await loadTableData(props.tableId, where)
+          if (cachedItems && cachedItems.length > 0) {
+            items.value = cachedItems as Item[]
+            error.value = null // Clear error since we have cached data
+            console.log(`[TableComponent] Using cached data after fetch failure: ${cachedItems.length} items`)
+          }
+        } catch (cacheError) {
+          console.warn('[TableComponent] Failed to load cached data:', cacheError)
+        }
+      }
+    }
   } finally {
     loading.value = false
   }
@@ -1328,6 +1407,7 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <div class="table-component-wrapper">
   <Section :title="sectionTitle" :padding="false">
     <template v-if="showToolbar" #toolbar>
       <div class="toolbar-group">
@@ -1437,6 +1517,7 @@ onUnmounted(() => {
           🗑️ Delete Selected ({{ selectedKeys.size }})
         </button>
       </div>
+      <div class="table-scroll-container">
       <table class="table row-hover">
         <colgroup>
           <col class="checkbox-col">
@@ -1566,6 +1647,7 @@ onUnmounted(() => {
           </tr>
         </tbody>
       </table>
+      </div>
 	  <div v-if="showPagination" class = "padding">
 		  <Pagination
 		    :total="total"
@@ -1640,6 +1722,7 @@ onUnmounted(() => {
       </div>
     </div>
   </Section>
+  </div>
 
   <!-- Column context menu -->
   <div
@@ -1782,9 +1865,63 @@ onUnmounted(() => {
   color: #b00020;
 }
 
+/* Constrain the table component wrapper */
+.table-component-wrapper {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 150px);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Constrain the Section component itself */
+.table-component-wrapper :deep(.section) {
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  flex: 1 !important;
+}
+
+.table-component-wrapper :deep(.section > *),
+.table-component-wrapper :deep([class*="section-body"]),
+.table-component-wrapper :deep([class*="section-content"]) {
+  flex: 1 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.section-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  max-height: 100%;
+}
+
+.table-scroll-container {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  max-height: 100%;
+  position: relative;
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;
+  min-width: max-content;
+}
+
+.table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #fff;
 }
 
 /* Column group styles for consistent column widths */
@@ -1822,9 +1959,6 @@ onUnmounted(() => {
   text-align: left;
   border-bottom: 1px solid #ddd;
   padding: .5rem;
-}
-
-.table thead th {
   cursor: pointer;
   transition: color .15s ease-in-out;
   background-color: #fff;

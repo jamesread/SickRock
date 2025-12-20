@@ -1973,14 +1973,19 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			tn.ordinal,
 			tn.table_configuration,
 			tc.name as table_name,
-			tc.icon as table_icon,
+			COALESCE(tc.title, tc.name) as table_title,
+			tc.icon as icon,
 			tn.dashboard_id as dashboard_id,
 			td.name as dashboard_name,
+			tn.name as navigation,
+			tn.workflow_id as workflow_id,
+			tw.name as workflow_name,
 			tn.name as title
 		FROM table_user_bookmarks ub
 		LEFT JOIN table_navigation tn ON ub.navigation_item = tn.id
 		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
 		LEFT JOIN table_dashboards td ON tn.dashboard_id = td.id
+		LEFT JOIN table_workflows tw ON tn.workflow_id = tw.id
 		WHERE ub.user = ?
 		ORDER BY ub.id DESC
 	`
@@ -2003,10 +2008,13 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			&navItem.Ordinal,
 			&navItem.TableConfiguration,
 			&navItem.TableName,
+			&navItem.TableTitle,
 			&navItem.Icon,
-			&navItem.TableView,
 			&navItem.DashboardID,
 			&navItem.DashboardName,
+			&navItem.Navigation,
+			&navItem.WorkflowID,
+			&navItem.WorkflowName,
 			&bookmark.Title,
 		)
 		if err != nil {
@@ -2307,8 +2315,8 @@ func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID i
 		// SQLite - check using PRAGMA
 		type colInfo struct {
 			Cid  int    `db:"cid"`
-			Name string  `db:"name"`
-			Type string  `db:"type"`
+			Name string `db:"name"`
+			Type string `db:"type"`
 		}
 		var cols []colInfo
 		err := r.db.SelectContext(ctx, &cols, "PRAGMA table_info(table_conditional_formatting_rules)")

@@ -413,6 +413,27 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 		return nil, err
 	}
 
+	// Get conditional formatting rules once for all items (not per item)
+	var rules []*repo.ConditionalFormattingRule
+	userID, err := s.getUserIDFromContext(ctx)
+	if err == nil {
+		rules, err = s.repo.GetConditionalFormattingRules(ctx, userID, table)
+		if err == nil {
+			log.WithFields(log.Fields{
+				"table":     table,
+				"userID":    userID,
+				"ruleCount": len(rules),
+			}).Info("ListItems: Retrieved conditional formatting rules")
+		} else {
+			log.WithError(err).WithFields(log.Fields{
+				"table":  table,
+				"userID": userID,
+			}).Error("ListItems: Failed to get conditional formatting rules")
+		}
+	} else {
+		log.WithError(err).Error("ListItems: Failed to get user ID from context")
+	}
+
 	out := make([]*sickrockpb.Item, 0, len(items))
 	for _, it := range items {
 		// Convert dynamic fields to string map for protobuf
@@ -429,95 +450,54 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 			}
 		}
 
-		// Process markdown formatting rules
-		userID, err := s.getUserIDFromContext(ctx)
-		if err == nil {
-			// Get conditional formatting rules for this table
-			rules, err := s.repo.GetConditionalFormattingRules(ctx, userID, table)
-			if err == nil {
-				log.WithFields(log.Fields{
-					"table":     table,
-					"userID":    userID,
-					"ruleCount": len(rules),
-					"itemID":    it.ID,
-				}).Info("ListItems: Retrieved conditional formatting rules")
+		// Process markdown formatting rules (using rules fetched once above)
+		if err == nil && rules != nil {
 
-				// Find markdown rules and render markdown for applicable fields
-				for _, rule := range rules {
-					if rule.FormatType == "markdown" && rule.IsActive {
-						// Check if this rule applies to the current item
-						fieldValue := ""
-						if val, exists := it.Fields[rule.ColumnName]; exists && val != nil {
-							fieldValue = fmt.Sprintf("%v", val)
-						}
+			// Find markdown rules and render markdown for applicable fields
+			for _, rule := range rules {
+				if rule.FormatType == "markdown" && rule.IsActive {
+					// Check if this rule applies to the current item
+					fieldValue := ""
+					if val, exists := it.Fields[rule.ColumnName]; exists && val != nil {
+						fieldValue = fmt.Sprintf("%v", val)
+					}
 
-						log.WithFields(log.Fields{
-							"ruleID":         rule.ID,
-							"columnName":     rule.ColumnName,
-							"fieldValue":     fieldValue,
-							"conditionType":  rule.ConditionType,
-							"conditionValue": rule.ConditionValue,
-							"itemID":         it.ID,
-						}).Info("ListItems: Evaluating markdown rule condition")
-
-						shouldApply := false
-						switch rule.ConditionType {
-						case "always":
-							shouldApply = true
-						case "equals":
-							shouldApply = fieldValue == rule.ConditionValue
-						case "contains":
-							shouldApply = strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
-						case "greater_than":
-							if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
-								if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
-									shouldApply = fieldNum > conditionNum
-								}
-							}
-						case "less_than":
-							if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
-								if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
-									shouldApply = fieldNum < conditionNum
-								}
+					shouldApply := false
+					switch rule.ConditionType {
+					case "always":
+						shouldApply = true
+					case "equals":
+						shouldApply = fieldValue == rule.ConditionValue
+					case "contains":
+						shouldApply = strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
+					case "greater_than":
+						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
+							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
+								shouldApply = fieldNum > conditionNum
 							}
 						}
-
-						log.WithFields(log.Fields{
-							"ruleID":      rule.ID,
-							"shouldApply": shouldApply,
-							"itemID":      it.ID,
-						}).Info("ListItems: Markdown rule evaluation result")
-
-						if shouldApply {
-							// Prepare markdown content
-							markdownContent := fieldValue
-							if rule.FormatValue != "" {
-								markdownContent = fieldValue + "\n\n" + rule.FormatValue
+					case "less_than":
+						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
+							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
+								shouldApply = fieldNum < conditionNum
 							}
-
-							// Render markdown and add to additional fields
-							markdownFieldName := rule.ColumnName + "Markdown"
-							renderedMarkdown := renderMarkdown(markdownContent)
-							additionalFields[markdownFieldName] = renderedMarkdown
-
-							log.WithFields(log.Fields{
-								"ruleID":            rule.ID,
-								"markdownFieldName": markdownFieldName,
-								"markdownContent":   markdownContent,
-								"renderedMarkdown":  renderedMarkdown,
-								"itemID":            it.ID,
-							}).Info("ListItems: Added markdown field to additional fields")
 						}
 					}
+
+					if shouldApply {
+						// Prepare markdown content
+						markdownContent := fieldValue
+						if rule.FormatValue != "" {
+							markdownContent = fieldValue + "\n\n" + rule.FormatValue
+						}
+
+						// Render markdown and add to additional fields
+						markdownFieldName := rule.ColumnName + "Markdown"
+						renderedMarkdown := renderMarkdown(markdownContent)
+						additionalFields[markdownFieldName] = renderedMarkdown
+					}
 				}
-			} else {
-				log.WithError(err).WithFields(log.Fields{
-					"table":  table,
-					"userID": userID,
-				}).Error("ListItems: Failed to get conditional formatting rules")
 			}
-		} else {
-			log.WithError(err).Error("ListItems: Failed to get user ID from context")
 		}
 
 		// Calculate relative time in seconds from now
