@@ -8,7 +8,6 @@ import (
 	"connectrpc.com/connect"
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	repo "github.com/jamesread/SickRock/internal/repo"
-	log "github.com/sirupsen/logrus"
 )
 
 // GetNotificationEvents retrieves all available notification events

@@ -48,7 +48,7 @@ async function loadAvailableDatabases() {
 
     // Debug logging to help troubleshoot
     console.log('Available databases loaded:', availableDatabases.value)
-    console.log('Table configurations:', response.pages?.map(p => ({ name: p.name, database: p.database })))
+    console.log('Table configurations:', response.pages?.map(p => ({ title: p.title, database: p.database })))
   } catch (e) {
     console.warn('Failed to load available databases:', e)
     // Fallback to just 'main' if loading fails
