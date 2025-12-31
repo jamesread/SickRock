@@ -159,6 +159,30 @@ const (
 	// SickRockDeleteConditionalFormattingRuleProcedure is the fully-qualified name of the SickRock's
 	// DeleteConditionalFormattingRule RPC.
 	SickRockDeleteConditionalFormattingRuleProcedure = "/sickrock.SickRock/DeleteConditionalFormattingRule"
+	// SickRockGetNotificationEventsProcedure is the fully-qualified name of the SickRock's
+	// GetNotificationEvents RPC.
+	SickRockGetNotificationEventsProcedure = "/sickrock.SickRock/GetNotificationEvents"
+	// SickRockGetUserNotificationChannelsProcedure is the fully-qualified name of the SickRock's
+	// GetUserNotificationChannels RPC.
+	SickRockGetUserNotificationChannelsProcedure = "/sickrock.SickRock/GetUserNotificationChannels"
+	// SickRockCreateUserNotificationChannelProcedure is the fully-qualified name of the SickRock's
+	// CreateUserNotificationChannel RPC.
+	SickRockCreateUserNotificationChannelProcedure = "/sickrock.SickRock/CreateUserNotificationChannel"
+	// SickRockUpdateUserNotificationChannelProcedure is the fully-qualified name of the SickRock's
+	// UpdateUserNotificationChannel RPC.
+	SickRockUpdateUserNotificationChannelProcedure = "/sickrock.SickRock/UpdateUserNotificationChannel"
+	// SickRockDeleteUserNotificationChannelProcedure is the fully-qualified name of the SickRock's
+	// DeleteUserNotificationChannel RPC.
+	SickRockDeleteUserNotificationChannelProcedure = "/sickrock.SickRock/DeleteUserNotificationChannel"
+	// SickRockGetUserNotificationSubscriptionsProcedure is the fully-qualified name of the SickRock's
+	// GetUserNotificationSubscriptions RPC.
+	SickRockGetUserNotificationSubscriptionsProcedure = "/sickrock.SickRock/GetUserNotificationSubscriptions"
+	// SickRockCreateUserNotificationSubscriptionProcedure is the fully-qualified name of the SickRock's
+	// CreateUserNotificationSubscription RPC.
+	SickRockCreateUserNotificationSubscriptionProcedure = "/sickrock.SickRock/CreateUserNotificationSubscription"
+	// SickRockDeleteUserNotificationSubscriptionProcedure is the fully-qualified name of the SickRock's
+	// DeleteUserNotificationSubscription RPC.
+	SickRockDeleteUserNotificationSubscriptionProcedure = "/sickrock.SickRock/DeleteUserNotificationSubscription"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -230,6 +254,15 @@ type SickRockClient interface {
 	CreateConditionalFormattingRule(context.Context, *connect.Request[proto.CreateConditionalFormattingRuleRequest]) (*connect.Response[proto.CreateConditionalFormattingRuleResponse], error)
 	UpdateConditionalFormattingRule(context.Context, *connect.Request[proto.UpdateConditionalFormattingRuleRequest]) (*connect.Response[proto.UpdateConditionalFormattingRuleResponse], error)
 	DeleteConditionalFormattingRule(context.Context, *connect.Request[proto.DeleteConditionalFormattingRuleRequest]) (*connect.Response[proto.DeleteConditionalFormattingRuleResponse], error)
+	// Notification System
+	GetNotificationEvents(context.Context, *connect.Request[proto.GetNotificationEventsRequest]) (*connect.Response[proto.GetNotificationEventsResponse], error)
+	GetUserNotificationChannels(context.Context, *connect.Request[proto.GetUserNotificationChannelsRequest]) (*connect.Response[proto.GetUserNotificationChannelsResponse], error)
+	CreateUserNotificationChannel(context.Context, *connect.Request[proto.CreateUserNotificationChannelRequest]) (*connect.Response[proto.CreateUserNotificationChannelResponse], error)
+	UpdateUserNotificationChannel(context.Context, *connect.Request[proto.UpdateUserNotificationChannelRequest]) (*connect.Response[proto.UpdateUserNotificationChannelResponse], error)
+	DeleteUserNotificationChannel(context.Context, *connect.Request[proto.DeleteUserNotificationChannelRequest]) (*connect.Response[proto.DeleteUserNotificationChannelResponse], error)
+	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
+	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
+	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -537,60 +570,116 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeleteConditionalFormattingRule")),
 			connect.WithClientOptions(opts...),
 		),
+		getNotificationEvents: connect.NewClient[proto.GetNotificationEventsRequest, proto.GetNotificationEventsResponse](
+			httpClient,
+			baseURL+SickRockGetNotificationEventsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetNotificationEvents")),
+			connect.WithClientOptions(opts...),
+		),
+		getUserNotificationChannels: connect.NewClient[proto.GetUserNotificationChannelsRequest, proto.GetUserNotificationChannelsResponse](
+			httpClient,
+			baseURL+SickRockGetUserNotificationChannelsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUserNotificationChannels")),
+			connect.WithClientOptions(opts...),
+		),
+		createUserNotificationChannel: connect.NewClient[proto.CreateUserNotificationChannelRequest, proto.CreateUserNotificationChannelResponse](
+			httpClient,
+			baseURL+SickRockCreateUserNotificationChannelProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateUserNotificationChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		updateUserNotificationChannel: connect.NewClient[proto.UpdateUserNotificationChannelRequest, proto.UpdateUserNotificationChannelResponse](
+			httpClient,
+			baseURL+SickRockUpdateUserNotificationChannelProcedure,
+			connect.WithSchema(sickRockMethods.ByName("UpdateUserNotificationChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteUserNotificationChannel: connect.NewClient[proto.DeleteUserNotificationChannelRequest, proto.DeleteUserNotificationChannelResponse](
+			httpClient,
+			baseURL+SickRockDeleteUserNotificationChannelProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationChannel")),
+			connect.WithClientOptions(opts...),
+		),
+		getUserNotificationSubscriptions: connect.NewClient[proto.GetUserNotificationSubscriptionsRequest, proto.GetUserNotificationSubscriptionsResponse](
+			httpClient,
+			baseURL+SickRockGetUserNotificationSubscriptionsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUserNotificationSubscriptions")),
+			connect.WithClientOptions(opts...),
+		),
+		createUserNotificationSubscription: connect.NewClient[proto.CreateUserNotificationSubscriptionRequest, proto.CreateUserNotificationSubscriptionResponse](
+			httpClient,
+			baseURL+SickRockCreateUserNotificationSubscriptionProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateUserNotificationSubscription")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteUserNotificationSubscription: connect.NewClient[proto.DeleteUserNotificationSubscriptionRequest, proto.DeleteUserNotificationSubscriptionResponse](
+			httpClient,
+			baseURL+SickRockDeleteUserNotificationSubscriptionProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationSubscription")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // sickRockClient implements SickRockClient.
 type sickRockClient struct {
-	init                            *connect.Client[proto.InitRequest, proto.InitResponse]
-	ping                            *connect.Client[proto.PingRequest, proto.PingResponse]
-	login                           *connect.Client[proto.LoginRequest, proto.LoginResponse]
-	logout                          *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
-	validateToken                   *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
-	resetUserPassword               *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
-	generateDeviceCode              *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
-	claimDeviceCode                 *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
-	checkDeviceCode                 *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
-	getDeviceCodeSession            *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
-	getNavigationLinks              *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
-	getTableConfigurations          *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
-	createTable                     *connect.Client[proto.CreateTableRequest, proto.CreateTableResponse]
-	createTableConfiguration        *connect.Client[proto.CreateTableConfigurationRequest, proto.CreateTableConfigurationResponse]
-	getDatabaseTables               *connect.Client[proto.GetDatabaseTablesRequest, proto.GetDatabaseTablesResponse]
-	getNavigation                   *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
-	listItems                       *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
-	createItem                      *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
-	getItem                         *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
-	editItem                        *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
-	deleteItem                      *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
-	getTableStructure               *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
-	addTableColumn                  *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
-	createTableView                 *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
-	updateTableView                 *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
-	getTableViews                   *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
-	deleteTableView                 *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
-	createForeignKey                *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
-	getForeignKeys                  *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
-	deleteForeignKey                *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
-	changeColumnType                *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
-	dropColumn                      *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
-	changeColumnName                *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
-	getMostRecentlyViewed           *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
-	getDashboards                   *connect.Client[proto.GetDashboardsRequest, proto.GetDashboardsResponse]
-	getDashboardComponentRules      *connect.Client[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse]
-	createDashboardComponentRule    *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
-	getSystemInfo                   *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
-	getUserBookmarks                *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
-	createUserBookmark              *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
-	deleteUserBookmark              *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
-	createAPIKey                    *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
-	getAPIKeys                      *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
-	deleteAPIKey                    *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
-	deactivateAPIKey                *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
-	getConditionalFormattingRules   *connect.Client[proto.GetConditionalFormattingRulesRequest, proto.GetConditionalFormattingRulesResponse]
-	createConditionalFormattingRule *connect.Client[proto.CreateConditionalFormattingRuleRequest, proto.CreateConditionalFormattingRuleResponse]
-	updateConditionalFormattingRule *connect.Client[proto.UpdateConditionalFormattingRuleRequest, proto.UpdateConditionalFormattingRuleResponse]
-	deleteConditionalFormattingRule *connect.Client[proto.DeleteConditionalFormattingRuleRequest, proto.DeleteConditionalFormattingRuleResponse]
+	init                               *connect.Client[proto.InitRequest, proto.InitResponse]
+	ping                               *connect.Client[proto.PingRequest, proto.PingResponse]
+	login                              *connect.Client[proto.LoginRequest, proto.LoginResponse]
+	logout                             *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
+	validateToken                      *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
+	resetUserPassword                  *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
+	generateDeviceCode                 *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
+	claimDeviceCode                    *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
+	checkDeviceCode                    *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
+	getDeviceCodeSession               *connect.Client[proto.GetDeviceCodeSessionRequest, proto.GetDeviceCodeSessionResponse]
+	getNavigationLinks                 *connect.Client[proto.GetNavigationLinksRequest, proto.GetNavigationLinksResponse]
+	getTableConfigurations             *connect.Client[proto.GetTableConfigurationsRequest, proto.GetTableConfigurationsResponse]
+	createTable                        *connect.Client[proto.CreateTableRequest, proto.CreateTableResponse]
+	createTableConfiguration           *connect.Client[proto.CreateTableConfigurationRequest, proto.CreateTableConfigurationResponse]
+	getDatabaseTables                  *connect.Client[proto.GetDatabaseTablesRequest, proto.GetDatabaseTablesResponse]
+	getNavigation                      *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
+	listItems                          *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
+	createItem                         *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
+	getItem                            *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
+	editItem                           *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
+	deleteItem                         *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
+	getTableStructure                  *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
+	addTableColumn                     *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
+	createTableView                    *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
+	updateTableView                    *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
+	getTableViews                      *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
+	deleteTableView                    *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
+	createForeignKey                   *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
+	getForeignKeys                     *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
+	deleteForeignKey                   *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
+	changeColumnType                   *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
+	dropColumn                         *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
+	changeColumnName                   *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
+	getMostRecentlyViewed              *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
+	getDashboards                      *connect.Client[proto.GetDashboardsRequest, proto.GetDashboardsResponse]
+	getDashboardComponentRules         *connect.Client[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse]
+	createDashboardComponentRule       *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
+	getSystemInfo                      *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
+	getUserBookmarks                   *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
+	createUserBookmark                 *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
+	deleteUserBookmark                 *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
+	createAPIKey                       *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
+	getAPIKeys                         *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
+	deleteAPIKey                       *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
+	deactivateAPIKey                   *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
+	getConditionalFormattingRules      *connect.Client[proto.GetConditionalFormattingRulesRequest, proto.GetConditionalFormattingRulesResponse]
+	createConditionalFormattingRule    *connect.Client[proto.CreateConditionalFormattingRuleRequest, proto.CreateConditionalFormattingRuleResponse]
+	updateConditionalFormattingRule    *connect.Client[proto.UpdateConditionalFormattingRuleRequest, proto.UpdateConditionalFormattingRuleResponse]
+	deleteConditionalFormattingRule    *connect.Client[proto.DeleteConditionalFormattingRuleRequest, proto.DeleteConditionalFormattingRuleResponse]
+	getNotificationEvents              *connect.Client[proto.GetNotificationEventsRequest, proto.GetNotificationEventsResponse]
+	getUserNotificationChannels        *connect.Client[proto.GetUserNotificationChannelsRequest, proto.GetUserNotificationChannelsResponse]
+	createUserNotificationChannel      *connect.Client[proto.CreateUserNotificationChannelRequest, proto.CreateUserNotificationChannelResponse]
+	updateUserNotificationChannel      *connect.Client[proto.UpdateUserNotificationChannelRequest, proto.UpdateUserNotificationChannelResponse]
+	deleteUserNotificationChannel      *connect.Client[proto.DeleteUserNotificationChannelRequest, proto.DeleteUserNotificationChannelResponse]
+	getUserNotificationSubscriptions   *connect.Client[proto.GetUserNotificationSubscriptionsRequest, proto.GetUserNotificationSubscriptionsResponse]
+	createUserNotificationSubscription *connect.Client[proto.CreateUserNotificationSubscriptionRequest, proto.CreateUserNotificationSubscriptionResponse]
+	deleteUserNotificationSubscription *connect.Client[proto.DeleteUserNotificationSubscriptionRequest, proto.DeleteUserNotificationSubscriptionResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -838,6 +927,46 @@ func (c *sickRockClient) DeleteConditionalFormattingRule(ctx context.Context, re
 	return c.deleteConditionalFormattingRule.CallUnary(ctx, req)
 }
 
+// GetNotificationEvents calls sickrock.SickRock.GetNotificationEvents.
+func (c *sickRockClient) GetNotificationEvents(ctx context.Context, req *connect.Request[proto.GetNotificationEventsRequest]) (*connect.Response[proto.GetNotificationEventsResponse], error) {
+	return c.getNotificationEvents.CallUnary(ctx, req)
+}
+
+// GetUserNotificationChannels calls sickrock.SickRock.GetUserNotificationChannels.
+func (c *sickRockClient) GetUserNotificationChannels(ctx context.Context, req *connect.Request[proto.GetUserNotificationChannelsRequest]) (*connect.Response[proto.GetUserNotificationChannelsResponse], error) {
+	return c.getUserNotificationChannels.CallUnary(ctx, req)
+}
+
+// CreateUserNotificationChannel calls sickrock.SickRock.CreateUserNotificationChannel.
+func (c *sickRockClient) CreateUserNotificationChannel(ctx context.Context, req *connect.Request[proto.CreateUserNotificationChannelRequest]) (*connect.Response[proto.CreateUserNotificationChannelResponse], error) {
+	return c.createUserNotificationChannel.CallUnary(ctx, req)
+}
+
+// UpdateUserNotificationChannel calls sickrock.SickRock.UpdateUserNotificationChannel.
+func (c *sickRockClient) UpdateUserNotificationChannel(ctx context.Context, req *connect.Request[proto.UpdateUserNotificationChannelRequest]) (*connect.Response[proto.UpdateUserNotificationChannelResponse], error) {
+	return c.updateUserNotificationChannel.CallUnary(ctx, req)
+}
+
+// DeleteUserNotificationChannel calls sickrock.SickRock.DeleteUserNotificationChannel.
+func (c *sickRockClient) DeleteUserNotificationChannel(ctx context.Context, req *connect.Request[proto.DeleteUserNotificationChannelRequest]) (*connect.Response[proto.DeleteUserNotificationChannelResponse], error) {
+	return c.deleteUserNotificationChannel.CallUnary(ctx, req)
+}
+
+// GetUserNotificationSubscriptions calls sickrock.SickRock.GetUserNotificationSubscriptions.
+func (c *sickRockClient) GetUserNotificationSubscriptions(ctx context.Context, req *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error) {
+	return c.getUserNotificationSubscriptions.CallUnary(ctx, req)
+}
+
+// CreateUserNotificationSubscription calls sickrock.SickRock.CreateUserNotificationSubscription.
+func (c *sickRockClient) CreateUserNotificationSubscription(ctx context.Context, req *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error) {
+	return c.createUserNotificationSubscription.CallUnary(ctx, req)
+}
+
+// DeleteUserNotificationSubscription calls sickrock.SickRock.DeleteUserNotificationSubscription.
+func (c *sickRockClient) DeleteUserNotificationSubscription(ctx context.Context, req *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error) {
+	return c.deleteUserNotificationSubscription.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -907,6 +1036,15 @@ type SickRockHandler interface {
 	CreateConditionalFormattingRule(context.Context, *connect.Request[proto.CreateConditionalFormattingRuleRequest]) (*connect.Response[proto.CreateConditionalFormattingRuleResponse], error)
 	UpdateConditionalFormattingRule(context.Context, *connect.Request[proto.UpdateConditionalFormattingRuleRequest]) (*connect.Response[proto.UpdateConditionalFormattingRuleResponse], error)
 	DeleteConditionalFormattingRule(context.Context, *connect.Request[proto.DeleteConditionalFormattingRuleRequest]) (*connect.Response[proto.DeleteConditionalFormattingRuleResponse], error)
+	// Notification System
+	GetNotificationEvents(context.Context, *connect.Request[proto.GetNotificationEventsRequest]) (*connect.Response[proto.GetNotificationEventsResponse], error)
+	GetUserNotificationChannels(context.Context, *connect.Request[proto.GetUserNotificationChannelsRequest]) (*connect.Response[proto.GetUserNotificationChannelsResponse], error)
+	CreateUserNotificationChannel(context.Context, *connect.Request[proto.CreateUserNotificationChannelRequest]) (*connect.Response[proto.CreateUserNotificationChannelResponse], error)
+	UpdateUserNotificationChannel(context.Context, *connect.Request[proto.UpdateUserNotificationChannelRequest]) (*connect.Response[proto.UpdateUserNotificationChannelResponse], error)
+	DeleteUserNotificationChannel(context.Context, *connect.Request[proto.DeleteUserNotificationChannelRequest]) (*connect.Response[proto.DeleteUserNotificationChannelResponse], error)
+	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
+	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
+	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -1210,6 +1348,54 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeleteConditionalFormattingRule")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetNotificationEventsHandler := connect.NewUnaryHandler(
+		SickRockGetNotificationEventsProcedure,
+		svc.GetNotificationEvents,
+		connect.WithSchema(sickRockMethods.ByName("GetNotificationEvents")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetUserNotificationChannelsHandler := connect.NewUnaryHandler(
+		SickRockGetUserNotificationChannelsProcedure,
+		svc.GetUserNotificationChannels,
+		connect.WithSchema(sickRockMethods.ByName("GetUserNotificationChannels")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateUserNotificationChannelHandler := connect.NewUnaryHandler(
+		SickRockCreateUserNotificationChannelProcedure,
+		svc.CreateUserNotificationChannel,
+		connect.WithSchema(sickRockMethods.ByName("CreateUserNotificationChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockUpdateUserNotificationChannelHandler := connect.NewUnaryHandler(
+		SickRockUpdateUserNotificationChannelProcedure,
+		svc.UpdateUserNotificationChannel,
+		connect.WithSchema(sickRockMethods.ByName("UpdateUserNotificationChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteUserNotificationChannelHandler := connect.NewUnaryHandler(
+		SickRockDeleteUserNotificationChannelProcedure,
+		svc.DeleteUserNotificationChannel,
+		connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationChannel")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetUserNotificationSubscriptionsHandler := connect.NewUnaryHandler(
+		SickRockGetUserNotificationSubscriptionsProcedure,
+		svc.GetUserNotificationSubscriptions,
+		connect.WithSchema(sickRockMethods.ByName("GetUserNotificationSubscriptions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateUserNotificationSubscriptionHandler := connect.NewUnaryHandler(
+		SickRockCreateUserNotificationSubscriptionProcedure,
+		svc.CreateUserNotificationSubscription,
+		connect.WithSchema(sickRockMethods.ByName("CreateUserNotificationSubscription")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteUserNotificationSubscriptionHandler := connect.NewUnaryHandler(
+		SickRockDeleteUserNotificationSubscriptionProcedure,
+		svc.DeleteUserNotificationSubscription,
+		connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationSubscription")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -1310,6 +1496,22 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockUpdateConditionalFormattingRuleHandler.ServeHTTP(w, r)
 		case SickRockDeleteConditionalFormattingRuleProcedure:
 			sickRockDeleteConditionalFormattingRuleHandler.ServeHTTP(w, r)
+		case SickRockGetNotificationEventsProcedure:
+			sickRockGetNotificationEventsHandler.ServeHTTP(w, r)
+		case SickRockGetUserNotificationChannelsProcedure:
+			sickRockGetUserNotificationChannelsHandler.ServeHTTP(w, r)
+		case SickRockCreateUserNotificationChannelProcedure:
+			sickRockCreateUserNotificationChannelHandler.ServeHTTP(w, r)
+		case SickRockUpdateUserNotificationChannelProcedure:
+			sickRockUpdateUserNotificationChannelHandler.ServeHTTP(w, r)
+		case SickRockDeleteUserNotificationChannelProcedure:
+			sickRockDeleteUserNotificationChannelHandler.ServeHTTP(w, r)
+		case SickRockGetUserNotificationSubscriptionsProcedure:
+			sickRockGetUserNotificationSubscriptionsHandler.ServeHTTP(w, r)
+		case SickRockCreateUserNotificationSubscriptionProcedure:
+			sickRockCreateUserNotificationSubscriptionHandler.ServeHTTP(w, r)
+		case SickRockDeleteUserNotificationSubscriptionProcedure:
+			sickRockDeleteUserNotificationSubscriptionHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1513,4 +1715,36 @@ func (UnimplementedSickRockHandler) UpdateConditionalFormattingRule(context.Cont
 
 func (UnimplementedSickRockHandler) DeleteConditionalFormattingRule(context.Context, *connect.Request[proto.DeleteConditionalFormattingRuleRequest]) (*connect.Response[proto.DeleteConditionalFormattingRuleResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteConditionalFormattingRule is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetNotificationEvents(context.Context, *connect.Request[proto.GetNotificationEventsRequest]) (*connect.Response[proto.GetNotificationEventsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetNotificationEvents is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUserNotificationChannels(context.Context, *connect.Request[proto.GetUserNotificationChannelsRequest]) (*connect.Response[proto.GetUserNotificationChannelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserNotificationChannels is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateUserNotificationChannel(context.Context, *connect.Request[proto.CreateUserNotificationChannelRequest]) (*connect.Response[proto.CreateUserNotificationChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateUserNotificationChannel is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) UpdateUserNotificationChannel(context.Context, *connect.Request[proto.UpdateUserNotificationChannelRequest]) (*connect.Response[proto.UpdateUserNotificationChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateUserNotificationChannel is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteUserNotificationChannel(context.Context, *connect.Request[proto.DeleteUserNotificationChannelRequest]) (*connect.Response[proto.DeleteUserNotificationChannelResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserNotificationChannel is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserNotificationSubscriptions is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateUserNotificationSubscription is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserNotificationSubscription is not implemented"))
 }
