@@ -22,12 +22,14 @@ import (
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/auth"
 	"github.com/jamesread/SickRock/internal/buildinfo"
+	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	log "github.com/sirupsen/logrus"
 )
 
 type SickRockServer struct {
-	repo *repo.Repository
+	repo              *repo.Repository
+	notificationService *notifications.NotificationService
 }
 
 // markdownRenderer is a configured goldmark instance for rendering markdown
@@ -57,7 +59,10 @@ func renderMarkdown(content string) string {
 }
 
 func NewSickRockServer(r *repo.Repository) *SickRockServer {
-	return &SickRockServer{repo: r}
+	return &SickRockServer{
+		repo:              r,
+		notificationService: notifications.NewNotificationService(r),
+	}
 }
 
 // getUserIDFromContext extracts the user ID from the context

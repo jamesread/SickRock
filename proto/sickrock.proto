@@ -637,6 +637,106 @@ message UpdateConditionalFormattingRuleResponse {
   string message = 2;
 }
 
+// Notification System
+message NotificationEvent {
+  int32 id = 1;
+  string event_code = 2;
+  string event_name = 3;
+  string description = 4;
+}
+
+message UserNotificationChannel {
+  int32 id = 1;
+  int32 user_id = 2;
+  string channel_type = 3; // 'email', 'telegram', 'webhook'
+  string channel_value = 4; // email address, telegram ID, or webhook URL
+  string channel_name = 5; // Optional name for webhooks
+  bool is_active = 6;
+  int64 sr_created = 7;
+  int64 sr_updated = 8;
+}
+
+message UserNotificationSubscription {
+  int32 id = 1;
+  int32 user_id = 2;
+  int32 event_id = 3;
+  NotificationEvent event = 4;
+  int32 channel_id = 5;
+  UserNotificationChannel channel = 6;
+  int64 sr_created = 7;
+}
+
+message GetNotificationEventsRequest {}
+
+message GetNotificationEventsResponse {
+  repeated NotificationEvent events = 1;
+}
+
+message GetUserNotificationChannelsRequest {}
+
+message GetUserNotificationChannelsResponse {
+  repeated UserNotificationChannel channels = 1;
+}
+
+message CreateUserNotificationChannelRequest {
+  string channel_type = 1; // 'email', 'telegram', 'webhook'
+  string channel_value = 2; // email address, telegram ID, or webhook URL
+  string channel_name = 3; // Optional name for webhooks
+}
+
+message CreateUserNotificationChannelResponse {
+  bool success = 1;
+  string message = 2;
+  UserNotificationChannel channel = 3;
+}
+
+message UpdateUserNotificationChannelRequest {
+  int32 channel_id = 1;
+  string channel_value = 2;
+  string channel_name = 3;
+  bool is_active = 4;
+}
+
+message UpdateUserNotificationChannelResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteUserNotificationChannelRequest {
+  int32 channel_id = 1;
+}
+
+message DeleteUserNotificationChannelResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetUserNotificationSubscriptionsRequest {}
+
+message GetUserNotificationSubscriptionsResponse {
+  repeated UserNotificationSubscription subscriptions = 1;
+}
+
+message CreateUserNotificationSubscriptionRequest {
+  string event_code = 1; // e.g., 'user.logged_in'
+  int32 channel_id = 2;
+}
+
+message CreateUserNotificationSubscriptionResponse {
+  bool success = 1;
+  string message = 2;
+  UserNotificationSubscription subscription = 3;
+}
+
+message DeleteUserNotificationSubscriptionRequest {
+  int32 subscription_id = 1;
+}
+
+message DeleteUserNotificationSubscriptionResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 service SickRock {
   rpc Init(InitRequest) returns (InitResponse);
   rpc Ping(PingRequest) returns (PingResponse);
@@ -723,4 +823,14 @@ service SickRock {
   rpc CreateConditionalFormattingRule(CreateConditionalFormattingRuleRequest) returns (CreateConditionalFormattingRuleResponse);
   rpc UpdateConditionalFormattingRule(UpdateConditionalFormattingRuleRequest) returns (UpdateConditionalFormattingRuleResponse);
   rpc DeleteConditionalFormattingRule(DeleteConditionalFormattingRuleRequest) returns (DeleteConditionalFormattingRuleResponse);
+
+  // Notification System
+  rpc GetNotificationEvents(GetNotificationEventsRequest) returns (GetNotificationEventsResponse);
+  rpc GetUserNotificationChannels(GetUserNotificationChannelsRequest) returns (GetUserNotificationChannelsResponse);
+  rpc CreateUserNotificationChannel(CreateUserNotificationChannelRequest) returns (CreateUserNotificationChannelResponse);
+  rpc UpdateUserNotificationChannel(UpdateUserNotificationChannelRequest) returns (UpdateUserNotificationChannelResponse);
+  rpc DeleteUserNotificationChannel(DeleteUserNotificationChannelRequest) returns (DeleteUserNotificationChannelResponse);
+  rpc GetUserNotificationSubscriptions(GetUserNotificationSubscriptionsRequest) returns (GetUserNotificationSubscriptionsResponse);
+  rpc CreateUserNotificationSubscription(CreateUserNotificationSubscriptionRequest) returns (CreateUserNotificationSubscriptionResponse);
+  rpc DeleteUserNotificationSubscription(DeleteUserNotificationSubscriptionRequest) returns (DeleteUserNotificationSubscriptionResponse);
 }

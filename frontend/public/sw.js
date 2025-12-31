@@ -47,16 +47,32 @@ self.addEventListener('install', (event) => {
     caches.open(STATIC_CACHE_NAME)
       .then((cache) => {
         console.log('Opened cache');
-        return cache.addAll([
+        // Cache resources individually to prevent one failure from blocking installation
+        const resourcesToCache = [
           '/',
           '/manifest.json',
           '/offline.html',
           '/icons/icon-192x192.png',
           '/icons/icon-512x512.png'
-        ]);
+        ];
+        
+        // Cache each resource individually, logging failures but not blocking installation
+        return Promise.allSettled(
+          resourcesToCache.map(url => 
+            cache.add(url).catch(err => {
+              console.warn(`Failed to cache ${url}:`, err);
+              return null; // Don't throw, just log the error
+            })
+          )
+        );
       })
       .then(() => {
         console.log('Service Worker installed');
+        return self.skipWaiting();
+      })
+      .catch((error) => {
+        console.error('Service Worker installation error:', error);
+        // Still skip waiting to allow activation even if caching fails
         return self.skipWaiting();
       })
   );

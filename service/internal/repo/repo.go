@@ -2533,3 +2533,396 @@ func (r *Repository) UpdateConditionalFormattingRule(ctx context.Context, userID
 
 	return nil
 }
+
+// Notification System Types and Methods
+
+type NotificationEvent struct {
+	ID          int
+	EventCode   string
+	EventName   string
+	Description string
+	SrCreated   time.Time
+}
+
+type UserNotificationChannel struct {
+	ID          int
+	User        int
+	ChannelType string // 'email', 'telegram', 'webhook'
+	ChannelValue string
+	ChannelName *string
+	IsActive    bool
+	SrCreated   time.Time
+	SrUpdated   time.Time
+}
+
+type UserNotificationSubscription struct {
+	ID        int
+	User      int
+	EventID   int
+	ChannelID int
+	SrCreated time.Time
+}
+
+// GetNotificationEvents retrieves all available notification events
+func (r *Repository) GetNotificationEvents(ctx context.Context) ([]NotificationEvent, error) {
+	query := `
+		SELECT id, event_code, event_name, description, sr_created
+		FROM notification_events
+		ORDER BY event_code ASC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []NotificationEvent
+	for rows.Next() {
+		var event NotificationEvent
+		err := rows.Scan(
+			&event.ID,
+			&event.EventCode,
+			&event.EventName,
+			&event.Description,
+			&event.SrCreated,
+		)
+		if err != nil {
+			return nil, err
+		}
+		events = append(events, event)
+	}
+
+	return events, nil
+}
+
+// GetNotificationEventByCode retrieves a notification event by its code
+func (r *Repository) GetNotificationEventByCode(ctx context.Context, eventCode string) (*NotificationEvent, error) {
+	query := `
+		SELECT id, event_code, event_name, description, sr_created
+		FROM notification_events
+		WHERE event_code = ?
+	`
+
+	var event NotificationEvent
+	err := r.db.QueryRowxContext(ctx, query, eventCode).Scan(
+		&event.ID,
+		&event.EventCode,
+		&event.EventName,
+		&event.Description,
+		&event.SrCreated,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &event, nil
+}
+
+// GetUserNotificationChannels retrieves all notification channels for a user
+func (r *Repository) GetUserNotificationChannels(ctx context.Context, userID int) ([]UserNotificationChannel, error) {
+	query := `
+		SELECT id, user, channel_type, channel_value, channel_name, is_active, sr_created, sr_updated
+		FROM user_notification_channels
+		WHERE user = ?
+		ORDER BY channel_type ASC, sr_created ASC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var channels []UserNotificationChannel
+	for rows.Next() {
+		var channel UserNotificationChannel
+		var channelName sql.NullString
+		err := rows.Scan(
+			&channel.ID,
+			&channel.User,
+			&channel.ChannelType,
+			&channel.ChannelValue,
+			&channelName,
+			&channel.IsActive,
+			&channel.SrCreated,
+			&channel.SrUpdated,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if channelName.Valid {
+			channel.ChannelName = &channelName.String
+		}
+		channels = append(channels, channel)
+	}
+
+	return channels, nil
+}
+
+// CreateUserNotificationChannel creates a new notification channel for a user
+func (r *Repository) CreateUserNotificationChannel(ctx context.Context, userID int, channelType, channelValue string, channelName *string) (*UserNotificationChannel, error) {
+	query := `
+		INSERT INTO user_notification_channels (user, channel_type, channel_value, channel_name)
+		VALUES (?, ?, ?, ?)
+	`
+	result, err := r.db.ExecContext(ctx, query, userID, channelType, channelValue, channelName)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetUserNotificationChannelByID(ctx, int(id))
+}
+
+// GetUserNotificationChannelByID retrieves a notification channel by its ID
+func (r *Repository) GetUserNotificationChannelByID(ctx context.Context, id int) (*UserNotificationChannel, error) {
+	query := `
+		SELECT id, user, channel_type, channel_value, channel_name, is_active, sr_created, sr_updated
+		FROM user_notification_channels
+		WHERE id = ?
+	`
+
+	var channel UserNotificationChannel
+	var channelName sql.NullString
+	err := r.db.QueryRowxContext(ctx, query, id).Scan(
+		&channel.ID,
+		&channel.User,
+		&channel.ChannelType,
+		&channel.ChannelValue,
+		&channelName,
+		&channel.IsActive,
+		&channel.SrCreated,
+		&channel.SrUpdated,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if channelName.Valid {
+		channel.ChannelName = &channelName.String
+	}
+
+	return &channel, nil
+}
+
+// UpdateUserNotificationChannel updates a notification channel
+func (r *Repository) UpdateUserNotificationChannel(ctx context.Context, channelID int, channelValue string, channelName *string, isActive bool) error {
+	query := `
+		UPDATE user_notification_channels
+		SET channel_value = ?, channel_name = ?, is_active = ?, sr_updated = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`
+	result, err := r.db.ExecContext(ctx, query, channelValue, channelName, isActive, channelID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("notification channel not found")
+	}
+
+	return nil
+}
+
+// DeleteUserNotificationChannel deletes a notification channel
+func (r *Repository) DeleteUserNotificationChannel(ctx context.Context, channelID int) error {
+	query := `DELETE FROM user_notification_channels WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, channelID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("notification channel not found")
+	}
+
+	return nil
+}
+
+// GetUserNotificationSubscriptions retrieves all notification subscriptions for a user
+func (r *Repository) GetUserNotificationSubscriptions(ctx context.Context, userID int) ([]UserNotificationSubscription, error) {
+	query := `
+		SELECT id, user, event_id, channel_id, sr_created
+		FROM user_notification_subscriptions
+		WHERE user = ?
+		ORDER BY sr_created DESC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subscriptions []UserNotificationSubscription
+	for rows.Next() {
+		var sub UserNotificationSubscription
+		err := rows.Scan(
+			&sub.ID,
+			&sub.User,
+			&sub.EventID,
+			&sub.ChannelID,
+			&sub.SrCreated,
+		)
+		if err != nil {
+			return nil, err
+		}
+		subscriptions = append(subscriptions, sub)
+	}
+
+	return subscriptions, nil
+}
+
+// CreateUserNotificationSubscription creates a new notification subscription
+func (r *Repository) CreateUserNotificationSubscription(ctx context.Context, userID, eventID, channelID int) (*UserNotificationSubscription, error) {
+	query := `
+		INSERT INTO user_notification_subscriptions (user, event_id, channel_id)
+		VALUES (?, ?, ?)
+	`
+	result, err := r.db.ExecContext(ctx, query, userID, eventID, channelID)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	return r.GetUserNotificationSubscriptionByID(ctx, int(id))
+}
+
+// GetUserNotificationSubscriptionByID retrieves a subscription by its ID
+func (r *Repository) GetUserNotificationSubscriptionByID(ctx context.Context, id int) (*UserNotificationSubscription, error) {
+	query := `
+		SELECT id, user, event_id, channel_id, sr_created
+		FROM user_notification_subscriptions
+		WHERE id = ?
+	`
+
+	var sub UserNotificationSubscription
+	err := r.db.QueryRowxContext(ctx, query, id).Scan(
+		&sub.ID,
+		&sub.User,
+		&sub.EventID,
+		&sub.ChannelID,
+		&sub.SrCreated,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &sub, nil
+}
+
+// DeleteUserNotificationSubscription deletes a notification subscription
+func (r *Repository) DeleteUserNotificationSubscription(ctx context.Context, subscriptionID int) error {
+	query := `DELETE FROM user_notification_subscriptions WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, subscriptionID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("notification subscription not found")
+	}
+
+	return nil
+}
+
+// GetSubscriptionsForEvent retrieves all subscriptions for a specific event code
+func (r *Repository) GetSubscriptionsForEvent(ctx context.Context, eventCode string) ([]struct {
+	Subscription UserNotificationSubscription
+	Channel      UserNotificationChannel
+	Event        NotificationEvent
+}, error) {
+	query := `
+		SELECT 
+			uns.id, uns.user, uns.event_id, uns.channel_id, uns.sr_created,
+			unc.id, unc.user, unc.channel_type, unc.channel_value, unc.channel_name, unc.is_active, unc.sr_created, unc.sr_updated,
+			ne.id, ne.event_code, ne.event_name, ne.description, ne.sr_created
+		FROM user_notification_subscriptions uns
+		JOIN user_notification_channels unc ON uns.channel_id = unc.id
+		JOIN notification_events ne ON uns.event_id = ne.id
+		WHERE ne.event_code = ? AND unc.is_active = 1
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query, eventCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []struct {
+		Subscription UserNotificationSubscription
+		Channel      UserNotificationChannel
+		Event        NotificationEvent
+	}
+
+	for rows.Next() {
+		var result struct {
+			Subscription UserNotificationSubscription
+			Channel      UserNotificationChannel
+			Event        NotificationEvent
+		}
+		var channelName sql.NullString
+
+		err := rows.Scan(
+			&result.Subscription.ID,
+			&result.Subscription.User,
+			&result.Subscription.EventID,
+			&result.Subscription.ChannelID,
+			&result.Subscription.SrCreated,
+			&result.Channel.ID,
+			&result.Channel.User,
+			&result.Channel.ChannelType,
+			&result.Channel.ChannelValue,
+			&channelName,
+			&result.Channel.IsActive,
+			&result.Channel.SrCreated,
+			&result.Channel.SrUpdated,
+			&result.Event.ID,
+			&result.Event.EventCode,
+			&result.Event.EventName,
+			&result.Event.Description,
+			&result.Event.SrCreated,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if channelName.Valid {
+			result.Channel.ChannelName = &channelName.String
+		}
+		results = append(results, result)
+	}
+
+	return results, nil
+}

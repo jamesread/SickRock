@@ -4,11 +4,13 @@ import (
 	"context"
 	"net"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/auth"
+	log "github.com/sirupsen/logrus"
 )
 
 func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickrockpb.LoginRequest]) (*connect.Response[sickrockpb.LoginResponse], error) {
@@ -35,6 +37,22 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 			Message: "Invalid credentials",
 		}), nil
 	}
+
+	// Trigger notification for user login (async, don't block login)
+	go func() {
+		notificationCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		data := map[string]interface{}{
+			"username":  username,
+			"user_agent": userAgent,
+			"ip_address": ipAddress,
+		}
+		
+		if err := s.notificationService.SendNotification(notificationCtx, "user.logged_in", data); err != nil {
+			log.WithError(err).WithField("username", username).Warn("Failed to send login notification")
+		}
+	}()
 
 	return connect.NewResponse(&sickrockpb.LoginResponse{
 		Success:   true,

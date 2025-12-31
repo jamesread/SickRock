@@ -222,22 +222,47 @@ func main() {
 	})
 	router.Any("/api/*any", gin.WrapH(http.StripPrefix("/api", mux)))
 
-	// SPA fallback for non-API routes
-	router.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api") {
-			c.Status(http.StatusNotFound)
-			return
-		}
-		c.File(filepath.Join(findFrontendDir(), "index.html"))
-	})
-
-	// Serve static files from frontend directory (avoiding wildcard conflicts)
+	// Serve static files from frontend directory (must be before NoRoute)
 	frontendDir := findFrontendDir()
 	router.Static("/assets", filepath.Join(frontendDir, "assets"))
 	router.Static("/css", filepath.Join(frontendDir, "css"))
 	router.Static("/js", filepath.Join(frontendDir, "js"))
 	router.Static("/images", filepath.Join(frontendDir, "images"))
 	router.StaticFile("/favicon.ico", filepath.Join(frontendDir, "favicon.ico"))
+
+	// Serve PWA-critical files with proper Content-Type headers
+	// Manifest must be served with application/manifest+json Content-Type
+	router.GET("/manifest.json", func(c *gin.Context) {
+		manifestPath := filepath.Join(frontendDir, "manifest.json")
+		c.Header("Content-Type", "application/manifest+json")
+		c.File(manifestPath)
+	})
+
+	// Service worker must be served from root with application/javascript Content-Type
+	router.GET("/sw.js", func(c *gin.Context) {
+		swPath := filepath.Join(frontendDir, "sw.js")
+		c.Header("Content-Type", "application/javascript")
+		c.Header("Service-Worker-Allowed", "/")
+		c.File(swPath)
+	})
+
+	// Serve icons directory
+	router.Static("/icons", filepath.Join(frontendDir, "icons"))
+
+	// Serve offline.html
+	router.StaticFile("/offline.html", filepath.Join(frontendDir, "offline.html"))
+
+	// Serve screenshots (optional, but referenced in manifest)
+	router.Static("/screenshots", filepath.Join(frontendDir, "screenshots"))
+
+	// SPA fallback for non-API routes (must be last)
+	router.NoRoute(func(c *gin.Context) {
+		if strings.HasPrefix(c.Request.URL.Path, "/api") {
+			c.Status(http.StatusNotFound)
+			return
+		}
+		c.File(filepath.Join(frontendDir, "index.html"))
+	})
 
 	router.Run(":" + getPort())
 }
