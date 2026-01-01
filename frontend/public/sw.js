@@ -1,5 +1,5 @@
-const CACHE_NAME = 'sickrock-v3';
-const STATIC_CACHE_NAME = 'sickrock-static-v3';
+const CACHE_NAME = 'sickrock-v4';
+const STATIC_CACHE_NAME = 'sickrock-static-v4';
 
 // Routes that should be cached for offline use (table views only)
 const CACHEABLE_ROUTES = [
