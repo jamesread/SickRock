@@ -1019,12 +1019,12 @@ onMounted(async () => {
                 <HugeiconsIcon :icon="Hugeicons.CheckmarkSquare03Icon" />
             </button>
             <router-link
-                to="/user-preferences"
+                to="/user-control-panel"
                 class="user-preferences-button"
-                title="User Preferences"
+                title="User Control Panel"
             >
                 <HugeiconsIcon :icon="Hugeicons.UserIcon" />
-                {{ user?.username }}
+                <span class="username-text">{{ user?.username }}</span>
             </router-link>
         </template>
     </Header>
@@ -1262,6 +1262,10 @@ onMounted(async () => {
     font-size: 0.875rem;
     font-weight: 500;
     transition: all 0.2s ease;
+}
+
+.user-preferences-button .username-text {
+    display: inline;
 }
 
 .user-preferences-button:hover {
@@ -1665,16 +1669,20 @@ onMounted(async () => {
 
 /* Mobile responsive styles */
 @media (max-width: 768px) {
-    .toolbar-content {
-        display: none;
-    }
-
-    .bookmark-button {
+    .pinned-workflow-toolbar {
         display: none;
     }
 
     .help-button {
         display: none;
+    }
+
+    .user-preferences-button .username-text {
+        display: none;
+    }
+
+    .user-preferences-button {
+        padding: 0.5rem;
     }
 
     .g-key-content {
@@ -1686,8 +1694,7 @@ onMounted(async () => {
 /* Constrain main content area to prevent page scrolling */
 #layout {
     display: flex;
-    height: calc(100vh - 60px); /* Subtract header height */
-    overflow: hidden;
+	flex-direction: column;
 }
 
 #content {
@@ -1695,7 +1702,6 @@ onMounted(async () => {
     display: flex;
     flex-direction: column;
     min-height: 0;
-    overflow: hidden;
 }
 
 #content main {

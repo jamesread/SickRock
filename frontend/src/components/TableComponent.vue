@@ -1407,10 +1407,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="table-component-wrapper">
-  <Section :title="sectionTitle" :padding="false">
+  <Section :title="sectionTitle" :padding="false" class="table-component-wrapper">
     <template v-if="showToolbar" #toolbar>
-      <div class="toolbar-group">
         <ViewsButton
           v-if="showViewSwitcher || showViewEdit || showViewCreate"
           :table-id="props.tableId"
@@ -1441,7 +1439,6 @@ onUnmounted(() => {
             <span class="quick-add-text"></span>
           </button>
         </div>
-      </div>
     </template>
     <div v-if="error" class="error">{{ error }}</div>
     <div v-else-if="loading">Loading…</div>
@@ -1657,7 +1654,7 @@ onUnmounted(() => {
 		    @update:page-size="(newPageSize) => pageSize = newPageSize"
 		  />
 	  </div>
-    </div>
+      </div>
     </div>
 
 
@@ -1722,7 +1719,6 @@ onUnmounted(() => {
       </div>
     </div>
   </Section>
-  </div>
 
   <!-- Column context menu -->
   <div
@@ -1761,7 +1757,6 @@ onUnmounted(() => {
 .toolbar-group {
   display: flex;
   align-items: center;
-  gap: 1rem;
 }
 
 .view-selector {
@@ -1865,23 +1860,11 @@ onUnmounted(() => {
   color: #b00020;
 }
 
-/* Constrain the table component wrapper */
+/* Constrain the table component wrapper (now applied directly to Section) */
 .table-component-wrapper {
-  display: flex;
-  flex-direction: column;
-  max-height: calc(100vh - 150px);
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* Constrain the Section component itself */
-.table-component-wrapper :deep(.section) {
   display: flex !important;
   flex-direction: column !important;
-  max-height: 100% !important;
-  min-height: 0 !important;
   overflow: hidden !important;
-  flex: 1 !important;
 }
 
 .table-component-wrapper :deep(.section > *),
@@ -1897,6 +1880,7 @@ onUnmounted(() => {
 .section-content {
   display: flex;
   flex-direction: column;
+  max-width: calc(100dvw - 3rem);
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -1920,7 +1904,7 @@ onUnmounted(() => {
 .table thead {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 1;
   background-color: #fff;
 }
 
@@ -1952,6 +1936,10 @@ onUnmounted(() => {
   .table thead th:nth-child(n+5),
   .table tbody td:nth-child(n+5) {
     display: none;
+  }
+
+  .section-content {
+    max-width: 100%;
   }
 }
 
@@ -2223,33 +2211,6 @@ onUnmounted(() => {
 .insert-button-group {
   display: flex;
   align-items: center;
-  border-radius: 6px;
-  overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.insert-button {
-  border-radius: 0;
-  border-right: none;
-  flex: 1;
-  min-width: auto;
-  white-space: nowrap;
-}
-
-.insert-button:hover {
-  background: #c9ccd4;
-}
-
-.quick-add-button {
-  border-radius: 0;
-  border-left: none;
-  flex: 0 0 auto;
-  min-width: auto;
-  white-space: nowrap;
-}
-
-.quick-add-button:hover {
-  background: #0056b3;
 }
 
 /* Ensure proper spacing between buttons */
@@ -2272,36 +2233,22 @@ onUnmounted(() => {
 
   /* Mobile Insert Button Group Styles */
   .insert-button-group {
+	display: flex;
     flex-direction: row;
-    border-radius: 4px;
-  }
-
-  .insert-button {
-    border-radius: 0;
-    border-right: 1px solid #ddd;
-    border-bottom: 1px solid #ddd;
-    flex: 1;
   }
 
   .insert-button:first-child {
-    border-top-left-radius: 4px;
-    border-bottom-left-radius: 4px;
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
+	border-right: 0;
+	padding-right: 0.5rem;
   }
 
   .quick-add-button {
-    border-radius: 0;
-    border-left: 1px solid #ddd;
-    border-top: 1px solid #ddd;
-    flex: 0 0 auto;
-  }
-
-  .quick-add-button:last-child {
-    border-top-right-radius: 4px;
-    border-bottom-right-radius: 4px;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
+	border-top-left-radius: 0;
+	border-bottom-left-radius: 0;
+	border-left: 0;
+	padding-left: 0.5rem;
   }
 
   /* Hide Quick Add text on mobile */
@@ -2430,13 +2377,7 @@ onUnmounted(() => {
     margin: 0.25rem 0;
   }
 
-  .insert-button,
-  .quick-add-button {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.9rem;
-  }
-
-  /* Ensure Quick Add text stays hidden on extra small screens */
+   /* Ensure Quick Add text stays hidden on extra small screens */
   .quick-add-text {
     display: none;
   }

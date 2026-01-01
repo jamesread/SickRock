@@ -17,4 +17,18 @@ body {
   .date {
     font-size: 0.8em;
   }
+
+  div[role="toolbar"] {
+	  gap: .2em;
+  }
+
+  button, .button {
+    font-size: 0.9em;
+  }
+}
+
+@media (max-width: 411px) {
+  .h2 {
+	font-size: 0.2em;
+  }
 }

@@ -13,8 +13,7 @@ import {
   HomeIcon,
   UserIcon,
   KeyIcon,
-  DatabaseIcon,
-  Download01Icon
+  DatabaseIcon
 } from '@hugeicons/core-free-icons'
 
 const router = useRouter()
@@ -28,8 +27,6 @@ const buildDate = ref<string>('')
 const dbName = ref<string>('')
 const loading = ref(false)
 const error = ref<string | null>(null)
-const resetUser = ref({ username: '', newPassword: '' })
-const resetStatus = ref<string>('')
 
 // Database stats
 const totalTables = ref<number>(0)
@@ -79,51 +76,107 @@ function refreshData() {
   })
 }
 
-async function resetUserPassword() {
-  resetStatus.value = ''
-  error.value = null
-  try {
-    if (!resetUser.value.username || !resetUser.value.newPassword) {
-      error.value = 'Username and new password are required'
-      return
-    }
-    const resp = await client.resetUserPassword({
-      username: resetUser.value.username,
-      newPassword: resetUser.value.newPassword
-    } as any)
-    if ((resp as any).success) {
-      resetStatus.value = 'Password updated'
-      resetUser.value = { username: '', newPassword: '' }
-    } else {
-      error.value = (resp as any).message || 'Failed to update password'
-    }
-  } catch (e) {
-    console.error(e)
-    error.value = 'Network error'
-  }
-}
 </script>
 
 <template>
   <div class="control-panel">
-    <Section title = "Control Panel">
-        <div class = "section-content">
-            <h2>System Information</h2>
-        </div>
-              <button @click="refreshData" :disabled="loading" class="refresh-btn">
-          <HugeiconsIcon :icon="RefreshIcon" width="16" height="16" />
-          {{ loading ? 'Refreshing...' : 'Refresh' }}
-        </button>
-
-    </Section>
-
     <div v-if="error" class="error-message">
       {{ error }}
     </div>
 
     <div class="control-sections">
-      <!-- System Information -->
-      <Section title = "System Information">
+      <!-- Control Panel -->
+      <Section title = "Control Panel">
+        <div class="quick-actions-grid">
+          <router-link to="/admin/table/create" class="quick-action-card">
+            <div class="card-icon">
+              <HugeiconsIcon :icon="AddIcon" />
+            </div>
+            <div class="card-content">
+              <h3>Create New Table</h3>
+              <p>Create a new database table</p>
+            </div>
+            <div class="card-arrow">
+              →
+            </div>
+          </router-link>
+          <router-link to="/admin/database-browser" class="quick-action-card">
+            <div class="card-icon">
+              <HugeiconsIcon :icon="DatabaseIcon" />
+            </div>
+            <div class="card-content">
+              <h3>Database Browser</h3>
+              <p>Browse and explore database structure</p>
+            </div>
+            <div class="card-arrow">
+              →
+            </div>
+          </router-link>
+          <router-link to="/admin/user-management" class="quick-action-card">
+            <div class="card-icon">
+              <HugeiconsIcon :icon="UserIcon" />
+            </div>
+            <div class="card-content">
+              <h3>User Management</h3>
+              <p>Reset user passwords and manage user accounts</p>
+            </div>
+            <div class="card-arrow">
+              →
+            </div>
+          </router-link>
+          <router-link to="/table/table_sessions" class="quick-action-card">
+            <div class="card-icon">
+              <HugeiconsIcon :icon="UserIcon" />
+            </div>
+            <div class="card-content">
+              <h3>View Sessions</h3>
+              <p>View active user sessions</p>
+            </div>
+            <div class="card-arrow">
+              →
+            </div>
+          </router-link>
+          <router-link to="/table/device_codes" class="quick-action-card">
+            <div class="card-icon">
+              <HugeiconsIcon :icon="KeyIcon" />
+            </div>
+            <div class="card-content">
+              <h3>View Device Codes</h3>
+              <p>Manage device authentication codes</p>
+            </div>
+            <div class="card-arrow">
+              →
+            </div>
+          </router-link>
+          <button @click="refreshData" class="quick-action-card" :disabled="loading">
+            <div class="card-icon">
+              <HugeiconsIcon :icon="RefreshIcon" />
+            </div>
+            <div class="card-content">
+              <h3>Refresh All Data</h3>
+              <p>{{ loading ? 'Refreshing...' : 'Reload system information' }}</p>
+            </div>
+            <div class="card-arrow">
+              →
+            </div>
+          </button>
+          <button @click="router.push('/')" class="quick-action-card">
+            <div class="card-icon">
+              <HugeiconsIcon :icon="HomeIcon" />
+            </div>
+            <div class="card-content">
+              <h3>Go to Home</h3>
+              <p>Return to the home dashboard</p>
+            </div>
+            <div class="card-arrow">
+              →
+            </div>
+          </button>
+        </div>
+      </Section>
+
+      <!-- System Diagnostics -->
+      <Section title = "System Diagnostics">
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-number">{{ version || '—' }}</div>
@@ -144,8 +197,8 @@ async function resetUserPassword() {
         </div>
       </Section>
 
-      <!-- Database Statistics -->
-      <Section title = "Database Statistics">
+      <!-- Database Diagnostics -->
+      <Section title = "Database Diagnostics">
         <div class="stats-grid">
           <div class="stat-card">
             <div class="stat-number">{{ totalTables }}</div>
@@ -157,77 +210,6 @@ async function resetUserPassword() {
           </div>
         </div>
       </Section>
-
-      <!-- Quick Actions -->
-      <Section title = "Quick Actions">
-        <div class="quick-actions">
-          <router-link to="/admin/table/create" class="button">
-            <HugeiconsIcon :icon="AddIcon" width="18" height="18" class="action-icon" />
-            Create New Table
-          </router-link>
-          <router-link to="/admin/database-browser" class="button">
-            <HugeiconsIcon :icon="DatabaseIcon" width="18" height="18" class="action-icon" />
-            Database Browser
-          </router-link>
-          <router-link to="/admin/pwa-installation" class="button">
-            <HugeiconsIcon :icon="Download01Icon" width="18" height="18" class="action-icon" />
-            PWA & Service Worker
-          </router-link>
-          <button @click="refreshData" class="button" :disabled="loading">
-            <HugeiconsIcon :icon="RefreshIcon" width="18" height="18" class="action-icon" />
-            Refresh All Data
-          </button>
-          <button @click="router.push('/')" class="button">
-            <HugeiconsIcon :icon="HomeIcon" width="18" height="18" class="action-icon" />
-            Go to Home
-          </button>
-        </div>
-      </Section>
-
-      <!-- User Management -->
-      <Section title = "User Management">
-        <div class="add-rule-form">
-          <h3>Reset User Password</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label>Username:</label>
-              <input v-model="resetUser.username" type="text" placeholder="e.g., admin" />
-            </div>
-            <div class="form-group">
-              <label>New Password:</label>
-              <input v-model="resetUser.newPassword" type="password" placeholder="new password" />
-            </div>
-          </div>
-          <div class="form-actions">
-            <button @click="resetUserPassword" class="save-btn">Reset Password</button>
-            <span v-if="resetStatus" class="subtle">{{ resetStatus }}</span>
-          </div>
-        </div>
-      </Section>
-
-      <!-- System Tables -->
-      <Section title = "System Tables">
-        <div class="quick-actions">
-          <router-link to="/table/table_sessions" class="button">
-            <HugeiconsIcon :icon="UserIcon" width="18" height="18" class="action-icon" />
-            View Sessions
-          </router-link>
-          <router-link to="/table/device_codes" class="button">
-            <HugeiconsIcon :icon="KeyIcon" width="18" height="18" class="action-icon" />
-            View Device Codes
-          </router-link>
-        </div>
-      </Section>
-
-      <!-- PWA & Service Worker -->
-      <Section title = "PWA & Service Worker">
-        <div class="quick-actions">
-          <router-link to="/admin/pwa-installation" class="button">
-            <HugeiconsIcon :icon="Download01Icon" width="18" height="18" class="action-icon" />
-            PWA Installation & Service Worker
-          </router-link>
-        </div>
-      </Section>
     </div>
   </div>
 </template>
@@ -236,7 +218,6 @@ async function resetUserPassword() {
 .control-panel {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
 }
 
 .control-panel-header {
@@ -364,59 +345,6 @@ async function resetUserPassword() {
   letter-spacing: 0.5px;
 }
 
-.add-rule-form {
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 8px;
-  margin-bottom: 20px;
-  border: 1px solid #e9ecef;
-}
-
-.add-rule-form h3 {
-  margin: 0 0 20px 0;
-  color: #333;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
-  margin-bottom: 20px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.form-group label {
-  font-weight: bold;
-  color: #666;
-  font-size: 14px;
-}
-
-.form-group input,
-.form-group select {
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.form-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.save-btn {
-  background: #28a745;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: 4px;
-  cursor: pointer;
-}
 
 .cancel-btn {
   background: #6c757d;
@@ -486,24 +414,97 @@ async function resetUserPassword() {
   font-size: 12px;
 }
 
-.quick-actions {
+.quick-actions-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
 }
 
-.button {
-  padding: 1rem;
+.quick-action-card {
   display: flex;
-  gap: .5em;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 1.5rem;
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  min-height: 160px;
+  text-decoration: none;
+  color: inherit;
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  text-align: left;
+  width: 100%;
+  box-sizing: border-box;
+  text-indent: 0;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+.quick-action-card:hover:not(:disabled) {
+  border-color: #007bff;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.quick-action-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.quick-action-card .card-icon {
+  display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-  border: 0;
+  width: 48px;
+  height: 48px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  color: #007bff;
 }
 
-.action-icon {
-  font-size: 18px;
+.quick-action-card .card-icon :deep(svg) {
+  width: 24px;
+  height: 24px;
+}
+
+.quick-action-card .card-content {
+  flex: 1;
+}
+
+.quick-action-card .card-content h3 {
+  margin: 0 0 0.5rem 0;
+  color: #212529;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.quick-action-card .card-content p {
+  margin: 0;
+  color: #6c757d;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.quick-action-card .card-arrow {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  color: #6c757d;
+  font-size: 1.25rem;
+  font-weight: 300;
+  transition: all 0.2s ease;
+}
+
+.quick-action-card:hover:not(:disabled) .card-arrow {
+  color: #007bff;
+  transform: translateX(4px);
 }
 
 .stat-display .subtle {
@@ -516,10 +517,6 @@ async function resetUserPassword() {
 }
 
 @media (max-width: 768px) {
-  .control-panel {
-    padding: 10px;
-  }
-
   .control-panel-header {
     flex-direction: column;
     gap: 15px;
@@ -530,7 +527,7 @@ async function resetUserPassword() {
     grid-template-columns: 1fr;
   }
 
-  .quick-actions {
+  .quick-actions-grid {
     grid-template-columns: 1fr;
   }
 }

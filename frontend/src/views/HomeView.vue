@@ -303,13 +303,66 @@ onMounted(load)
   display: flex;
   align-items: center;
   margin-left: 0.75rem;
+  flex-shrink: 0;
+}
+
+.workflow-card-main {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.workflow-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .workflows-grid {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .workflow-card {
+    flex-wrap: wrap;
+    padding: 0.75rem;
+  }
+
+  .workflow-card-main {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .workflow-card-actions {
+    flex: 1 1 100%;
+    margin-left: 0;
+    margin-top: 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .workflow-card-actions .button {
+    width: 100%;
+  }
+
+  .recently-viewed-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-item {
+    flex-wrap: wrap;
+  }
+
+  .item-details {
+    flex: 1 1 100%;
+    margin: 0.5rem 0 0 0;
+  }
 }
 
 /* Groups */
 .recently-viewed-groups {
   display: grid;
   grid-auto-flow: dense;
-  grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1rem;
 }
 

@@ -24,6 +24,11 @@ import DashboardListView from './views/DashboardListView.vue'
 import Dashboard from './views/Dashboard.vue'
 import WorkflowView from './views/WorkflowView.vue'
 import UserPreferences from './views/UserPreferences.vue'
+import UserControlPanel from './views/UserControlPanel.vue'
+import UserBookmarks from './views/UserBookmarks.vue'
+import UserAPIKeys from './views/UserAPIKeys.vue'
+import UserNotifications from './views/UserNotifications.vue'
+import UserManagement from './views/UserManagement.vue'
 import { useAuthStore } from './stores/auth'
 
 const router = createRouter({
@@ -92,9 +97,33 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/user-control-panel',
+      name: 'user-control-panel',
+      component: UserControlPanel,
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/user-preferences',
       name: 'user-preferences',
       component: UserPreferences,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/user-bookmarks',
+      name: 'user-bookmarks',
+      component: UserBookmarks,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/user-api-keys',
+      name: 'user-api-keys',
+      component: UserAPIKeys,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/user-notifications',
+      name: 'user-notifications',
+      component: UserNotifications,
       meta: { requiresAuth: true }
     },
     {
@@ -267,6 +296,16 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         title: 'Control Panel',
+        icon: DatabaseAddIcon
+      },
+    },
+    {
+      path: '/admin/user-management',
+      name: 'user-management',
+      component: UserManagement,
+      meta: {
+        requiresAuth: true,
+        title: 'User Management',
         icon: DatabaseAddIcon
       },
     },
