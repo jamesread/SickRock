@@ -16,6 +16,7 @@ import { useKeyboardShortcuts, type KeyboardShortcut } from './composables/useKe
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
 import PWAInstallPrompt from './components/PWAInstallPrompt.vue'
 import { usePWAInstall } from './composables/usePWAInstall'
+import { isOnline } from './utils/indexedDB'
 
 const sidebar = ref(null)
 const isSidebarOpen = ref(true)
@@ -26,6 +27,7 @@ const authStore = useAuthStore()
 
 const isAuthenticated = computed(() => authStore.isAuthenticated)
 const user = computed(() => authStore.user)
+const isOffline = ref(false)
 
 // Create global API client once and provide it to all components
 const apiClient = createApiClient()
@@ -131,6 +133,34 @@ async function loadAppData() {
         if (sidebar.value) sidebar.value.close();
         isSidebarOpen.value = false
         persistSidebarState()
+        return
+    }
+
+    // Check if we're offline
+    const online = isOnline()
+    isOffline.value = !online
+
+    // If offline, show a message but don't fail completely
+    if (!online) {
+        console.warn('App is offline, skipping API calls')
+        // Still try to set up basic UI structure
+        if (sidebar.value) {
+            sidebar.value.clearNavigationLinks()
+            sidebar.value.addNavigationLink({
+                id: 'home',
+                name: 'Home',
+                title: 'Home',
+                path: '/',
+                icon: HomeIcon
+            })
+            sidebar.value.stick()
+            try {
+                const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
+                isSidebarOpen.value = (stored == null ? true : stored === '1')
+            } catch { isSidebarOpen.value = true }
+            if (isSidebarOpen.value) sidebar.value.open()
+            else sidebar.value.close()
+        }
         return
     }
 
@@ -442,6 +472,40 @@ async function loadAppData() {
         }
     } catch (error) {
         console.error('Failed to load data:', error)
+
+        // Check if it's a network error (offline)
+        const isNetworkError = !isOnline() ||
+            (error instanceof Error && (
+                error.message.includes('Failed to fetch') ||
+                error.message.includes('NetworkError') ||
+                error.message.includes('network') ||
+                error.name === 'NetworkError'
+            ))
+
+        if (isNetworkError) {
+            isOffline.value = true
+            console.warn('Network error detected, app is offline')
+            // Still try to set up basic UI structure
+            if (sidebar.value) {
+                sidebar.value.clearNavigationLinks()
+                sidebar.value.addNavigationLink({
+                    id: 'home',
+                    name: 'Home',
+                    title: 'Home',
+                    path: '/',
+                    icon: HomeIcon
+                })
+                sidebar.value.stick()
+                try {
+                    const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
+                    isSidebarOpen.value = (stored == null ? true : stored === '1')
+                } catch { isSidebarOpen.value = true }
+                if (isSidebarOpen.value) sidebar.value.open()
+                else sidebar.value.close()
+            }
+            return
+        }
+
         // If we get an auth error, redirect to login
         if (error.code === 'unauthenticated') {
             router.push('/login')
@@ -922,6 +986,28 @@ onMounted(() => {
         // Re-fetch navigation to rebuild pinnedWorkflow state
         loadAppData()
     })
+
+    // Listen for online/offline events
+    const handleOnline = () => {
+        isOffline.value = false
+        if (authStore.isAuthenticated) {
+            loadAppData()
+        }
+    }
+    const handleOffline = () => {
+        isOffline.value = true
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    // Check initial online status
+    isOffline.value = !isOnline()
+
+    onUnmounted(() => {
+        window.removeEventListener('online', handleOnline)
+        window.removeEventListener('offline', handleOffline)
+    })
 })
 
 onUnmounted(() => {
@@ -1032,6 +1118,10 @@ onMounted(async () => {
     <div id="layout">
         <Sidebar v-if="isAuthenticated" ref="sidebar" />
         <div id="content">
+            <!-- Offline Banner -->
+            <div v-if="isOffline && isAuthenticated" class="offline-banner">
+                <span>📡 You're offline. Some features may be unavailable.</span>
+            </div>
             <main>
                 <router-view :key="$route.path" />
             </main>
@@ -1737,5 +1827,23 @@ footer span {
         gap: 0.5rem;
         font-size: 0.8rem;
     }
+}
+
+/* Offline Banner */
+.offline-banner {
+    background: #ffc107;
+    color: #000;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-bottom: 1px solid #ffb300;
+    z-index: 100;
+}
+
+.offline-banner span {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 </style>

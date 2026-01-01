@@ -55,10 +55,10 @@ self.addEventListener('install', (event) => {
           '/icons/icon-192x192.png',
           '/icons/icon-512x512.png'
         ];
-        
+
         // Cache each resource individually, logging failures but not blocking installation
         return Promise.allSettled(
-          resourcesToCache.map(url => 
+          resourcesToCache.map(url =>
             cache.add(url).catch(err => {
               console.warn(`Failed to cache ${url}:`, err);
               return null; // Don't throw, just log the error
@@ -117,6 +117,44 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Handle navigation requests (page loads)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Cache successful responses
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+          }
+          return response;
+        })
+        .catch(() => {
+          // When offline, try to serve cached version of the page
+          return caches.match(event.request)
+            .then((cachedResponse) => {
+              if (cachedResponse) {
+                return cachedResponse;
+              }
+              // If no cached version, try to serve the app shell (index.html) from both caches
+              return Promise.all([
+                caches.open(CACHE_NAME).then(cache => cache.match('/')),
+                caches.open(STATIC_CACHE_NAME).then(cache => cache.match('/'))
+              ]).then(([cached1, cached2]) => {
+                if (cached1) return cached1;
+                if (cached2) return cached2;
+                // Last resort: serve offline.html
+                return caches.match('/offline.html');
+              });
+            });
+        })
+    );
+    return;
+  }
+
   // Only cache specific routes (table views, not admin/control panel)
   if (!shouldCache(event.request.url)) {
     return;
@@ -152,10 +190,6 @@ self.addEventListener('fetch', (event) => {
             return response;
           })
           .catch(() => {
-            // Return offline page for navigation requests when offline
-            if (event.request.mode === 'navigate') {
-              return caches.match('/offline.html') || caches.match('/');
-            }
             // For other requests, return cached version if available
             return caches.match(event.request);
           });
