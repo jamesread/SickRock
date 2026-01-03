@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import Calendar, { type CalendarEvent } from 'picocrank/vue/components/Calendar.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
-import ViewsButton from './ViewsButton.vue'
 
 const props = defineProps<{
   tableId: string
@@ -37,6 +36,14 @@ const contextMenu = ref<{ visible: boolean; x: number; y: number; item: Item | n
   item: null
 })
 const deleting = ref(false)
+
+// Day menu state
+const dayMenu = ref<{ visible: boolean; x: number; y: number; date: Date | null }>({
+  visible: false,
+  x: 0,
+  y: 0,
+  date: null
+})
 
 // Quick add state
 const quickAdd = ref<{ visible: boolean; date: Date | null; name: string; icon: string }>({
@@ -308,7 +315,13 @@ function handleEventClick(event: CalendarEvent) {
 }
 
 function handleDateClick(date: Date) {
-  showQuickAdd(date)
+  // Show day menu dialog
+  dayMenu.value = {
+    visible: true,
+    x: window.innerWidth / 2,
+    y: window.innerHeight / 2,
+    date: date
+  }
 }
 
 function handleMonthChange(month: number, year: number) {
@@ -519,6 +532,32 @@ function hideContextMenu() {
   contextMenu.value.item = null
 }
 
+// Day menu functions
+function hideDayMenu() {
+  dayMenu.value.visible = false
+  dayMenu.value.date = null
+}
+
+function goToDayView() {
+  if (!dayMenu.value.date) return
+
+  // Format date as YYYY-MM-DD for the route
+  const year = dayMenu.value.date.getFullYear()
+  const month = String(dayMenu.value.date.getMonth() + 1).padStart(2, '0')
+  const day = String(dayMenu.value.date.getDate()).padStart(2, '0')
+  const dateStr = `${year}-${month}-${day}`
+
+  hideDayMenu()
+  router.push(`/table/${props.tableId}/day/${dateStr}`)
+}
+
+function openQuickAddFromMenu() {
+  if (!dayMenu.value.date) return
+
+  hideDayMenu()
+  showQuickAdd(dayMenu.value.date)
+}
+
 async function deleteItem() {
   if (!contextMenu.value.item) {
     console.log('No item in context menu')
@@ -554,22 +593,9 @@ onMounted(load)
 </script>
 
 <template>
-  <Section :title="sectionTitle" :padding="false">
+  <Section :title="sectionTitle" :padding="false" class="calendar-section">
     <template #toolbar>
       <div class="toolbar">
-        <ViewsButton
-          :table-id="props.tableId"
-          :show-view-create="true"
-          :show-view-edit="true"
-          @view-changed="(viewType: string) => {
-            emit('view-changed', viewType)
-            // Reload if still on calendar view
-            if (viewType === 'calendar') {
-              reloadItems()
-            }
-          }"
-        />
-        <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
         <button @click="goToToday" class="button neutral">Today</button>
         <button @click="prevMonth" class="button neutral">‹</button>
          <div class="date-picker-container">
@@ -638,6 +664,38 @@ onMounted(load)
       v-if="contextMenu.visible"
       class="context-menu-backdrop"
       @click="hideContextMenu"
+    ></div>
+
+    <!-- Day Menu Modal -->
+    <div
+      v-if="dayMenu.visible"
+      class="day-menu-modal"
+      @click.stop
+    >
+      <div class="day-menu-content">
+        <h3>Choose an action</h3>
+        <p class="day-menu-date" v-if="dayMenu.date">
+          {{ dayMenu.date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) }}
+        </p>
+        <div class="day-menu-actions">
+          <button @click="goToDayView" class="button primary">
+            View Day
+          </button>
+          <button @click="openQuickAddFromMenu" class="button secondary">
+            Quick Add
+          </button>
+          <button @click="hideDayMenu" class="button neutral">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backdrop to close day menu -->
+    <div
+      v-if="dayMenu.visible"
+      class="day-menu-backdrop"
+      @click="hideDayMenu"
     ></div>
 
     <!-- Quick Add Modal -->
@@ -718,6 +776,32 @@ onMounted(load)
   border-radius: 0;
 }
 
+.calendar-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.calendar-content :deep(table) {
+  height: 100%;
+  table-layout: fixed;
+}
+
+.calendar-content :deep(tbody) {
+  height: 100%;
+}
+
+.calendar-content :deep(tbody tr) {
+  height: 100%;
+}
+
+.calendar-content :deep(tbody td) {
+  height: 100%;
+  min-height: 120px;
+  vertical-align: top;
+}
+
 .date-picker-input {
   padding: 0.5rem;
   border: 1px solid #ddd;
@@ -735,6 +819,22 @@ onMounted(load)
 
 .date-picker-input:hover {
   border-color: #999;
+}
+
+.calendar-section {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.calendar-section :deep(.section-content),
+.calendar-section :deep(.section-body) {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .toolbar {
@@ -853,9 +953,73 @@ onMounted(load)
   z-index: 1000;
 }
 
+/* Day Menu Modal */
+.day-menu-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+  min-width: 300px;
+  max-width: 400px;
+}
+
+.day-menu-content {
+  padding: 1.5rem;
+}
+
+.day-menu-content h3 {
+  margin: 0 0 0.5rem 0;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.day-menu-date {
+  margin: 0 0 1.5rem 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.day-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.day-menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
 @media (max-width: 768px) {
   .calendar-content {
-    padding: 0.5rem;
+    padding: 0;
+  }
+
+  .calendar-content :deep(.calendar-cell),
+  .calendar-content :deep(.day),
+  .calendar-content :deep(.date),
+  .calendar-content :deep(td),
+  .calendar-content :deep(th) {
+    font-size: 0.75rem;
+  }
+
+  .calendar-content :deep(.event-content),
+  .calendar-content :deep(.event-title),
+  .calendar-content :deep(.event-time) {
+    font-size: 0.7rem;
+  }
+
+  section {
+	margin-top: 0;
   }
 }
 </style>

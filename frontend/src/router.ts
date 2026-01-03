@@ -29,6 +29,7 @@ import UserBookmarks from './views/UserBookmarks.vue'
 import UserAPIKeys from './views/UserAPIKeys.vue'
 import UserNotifications from './views/UserNotifications.vue'
 import UserManagement from './views/UserManagement.vue'
+import DayView from './views/DayView.vue'
 import { useAuthStore } from './stores/auth'
 
 const router = createRouter({
@@ -136,6 +137,23 @@ const router = createRouter({
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), to: { name: 'table', params: { tableName: route.params.tableName } } },
         ],
+      },
+    },
+    {
+      path: '/table/:tableName/day/:date',
+      name: 'day-view',
+      component: DayView,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: (route: any) => {
+          const date = new Date(String(route.params.date))
+          const formattedDate = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+          return [
+            { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+            { name: formattedDate },
+          ]
+        },
       },
     },
     {

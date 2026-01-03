@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
+import Navigation from 'picocrank/vue/components/Navigation.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
 import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon, CheckListIcon, Delete01Icon, Download01Icon } from '@hugeicons/core-free-icons'
 import { createApiClient } from './stores/api'
@@ -19,6 +20,7 @@ import { usePWAInstall } from './composables/usePWAInstall'
 import { isOnline } from './utils/indexedDB'
 
 const sidebar = ref(null)
+const navigation = ref(null)
 const isSidebarOpen = ref(true)
 const SIDEBAR_STATE_KEY = 'sickrock_sidebar_open'
 const PINNED_WORKFLOW_KEY = 'sickrock_pinned_workflow'
@@ -144,15 +146,17 @@ async function loadAppData() {
     if (!online) {
         console.warn('App is offline, skipping API calls')
         // Still try to set up basic UI structure
-        if (sidebar.value) {
-            sidebar.value.clearNavigationLinks()
-            sidebar.value.addNavigationLink({
+        if (navigation.value) {
+            navigation.value.clearNavigationLinks()
+            navigation.value.addNavigationLink({
                 id: 'home',
                 name: 'Home',
                 title: 'Home',
                 path: '/',
                 icon: HomeIcon
             })
+        }
+        if (sidebar.value) {
             sidebar.value.stick()
             try {
                 const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
@@ -249,19 +253,23 @@ async function loadAppData() {
             }
         }
 
-        sidebar.value.clearNavigationLinks()
+        if (navigation.value) {
+            navigation.value.clearNavigationLinks()
+        }
         if (quickSearch.value) {
             quickSearch.value.clearItems()
         }
 
         // Add home link
-        sidebar.value.addNavigationLink({
-            id: 'home',
-            name: 'Home',
-            title: 'Home',
-            path: '/',
-            icon: HomeIcon
-        })
+        if (navigation.value) {
+            navigation.value.addNavigationLink({
+                id: 'home',
+                name: 'Home',
+                title: 'Home',
+                path: '/',
+                icon: HomeIcon
+            })
+        }
 
         if (quickSearch.value) {
             quickSearch.value.addItem({
@@ -285,7 +293,7 @@ async function loadAppData() {
             const workflowIcon = (Hugeicons as any)[workflowIconName] || DatabaseIcon
             const workflowPath = `/workflow/${workflow.id}`
 
-            sidebar.value?.addNavigationLink({
+            navigation.value?.addNavigationLink({
                 id: `workflow-${workflow.id}`,
                 name: workflow.name || '',
                 title: workflow.name || '',
@@ -310,7 +318,7 @@ async function loadAppData() {
         pages.value.forEach(pg => {
             const icon = Hugeicons[pg.icon] || DatabaseIcon
 
-            sidebar.value?.addNavigationLink({
+            navigation.value?.addNavigationLink({
                 id: pg.id,
                 name: pg.id,
                 title: pg.title,
@@ -344,11 +352,11 @@ async function loadAppData() {
             })
         }
 
-        if (sidebar.value) {
-            sidebar.value.addSeparator()
+        if (navigation.value) {
+            navigation.value.addSeparator()
 
             // Table configurations
-            sidebar.value.addNavigationLink({
+            navigation.value.addNavigationLink({
                 id: 'table-configurations',
                 name: 'Table Configurations',
                 title: 'Table Configurations',
@@ -367,7 +375,7 @@ async function loadAppData() {
             })
 
             // Workflows
-            sidebar.value.addNavigationLink({
+            navigation.value.addNavigationLink({
                 id: 'workflows',
                 name: 'Workflows',
                 title: 'Workflows',
@@ -385,33 +393,7 @@ async function loadAppData() {
                 icon: DatabaseSettingIcon
             })
 
-            // Settings
-            sidebar.value.addNavigationLink({
-                id: 'settings',
-                name: 'Settings',
-                title: 'Settings',
-                path: '/table/table_settings',
-                icon: DatabaseSettingIcon
-            })
-            quickSearch.value?.addItem({
-                id: 'settings',
-                name: 'Settings',
-                title: 'Settings',
-                description: 'Manage application settings',
-                category: 'Navigation',
-                path: '/table/table_settings',
-                type: 'route',
-                icon: DatabaseSettingIcon
-            })
-
-            // Navigation items
-            sidebar.value.addNavigationLink({
-                id: 'nav-items',
-                name: 'Navigation',
-                title: 'Navigation',
-                path: '/table/table_navigation',
-                icon: DatabaseSettingIcon
-            })
+            // Navigation items - removed from sidebar, now in control panel
             quickSearch.value?.addItem({
                 id: 'nav-items',
                 name: 'Navigation',
@@ -423,8 +405,7 @@ async function loadAppData() {
                 icon: DatabaseSettingIcon
             })
 
-            // Admin routes: table-create, control-panel, device-code-claimer
-            sidebar.value.addRouterLink('table-create')
+            // Admin routes: control-panel, device-code-claimer
             quickSearch.value?.addItem({
                 id: 'table-create',
                 name: 'Create Table',
@@ -436,7 +417,7 @@ async function loadAppData() {
                 icon: DatabaseSettingIcon
             })
 
-            sidebar.value.addRouterLink('control-panel')
+            navigation.value.addRouterLink('control-panel')
             quickSearch.value?.addItem({
                 id: 'control-panel',
                 name: 'Control Panel',
@@ -448,7 +429,6 @@ async function loadAppData() {
                 icon: DatabaseSettingIcon
             })
 
-            sidebar.value.addRouterLink('device-code-claimer')
             quickSearch.value?.addItem({
                 id: 'device-code-claimer',
                 name: 'Device Code Claimer',
@@ -460,7 +440,9 @@ async function loadAppData() {
                 icon: DatabaseSettingIcon
             })
 
-            sidebar.value.addCallback('Logout', async () => { await handleLogout() }, LogoutIcon)
+            navigation.value.addCallback('Logout', async () => { await handleLogout() }, { icon: LogoutIcon })
+        }
+        if (sidebar.value) {
             sidebar.value.stick()
             // Restore sidebar state from localStorage (default open)
             try {
@@ -486,15 +468,17 @@ async function loadAppData() {
             isOffline.value = true
             console.warn('Network error detected, app is offline')
             // Still try to set up basic UI structure
-            if (sidebar.value) {
-                sidebar.value.clearNavigationLinks()
-                sidebar.value.addNavigationLink({
+            if (navigation.value) {
+                navigation.value.clearNavigationLinks()
+                navigation.value.addNavigationLink({
                     id: 'home',
                     name: 'Home',
                     title: 'Home',
                     path: '/',
                     icon: HomeIcon
                 })
+            }
+            if (sidebar.value) {
                 sidebar.value.stick()
                 try {
                     const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
@@ -521,8 +505,8 @@ watch(isAuthenticated, (newValue) => {
         // Clear data when logged out
         pages.value = []
         version.value = ''
-        if (sidebar.value && typeof sidebar.value.clearNavigationLinks === 'function') {
-            sidebar.value.clearNavigationLinks()
+        if (navigation.value && typeof navigation.value.clearNavigationLinks === 'function') {
+            navigation.value.clearNavigationLinks()
         }
         if (quickSearch.value && typeof quickSearch.value.clearItems === 'function') {
             quickSearch.value.clearItems()
@@ -1115,9 +1099,10 @@ onMounted(async () => {
         </template>
     </Header>
 
-    <div id="layout">
-        <Sidebar v-if="isAuthenticated" ref="sidebar" />
-        <div id="content">
+    <Navigation v-if="isAuthenticated" ref="navigation">
+        <div id="layout">
+            <Sidebar ref="sidebar" />
+            <div id="content">
             <!-- Offline Banner -->
             <div v-if="isOffline && isAuthenticated" class="offline-banner">
                 <span>📡 You're offline. Some features may be unavailable.</span>
@@ -1141,6 +1126,7 @@ onMounted(async () => {
             </footer>
         </div>
     </div>
+    </Navigation>
 
     <!-- QuickSearch Dialog -->
     <div

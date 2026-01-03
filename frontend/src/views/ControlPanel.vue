@@ -5,15 +5,15 @@ import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import { useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
-import { HugeiconsIcon } from '@hugeicons/vue'
+import Navigation from 'picocrank/vue/components/Navigation.vue'
+import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import {
-  RefreshIcon,
   AddIcon,
-  BashIcon,
   HomeIcon,
   UserIcon,
   KeyIcon,
-  DatabaseIcon
+  DatabaseIcon,
+  DatabaseSettingIcon
 } from '@hugeicons/core-free-icons'
 
 const router = useRouter()
@@ -32,10 +32,103 @@ const error = ref<string | null>(null)
 const totalTables = ref<number>(0)
 const totalItems = ref<number>(0)
 
+// Navigation ref
+const localNavigation = ref(null)
+
 // Load initial data
 onMounted(async () => {
   await loadBuildInfo()
   await loadDatabaseStats()
+
+  if (localNavigation.value) {
+    // Create New Table
+    localNavigation.value.addNavigationLink({
+      id: 'create-table',
+      name: 'create-table',
+      title: 'Create New Table',
+      path: '/admin/table/create',
+      icon: AddIcon,
+      type: 'route',
+      description: 'Create a new database table'
+    })
+
+    // Database Browser
+    localNavigation.value.addNavigationLink({
+      id: 'database-browser',
+      name: 'database-browser',
+      title: 'Database Browser',
+      path: '/admin/database-browser',
+      icon: DatabaseIcon,
+      type: 'route',
+      description: 'Browse and explore database structure'
+    })
+
+    // User Management
+    localNavigation.value.addNavigationLink({
+      id: 'user-management',
+      name: 'user-management',
+      title: 'User Management',
+      path: '/admin/user-management',
+      icon: UserIcon,
+      type: 'route',
+      description: 'Reset user passwords and manage user accounts'
+    })
+
+    // View Sessions
+    localNavigation.value.addNavigationLink({
+      id: 'view-sessions',
+      name: 'view-sessions',
+      title: 'View Sessions',
+      path: '/table/table_sessions',
+      icon: UserIcon,
+      type: 'route',
+      description: 'View active user sessions'
+    })
+
+    // View Device Codes
+    localNavigation.value.addNavigationLink({
+      id: 'view-device-codes',
+      name: 'view-device-codes',
+      title: 'View Device Codes',
+      path: '/table/device_codes',
+      icon: KeyIcon,
+      type: 'route',
+      description: 'Manage device authentication codes'
+    })
+
+    // Settings
+    localNavigation.value.addNavigationLink({
+      id: 'settings',
+      name: 'settings',
+      title: 'Settings',
+      path: '/table/table_settings',
+      icon: DatabaseSettingIcon,
+      type: 'route',
+      description: 'Manage application settings'
+    })
+
+    // Navigation items management
+    localNavigation.value.addNavigationLink({
+      id: 'nav-items',
+      name: 'nav-items',
+      title: 'Navigation',
+      path: '/table/table_navigation',
+      icon: DatabaseSettingIcon,
+      type: 'route',
+      description: 'Manage navigation items'
+    })
+
+    // Go to Home
+    localNavigation.value.addNavigationLink({
+      id: 'go-home',
+      name: 'go-home',
+      title: 'Go to Home',
+      path: '/',
+      icon: HomeIcon,
+      type: 'route',
+      description: 'Return to the home dashboard'
+    })
+  }
 })
 
 async function loadBuildInfo() {
@@ -86,93 +179,10 @@ function refreshData() {
 
     <div class="control-sections">
       <!-- Control Panel -->
-      <Section title = "Control Panel">
-        <div class="quick-actions-grid">
-          <router-link to="/admin/table/create" class="quick-action-card">
-            <div class="card-icon">
-              <HugeiconsIcon :icon="AddIcon" />
-            </div>
-            <div class="card-content">
-              <h3>Create New Table</h3>
-              <p>Create a new database table</p>
-            </div>
-            <div class="card-arrow">
-              →
-            </div>
-          </router-link>
-          <router-link to="/admin/database-browser" class="quick-action-card">
-            <div class="card-icon">
-              <HugeiconsIcon :icon="DatabaseIcon" />
-            </div>
-            <div class="card-content">
-              <h3>Database Browser</h3>
-              <p>Browse and explore database structure</p>
-            </div>
-            <div class="card-arrow">
-              →
-            </div>
-          </router-link>
-          <router-link to="/admin/user-management" class="quick-action-card">
-            <div class="card-icon">
-              <HugeiconsIcon :icon="UserIcon" />
-            </div>
-            <div class="card-content">
-              <h3>User Management</h3>
-              <p>Reset user passwords and manage user accounts</p>
-            </div>
-            <div class="card-arrow">
-              →
-            </div>
-          </router-link>
-          <router-link to="/table/table_sessions" class="quick-action-card">
-            <div class="card-icon">
-              <HugeiconsIcon :icon="UserIcon" />
-            </div>
-            <div class="card-content">
-              <h3>View Sessions</h3>
-              <p>View active user sessions</p>
-            </div>
-            <div class="card-arrow">
-              →
-            </div>
-          </router-link>
-          <router-link to="/table/device_codes" class="quick-action-card">
-            <div class="card-icon">
-              <HugeiconsIcon :icon="KeyIcon" />
-            </div>
-            <div class="card-content">
-              <h3>View Device Codes</h3>
-              <p>Manage device authentication codes</p>
-            </div>
-            <div class="card-arrow">
-              →
-            </div>
-          </router-link>
-          <button @click="refreshData" class="quick-action-card" :disabled="loading">
-            <div class="card-icon">
-              <HugeiconsIcon :icon="RefreshIcon" />
-            </div>
-            <div class="card-content">
-              <h3>Refresh All Data</h3>
-              <p>{{ loading ? 'Refreshing...' : 'Reload system information' }}</p>
-            </div>
-            <div class="card-arrow">
-              →
-            </div>
-          </button>
-          <button @click="router.push('/')" class="quick-action-card">
-            <div class="card-icon">
-              <HugeiconsIcon :icon="HomeIcon" />
-            </div>
-            <div class="card-content">
-              <h3>Go to Home</h3>
-              <p>Return to the home dashboard</p>
-            </div>
-            <div class="card-arrow">
-              →
-            </div>
-          </button>
-        </div>
+      <Section title="Control Panel" subtitle="Administrative tools and quick actions">
+        <Navigation ref="localNavigation">
+          <NavigationGrid />
+        </Navigation>
       </Section>
 
       <!-- System Diagnostics -->
@@ -414,98 +424,6 @@ function refreshData() {
   font-size: 12px;
 }
 
-.quick-actions-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 1.5rem;
-}
-
-.quick-action-card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 1.5rem;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  min-height: 160px;
-  text-decoration: none;
-  color: inherit;
-  margin: 0;
-  font-family: inherit;
-  font-size: inherit;
-  text-align: left;
-  width: 100%;
-  box-sizing: border-box;
-  text-indent: 0;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-}
-
-.quick-action-card:hover:not(:disabled) {
-  border-color: #007bff;
-  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.15);
-  transform: translateY(-2px);
-}
-
-.quick-action-card:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.quick-action-card .card-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  background: #f8f9fa;
-  border-radius: 8px;
-  margin-bottom: 1rem;
-  color: #007bff;
-}
-
-.quick-action-card .card-icon :deep(svg) {
-  width: 24px;
-  height: 24px;
-}
-
-.quick-action-card .card-content {
-  flex: 1;
-}
-
-.quick-action-card .card-content h3 {
-  margin: 0 0 0.5rem 0;
-  color: #212529;
-  font-size: 1.125rem;
-  font-weight: 600;
-}
-
-.quick-action-card .card-content p {
-  margin: 0;
-  color: #6c757d;
-  font-size: 0.9rem;
-  line-height: 1.5;
-}
-
-.quick-action-card .card-arrow {
-  position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
-  color: #6c757d;
-  font-size: 1.25rem;
-  font-weight: 300;
-  transition: all 0.2s ease;
-}
-
-.quick-action-card:hover:not(:disabled) .card-arrow {
-  color: #007bff;
-  transform: translateX(4px);
-}
 
 .stat-display .subtle {
   letter-spacing: 1px;
@@ -524,10 +442,6 @@ function refreshData() {
   }
 
   .form-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .quick-actions-grid {
     grid-template-columns: 1fr;
   }
 }

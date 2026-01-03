@@ -1504,16 +1504,6 @@ onUnmounted(() => {
         </div>
       </div>
       <div v-else class="section-content">
-      <!-- Selection controls -->
-      <div v-if="pagedItems.length > 0 && hasSelectedItems" class="selection-controls padding">
-        <button
-          @click="confirmDeleteSelected"
-          class="button delete-button"
-          :disabled="deleting"
-        >
-          🗑️ Delete Selected ({{ selectedKeys.size }})
-        </button>
-      </div>
       <div class="table-scroll-container">
       <table class="table row-hover">
         <colgroup>
@@ -1644,6 +1634,16 @@ onUnmounted(() => {
           </tr>
         </tbody>
       </table>
+      </div>
+      <!-- Selection controls - moved to bottom above pagination -->
+      <div v-if="pagedItems.length > 0 && hasSelectedItems" class="selection-controls padding">
+        <button
+          @click="confirmDeleteSelected"
+          class="button delete-button"
+          :disabled="deleting"
+        >
+          🗑️ Delete Selected ({{ selectedKeys.size }})
+        </button>
       </div>
 	  <div v-if="showPagination" class = "padding">
 		  <Pagination
