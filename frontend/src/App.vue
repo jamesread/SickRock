@@ -271,6 +271,34 @@ function populateQuickSearchItems() {
 }
 
 async function loadAppData() {
+    // Wait for init to complete before making any API calls
+    // Poll for initResponse with a timeout to avoid infinite waiting
+    let initResponse = authStore.initResponse
+    let attempts = 0
+    const maxAttempts = 50 // Wait up to 5 seconds (50 * 100ms)
+
+    while (!initResponse && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        initResponse = authStore.initResponse
+        attempts++
+    }
+
+    // If init still hasn't completed, try calling it ourselves as fallback
+    if (!initResponse) {
+        console.warn('Init response not available, calling init as fallback')
+        try {
+            initResponse = await apiClient.init(create(InitRequestSchema, {}))
+            authStore.setInitResponse(initResponse)
+        } catch (error) {
+            console.error('Failed to call init in loadAppData:', error)
+            // If init fails, user is not authenticated
+            if (sidebar.value) sidebar.value.close();
+            isSidebarOpen.value = false
+            persistSidebarState()
+            return
+        }
+    }
+
     // Only load data if authenticated
     if (!authStore.isAuthenticated) {
         if (sidebar.value) sidebar.value.close();
@@ -310,8 +338,6 @@ async function loadAppData() {
     }
 
     try {
-        // Get build info
-        const initResponse = await apiClient.init(create(InitRequestSchema , {}))
         version.value = initResponse.version
 
         // Load appTitle setting from table_settings
@@ -616,6 +642,12 @@ const isCurrentPageBookmarked = computed(() => {
 
 // Check if current page can be bookmarked (has a matching navigation item)
 async function checkCanBookmarkCurrentPage() {
+    // Don't check if user is not authenticated
+    if (!authStore.isAuthenticated) {
+        canBookmarkCurrentPage.value = false
+        return
+    }
+
     if (!currentRoute.value.path) {
         canBookmarkCurrentPage.value = false
         return
@@ -653,6 +685,11 @@ async function checkCanBookmarkCurrentPage() {
 }
 
 async function toggleCurrentPageBookmark() {
+    // Don't proceed if user is not authenticated
+    if (!authStore.isAuthenticated) {
+        return
+    }
+
     if (!currentRoute.value.path) return
 
     const currentPath = currentRoute.value.path
@@ -1151,34 +1188,41 @@ onMounted(async () => {
         </template>
     </Header>
 
-    <Navigation v-if="isAuthenticated" ref="navigation">
-        <div id="layout">
-            <Sidebar ref="sidebar" />
-            <div id="content">
-            <!-- Offline Banner -->
-            <div v-if="isOffline && isAuthenticated" class="offline-banner">
-                <span>📡 You're offline. Some features may be unavailable.</span>
+    <!-- Always render router-view so login page can display -->
+    <template v-if="!isAuthenticated">
+        <router-view :key="$route.path" />
+    </template>
+
+    <template v-else>
+        <Navigation ref="navigation">
+            <div id="layout">
+                <Sidebar ref="sidebar" />
+                <div id="content">
+                <!-- Offline Banner -->
+                <div v-if="isOffline" class="offline-banner">
+                    <span>📡 You're offline. Some features may be unavailable.</span>
+                </div>
+                <main>
+                    <router-view :key="$route.path" />
+                </main>
+                <footer v-if="version">
+                    <span>
+                        <a
+                            href="https://github.com/jamesread/SickRock"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="github-link"
+                            title="View on GitHub"
+                        >
+                            SickRock
+                        </a>
+                    </span>
+                    <span>{{ version }}</span>
+                </footer>
             </div>
-            <main>
-                <router-view :key="$route.path" />
-            </main>
-            <footer v-if="version">
-                <span>
-                    <a
-                        href="https://github.com/jamesread/SickRock"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="github-link"
-                        title="View on GitHub"
-                    >
-                        SickRock
-                    </a>
-                </span>
-                <span>{{ version }}</span>
-            </footer>
         </div>
-    </div>
-    </Navigation>
+        </Navigation>
+    </template>
 
     <!-- QuickSearch Dialog -->
     <div

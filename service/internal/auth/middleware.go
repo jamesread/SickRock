@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -71,70 +72,53 @@ func ConnectAuthMiddleware(authService *AuthService) connect.UnaryInterceptorFun
 				return next(ctx, req)
 			}
 
-			// Get token from Authorization header
-			authHeader := req.Header().Get("Authorization")
-			log.Tracef("Authorization header: %s", authHeader)
-
-			if authHeader == "" {
-				log.Trace("No authorization header")
-				return nil, connect.NewError(connect.CodeUnauthenticated, nil)
-			}
-
-			// Extract token from "Bearer <token>"
-			parts := strings.Split(authHeader, " ")
-			if len(parts) != 2 || parts[0] != "Bearer" {
-				log.Trace("Invalid authorization header format")
-				return nil, connect.NewError(connect.CodeUnauthenticated, nil)
-			}
-
-			token := parts[1]
-
-			// Check if this is an API key (starts with "sk_")
-			if strings.HasPrefix(token, "sk_") {
-				log.Trace("Attempting API key authentication")
-				apiKey, err := authService.ValidateAPIKey(ctx, token)
-				if err != nil {
-					log.Tracef("API key validation failed: %v", err)
-					return nil, connect.NewError(connect.CodeUnauthenticated, nil)
-				}
-				if apiKey == nil {
-					log.Trace("API key not found or expired")
-					return nil, connect.NewError(connect.CodeUnauthenticated, nil)
-				}
-
-				// Update last used timestamp
-				authService.UpdateAPIKeyLastUsed(ctx, token)
-
-				// Create a claims-like object for API key authentication
-				claims := &Claims{
-					Username:  "", // We'll get this from the API key
-					SessionID: "", // No session for API keys
-					RegisteredClaims: jwt.RegisteredClaims{
-						ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // API keys don't expire via JWT
-					},
-				}
-
-				// Get the user associated with this API key
-				user, err := authService.repo.GetUserByID(ctx, apiKey.UserID)
-				if err != nil || user == nil {
-					log.Tracef("Failed to get user for API key: %v", err)
-					return nil, connect.NewError(connect.CodeUnauthenticated, nil)
-				}
-
-				claims.Username = user.Username
-				ctx = context.WithValue(ctx, "user", claims)
-				ctx = context.WithValue(ctx, "api_key", apiKey)
-				return next(ctx, req)
-			}
-
-			// Regular JWT token authentication
-			claims, err := authService.ValidateToken(ctx, token)
+			// Convert Connect request to HTTP request for httpauthshim
+			// httpauthshim requires req.URL to be set, so we construct a minimal URL
+			// from the procedure path
+			procedure := req.Spec().Procedure
+			parsedURL, err := url.Parse("http://localhost" + procedure)
 			if err != nil {
-				log.Tracef("Token validation failed: %v", err)
+				log.WithError(err).Error("Failed to parse request URL")
+				return nil, connect.NewError(connect.CodeInternal, err)
+			}
+
+			httpReq := &http.Request{
+				Method: "POST", // Connect uses POST
+				URL:    parsedURL,
+				Header: make(http.Header),
+			}
+
+			// Copy headers from Connect request
+			// Connect headers are accessed via Header().Get() or Header().Values()
+			// We'll manually copy the Authorization header which is what we need
+			if authHeader := req.Header().Get("Authorization"); authHeader != "" {
+				httpReq.Header.Set("Authorization", authHeader)
+			}
+			if sessionToken := req.Header().Get("Session-Token"); sessionToken != "" {
+				httpReq.Header.Set("Session-Token", sessionToken)
+			}
+			httpReq = httpReq.WithContext(ctx)
+
+			// Authenticate using httpauthshim
+			authUser := authService.AuthFromHttpReq(httpReq)
+			if authUser == nil || authUser.IsGuest() {
+				log.Trace("Authentication failed - guest user or nil")
 				return nil, connect.NewError(connect.CodeUnauthenticated, nil)
 			}
 
+			// Add authenticated user to context
+			ctx = context.WithValue(ctx, "authenticated_user", authUser)
+
+			// Also add legacy Claims for backward compatibility
+			claims := &Claims{
+				Username:  authUser.Username,
+				SessionID: authUser.SID,
+				RegisteredClaims: jwt.RegisteredClaims{
+					ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)), // Default expiration
+				},
+			}
 			ctx = context.WithValue(ctx, "user", claims)
+
 			return next(ctx, req)
 		}
 	}

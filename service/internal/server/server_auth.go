@@ -9,7 +9,6 @@ import (
 	"connectrpc.com/connect"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
-	"github.com/jamesread/SickRock/internal/auth"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -29,8 +28,7 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 	ipAddress := getClientIP(req)
 
 	// Validate against database and create session
-	authService := auth.NewAuthService(s.repo)
-	token, expiresAt, err := authService.Login(ctx, username, password, userAgent, ipAddress)
+	token, expiresAt, err := s.authService.Login(ctx, username, password, userAgent, ipAddress)
 	if err != nil {
 		return connect.NewResponse(&sickrockpb.LoginResponse{
 			Success: false,
@@ -84,8 +82,7 @@ func (s *SickRockServer) Logout(ctx context.Context, req *connect.Request[sickro
 	token := parts[1]
 
 	// Invalidate session in database
-	authService := auth.NewAuthService(s.repo)
-	err := authService.Logout(ctx, token)
+	err := s.authService.Logout(ctx, token)
 	if err != nil {
 		return connect.NewResponse(&sickrockpb.LogoutResponse{
 			Success: false,
@@ -107,8 +104,7 @@ func (s *SickRockServer) ValidateToken(ctx context.Context, req *connect.Request
 		}), nil
 	}
 
-	authService := auth.NewAuthService(s.repo)
-	claims, err := authService.ValidateToken(ctx, token)
+	claims, err := s.authService.ValidateToken(ctx, token)
 	if err != nil {
 		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{
 			Valid: false,

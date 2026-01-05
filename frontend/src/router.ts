@@ -379,15 +379,29 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // Attempt to restore authentication from localStorage before redirecting
+  // Only attempt to restore authentication if there's a token in localStorage
+  // This avoids unnecessary API calls if init already determined user is not authenticated
+  const SESSION_TOKEN_KEY = 'session-token'
+  const LEGACY_TOKEN_KEY = 'auth_token'
+  let token: string | null = null
   try {
-    const ok = await authStore.validateToken()
-    if (ok) {
-      next()
-      return
-    }
+    token = localStorage.getItem(SESSION_TOKEN_KEY) || localStorage.getItem(LEGACY_TOKEN_KEY)
   } catch {
-    // fall through to login
+    // localStorage might not be available
+  }
+
+  // Only call validateToken if we have a token and user is not already set
+  // This prevents unnecessary API calls when init already determined user is not authenticated
+  if (token && !authStore.user) {
+    try {
+      const ok = await authStore.validateToken()
+      if (ok) {
+        next()
+        return
+      }
+    } catch {
+      // fall through to login
+    }
   }
 
   // If not authenticated, redirect to login
@@ -412,6 +426,17 @@ async function getAppTitle(): Promise<string> {
   // Load appTitle from settings
   appTitleLoadPromise = (async () => {
     try {
+      // Check authentication before making API call
+      // Use auth store to check if user is authenticated (init has already been called)
+      const { useAuthStore } = await import('./stores/auth')
+      const authStore = useAuthStore()
+
+      // Don't make API calls if user is not authenticated (init determined currentUser is empty)
+      if (!authStore.isAuthenticated) {
+        cachedAppTitle = 'SickRock'
+        return 'SickRock'
+      }
+
       const { createApiClient } = await import('./stores/api')
       const client = createApiClient()
       const settingsResponse = await client.listItems({ tcName: 'table_settings', where: { setting_key: 'appTitle' } })
@@ -442,6 +467,18 @@ router.afterEach(async (to) => {
   // Special handling for table route - load table configuration title
   if (to.name === 'table' && to.params.tableName) {
     try {
+      // Check authentication before making API call
+      // Use auth store to check if user is authenticated (init has already been called)
+      const { useAuthStore } = await import('./stores/auth')
+      const authStore = useAuthStore()
+
+      // Don't make API calls if user is not authenticated (init determined currentUser is empty)
+      if (!authStore.isAuthenticated) {
+        // Skip API call if not authenticated, use default title
+        document.title = `${to.params.tableName} - ${appTitle}`
+        return
+      }
+
       const { createApiClient } = await import('./stores/api')
       const client = createApiClient()
       const configs = await client.getTableConfigurations({})

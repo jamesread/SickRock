@@ -53,8 +53,7 @@ func (s *SickRockServer) ClaimDeviceCode(ctx context.Context, req *connect.Reque
 	}
 
 	// Get the current user from context (must be authenticated to claim a device code)
-	authService := auth.NewAuthService(s.repo)
-	username, err := authService.GetUserFromContext(ctx)
+	username, err := s.authService.GetUserFromContext(ctx)
 	if err != nil {
 		return connect.NewResponse(&sickrockpb.ClaimDeviceCodeResponse{
 			Success:   false,

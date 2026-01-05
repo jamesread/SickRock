@@ -14,7 +14,7 @@
     "@connectrpc/connect-web": "^2.1.1",
     "@tailwindcss/postcss": "^4.1.18",
     "@vitejs/plugin-basic-ssl": "^2.1.0",
-    "picocrank": "^1.11.2",
+    "picocrank": "^1.12.1",
     "pinia": "^3.0.4",
     "vite-plugin-mkcert": "^1.17.9",
     "vue": "^3.5.26",
@@ -24,6 +24,6 @@
     "@vitejs/plugin-vue": "^6.0.3",
     "typescript": "^5.9.3",
     "vite": "^7.3.0",
-    "vue-tsc": "^3.2.1"
+    "vue-tsc": "^3.2.2"
   }
 }

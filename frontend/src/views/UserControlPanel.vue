@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
-import { UserIcon, BookmarkIcon, SettingsIcon, KeyIcon, NotificationIcon, Download01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { UserIcon, BookmarkIcon, SettingsIcon, KeyIcon, NotificationIcon, Download01Icon, LogoutIcon } from '@hugeicons/core-free-icons'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const user = computed(() => authStore.user)
 const localNavigation = ref(null)
+
+async function handleLogout() {
+  await authStore.logout()
+  router.push('/login')
+}
 
 onMounted(() => {
   if (localNavigation.value) {
@@ -77,6 +85,9 @@ onMounted(() => {
       type: 'route',
       description: 'Complete device code authentication'
     })
+
+    // Logout
+    localNavigation.value.addCallback('Logout', async () => { await handleLogout() }, { icon: LogoutIcon })
   }
 })
 </script>
@@ -92,6 +103,13 @@ onMounted(() => {
       <Navigation ref="localNavigation">
         <NavigationGrid />
       </Navigation>
+
+      <div class="logout-section">
+        <button @click="handleLogout" class="logout-button">
+          <HugeiconsIcon :icon="LogoutIcon" />
+          <span>Logout</span>
+        </button>
+      </div>
     </div>
   </Section>
 </template>
@@ -119,6 +137,44 @@ onMounted(() => {
   margin: 0;
   color: #6c757d;
   font-size: 1rem;
+}
+
+.logout-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  display: flex;
+  justify-content: center;
+}
+
+.logout-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.logout-button:hover {
+  background: #b91c1c;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.logout-button:active {
+  transform: translateY(0);
+}
+
+.logout-button svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* Responsive design */

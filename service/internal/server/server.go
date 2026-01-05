@@ -30,6 +30,7 @@ import (
 type SickRockServer struct {
 	repo              *repo.Repository
 	notificationService *notifications.NotificationService
+	authService       *auth.AuthService
 }
 
 // markdownRenderer is a configured goldmark instance for rendering markdown
@@ -58,17 +59,17 @@ func renderMarkdown(content string) string {
 	return buf.String()
 }
 
-func NewSickRockServer(r *repo.Repository) *SickRockServer {
+func NewSickRockServer(r *repo.Repository, authService *auth.AuthService) *SickRockServer {
 	return &SickRockServer{
 		repo:              r,
 		notificationService: notifications.NewNotificationService(r),
+		authService:       authService,
 	}
 }
 
 // getUserIDFromContext extracts the user ID from the context
 func (s *SickRockServer) getUserIDFromContext(ctx context.Context) (int, error) {
-	authService := auth.NewAuthService(s.repo)
-	username, err := authService.GetUserFromContext(ctx)
+	username, err := s.authService.GetUserFromContext(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -120,8 +121,9 @@ func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrock
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
 	var currentUsername string
-	if claims, ok := ctx.Value("user").(*auth.Claims); ok && claims != nil {
-		currentUsername = claims.Username
+	username, err := s.authService.GetUserFromContext(ctx)
+	if err == nil {
+		currentUsername = username
 	}
 
 	res := connect.NewResponse(&sickrockpb.InitResponse{

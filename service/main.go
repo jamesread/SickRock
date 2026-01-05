@@ -178,9 +178,18 @@ func main() {
 		log.Info("Default admin user created (username: admin, password: admin)")
 	}
 
-	srv := srvpkg.NewSickRockServer(repo)
-
 	authService := auth.NewAuthService(repo)
+
+	srv := srvpkg.NewSickRockServer(repo, authService)
+
+	// Ensure httpauthshim context is properly shut down on exit
+	defer func() {
+		if authShimCtx := authService.GetAuthShimContext(); authShimCtx != nil {
+			if err := authShimCtx.Shutdown(); err != nil {
+				log.WithError(err).Warn("Error shutting down httpauthshim context")
+			}
+		}
+	}()
 
 	// Start session cleanup job
 	go startSessionCleanupJob(repo)

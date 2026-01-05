@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { createApiClient } from './api'
+import type { InitResponse } from '../gen/sickrock_pb'
 
 const SESSION_TOKEN_KEY = 'session-token'
 const LEGACY_TOKEN_KEY = 'auth_token'
@@ -15,6 +16,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const initResponse = ref<InitResponse | null>(null)
 
   const isAuthenticated = computed(() => {
     if (!user.value) return false
@@ -72,6 +74,7 @@ export const useAuthStore = defineStore('auth', () => {
       console.error('Logout error:', err)
     } finally {
       user.value = null
+      initResponse.value = null // Clear init response on logout
       localStorage.removeItem(SESSION_TOKEN_KEY)
       localStorage.removeItem(LEGACY_TOKEN_KEY)
     }
@@ -121,14 +124,20 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  const setInitResponse = (response: InitResponse) => {
+    initResponse.value = response
+  }
+
   return {
     user,
     isLoading,
     error,
     isAuthenticated,
+    initResponse,
     login,
     logout,
     validateToken,
-    getAuthHeaders
+    getAuthHeaders,
+    setInitResponse
   }
 })

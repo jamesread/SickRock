@@ -6,17 +6,28 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	authshim "github.com/jamesread/httpauthshim"
+	types "github.com/jamesread/httpauthshim/authpublic"
+	"github.com/jamesread/httpauthshim/sessions"
 	"github.com/jamesread/SickRock/internal/repo"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
-	jwtSecret []byte
-	repo      *repo.Repository
+	jwtSecret      []byte
+	repo           *repo.Repository
+	authShimCtx    *authshim.AuthShimContext
+	dbAuthProvider *DatabaseAuthProvider
+}
+
+// GetAuthShimContext returns the httpauthshim context
+func (a *AuthService) GetAuthShimContext() *authshim.AuthShimContext {
+	return a.authShimCtx
 }
 
 type User struct {
@@ -37,10 +48,65 @@ func NewAuthService(repository *repo.Repository) *AuthService {
 		secret = "supersecretkey"
 	}
 
-	return &AuthService{
-		jwtSecret: []byte(secret),
-		repo:      repository,
+	jwtSecret := []byte(secret)
+
+	// Create httpauthshim config
+	cfg := &types.Config{
+		Jwt: types.JwtConfig{
+			HmacSecret: secret,
+		},
 	}
+
+	var authShimCtx *authshim.AuthShimContext
+
+	// Create database-backed persistence backend
+	dbPersistence := NewDatabasePersistence(repository)
+
+	// Create SessionStorage with database persistence
+	// httpauthshim no longer loads YAML session storage by default, so we can
+	// use NewAuthShimContext directly with our database-backed storage
+	sessionStorage := sessions.NewSessionStorage(dbPersistence)
+
+	// Create AuthShimContext with database-backed session storage
+	authShimCtx, err := authshim.NewAuthShimContext(cfg, sessionStorage)
+	if err != nil {
+		fmt.Printf("Warning: failed to create httpauthshim context: %v\n", err)
+		authShimCtx = nil
+	}
+
+	// Create a temporary AuthService struct to pass to DatabaseAuthProvider
+	// We'll complete initialization after creating the provider
+	tempAuthService := &AuthService{
+		jwtSecret:   jwtSecret,
+		repo:        repository,
+		authShimCtx: authShimCtx,
+	}
+
+	// Create database auth provider (passing the temp authService to avoid circular dependency)
+	dbAuthProvider := NewDatabaseAuthProvider(repository, jwtSecret, tempAuthService)
+
+	// Add database provider to httpauthshim chain
+	if authShimCtx != nil {
+		authShimCtx.AddProvider(dbAuthProvider.CheckUserFromDatabaseAuth)
+	}
+
+	// Complete the AuthService initialization
+	tempAuthService.dbAuthProvider = dbAuthProvider
+
+	return tempAuthService
+}
+
+// AuthFromHttpReq authenticates a user from an HTTP request using httpauthshim
+func (a *AuthService) AuthFromHttpReq(req *http.Request) *types.AuthenticatedUser {
+	if a.authShimCtx != nil {
+		return a.authShimCtx.AuthFromHttpReq(req)
+	}
+	// Fallback to direct provider if httpauthshim context is not available
+	return a.dbAuthProvider.CheckUserFromDatabaseAuth(&types.AuthCheckingContext{
+		Request: req,
+		Config:  &types.Config{},
+		Context: req.Context(),
+	})
 }
 
 func (a *AuthService) Login(ctx context.Context, username, password, userAgent, ipAddress string) (string, time.Time, error) {
@@ -128,11 +194,15 @@ func (a *AuthService) ValidateToken(ctx context.Context, tokenString string) (*C
 }
 
 func (a *AuthService) GetUserFromContext(ctx context.Context) (string, error) {
-	claims, ok := ctx.Value("user").(*Claims)
-	if !ok {
-		return "", fmt.Errorf("no user in context")
+	// Try httpauthshim AuthenticatedUser first
+	if authUser, ok := ctx.Value("authenticated_user").(*types.AuthenticatedUser); ok && authUser != nil {
+		return authUser.Username, nil
 	}
-	return claims.Username, nil
+	// Fallback to legacy Claims
+	if claims, ok := ctx.Value("user").(*Claims); ok && claims != nil {
+		return claims.Username, nil
+	}
+	return "", fmt.Errorf("no user in context")
 }
 
 func (a *AuthService) Logout(ctx context.Context, tokenString string) error {
