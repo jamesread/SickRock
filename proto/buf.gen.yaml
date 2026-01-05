@@ -8,7 +8,7 @@ plugins:
     out: ../service/gen/proto
     opt:
       - paths=source_relative
-    
+
   - remote: buf.build/connectrpc/go
     out: ../service/gen
     opt:

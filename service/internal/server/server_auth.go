@@ -42,13 +42,13 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 	go func() {
 		notificationCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		
+
 		data := map[string]interface{}{
 			"username":  username,
 			"user_agent": userAgent,
 			"ip_address": ipAddress,
 		}
-		
+
 		if err := s.notificationService.SendNotification(notificationCtx, "user.logged_in", data); err != nil {
 			log.WithError(err).WithField("username", username).Warn("Failed to send login notification")
 		}

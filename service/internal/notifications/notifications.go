@@ -106,7 +106,7 @@ func (ns *NotificationService) sendTelegram(ctx context.Context, telegramID stri
 	}
 
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", ns.telegramBotToken)
-	
+
 	payload := map[string]interface{}{
 		"chat_id": telegramID,
 		"text":    message,

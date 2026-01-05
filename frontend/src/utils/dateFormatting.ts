@@ -14,15 +14,15 @@ export function formatUnixTimestamp(
   options: Intl.DateTimeFormatOptions = {}
 ): string {
   if (!timestamp) return ''
-  
+
   const numTimestamp = typeof timestamp === 'bigint' ? Number(timestamp) : Number(timestamp)
-  
+
   if (!Number.isFinite(numTimestamp) || numTimestamp <= 0) {
     return ''
   }
-  
+
   const date = new Date(numTimestamp * 1000)
-  
+
   // Default options for a readable date format
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
@@ -34,7 +34,7 @@ export function formatUnixTimestamp(
     hour12: true,
     ...options
   }
-  
+
   return date.toLocaleString(undefined, defaultOptions)
 }
 
@@ -54,7 +54,7 @@ export function formatUnixDate(
     day: 'numeric',
     ...options
   }
-  
+
   return formatUnixTimestamp(timestamp, dateOptions)
 }
 
@@ -75,7 +75,7 @@ export function formatUnixTime(
     hour12: true,
     ...options
   }
-  
+
   return formatUnixTimestamp(timestamp, timeOptions)
 }
 
@@ -90,19 +90,19 @@ export function formatMySQLDateTime(
   options: Intl.DateTimeFormatOptions = {}
 ): string {
   if (!dateStr) return ''
-  
+
   // Parse MySQL datetime format: YYYY-MM-DD HH:MM:SS
   const datetimeMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})(?: (\d{2}):(\d{2}):(\d{2}))?$/)
-  
+
   if (!datetimeMatch) {
     // Fallback to standard Date parsing
     const date = new Date(dateStr)
     if (isNaN(date.getTime())) return ''
     return date.toLocaleString(undefined, options)
   }
-  
+
   const [, year, month, day, hour = '0', minute = '0', second = '0'] = datetimeMatch
-  
+
   // Create date in local timezone
   const date = new Date(
     parseInt(year, 10),
@@ -112,9 +112,9 @@ export function formatMySQLDateTime(
     parseInt(minute, 10),
     parseInt(second, 10)
   )
-  
+
   if (isNaN(date.getTime())) return ''
-  
+
   // Default options for a readable date format
   const defaultOptions: Intl.DateTimeFormatOptions = {
     year: 'numeric',
@@ -126,7 +126,7 @@ export function formatMySQLDateTime(
     hour12: true,
     ...options
   }
-  
+
   return date.toLocaleString(undefined, defaultOptions)
 }
 
@@ -137,25 +137,25 @@ export function formatMySQLDateTime(
  */
 export function formatRelativeTime(timestamp: number | bigint | string): string {
   if (!timestamp) return ''
-  
+
   const numTimestamp = typeof timestamp === 'bigint' ? Number(timestamp) : Number(timestamp)
-  
+
   if (!Number.isFinite(numTimestamp) || numTimestamp <= 0) {
     return ''
   }
-  
+
   const date = new Date(numTimestamp * 1000)
   const now = new Date()
   const diffMs = now.getTime() - date.getTime()
   const diffMins = Math.floor(diffMs / (1000 * 60))
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-  
+
   if (diffMins < 1) return 'Just now'
   if (diffMins < 60) return `${diffMins}m ago`
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 7) return `${diffDays}d ago`
-  
+
   // For older dates, show the actual date
   return formatUnixDate(timestamp)
 }

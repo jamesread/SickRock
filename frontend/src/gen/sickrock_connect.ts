@@ -565,4 +565,3 @@ export const SickRock = {
     },
   }
 } as const;
-

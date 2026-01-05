@@ -147,13 +147,10 @@ export function useTableViewManager(tableId: string, onViewChange?: (view: Table
 
   function editTableView() {
     if (currentView.value && currentView.value.id !== -1) {
-      router.push({
-        name: 'edit-table-view',
-        params: {
-          tableName: tableId,
-          viewId: currentView.value.id.toString()
-        }
-      })
+      // Use path-based navigation to avoid issues with special characters in route params
+      const viewId = encodeURIComponent(currentView.value.id.toString())
+      const tableName = encodeURIComponent(tableId)
+      router.push(`/table/${tableName}/edit-view/${viewId}`)
     }
   }
 

@@ -2,7 +2,7 @@
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
-import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon, CheckListIcon, Delete01Icon, Download01Icon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon, CheckListIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
 import { createApiClient } from './stores/api'
 import Header from 'picocrank/vue/components/Header.vue'
 import logo from './resources/images/logo.png'
@@ -129,6 +129,147 @@ async function handlePWAInstall() {
   }
 }
 
+// Store navResponse for use in populateQuickSearchItems
+let navResponse: any = null
+
+// Helper function to populate QuickSearch with navigation items
+function populateQuickSearchItems() {
+    if (!quickSearch.value || !navResponse) return
+
+    // Clear existing items first
+    quickSearch.value.clearItems()
+
+    // Add home link
+    quickSearch.value.addItem({
+        id: 'home',
+        name: 'Home',
+        title: 'Home',
+        description: 'Dashboard with recently viewed items',
+        category: 'Navigation',
+        path: '/',
+        type: 'route',
+        icon: HomeIcon
+    })
+
+    // Add workflows
+    const workflows = (navResponse as any)?.workflows || []
+    const sortedWorkflows = [...workflows].sort((a: any, b: any) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+    sortedWorkflows.forEach((workflow: any) => {
+        const workflowIconName = workflow.icon || 'DatabaseIcon'
+        const workflowIcon = (Hugeicons as any)[workflowIconName] || DatabaseIcon
+        const workflowPath = `/workflow/${workflow.id}`
+        quickSearch.value.addItem({
+            id: `workflow-${workflow.id}`,
+            name: workflow.name || '',
+            title: workflow.name || '',
+            description: `Workflow with ${workflow.items?.length || 0} items`,
+            category: 'Workflows',
+            path: workflowPath,
+            type: 'route',
+            icon: workflowIcon
+        })
+    })
+
+    // Add navigation items (pages)
+    pages.value.forEach(pg => {
+        const isDashboard = pg.path.startsWith('/dashboard/')
+        const defaultIcon = isDashboard ? LayoutIcon : DatabaseIcon
+        const icon = Hugeicons[pg.icon] || defaultIcon
+        const description = isDashboard
+            ? `Dashboard: ${pg.title}`
+            : `Table: ${pg.title}`
+        quickSearch.value.addItem({
+            id: pg.id,
+            name: pg.title,
+            title: pg.title,
+            description: description,
+            category: 'Navigation',
+            path: pg.path,
+            type: 'route',
+            icon: icon
+        })
+    })
+
+    // Add keyboard shortcuts help item
+    quickSearch.value.addItem({
+        id: 'keyboard-shortcuts',
+        name: 'Keyboard Shortcuts',
+        title: 'Keyboard Shortcuts',
+        description: 'View all available keyboard shortcuts (g then ?)',
+        category: 'Help',
+        path: '#keyboard-shortcuts',
+        type: 'action',
+        icon: QuestionIcon
+    })
+
+    // Add admin/system items
+    quickSearch.value.addItem({
+        id: 'table-configurations',
+        name: 'Table Configurations',
+        title: 'Table Configurations',
+        description: 'Manage table configurations',
+        category: 'Navigation',
+        path: '/table/table_configurations',
+        type: 'route',
+        icon: DatabaseSettingIcon
+    })
+
+    quickSearch.value.addItem({
+        id: 'workflows',
+        name: 'Workflows',
+        title: 'Workflows',
+        description: 'Manage workflows',
+        category: 'Navigation',
+        path: '/table/table_workflows',
+        type: 'route',
+        icon: DatabaseSettingIcon
+    })
+
+    quickSearch.value.addItem({
+        id: 'nav-items',
+        name: 'Navigation',
+        title: 'Navigation',
+        description: 'Manage navigation items',
+        category: 'Navigation',
+        path: '/table/table_navigation',
+        type: 'route',
+        icon: DatabaseSettingIcon
+    })
+
+    quickSearch.value.addItem({
+        id: 'table-create',
+        name: 'Create Table',
+        title: 'Create Table',
+        description: 'Create a new table',
+        category: 'Navigation',
+        path: '/admin/table/create',
+        type: 'route',
+        icon: DatabaseSettingIcon
+    })
+
+    quickSearch.value.addItem({
+        id: 'control-panel',
+        name: 'Control Panel',
+        title: 'Control Panel',
+        description: 'Administrative control panel',
+        category: 'Navigation',
+        path: '/admin/control-panel',
+        type: 'route',
+        icon: DatabaseSettingIcon
+    })
+
+    quickSearch.value.addItem({
+        id: 'device-code-claimer',
+        name: 'Device Code Claimer',
+        title: 'Device Code Claimer',
+        description: 'Complete device code authentication',
+        category: 'Navigation',
+        path: '/device-code-claimer',
+        type: 'route',
+        icon: DatabaseSettingIcon
+    })
+}
+
 async function loadAppData() {
     // Only load data if authenticated
     if (!authStore.isAuthenticated) {
@@ -188,7 +329,7 @@ async function loadAppData() {
             // Keep default 'SickRock' if loading fails
         }
 
-        const navResponse = await apiClient.getNavigation({})
+        navResponse = await apiClient.getNavigation({})
 
         // Load bookmarks from navigation response
         bookmarks.value = (navResponse.bookmarks || []).map(bookmark => ({
@@ -214,8 +355,13 @@ async function loadAppData() {
             .map(item => {
                 const title = item.title || String(item.id)
                 const slug = item.tableName || item.dashboardName || ''
-                // Use CheckListIcon as default for workflow items, DatabaseIcon for table configurations
-                const defaultIcon = (item.workflowId && item.workflowId > 0) ? 'CheckListIcon' : 'DatabaseIcon'
+                // Use CheckListIcon for workflow items, LayoutIcon for dashboards, DatabaseIcon for tables
+                let defaultIcon = 'DatabaseIcon'
+                if (item.workflowId && item.workflowId > 0) {
+                    defaultIcon = 'CheckListIcon'
+                } else if (item.dashboardId && item.dashboardId > 0) {
+                    defaultIcon = 'LayoutIcon'
+                }
                 const icon = item.icon || defaultIcon
                 const view = item.tableView || ''
                 const id = title
@@ -246,8 +392,10 @@ async function loadAppData() {
                     const path = item.dashboardId > 0
                         ? `/dashboard/${item.dashboardName}`
                         : `/table/${item.tableName}`
-                    const iconName = item.icon || 'DatabaseIcon'
-                    const icon = (Hugeicons as any)[iconName] || DatabaseIcon
+                    // Use LayoutIcon for dashboards, DatabaseIcon for tables
+                    const defaultIconName = (item.dashboardId && item.dashboardId > 0) ? 'LayoutIcon' : 'DatabaseIcon'
+                    const iconName = item.icon || defaultIconName
+                    const icon = (Hugeicons as any)[iconName] || (item.dashboardId && item.dashboardId > 0 ? LayoutIcon : DatabaseIcon)
                     return { id: item.id, title, path, icon }
                 })
             }
@@ -256,12 +404,11 @@ async function loadAppData() {
         if (navigation.value) {
             navigation.value.clearNavigationLinks()
         }
-        if (quickSearch.value) {
-            quickSearch.value.clearItems()
-        }
-
-        // Add home link
+        // Add navigation links to sidebar
         if (navigation.value) {
+            navigation.value.clearNavigationLinks()
+
+            // Add home link
             navigation.value.addNavigationLink({
                 id: 'home',
                 name: 'Home',
@@ -269,88 +416,40 @@ async function loadAppData() {
                 path: '/',
                 icon: HomeIcon
             })
-        }
 
-        if (quickSearch.value) {
-            quickSearch.value.addItem({
-                id: 'home',
-                name: 'Home',
-                title: 'Home',
-                description: 'Dashboard with recently viewed items',
-                category: 'Navigation',
-                path: '/',
-                type: 'route',
-                icon: HomeIcon
-            })
-        }
-
-        // Add workflows to sidebar and quick search (if present)
-        const workflows = (navResponse as any).workflows || []
-        const sortedWorkflows = [...workflows].sort((a: any, b: any) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
-
-        sortedWorkflows.forEach((workflow: any) => {
-            const workflowIconName = workflow.icon || 'DatabaseIcon'
-            const workflowIcon = (Hugeicons as any)[workflowIconName] || DatabaseIcon
-            const workflowPath = `/workflow/${workflow.id}`
-
-            navigation.value?.addNavigationLink({
-                id: `workflow-${workflow.id}`,
-                name: workflow.name || '',
-                title: workflow.name || '',
-                path: workflowPath,
-                icon: workflowIcon
-            })
-
-            if (quickSearch.value) {
-                quickSearch.value.addItem({
+            // Add workflows to sidebar
+            const workflows = (navResponse as any).workflows || []
+            const sortedWorkflows = [...workflows].sort((a: any, b: any) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+            sortedWorkflows.forEach((workflow: any) => {
+                const workflowIconName = workflow.icon || 'DatabaseIcon'
+                const workflowIcon = (Hugeicons as any)[workflowIconName] || DatabaseIcon
+                const workflowPath = `/workflow/${workflow.id}`
+                navigation.value.addNavigationLink({
                     id: `workflow-${workflow.id}`,
                     name: workflow.name || '',
                     title: workflow.name || '',
-                    description: `Workflow with ${workflow.items?.length || 0} items`,
-                    category: 'Workflows',
                     path: workflowPath,
-                    type: 'route',
                     icon: workflowIcon
                 })
-            }
-        })
-
-        pages.value.forEach(pg => {
-            const icon = Hugeicons[pg.icon] || DatabaseIcon
-
-            navigation.value?.addNavigationLink({
-                id: pg.id,
-                name: pg.id,
-                title: pg.title,
-                path: pg.path,
-                icon: icon
             })
 
-            quickSearch.value?.addItem({
-                id: pg.id,
-                name: pg.title,
-                title: pg.title,
-                description: 'Table: ' + pg.title,
-                category: 'Navigation',
-                path: pg.path,
-                type: 'route',
-                icon: icon
-            })
-        })
-
-        // Add keyboard shortcuts help item
-        if (quickSearch.value) {
-            quickSearch.value.addItem({
-                id: 'keyboard-shortcuts',
-                name: 'Keyboard Shortcuts',
-                title: 'Keyboard Shortcuts',
-                description: 'View all available keyboard shortcuts (g then ?)',
-                category: 'Help',
-                path: '#keyboard-shortcuts',
-                type: 'action',
-                icon: QuestionIcon
+            // Add pages to sidebar
+            pages.value.forEach(pg => {
+                const isDashboard = pg.path.startsWith('/dashboard/')
+                const defaultIcon = isDashboard ? LayoutIcon : DatabaseIcon
+                const icon = Hugeicons[pg.icon] || defaultIcon
+                navigation.value.addNavigationLink({
+                    id: pg.id,
+                    name: pg.id,
+                    title: pg.title,
+                    path: pg.path,
+                    icon: icon
+                })
             })
         }
+
+        // Populate QuickSearch if available, otherwise it will be populated when component becomes available
+        populateQuickSearchItems()
 
         if (navigation.value) {
             navigation.value.addSeparator()
@@ -363,17 +462,6 @@ async function loadAppData() {
                 path: '/table/table_configurations',
                 icon: DatabaseSettingIcon
             })
-            quickSearch.value?.addItem({
-                id: 'table-configurations',
-                name: 'Table Configurations',
-                title: 'Table Configurations',
-                description: 'Manage table configurations',
-                category: 'Navigation',
-                path: '/table/table_configurations',
-                type: 'route',
-                icon: DatabaseSettingIcon
-            })
-
             // Workflows
             navigation.value.addNavigationLink({
                 id: 'workflows',
@@ -382,63 +470,8 @@ async function loadAppData() {
                 path: '/table/table_workflows',
                 icon: DatabaseSettingIcon
             })
-            quickSearch.value?.addItem({
-                id: 'workflows',
-                name: 'Workflows',
-                title: 'Workflows',
-                description: 'Manage workflows',
-                category: 'Navigation',
-                path: '/table/table_workflows',
-                type: 'route',
-                icon: DatabaseSettingIcon
-            })
-
-            // Navigation items - removed from sidebar, now in control panel
-            quickSearch.value?.addItem({
-                id: 'nav-items',
-                name: 'Navigation',
-                title: 'Navigation',
-                description: 'Manage navigation items',
-                category: 'Navigation',
-                path: '/table/table_navigation',
-                type: 'route',
-                icon: DatabaseSettingIcon
-            })
-
-            // Admin routes: control-panel, device-code-claimer
-            quickSearch.value?.addItem({
-                id: 'table-create',
-                name: 'Create Table',
-                title: 'Create Table',
-                description: 'Create a new table',
-                category: 'Navigation',
-                path: '/admin/table/create',
-                type: 'route',
-                icon: DatabaseSettingIcon
-            })
 
             navigation.value.addRouterLink('control-panel')
-            quickSearch.value?.addItem({
-                id: 'control-panel',
-                name: 'Control Panel',
-                title: 'Control Panel',
-                description: 'Administrative control panel',
-                category: 'Navigation',
-                path: '/admin/control-panel',
-                type: 'route',
-                icon: DatabaseSettingIcon
-            })
-
-            quickSearch.value?.addItem({
-                id: 'device-code-claimer',
-                name: 'Device Code Claimer',
-                title: 'Device Code Claimer',
-                description: 'Complete device code authentication',
-                category: 'Navigation',
-                path: '/device-code-claimer',
-                type: 'route',
-                icon: DatabaseSettingIcon
-            })
 
             navigation.value.addCallback('Logout', async () => { await handleLogout() }, { icon: LogoutIcon })
         }
@@ -527,6 +560,25 @@ watch(() => router.currentRoute.value.hash, (hash) => {
 watch(showBookmarks, async (isOpen) => {
     if (isOpen) {
         await checkCanBookmarkCurrentPage()
+    }
+})
+
+// Watch for QuickSearch component becoming available and populate it
+watch(quickSearch, (newValue) => {
+    if (newValue && navResponse && pages.value.length > 0) {
+        populateQuickSearchItems()
+    }
+}, { immediate: true })
+
+// Watch for QuickSearch dialog opening and ensure items are populated
+watch(showQuickSearchDialog, (isOpen) => {
+    if (isOpen) {
+        // Use nextTick to ensure component is mounted
+        nextTick(() => {
+            if (quickSearch.value && navResponse) {
+                populateQuickSearchItems()
+            }
+        })
     }
 })
 
@@ -1140,7 +1192,7 @@ onMounted(async () => {
             <div class="modal-body">
                 <QuickSearch
                     ref="quickSearch"
-                    :search-fields="['title']"
+                    :search-fields="['title', 'name', 'description']"
                 />
             </div>
         </div>
@@ -1532,7 +1584,7 @@ onMounted(async () => {
 }
 
 .quicksearch-modal .modal-body {
-    padding: 16px 20px 20px;
+    padding: 0;
 }
 
 .quicksearch-modal :deep(.quick-search),

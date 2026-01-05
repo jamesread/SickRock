@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTableViewManager, type TableView } from '../composables/useTableViewManager'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, Edit03Icon, Settings01Icon } from '@hugeicons/core-free-icons'
@@ -21,6 +22,8 @@ const emit = defineEmits<{
   'view-changed': [viewType: string]
   'view-selected': [viewId: number]
 }>()
+
+const router = useRouter()
 
 // Use external state if provided, otherwise use internal state
 const useExternalState = computed(() => !!props.externalViews)
@@ -100,7 +103,16 @@ function createTableView() {
 }
 
 function editTableView() {
-  internalManager.editTableView()
+  if (useExternalState.value) {
+    // When using external state, we need to navigate directly since internalManager doesn't have the current view
+    if (currentView.value && currentView.value.id !== -1) {
+      const viewId = encodeURIComponent(currentView.value.id.toString())
+      const tableName = encodeURIComponent(props.tableId)
+      router.push(`/table/${tableName}/edit-view/${viewId}`)
+    }
+  } else {
+    internalManager.editTableView()
+  }
   closeViewsDialog()
 }
 

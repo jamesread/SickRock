@@ -7,6 +7,7 @@ import { createApiClient } from '../stores/api'
 
 const props = defineProps<{
   tableId: string
+  viewName?: string
 }>()
 
 const emit = defineEmits<{
@@ -69,7 +70,7 @@ const hasIconField = computed(() => {
 
 // Computed property for the section title
 const sectionTitle = computed(() => {
-  return tableTitle.value || `Table: ${props.tableId}`
+  return props.viewName || tableTitle.value || `Table: ${props.tableId}`
 })
 
 // Transport handled by authenticated client
@@ -554,8 +555,9 @@ function goToDayView() {
 function openQuickAddFromMenu() {
   if (!dayMenu.value.date) return
 
+  const date = dayMenu.value.date
   hideDayMenu()
-  showQuickAdd(dayMenu.value.date)
+  showQuickAdd(date)
 }
 
 async function deleteItem() {
@@ -673,10 +675,10 @@ onMounted(load)
       @click.stop
     >
       <div class="day-menu-content">
-        <h3>Choose an action</h3>
-        <p class="day-menu-date" v-if="dayMenu.date">
+        <h3 v-if="dayMenu.date">
           {{ dayMenu.date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) }}
-        </p>
+        </h3>
+        <p class="day-menu-subtitle">Choose an action</p>
         <div class="day-menu-actions">
           <button @click="goToDayView" class="button primary">
             View Day
@@ -696,6 +698,13 @@ onMounted(load)
       v-if="dayMenu.visible"
       class="day-menu-backdrop"
       @click="hideDayMenu"
+    ></div>
+
+    <!-- Backdrop to close quick add -->
+    <div
+      v-if="quickAdd.visible"
+      class="quick-add-backdrop"
+      @click="hideQuickAdd"
     ></div>
 
     <!-- Quick Add Modal -->
@@ -732,10 +741,10 @@ onMounted(load)
             <button @click="hideQuickAdd" class="button neutral" :disabled="creating">
               Cancel
             </button>
-            <button @click="saveItem" class="button primary" :disabled="creating || !quickAdd.name.trim()">
+            <button @click="saveItem" class="button primary" :disabled="creating || !quickAdd.name.trim() || !quickAdd.date">
               {{ creating ? 'Saving...' : 'Save' }}
             </button>
-            <button @click="saveAndEdit" class="button secondary" :disabled="creating || !quickAdd.name.trim()">
+            <button @click="saveAndEdit" class="button secondary" :disabled="creating || !quickAdd.name.trim() || !quickAdd.date">
               {{ creating ? 'Saving...' : 'Save & Edit' }}
             </button>
           </div>
@@ -746,13 +755,6 @@ onMounted(load)
     <p class="padding" style="margin-top: 0">
       <small>{{ upcomingEventsMessage }}</small>
     </p>
-
-    <!-- Backdrop to close quick add -->
-    <div
-      v-if="quickAdd.visible"
-      class="quick-add-backdrop"
-      @click="hideQuickAdd"
-    ></div>
   </Section>
 </template>
 
@@ -977,7 +979,7 @@ onMounted(load)
   font-size: 1.2rem;
 }
 
-.day-menu-date {
+.day-menu-subtitle {
   margin: 0 0 1.5rem 0;
   color: #666;
   font-size: 0.9rem;

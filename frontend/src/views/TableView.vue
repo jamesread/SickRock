@@ -7,6 +7,7 @@ import type { GetTableStructureResponse } from '../gen/sickrock_pb'
 import TableComponent from '../components/TableComponent.vue'
 import CalendarComponent from '../components/CalendarComponent.vue'
 import TickListComponent from '../components/TickListComponent.vue'
+import { useTableViewManager } from '../composables/useTableViewManager'
 
 const route = useRoute()
 const props = defineProps<{ tableName?: string }>()
@@ -20,6 +21,20 @@ const loading = ref(true)
 const currentViewType = ref<string>('table') // Default to "table"
 const viewTypeInitialized = ref(false) // Track if view type has been set by user interaction
 
+// Use table view manager to track current view
+const viewManager = useTableViewManager(tableId.value, (view) => {
+  if (view) {
+    currentViewType.value = view.viewType || 'table'
+    viewTypeInitialized.value = true
+  }
+})
+
+// Computed property for current view name
+const currentViewName = computed(() => {
+  const view = viewManager.currentView.value
+  return view && view.id !== -1 ? view.viewName : null
+})
+
 function handleViewChanged(viewType: string) {
   console.log('[TableView] View changed to:', viewType)
   currentViewType.value = viewType
@@ -32,21 +47,14 @@ onMounted(async () => {
     const res = await client.getTableStructure({ pageId: tableId.value })
     tableStructure.value = res
 
-    // Load views to determine the current view type (only if not already set by user)
+    // Load views using the view manager
+    await viewManager.loadTableViews()
+
+    // Determine the current view type (only if not already set by user)
     if (!viewTypeInitialized.value) {
-      try {
-        const viewsRes = await client.getTableViews({ tableName: tableId.value })
-        if (viewsRes.views && viewsRes.views.length > 0) {
-          // Find default view or first view
-          const defaultView = viewsRes.views.find(v => v.isDefault) || viewsRes.views[0]
-          if (defaultView.viewType) {
-            currentViewType.value = defaultView.viewType
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to load views for view type:', e)
-        // Default to "table" if views can't be loaded
-        currentViewType.value = 'table'
+      const currentView = viewManager.currentView.value
+      if (currentView && currentView.viewType) {
+        currentViewType.value = currentView.viewType
       }
     }
   } catch (error) {
@@ -61,7 +69,7 @@ onMounted(async () => {
 <template>
   <div v-if="loading">Loading...</div>
   <template v-else>
-    <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" @view-changed="handleViewChanged" />
+    <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" :view-name="currentViewName" @view-changed="handleViewChanged" />
     <TickListComponent v-else-if="currentViewType === 'ticklist'" :table-id="tableId" @view-changed="handleViewChanged" />
     <TableComponent v-else :table-id="tableId" :table-structure="tableStructure" :show-toolbar="true" :show-view-switcher="true" :show-export="true" :show-structure="true" :show-insert="true" :show-pagination="true" :show-view-create="true" :show-view-edit="true" @view-changed="handleViewChanged"/>
   </template>

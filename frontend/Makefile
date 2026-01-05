@@ -3,5 +3,5 @@ ci: deps build
 deps:
 	npm install
 
-build: 
+build:
 	npx vite build

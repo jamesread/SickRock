@@ -10,5 +10,3 @@ lint:
 
 clean:
 	rm -rf ../service/gen
-
-

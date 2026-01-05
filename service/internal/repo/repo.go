@@ -2865,7 +2865,7 @@ func (r *Repository) GetSubscriptionsForEvent(ctx context.Context, eventCode str
 	Event        NotificationEvent
 }, error) {
 	query := `
-		SELECT 
+		SELECT
 			uns.id, uns.user, uns.event_id, uns.channel_id, uns.sr_created,
 			unc.id, unc.user, unc.channel_type, unc.channel_value, unc.channel_name, unc.is_active, unc.sr_created, unc.sr_updated,
 			ne.id, ne.event_code, ne.event_name, ne.description, ne.sr_created

@@ -24,5 +24,3 @@ onMounted(() => {
 <template>
   <DropdownMenu ref="dropdown" />
 </template>
-
-

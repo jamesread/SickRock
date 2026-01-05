@@ -231,16 +231,16 @@ type SchemaAnalyzer struct {
 
 func (sa *SchemaAnalyzer) AnalyzeDatabase(database string) (*SchemaAnalysis, error) {
     // Get all tables
-    tables, err := sa.client.GetDatabaseTables(context.Background(), 
+    tables, err := sa.client.GetDatabaseTables(context.Background(),
         &sickrockpb.GetDatabaseTablesRequest{Database: database})
-    
+
     // Analyze each table structure
     for _, table := range tables.Tables {
         structure, err := sa.client.GetTableStructure(context.Background(),
             &sickrockpb.GetTableStructureRequest{PageId: table.TableName})
         // ... analysis logic
     }
-    
+
     return analysis, nil
 }
 ```
@@ -250,19 +250,19 @@ func (sa *SchemaAnalyzer) AnalyzeDatabase(database string) (*SchemaAnalysis, err
 // Example agent that generates UI components
 class UIGenerator {
     private client: SickRockClient;
-    
+
     async generateTableView(tableName: string): Promise<TableView> {
         const structure = await this.client.getTableStructure({
             pageId: tableName
         });
-        
+
         const columns = structure.fields.map(field => ({
             columnName: field.name,
             isVisible: true,
             columnOrder: 0,
             sortOrder: ""
         }));
-        
+
         return await this.client.createTableView({
             tableName,
             viewName: `${tableName}_default`,

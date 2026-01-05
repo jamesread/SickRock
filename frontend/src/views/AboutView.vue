@@ -4,5 +4,3 @@
     <p>This is a placeholder page rendered via vue-router.</p>
   </section>
 </template>
-
-
