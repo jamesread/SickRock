@@ -1,11 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
 import ViewsButton from './ViewsButton.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
+import { CheckmarkSquare03Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
 
 const props = defineProps<{
   tableId: string
@@ -15,16 +14,49 @@ const emit = defineEmits<{
   'view-changed': [viewType: string]
 }>()
 
-const router = useRouter()
-
 type Item = Record<string, unknown>
 
 const items = ref<Item[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-// Client-side only completion state (stored in JavaScript, not persisted to server)
+// LocalStorage key for this table's tick state
+const storageKey = computed(() => `sickrock-ticklist-${props.tableId}`)
+
+// Client-side only completion state (persisted to localStorage)
 const completionState = ref<Map<string, boolean>>(new Map())
+
+// Load tick state from localStorage
+function loadTickState() {
+  try {
+    const stored = localStorage.getItem(storageKey.value)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      completionState.value = new Map(Object.entries(parsed))
+    } else {
+      completionState.value = new Map()
+    }
+  } catch (e) {
+    console.error('Failed to load tick state from localStorage:', e)
+    completionState.value = new Map()
+  }
+}
+
+// Save tick state to localStorage
+function saveTickState() {
+  try {
+    const obj = Object.fromEntries(completionState.value)
+    localStorage.setItem(storageKey.value, JSON.stringify(obj))
+  } catch (e) {
+    console.error('Failed to save tick state to localStorage:', e)
+  }
+}
+
+// Clear all ticks
+function clearTicks() {
+  completionState.value = new Map()
+  saveTickState()
+}
 
 // Table structure state
 const tableStructure = ref<any>(null)
@@ -135,6 +167,7 @@ function toggleCompleted(item: any) {
   const itemId = String(item.id)
   const currentState = isCompleted(item)
   completionState.value.set(itemId, !currentState)
+  saveTickState()
 }
 
 function getItemDisplayText(item: any): string {
@@ -161,7 +194,16 @@ function isCompleted(item: any): boolean {
   return getBooleanValue(item, completionField.value)
 }
 
-onMounted(load)
+// Watch for tableId changes to reload state when navigating between tables
+watch(() => props.tableId, () => {
+  loadTickState()
+  load()
+})
+
+onMounted(() => {
+  loadTickState()
+  load()
+})
 </script>
 
 <template>
@@ -179,6 +221,10 @@ onMounted(load)
             }
           }"
         />
+        <button class="button neutral" @click="clearTicks" title="Clear all ticks">
+          <HugeiconsIcon :icon="Cancel01Icon" />
+          Clear Ticks
+        </button>
         <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
         <router-link :to="`/table/${props.tableId}/insert-row`" class="button primary">
           <HugeiconsIcon :icon="CheckmarkSquare03Icon" />
