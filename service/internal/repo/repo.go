@@ -1343,6 +1343,50 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 	return nil
 }
 
+// UpdateSystemTableConfigurations upserts the table_settings and table_configurations
+// table configurations using the database name from DB_NAME env (or "main" if unset).
+// Call after migrations so system configs always use the correct database.
+func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error {
+	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
+	if dbName == "" {
+		dbName = "main"
+	}
+	systemConfigs := []struct {
+		name   string
+		title  string
+		table  string
+		ordinal int
+	}{
+		{"table_settings", "Settings", "table_settings", 0},
+		{"table_configurations", "Table Configurations", "table_configurations", 1},
+	}
+	switch r.db.DriverName() {
+	case "mysql":
+		for _, c := range systemConfigs {
+			query := `INSERT INTO table_configurations (name, title, ` + "`db`" + `, ` + "`table`" + `, ordinal)
+VALUES (?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE title = VALUES(title), ` + "`db`" + ` = VALUES(` + "`db`" + `), ` + "`table`" + ` = VALUES(` + "`table`" + `), ordinal = VALUES(ordinal)`
+			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal)
+			if err != nil {
+				return fmt.Errorf("upsert system table config %s: %w", c.name, err)
+			}
+			log.Infof("Updated system table config: %s (db: %s)", c.name, dbName)
+		}
+	default: // sqlite
+		for _, c := range systemConfigs {
+			query := `INSERT INTO table_configurations (name, title, db, "table", ordinal)
+VALUES (?, ?, ?, ?, ?)
+ON CONFLICT(name) DO UPDATE SET title = excluded.title, db = excluded.db, "table" = excluded."table", ordinal = excluded.ordinal`
+			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal)
+			if err != nil {
+				return fmt.Errorf("upsert system table config %s: %w", c.name, err)
+			}
+			log.Infof("Updated system table config: %s (db: %s)", c.name, dbName)
+		}
+	}
+	return nil
+}
+
 // GetTableConfiguration returns the structure information for a table
 func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (*TableConfig, error) {
 	log.WithFields(log.Fields{

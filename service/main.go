@@ -152,6 +152,10 @@ func main() {
 		log.Fatalf("migrations failed: %v", err)
 	}
 
+	if err := repo.UpdateSystemTableConfigurations(context.Background()); err != nil {
+		log.Fatalf("update system table configurations: %v", err)
+	}
+
 	// Log database engine version after migrations
 	logDatabaseEngineVersion(db)
 
