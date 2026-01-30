@@ -1,5 +1,5 @@
 // Derive cache names that are scoped per deployment path to avoid collisions
-const CACHE_VERSION = 'v5';
+const CACHE_VERSION = 'v6';
 const SCOPE_PATH = (() => {
   try {
     const scopeUrl = new URL(self.registration.scope);
