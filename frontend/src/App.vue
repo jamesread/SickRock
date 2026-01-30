@@ -68,6 +68,59 @@ const version = ref<string>('')
 const quickSearch = ref(null)
 const appTitle = ref<string>('SickRock') // Default to 'SickRock', will be loaded from settings
 
+// Dynamically generate PWA manifest from template based on appTitle
+async function updateManifest(title: string) {
+    try {
+        // Load the manifest template from the public folder
+        const response = await fetch('/manifest.template.json', { cache: 'no-cache' })
+        if (!response.ok) {
+            console.warn('Failed to load manifest template, status:', response.status)
+            return
+        }
+
+        const template = await response.json()
+
+        // Update title-related fields
+        const trimmedTitle = title && title.trim().length > 0 ? title.trim() : 'SickRock'
+        template.name = trimmedTitle
+        template.short_name = trimmedTitle
+
+        // Derive a stable ID for this instance from the title
+        const normalizedId = trimmedTitle
+            .toLowerCase()
+            .replace(/\s+/g, '-')
+            .replace(/[^a-z0-9-_]/g, '')
+
+        template.id = `/${normalizedId || 'sickrock'}`
+
+        const manifestBlob = new Blob([JSON.stringify(template)], {
+            type: 'application/manifest+json',
+        })
+        const manifestUrl = URL.createObjectURL(manifestBlob)
+
+        // Ensure there's a single <link rel="manifest"> element
+        let linkEl = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
+        if (!linkEl) {
+            linkEl = document.createElement('link')
+            linkEl.rel = 'manifest'
+            document.head.appendChild(linkEl)
+        }
+
+        // Revoke previous object URL if it was one we created
+        try {
+            if (linkEl.href && linkEl.href.startsWith('blob:')) {
+                URL.revokeObjectURL(linkEl.href)
+            }
+        } catch {
+            // Ignore revoke errors
+        }
+
+        linkEl.href = manifestUrl
+    } catch (e) {
+        console.warn('Failed to update PWA manifest:', e)
+    }
+}
+
 // Bookmarks state
 const bookmarks = ref<Array<{
   id: number;
@@ -355,6 +408,9 @@ async function loadAppData() {
             // Keep default 'SickRock' if loading fails
         }
 
+        // Ensure manifest is in sync with the resolved appTitle
+        updateManifest(appTitle.value)
+
         navResponse = await apiClient.getNavigation({})
 
         // Load bookmarks from navigation response
@@ -570,6 +626,13 @@ watch(isAuthenticated, (newValue) => {
         if (quickSearch.value && typeof quickSearch.value.clearItems === 'function') {
             quickSearch.value.clearItems()
         }
+    }
+})
+
+// Regenerate manifest whenever appTitle changes
+watch(appTitle, (newTitle, oldTitle) => {
+    if (newTitle && newTitle !== oldTitle) {
+        updateManifest(newTitle)
     }
 })
 

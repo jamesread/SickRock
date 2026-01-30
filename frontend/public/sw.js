@@ -1,5 +1,22 @@
-const CACHE_NAME = 'sickrock-v5';
-const STATIC_CACHE_NAME = 'sickrock-static-v5';
+// Derive cache names that are scoped per deployment path to avoid collisions
+const CACHE_VERSION = 'v5';
+const SCOPE_PATH = (() => {
+  try {
+    const scopeUrl = new URL(self.registration.scope);
+    // Normalise to a safe cache key fragment
+    return (scopeUrl.pathname || '/')
+      .toLowerCase()
+      .replace(/[^a-z0-9/_-]/g, '-')
+      .replace(/\/+/g, '/')
+      .replace(/^\//, '')
+      .replace(/\/$/, '') || 'root';
+  } catch {
+    return 'root';
+  }
+})();
+
+const CACHE_NAME = `sickrock-${CACHE_VERSION}-${SCOPE_PATH}`;
+const STATIC_CACHE_NAME = `sickrock-static-${CACHE_VERSION}-${SCOPE_PATH}`;
 
 // Routes that should be cached for offline use (table views only)
 const CACHEABLE_ROUTES = [
@@ -51,7 +68,6 @@ self.addEventListener('install', (event) => {
       // Cache resources individually to prevent one failure from blocking installation
       const resourcesToCache = [
         '/',
-        '/manifest.json',
         '/offline.html',
         '/icons/icon-192x192.png',
         '/icons/icon-512x512.png'
