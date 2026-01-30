@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS table_users (
     username VARCHAR(255) UNIQUE,
     password VARCHAR(1024),
     initial_route VARCHAR(255) DEFAULT '/'
-);
+) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS table_sessions (
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,

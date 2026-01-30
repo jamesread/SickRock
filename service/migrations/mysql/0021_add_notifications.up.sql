@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS notification_events (
     event_name VARCHAR(255) NOT NULL,
     description TEXT,
     sr_created DATETIME DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB;
 
 -- Table to store user notification channel configurations
 CREATE TABLE IF NOT EXISTS user_notification_channels (
@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS user_notification_channels (
     sr_created DATETIME DEFAULT CURRENT_TIMESTAMP,
     sr_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user) REFERENCES table_users(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_user_channel (user, channel_type, channel_value)
-);
+    UNIQUE KEY unique_user_channel (user, channel_type, channel_value(191))
+) ENGINE=InnoDB;
 
 -- Table to store user subscriptions to events via specific channels
 CREATE TABLE IF NOT EXISTS user_notification_subscriptions (
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS user_notification_subscriptions (
     FOREIGN KEY (event_id) REFERENCES notification_events(id) ON DELETE CASCADE,
     FOREIGN KEY (channel_id) REFERENCES user_notification_channels(id) ON DELETE CASCADE,
     UNIQUE KEY unique_user_event_channel (user, event_id, channel_id)
-);
+) ENGINE=InnoDB;
 
 -- Insert default notification events
 INSERT INTO notification_events (event_code, event_name, description) VALUES
