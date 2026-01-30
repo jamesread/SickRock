@@ -10,6 +10,7 @@ const route = useRoute()
 const name = ref('')
 const database = ref('main')
 const table = ref('')
+const createTableInDatabase = ref(true)
 const createConfiguration = ref(true)
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -56,7 +57,7 @@ async function loadAvailableDatabases() {
   }
 }
 
-// Pre-fill from URL query parameters if present
+// Pre-fill from URL query parameters if present (e.g. from Database Browser "Configure")
 onMounted(async () => {
   await loadAvailableDatabases()
 
@@ -65,6 +66,11 @@ onMounted(async () => {
   }
   if (route.query.database) {
     database.value = String(route.query.database)
+  }
+  // From database browser: table already exists, only add configuration
+  if (route.query.table != null && route.query.table !== '') {
+    createTableInDatabase.value = false
+    createConfiguration.value = true
   }
 })
 
@@ -89,6 +95,10 @@ function ensureTableName() {
 
 async function submit() {
   if (!table.value || loading.value) return
+  if (!createTableInDatabase.value && (!name.value || !createConfiguration.value)) {
+    error.value = 'Configuration name is required when adding a configuration for an existing table'
+    return
+  }
 
   ensureTableName()
 
@@ -97,14 +107,16 @@ async function submit() {
   success.value = null
 
   try {
-    // First, create the physical table in the database
-    const createTableResponse = await client.createTable({
-      database: database.value,
-      table: table.value
-    })
+    if (createTableInDatabase.value) {
+      // Create the physical table in the database
+      const createTableResponse = await client.createTable({
+        database: database.value,
+        table: table.value
+      })
 
-    if (!createTableResponse.success) {
-      throw new Error(createTableResponse.message || 'Failed to create table')
+      if (!createTableResponse.success) {
+        throw new Error(createTableResponse.message || 'Failed to create table')
+      }
     }
 
     if (createConfiguration.value) {
@@ -123,12 +135,14 @@ async function submit() {
         throw new Error(response.message || 'Failed to create table configuration')
       }
 
-      success.value = 'Table and configuration created successfully'
+      success.value = createTableInDatabase.value
+        ? 'Table and configuration created successfully'
+        : 'Table configuration created successfully'
 
       // Navigate to the table view
       await router.push(`/table/${encodeURIComponent(name.value)}`)
     } else {
-      // If not creating configuration, just navigate to the table
+      // Only reachable when createTableInDatabase is true: table created, no config
       await router.push(`/table/${encodeURIComponent(table.value)}`)
     }
   } catch (e) {
@@ -140,9 +154,11 @@ async function submit() {
 </script>
 
 <template>
-  <Section title="Create Table">
-    <form @submit.prevent="submit" class="create-table-form">
-      <div class="form-group">
+  <Section
+    title="Create Table"
+    subtitle="Create a new table in the database or add a configuration for an existing table"
+  >
+    <form @submit.prevent="submit">
         <label for="table">Physical Table Name *</label>
         <input
           id="table"
@@ -153,9 +169,7 @@ async function submit() {
           required
         />
         <small>The actual table name in the database</small>
-      </div>
 
-      <div class="form-group">
         <label for="database">Database *</label>
         <input
           id="database"
@@ -170,21 +184,30 @@ async function submit() {
             {{ db }}
           </option>
         </datalist>
-        <small>The database where the table will be created</small>
-      </div>
+        <small>{{ createTableInDatabase ? 'The database where the table will be created' : 'The database containing the existing table' }}</small>
 
-      <div class="form-group checkbox-group">
+        <div>&nbsp;</div>
+        <label>
+          <input
+            type="checkbox"
+            v-model="createTableInDatabase"
+          />
+          Create table in database
+        </label>
+        <small>Untick when adding a configuration for a table that already exists (e.g. from Database Browser)</small>
+
+        <div>&nbsp;</div>
         <label>
           <input
             type="checkbox"
             v-model="createConfiguration"
+            :disabled="!createTableInDatabase"
           />
           Create table configuration entry
         </label>
-        <small>Recommended: Adds the table to SickRock's navigation and configuration system</small>
-      </div>
+        <small v-if="createTableInDatabase">Recommended: Adds the table to SickRock's navigation and configuration system</small>
+        <small v-else>Required when configuring an existing table</small>
 
-      <div v-if="createConfiguration" class="form-group">
         <label for="name">Configuration Name *</label>
         <input
           id="name"
@@ -196,90 +219,28 @@ async function submit() {
           :required="createConfiguration"
         />
         <small>This is the name used in URLs and references</small>
-      </div>
 
-      <div class="form-actions">
-        <button type="submit" class="button primary" :disabled="loading || !table || (createConfiguration && !name)">
-          {{ loading ? 'Creating...' : 'Create Table' }}
+        <button
+          type="submit"
+          :disabled="loading || !table || (createConfiguration && !name)"
+        >
+          {{
+            loading
+              ? 'Creating...'
+              : !createTableInDatabase
+                ? 'Add configuration'
+                : 'Create'
+          }}
         </button>
-      </div>
 
-      <div v-if="success" class="success-message">✓ {{ success }}</div>
-      <div v-if="error" class="error-message">✗ {{ error }}</div>
+      <div v-if="success" class="form-result success">✓ {{ success }}</div>
+      <div v-if="error" class="form-result error">✗ {{ error }}</div>
     </form>
   </Section>
 </template>
 
 <style scoped>
-.create-table-form {
-  max-width: 600px;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.form-group label {
-  font-weight: 600;
-  color: #333;
-}
-
-.form-group input[type="text"] {
-  padding: 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-}
-
-.form-group input[type="text"]:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.form-group small {
-  color: #666;
-  font-size: 0.875rem;
-}
-
-.checkbox-group label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: normal;
-  cursor: pointer;
-}
-
-.checkbox-group input[type="checkbox"] {
-  width: 1.25rem;
-  height: 1.25rem;
-  cursor: pointer;
-}
-
-.form-actions {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.success-message {
-  padding: 1rem;
-  background: #d4edda;
-  border: 1px solid #c3e6cb;
-  border-radius: 4px;
-  color: #155724;
-}
-
-.error-message {
-  padding: 1rem;
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  color: #721c24;
+form {
+  grid-template-columns: 200px max-content 1fr;
 }
 </style>

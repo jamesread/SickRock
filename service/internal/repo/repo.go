@@ -1329,8 +1329,8 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 	}
 
 	// Create a navigation entry for the new table configuration
-	navQuery := "INSERT INTO table_navigation (ordinal, table_configuration) VALUES (99, ?)"
-	_, err = r.db.ExecContext(ctx, navQuery, configID)
+	navQuery := "INSERT INTO table_navigation (ordinal, table_configuration, name) VALUES (99, ?, ?)"
+	_, err = r.db.ExecContext(ctx, navQuery, configID, name)
 	if err != nil {
 		log.Warnf("Failed to create navigation entry for table configuration %s: %v", name, err)
 		// Don't fail the whole operation if navigation entry creation fails
@@ -1343,22 +1343,25 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 	return nil
 }
 
-// UpdateSystemTableConfigurations upserts the table_settings and table_configurations
-// table configurations using the database name from DB_NAME env (or "main" if unset).
-// Call after migrations so system configs always use the correct database.
+// UpdateSystemTableConfigurations upserts system table configurations (table_settings,
+// table_configurations, table_workflows, table_navigation, table_dashboards) using the database name from
+// DB_NAME env (or "main" if unset). Call after migrations so system configs always use the correct database.
 func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error {
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 	if dbName == "" {
 		dbName = "main"
 	}
 	systemConfigs := []struct {
-		name   string
-		title  string
-		table  string
+		name    string
+		title   string
+		table   string
 		ordinal int
 	}{
 		{"table_settings", "Settings", "table_settings", 0},
 		{"table_configurations", "Table Configurations", "table_configurations", 1},
+		{"table_workflows", "Workflows", "table_workflows", 2},
+		{"table_navigation", "Navigation", "table_navigation", 3},
+		{"table_dashboards", "Dashboards", "table_dashboards", 4},
 	}
 	switch r.db.DriverName() {
 	case "mysql":
@@ -2589,14 +2592,14 @@ type NotificationEvent struct {
 }
 
 type UserNotificationChannel struct {
-	ID          int
-	User        int
-	ChannelType string // 'email', 'telegram', 'webhook'
+	ID           int
+	User         int
+	ChannelType  string // 'email', 'telegram', 'webhook'
 	ChannelValue string
-	ChannelName *string
-	IsActive    bool
-	SrCreated   time.Time
-	SrUpdated   time.Time
+	ChannelName  *string
+	IsActive     bool
+	SrCreated    time.Time
+	SrUpdated    time.Time
 }
 
 type UserNotificationSubscription struct {
