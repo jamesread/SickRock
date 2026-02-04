@@ -27,6 +27,7 @@ import (
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	"github.com/jamesread/SickRock/internal/auth"
 	"github.com/jamesread/SickRock/internal/buildinfo"
+	"github.com/jamesread/SickRock/internal/config"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
 )
@@ -42,12 +43,12 @@ func ginLogrusLogger() gin.HandlerFunc {
 	})
 }
 
-func loadEnvFile() {
-	envFile, err := dirs.GetFirstExistingFileFromDirs("env", []string{
-		".",
-		"~/.config/SickRock/",
-		"/config/",
-	}, "SickRock.env")
+func loadEnvFile(cfg *config.Config) {
+	searchDirs := []string{".", "~/.config/SickRock/", "/config/"}
+	if cfg != nil && cfg.ConfigDir != "" {
+		searchDirs = append([]string{cfg.ConfigDir}, searchDirs...)
+	}
+	envFile, err := dirs.GetFirstExistingFileFromDirs("env", searchDirs, "SickRock.env")
 
 	if err != nil {
 		log.Warnf("Could not find env file: %v", err)
@@ -79,20 +80,15 @@ func loadEnvFile() {
 	}
 }
 
-func configureLogging() {
-	level := os.Getenv("LOG_LEVEL")
-	if level == "" {
-		level = "info"
-	}
+func configureLogging(cfg *config.Config) {
+	level := cfg.LogLevel
 	logLevel, err := log.ParseLevel(level)
 	if err != nil {
 		logLevel = log.InfoLevel
 	}
 	log.SetLevel(logLevel)
 
-	// Set log format
-	format := os.Getenv("LOG_FORMAT")
-	if format == "json" {
+	if cfg.LogFormat == "json" {
 		log.SetFormatter(&log.JSONFormatter{})
 	} else {
 		log.SetFormatter(&log.TextFormatter{
@@ -128,9 +124,13 @@ func main() {
 		"date":    buildinfo.Date,
 	}).Info("Build info")
 
-	loadEnvFile()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
 
-	configureLogging()
+	loadEnvFile(cfg)
+	configureLogging(cfg)
 
 	db, err := repo.ConnectDatabase("file:../tmp/sickrock.db?_pragma=foreign_keys(1)")
 	if err != nil {
@@ -277,7 +277,8 @@ func main() {
 		c.File(filepath.Join(frontendDir, "index.html"))
 	})
 
-	router.Run(":" + getPort())
+	logListenPort(cfg.Port)
+	router.Run(":" + cfg.Port)
 }
 
 func runMigrations(db *sqlx.DB) error {
@@ -367,16 +368,8 @@ func logDatabaseEngineVersion(db *sqlx.DB) {
 	log.Infof("Database engine %s version: %s", driver, version)
 }
 
-func getPort() string {
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		port = "8080"
-	}
-
+func logListenPort(port string) {
 	log.Infof("Listening on port %s", port)
-
-	return port
 }
 
 func startSessionCleanupJob(repo *repo.Repository) {

@@ -1,4 +1,4 @@
-.PHONY: all deps build run test tidy clean
+.PHONY: all deps build run test lint tidy clean
 
 BIN := sickrock
 
@@ -11,10 +11,13 @@ build:
 	go build -o ./tmp/$(BIN)
 
 run:
-	go run ./main.go
+	go run .
 
 test:
 	go test ./...
+
+lint:
+	go vet ./...
 
 tidy:
 	go mod tidy
