@@ -2148,6 +2148,7 @@ type APIKey struct {
 	LastUsedAt *time.Time
 	ExpiresAt  *time.Time
 	IsActive   bool
+	ReadOnly   bool
 }
 
 type ConditionalFormattingRule struct {
@@ -2165,12 +2166,16 @@ type ConditionalFormattingRule struct {
 }
 
 // CreateAPIKey creates a new API key for a user
-func (r *Repository) CreateAPIKey(ctx context.Context, userID int, name, keyHash string, expiresAt *time.Time) (*APIKey, error) {
+func (r *Repository) CreateAPIKey(ctx context.Context, userID int, name, keyHash string, expiresAt *time.Time, readOnly bool) (*APIKey, error) {
 	query := `
-		INSERT INTO table_api_keys (user_id, name, key_hash, expires_at)
-		VALUES (?, ?, ?, ?)
+		INSERT INTO table_api_keys (user_id, name, key_hash, expires_at, read_only)
+		VALUES (?, ?, ?, ?, ?)
 	`
-	result, err := r.db.ExecContext(ctx, query, userID, name, keyHash, expiresAt)
+	readOnlyInt := 0
+	if readOnly {
+		readOnlyInt = 1
+	}
+	result, err := r.db.ExecContext(ctx, query, userID, name, keyHash, expiresAt, readOnlyInt)
 	if err != nil {
 		return nil, err
 	}
@@ -2187,12 +2192,13 @@ func (r *Repository) CreateAPIKey(ctx context.Context, userID int, name, keyHash
 // GetAPIKeyByID retrieves an API key by its ID
 func (r *Repository) GetAPIKeyByID(ctx context.Context, id int) (*APIKey, error) {
 	query := `
-		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active
+		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active, read_only
 		FROM table_api_keys
 		WHERE id = ?
 	`
 
 	var apiKey APIKey
+	var readOnlyInt int
 	err := r.db.QueryRowxContext(ctx, query, id).Scan(
 		&apiKey.ID,
 		&apiKey.UserID,
@@ -2202,7 +2208,9 @@ func (r *Repository) GetAPIKeyByID(ctx context.Context, id int) (*APIKey, error)
 		&apiKey.LastUsedAt,
 		&apiKey.ExpiresAt,
 		&apiKey.IsActive,
+		&readOnlyInt,
 	)
+	apiKey.ReadOnly = readOnlyInt != 0
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -2216,12 +2224,13 @@ func (r *Repository) GetAPIKeyByID(ctx context.Context, id int) (*APIKey, error)
 // GetAPIKeyByHash retrieves an API key by its hash
 func (r *Repository) GetAPIKeyByHash(ctx context.Context, keyHash string) (*APIKey, error) {
 	query := `
-		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active
+		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active, read_only
 		FROM table_api_keys
 		WHERE key_hash = ? AND is_active = 1
 	`
 
 	var apiKey APIKey
+	var readOnlyInt int
 	err := r.db.QueryRowxContext(ctx, query, keyHash).Scan(
 		&apiKey.ID,
 		&apiKey.UserID,
@@ -2231,7 +2240,9 @@ func (r *Repository) GetAPIKeyByHash(ctx context.Context, keyHash string) (*APIK
 		&apiKey.LastUsedAt,
 		&apiKey.ExpiresAt,
 		&apiKey.IsActive,
+		&readOnlyInt,
 	)
+	apiKey.ReadOnly = readOnlyInt != 0
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -2250,7 +2261,7 @@ func (r *Repository) GetAPIKeyByHash(ctx context.Context, keyHash string) (*APIK
 // GetUserAPIKeys retrieves all API keys for a user
 func (r *Repository) GetUserAPIKeys(ctx context.Context, userID int) ([]APIKey, error) {
 	query := `
-		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active
+		SELECT id, user_id, name, key_hash, created_at, last_used_at, expires_at, is_active, read_only
 		FROM table_api_keys
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -2265,6 +2276,7 @@ func (r *Repository) GetUserAPIKeys(ctx context.Context, userID int) ([]APIKey, 
 	var apiKeys []APIKey
 	for rows.Next() {
 		var apiKey APIKey
+		var readOnlyInt int
 		err := rows.Scan(
 			&apiKey.ID,
 			&apiKey.UserID,
@@ -2274,7 +2286,9 @@ func (r *Repository) GetUserAPIKeys(ctx context.Context, userID int) ([]APIKey, 
 			&apiKey.LastUsedAt,
 			&apiKey.ExpiresAt,
 			&apiKey.IsActive,
+			&readOnlyInt,
 		)
+		apiKey.ReadOnly = readOnlyInt != 0
 		if err != nil {
 			return nil, err
 		}
@@ -2282,6 +2296,43 @@ func (r *Repository) GetUserAPIKeys(ctx context.Context, userID int) ([]APIKey, 
 	}
 
 	return apiKeys, nil
+}
+
+// UpdateAPIKey updates an API key's name, expires_at, and/or read_only. Pass nil for fields to leave unchanged.
+func (r *Repository) UpdateAPIKey(ctx context.Context, userID, apiKeyID int, name *string, expiresAt *time.Time, readOnly *bool) error {
+	updates := []string{}
+	args := []any{}
+
+	if name != nil {
+		updates = append(updates, "name = ?")
+		args = append(args, *name)
+	}
+	if expiresAt != nil {
+		updates = append(updates, "expires_at = ?")
+		args = append(args, *expiresAt)
+	}
+	if readOnly != nil {
+		readOnlyInt := 0
+		if *readOnly {
+			readOnlyInt = 1
+		}
+		updates = append(updates, "read_only = ?")
+		args = append(args, readOnlyInt)
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+	args = append(args, apiKeyID, userID)
+	query := "UPDATE table_api_keys SET " + strings.Join(updates, ", ") + " WHERE id = ? AND user_id = ?"
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return fmt.Errorf("API key not found or not owned by user")
+	}
+	return nil
 }
 
 // UpdateAPIKeyLastUsed updates the last used timestamp for an API key

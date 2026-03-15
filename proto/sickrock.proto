@@ -529,6 +529,7 @@ message UserBookmark {
 message CreateAPIKeyRequest {
   string name = 1;
   int64 expires_at = 2; // Unix timestamp, 0 for no expiration
+  bool read_only = 3;   // If true, key can only perform read operations (no create/edit/delete)
 }
 
 message CreateAPIKeyResponse {
@@ -542,6 +543,18 @@ message GetAPIKeysRequest {}
 
 message GetAPIKeysResponse {
   repeated APIKey api_keys = 1;
+}
+
+message UpdateAPIKeyRequest {
+  int32 api_key_id = 1;
+  optional string name = 2;       // If set, update the key name
+  optional int64 expires_at = 3;  // If set, update expiration (0 = no expiration)
+  optional bool read_only = 4;    // If set, update read-only access level
+}
+
+message UpdateAPIKeyResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message DeleteAPIKeyRequest {
@@ -570,6 +583,7 @@ message APIKey {
   int64 last_used_at = 5;
   int64 expires_at = 6;
   bool is_active = 7;
+  bool read_only = 8;  // If true, key can only perform read operations
 }
 
 // Conditional Formatting Rules
@@ -815,6 +829,7 @@ service SickRock {
   // API Key Management
   rpc CreateAPIKey(CreateAPIKeyRequest) returns (CreateAPIKeyResponse);
   rpc GetAPIKeys(GetAPIKeysRequest) returns (GetAPIKeysResponse);
+  rpc UpdateAPIKey(UpdateAPIKeyRequest) returns (UpdateAPIKeyResponse);
   rpc DeleteAPIKey(DeleteAPIKeyRequest) returns (DeleteAPIKeyResponse);
   rpc DeactivateAPIKey(DeactivateAPIKeyRequest) returns (DeactivateAPIKeyResponse);
 

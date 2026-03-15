@@ -142,6 +142,8 @@ const (
 	SickRockCreateAPIKeyProcedure = "/sickrock.SickRock/CreateAPIKey"
 	// SickRockGetAPIKeysProcedure is the fully-qualified name of the SickRock's GetAPIKeys RPC.
 	SickRockGetAPIKeysProcedure = "/sickrock.SickRock/GetAPIKeys"
+	// SickRockUpdateAPIKeyProcedure is the fully-qualified name of the SickRock's UpdateAPIKey RPC.
+	SickRockUpdateAPIKeyProcedure = "/sickrock.SickRock/UpdateAPIKey"
 	// SickRockDeleteAPIKeyProcedure is the fully-qualified name of the SickRock's DeleteAPIKey RPC.
 	SickRockDeleteAPIKeyProcedure = "/sickrock.SickRock/DeleteAPIKey"
 	// SickRockDeactivateAPIKeyProcedure is the fully-qualified name of the SickRock's DeactivateAPIKey
@@ -247,6 +249,7 @@ type SickRockClient interface {
 	// API Key Management
 	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
+	UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 	// Conditional Formatting Rules
@@ -534,6 +537,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("GetAPIKeys")),
 			connect.WithClientOptions(opts...),
 		),
+		updateAPIKey: connect.NewClient[proto.UpdateAPIKeyRequest, proto.UpdateAPIKeyResponse](
+			httpClient,
+			baseURL+SickRockUpdateAPIKeyProcedure,
+			connect.WithSchema(sickRockMethods.ByName("UpdateAPIKey")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteAPIKey: connect.NewClient[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse](
 			httpClient,
 			baseURL+SickRockDeleteAPIKeyProcedure,
@@ -666,6 +675,7 @@ type sickRockClient struct {
 	deleteUserBookmark                 *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
 	createAPIKey                       *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
 	getAPIKeys                         *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
+	updateAPIKey                       *connect.Client[proto.UpdateAPIKeyRequest, proto.UpdateAPIKeyResponse]
 	deleteAPIKey                       *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
 	deactivateAPIKey                   *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
 	getConditionalFormattingRules      *connect.Client[proto.GetConditionalFormattingRulesRequest, proto.GetConditionalFormattingRulesResponse]
@@ -897,6 +907,11 @@ func (c *sickRockClient) GetAPIKeys(ctx context.Context, req *connect.Request[pr
 	return c.getAPIKeys.CallUnary(ctx, req)
 }
 
+// UpdateAPIKey calls sickrock.SickRock.UpdateAPIKey.
+func (c *sickRockClient) UpdateAPIKey(ctx context.Context, req *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error) {
+	return c.updateAPIKey.CallUnary(ctx, req)
+}
+
 // DeleteAPIKey calls sickrock.SickRock.DeleteAPIKey.
 func (c *sickRockClient) DeleteAPIKey(ctx context.Context, req *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error) {
 	return c.deleteAPIKey.CallUnary(ctx, req)
@@ -1029,6 +1044,7 @@ type SickRockHandler interface {
 	// API Key Management
 	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
+	UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 	// Conditional Formatting Rules
@@ -1312,6 +1328,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("GetAPIKeys")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockUpdateAPIKeyHandler := connect.NewUnaryHandler(
+		SickRockUpdateAPIKeyProcedure,
+		svc.UpdateAPIKey,
+		connect.WithSchema(sickRockMethods.ByName("UpdateAPIKey")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockDeleteAPIKeyHandler := connect.NewUnaryHandler(
 		SickRockDeleteAPIKeyProcedure,
 		svc.DeleteAPIKey,
@@ -1484,6 +1506,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockCreateAPIKeyHandler.ServeHTTP(w, r)
 		case SickRockGetAPIKeysProcedure:
 			sickRockGetAPIKeysHandler.ServeHTTP(w, r)
+		case SickRockUpdateAPIKeyProcedure:
+			sickRockUpdateAPIKeyHandler.ServeHTTP(w, r)
 		case SickRockDeleteAPIKeyProcedure:
 			sickRockDeleteAPIKeyHandler.ServeHTTP(w, r)
 		case SickRockDeactivateAPIKeyProcedure:
@@ -1691,6 +1715,10 @@ func (UnimplementedSickRockHandler) CreateAPIKey(context.Context, *connect.Reque
 
 func (UnimplementedSickRockHandler) GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetAPIKeys is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateAPIKey is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error) {

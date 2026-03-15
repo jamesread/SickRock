@@ -18,6 +18,22 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// AddUserToContext sets the authenticated user and legacy Claims on ctx so that
+// server methods can resolve the user via GetUserFromContext. Used by both the
+// Connect interceptor and the MCP HTTP endpoint.
+func AddUserToContext(ctx context.Context, authUser *types.AuthenticatedUser) context.Context {
+	ctx = context.WithValue(ctx, "authenticated_user", authUser)
+	claims := &Claims{
+		Username:  authUser.Username,
+		SessionID: authUser.SID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		},
+	}
+	ctx = context.WithValue(ctx, "user", claims)
+	return ctx
+}
+
 type AuthService struct {
 	jwtSecret      []byte
 	repo           *repo.Repository

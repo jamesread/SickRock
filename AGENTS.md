@@ -132,6 +132,17 @@ The `ListItems` API automatically includes synthetic fields to enhance data anal
 - `ChangeColumnName` - Rename columns
 - `CreateForeignKey` - Add relationships
 
+## MCP Server
+
+An **MCP (Model Context Protocol)** server is exposed as an HTTP endpoint on the same SickRock server so AI assistants (e.g. Cursor, Claude Desktop) can call the SickRock API via tools.
+
+- **Endpoint**: `GET/POST /mcp` on the same base URL as the app (e.g. `https://your-sickrock-instance/mcp` when running in Docker).
+- **Auth**: Same as the Connect API — **API key** (Bearer token) or **session** (Session-Token header). No separate process or config.
+- **Transport**: MCP Streamable HTTP; point your MCP client at `https://your-host/mcp`.
+- **Tools**: `sickrock_ping`, `sickrock_get_navigation`, `sickrock_get_table_configurations`, `sickrock_get_database_tables`, `sickrock_get_table_structure`, `sickrock_list_items`, `sickrock_get_item`, `sickrock_create_item`, `sickrock_edit_item`, `sickrock_delete_item`
+
+**Cursor**: In MCP settings use the HTTP transport with URL `https://your-sickrock-host/mcp` and set the API key in the request (per your client’s docs). No separate binary is required when SickRock is reachable over HTTP.
+
 ## Agent Integration Patterns
 
 ### 1. Webhook Integration

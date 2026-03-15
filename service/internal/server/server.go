@@ -1684,6 +1684,7 @@ func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[
 		t := time.Unix(expiresAt, 0)
 		expiresAtTime = &t
 	}
+	readOnly := req.Msg.GetReadOnly()
 
 	// Generate a secure API key
 	apiKey, err := s.generateSecureAPIKey()
@@ -1698,7 +1699,7 @@ func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[
 	}
 
 	// Create the API key in the database
-	createdAPIKey, err := s.repo.CreateAPIKey(ctx, userID, name, keyHash, expiresAtTime)
+	createdAPIKey, err := s.repo.CreateAPIKey(ctx, userID, name, keyHash, expiresAtTime, readOnly)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create API key: %w", err))
 	}
@@ -1733,6 +1734,7 @@ func (s *SickRockServer) GetAPIKeys(ctx context.Context, req *connect.Request[si
 			LastUsedAt: s.timeToUnixPtr(apiKey.LastUsedAt),
 			ExpiresAt:  s.timeToUnixPtr(apiKey.ExpiresAt),
 			IsActive:   apiKey.IsActive,
+			ReadOnly:   apiKey.ReadOnly,
 		})
 	}
 
@@ -1784,6 +1786,49 @@ func (s *SickRockServer) DeactivateAPIKey(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&sickrockpb.DeactivateAPIKeyResponse{
 		Success: true,
 		Message: "API key deactivated successfully",
+	}), nil
+}
+
+// UpdateAPIKey updates an API key's name, expires_at, and/or read_only
+func (s *SickRockServer) UpdateAPIKey(ctx context.Context, req *connect.Request[sickrockpb.UpdateAPIKeyRequest]) (*connect.Response[sickrockpb.UpdateAPIKeyResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+
+	apiKeyID := int(req.Msg.GetApiKeyId())
+	if apiKeyID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
+	}
+
+	var name *string
+	if req.Msg.Name != nil {
+		n := strings.TrimSpace(req.Msg.GetName())
+		name = &n
+	}
+	var expiresAt *time.Time
+	if req.Msg.ExpiresAt != nil {
+		if req.Msg.GetExpiresAt() == 0 {
+			expiresAt = nil // no expiration
+		} else {
+			t := time.Unix(req.Msg.GetExpiresAt(), 0)
+			expiresAt = &t
+		}
+	}
+	var readOnly *bool
+	if req.Msg.ReadOnly != nil {
+		r := req.Msg.GetReadOnly()
+		readOnly = &r
+	}
+
+	err = s.repo.UpdateAPIKey(ctx, userID, apiKeyID, name, expiresAt, readOnly)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to update API key: %w", err))
+	}
+
+	return connect.NewResponse(&sickrockpb.UpdateAPIKeyResponse{
+		Success: true,
+		Message: "API key updated successfully",
 	}), nil
 }
 

@@ -106,6 +106,19 @@ func ConnectAuthMiddleware(authService *AuthService) connect.UnaryInterceptorFun
 				return nil, connect.NewError(connect.CodeUnauthenticated, nil)
 			}
 
+			// If authenticated via API key, fetch the key record and set read_only in context
+			if authUser.Provider == "api_key" {
+				if authHeader := req.Header().Get("Authorization"); authHeader != "" {
+					parts := strings.Split(authHeader, " ")
+					if len(parts) == 2 && parts[0] == "Bearer" {
+						apiKeyRecord, err := authService.ValidateAPIKey(ctx, parts[1])
+						if err == nil && apiKeyRecord != nil && apiKeyRecord.ReadOnly {
+							ctx = context.WithValue(ctx, ContextKeyAPIKeyReadOnly, true)
+						}
+					}
+				}
+			}
+
 			// Add authenticated user to context
 			ctx = context.WithValue(ctx, "authenticated_user", authUser)
 
@@ -118,6 +131,12 @@ func ConnectAuthMiddleware(authService *AuthService) connect.UnaryInterceptorFun
 				},
 			}
 			ctx = context.WithValue(ctx, "user", claims)
+
+			// Block write operations when using a read-only API key
+			if IsAPIKeyReadOnly(ctx) && IsWriteProcedure(procedure) {
+				log.Trace("Read-only API key attempted write procedure")
+				return nil, connect.NewError(connect.CodePermissionDenied, nil)
+			}
 
 			return next(ctx, req)
 		}

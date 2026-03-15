@@ -25,3 +25,10 @@ plugins:
     opt:
       - target=ts
       - import_extension=none
+
+  - remote: buf.build/community/sudorandom-connect-openapi:v0.22.1
+    out: ../service/gen
+    opt:
+      - format=json
+      - path=openapi.json
+      - path-prefix=/api

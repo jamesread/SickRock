@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	_ "embed"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,9 +29,13 @@ import (
 	"github.com/jamesread/SickRock/internal/auth"
 	"github.com/jamesread/SickRock/internal/buildinfo"
 	"github.com/jamesread/SickRock/internal/config"
+	"github.com/jamesread/SickRock/internal/mcp"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
 )
+
+//go:embed gen/openapi.json
+var openAPISpec []byte
 
 func ginLogrusLogger() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
@@ -41,6 +46,32 @@ func ginLogrusLogger() gin.HandlerFunc {
 		}).Debugf("Gin Log")
 		return ""
 	})
+}
+
+// mcpAuthMiddleware authenticates requests to /mcp using the same logic as the Connect API
+// (session or API key). It sets the authenticated user and read-only flag on the request context.
+func mcpAuthMiddleware(authService *auth.AuthService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authUser := authService.AuthFromHttpReq(c.Request)
+		if authUser == nil || authUser.IsGuest() {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
+			return
+		}
+		ctx := auth.AddUserToContext(c.Request.Context(), authUser)
+		if authUser.Provider == "api_key" {
+			authHeader := c.GetHeader("Authorization")
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && parts[0] == "Bearer" {
+					if record, err := authService.ValidateAPIKey(ctx, parts[1]); err == nil && record != nil && record.ReadOnly {
+						ctx = context.WithValue(ctx, auth.ContextKeyAPIKeyReadOnly, true)
+					}
+				}
+			}
+		}
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}
 }
 
 func loadEnvFile(cfg *config.Config) {
@@ -234,6 +265,17 @@ func main() {
 		c.Next()
 	})
 	router.Any("/api/*any", gin.WrapH(http.StripPrefix("/api", mux)))
+
+	// OpenAPI spec for the Connect RPC API at /api
+	router.GET("/openapi", func(c *gin.Context) {
+		c.Header("Content-Type", "application/json")
+		c.Data(http.StatusOK, "application/json", openAPISpec)
+	})
+
+	// MCP (Model Context Protocol) endpoint at /mcp — same auth as Connect API (session or API key)
+	mcpHandler := mcp.NewHandler(srv)
+	router.Any("/mcp", mcpAuthMiddleware(authService), gin.WrapH(mcpHandler))
+	router.Any("/mcp/*path", mcpAuthMiddleware(authService), gin.WrapH(mcpHandler))
 
 	// Serve static files from frontend directory (must be before NoRoute)
 	frontendDir := findFrontendDir()
