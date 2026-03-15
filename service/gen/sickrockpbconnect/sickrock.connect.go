@@ -185,6 +185,15 @@ const (
 	// SickRockDeleteUserNotificationSubscriptionProcedure is the fully-qualified name of the SickRock's
 	// DeleteUserNotificationSubscription RPC.
 	SickRockDeleteUserNotificationSubscriptionProcedure = "/sickrock.SickRock/DeleteUserNotificationSubscription"
+	// SickRockGetTickListStateProcedure is the fully-qualified name of the SickRock's GetTickListState
+	// RPC.
+	SickRockGetTickListStateProcedure = "/sickrock.SickRock/GetTickListState"
+	// SickRockSetTickListCompletionProcedure is the fully-qualified name of the SickRock's
+	// SetTickListCompletion RPC.
+	SickRockSetTickListCompletionProcedure = "/sickrock.SickRock/SetTickListCompletion"
+	// SickRockClearTickListStateProcedure is the fully-qualified name of the SickRock's
+	// ClearTickListState RPC.
+	SickRockClearTickListStateProcedure = "/sickrock.SickRock/ClearTickListState"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -266,6 +275,10 @@ type SickRockClient interface {
 	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
 	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
 	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
+	// Tick list state (shared across clients)
+	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
+	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
+	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -627,6 +640,24 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationSubscription")),
 			connect.WithClientOptions(opts...),
 		),
+		getTickListState: connect.NewClient[proto.GetTickListStateRequest, proto.GetTickListStateResponse](
+			httpClient,
+			baseURL+SickRockGetTickListStateProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetTickListState")),
+			connect.WithClientOptions(opts...),
+		),
+		setTickListCompletion: connect.NewClient[proto.SetTickListCompletionRequest, proto.SetTickListCompletionResponse](
+			httpClient,
+			baseURL+SickRockSetTickListCompletionProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetTickListCompletion")),
+			connect.WithClientOptions(opts...),
+		),
+		clearTickListState: connect.NewClient[proto.ClearTickListStateRequest, proto.ClearTickListStateResponse](
+			httpClient,
+			baseURL+SickRockClearTickListStateProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ClearTickListState")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -690,6 +721,9 @@ type sickRockClient struct {
 	getUserNotificationSubscriptions   *connect.Client[proto.GetUserNotificationSubscriptionsRequest, proto.GetUserNotificationSubscriptionsResponse]
 	createUserNotificationSubscription *connect.Client[proto.CreateUserNotificationSubscriptionRequest, proto.CreateUserNotificationSubscriptionResponse]
 	deleteUserNotificationSubscription *connect.Client[proto.DeleteUserNotificationSubscriptionRequest, proto.DeleteUserNotificationSubscriptionResponse]
+	getTickListState                   *connect.Client[proto.GetTickListStateRequest, proto.GetTickListStateResponse]
+	setTickListCompletion              *connect.Client[proto.SetTickListCompletionRequest, proto.SetTickListCompletionResponse]
+	clearTickListState                 *connect.Client[proto.ClearTickListStateRequest, proto.ClearTickListStateResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -982,6 +1016,21 @@ func (c *sickRockClient) DeleteUserNotificationSubscription(ctx context.Context,
 	return c.deleteUserNotificationSubscription.CallUnary(ctx, req)
 }
 
+// GetTickListState calls sickrock.SickRock.GetTickListState.
+func (c *sickRockClient) GetTickListState(ctx context.Context, req *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error) {
+	return c.getTickListState.CallUnary(ctx, req)
+}
+
+// SetTickListCompletion calls sickrock.SickRock.SetTickListCompletion.
+func (c *sickRockClient) SetTickListCompletion(ctx context.Context, req *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error) {
+	return c.setTickListCompletion.CallUnary(ctx, req)
+}
+
+// ClearTickListState calls sickrock.SickRock.ClearTickListState.
+func (c *sickRockClient) ClearTickListState(ctx context.Context, req *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error) {
+	return c.clearTickListState.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -1061,6 +1110,10 @@ type SickRockHandler interface {
 	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
 	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
 	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
+	// Tick list state (shared across clients)
+	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
+	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
+	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -1418,6 +1471,24 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationSubscription")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetTickListStateHandler := connect.NewUnaryHandler(
+		SickRockGetTickListStateProcedure,
+		svc.GetTickListState,
+		connect.WithSchema(sickRockMethods.ByName("GetTickListState")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetTickListCompletionHandler := connect.NewUnaryHandler(
+		SickRockSetTickListCompletionProcedure,
+		svc.SetTickListCompletion,
+		connect.WithSchema(sickRockMethods.ByName("SetTickListCompletion")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockClearTickListStateHandler := connect.NewUnaryHandler(
+		SickRockClearTickListStateProcedure,
+		svc.ClearTickListState,
+		connect.WithSchema(sickRockMethods.ByName("ClearTickListState")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -1536,6 +1607,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockCreateUserNotificationSubscriptionHandler.ServeHTTP(w, r)
 		case SickRockDeleteUserNotificationSubscriptionProcedure:
 			sickRockDeleteUserNotificationSubscriptionHandler.ServeHTTP(w, r)
+		case SickRockGetTickListStateProcedure:
+			sickRockGetTickListStateHandler.ServeHTTP(w, r)
+		case SickRockSetTickListCompletionProcedure:
+			sickRockSetTickListCompletionHandler.ServeHTTP(w, r)
+		case SickRockClearTickListStateProcedure:
+			sickRockClearTickListStateHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -1775,4 +1852,16 @@ func (UnimplementedSickRockHandler) CreateUserNotificationSubscription(context.C
 
 func (UnimplementedSickRockHandler) DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserNotificationSubscription is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetTickListState is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetTickListCompletion is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ClearTickListState is not implemented"))
 }

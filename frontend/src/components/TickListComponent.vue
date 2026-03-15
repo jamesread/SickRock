@@ -20,42 +20,17 @@ const items = ref<Item[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 
-// LocalStorage key for this table's tick state
-const storageKey = computed(() => `sickrock-ticklist-${props.tableId}`)
-
-// Client-side only completion state (persisted to localStorage)
+// Server-side completion state (shared across clients)
 const completionState = ref<Map<string, boolean>>(new Map())
 
-// Load tick state from localStorage
-function loadTickState() {
+// Clear all ticks (server-side)
+async function clearTicks() {
   try {
-    const stored = localStorage.getItem(storageKey.value)
-    if (stored) {
-      const parsed = JSON.parse(stored)
-      completionState.value = new Map(Object.entries(parsed))
-    } else {
-      completionState.value = new Map()
-    }
-  } catch (e) {
-    console.error('Failed to load tick state from localStorage:', e)
+    await client.clearTickListState({ tcName: props.tableId })
     completionState.value = new Map()
-  }
-}
-
-// Save tick state to localStorage
-function saveTickState() {
-  try {
-    const obj = Object.fromEntries(completionState.value)
-    localStorage.setItem(storageKey.value, JSON.stringify(obj))
   } catch (e) {
-    console.error('Failed to save tick state to localStorage:', e)
+    console.error('Failed to clear tick state:', e)
   }
-}
-
-// Clear all ticks
-function clearTicks() {
-  completionState.value = new Map()
-  saveTickState()
 }
 
 // Table structure state
@@ -140,21 +115,18 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const res = await client.listItems({ tcName: props.tableId })
-    items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
-
-    // Fetch table configuration to get the title
-    const configs = await client.getTableConfigurations({})
-    const config = configs.pages?.find(p => p.id === props.tableId)
-    if (config && config.title) {
-      tableTitle.value = config.title
-    } else {
-      tableTitle.value = `Table: ${props.tableId}`
-    }
-
-    // Load table structure
-    const structureRes = await client.getTableStructure({ pageId: props.tableId })
+    const [listRes, configsRes, structureRes, tickStateRes] = await Promise.all([
+      client.listItems({ tcName: props.tableId }),
+      client.getTableConfigurations({}),
+      client.getTableStructure({ pageId: props.tableId }),
+      client.getTickListState({ tcName: props.tableId }).catch(() => ({ completedByItemId: {} })),
+    ])
+    items.value = Array.isArray(listRes.items) ? (listRes.items as Item[]) : []
+    const config = configsRes.pages?.find((p: any) => p.id === props.tableId)
+    tableTitle.value = config?.title ? String(config.title) : `Table: ${props.tableId}`
     tableStructure.value = structureRes
+    const m = tickStateRes.completedByItemId ?? {}
+    completionState.value = new Map(Object.entries(m))
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -162,12 +134,22 @@ async function load() {
   }
 }
 
-// Toggle completion state (client-side only, no server updates)
-function toggleCompleted(item: any) {
+// Toggle completion state (server-side, shared across clients)
+async function toggleCompleted(item: any) {
   const itemId = String(item.id)
   const currentState = isCompleted(item)
-  completionState.value.set(itemId, !currentState)
-  saveTickState()
+  const next = !currentState
+  completionState.value.set(itemId, next)
+  try {
+    await client.setTickListCompletion({
+      tcName: props.tableId,
+      itemId,
+      completed: next,
+    })
+  } catch (e) {
+    completionState.value.set(itemId, currentState) // revert on error
+    console.error('Failed to set tick completion:', e)
+  }
 }
 
 function getItemDisplayText(item: any): string {
@@ -194,14 +176,11 @@ function isCompleted(item: any): boolean {
   return getBooleanValue(item, completionField.value)
 }
 
-// Watch for tableId changes to reload state when navigating between tables
 watch(() => props.tableId, () => {
-  loadTickState()
   load()
 })
 
 onMounted(() => {
-  loadTickState()
   load()
 })
 </script>

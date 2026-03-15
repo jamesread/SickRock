@@ -294,6 +294,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/ClearTickListState": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "ClearTickListState",
+        "operationId": "sickrock.SickRock.ClearTickListState",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ClearTickListStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ClearTickListStateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/CreateAPIKey": {
       "post": {
         "tags": [
@@ -2570,6 +2628,65 @@
         }
       }
     },
+    "/api/sickrock.SickRock/GetTickListState": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "Tick list state (shared across clients)",
+        "description": "Tick list state (shared across clients)",
+        "operationId": "sickrock.SickRock.GetTickListState",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetTickListStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetTickListStateResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/GetUserBookmarks": {
       "post": {
         "tags": [
@@ -3088,6 +3205,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.ResetUserPasswordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetTickListCompletion": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetTickListCompletion",
+        "operationId": "sickrock.SickRock.SetTickListCompletion",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetTickListCompletionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetTickListCompletionResponse"
                 }
               }
             }
@@ -3698,6 +3873,22 @@
           }
         },
         "title": "ClaimDeviceCodeResponse",
+        "additionalProperties": false
+      },
+      "sickrock.ClearTickListStateRequest": {
+        "type": "object",
+        "properties": {
+          "tcName": {
+            "type": "string",
+            "title": "tc_name"
+          }
+        },
+        "title": "ClearTickListStateRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ClearTickListStateResponse": {
+        "type": "object",
+        "title": "ClearTickListStateResponse",
         "additionalProperties": false
       },
       "sickrock.ConditionalFormattingRule": {
@@ -5153,6 +5344,50 @@
         "title": "GetTableViewsResponse",
         "additionalProperties": false
       },
+      "sickrock.GetTickListStateRequest": {
+        "type": "object",
+        "properties": {
+          "tcName": {
+            "type": "string",
+            "title": "tc_name",
+            "description": "Table configuration name"
+          }
+        },
+        "title": "GetTickListStateRequest",
+        "additionalProperties": false,
+        "description": "Tick list state (server-side, shared across clients)"
+      },
+      "sickrock.GetTickListStateResponse": {
+        "type": "object",
+        "properties": {
+          "completedByItemId": {
+            "type": "object",
+            "title": "completed_by_item_id",
+            "additionalProperties": {
+              "type": "boolean",
+              "title": "value"
+            },
+            "description": "item_id -\u003e completed"
+          }
+        },
+        "title": "GetTickListStateResponse",
+        "additionalProperties": false
+      },
+      "sickrock.GetTickListStateResponse.CompletedByItemIdEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "value": {
+            "type": "boolean",
+            "title": "value"
+          }
+        },
+        "title": "CompletedByItemIdEntry",
+        "additionalProperties": false
+      },
       "sickrock.GetUserBookmarksRequest": {
         "type": "object",
         "title": "GetUserBookmarksRequest",
@@ -5663,6 +5898,30 @@
           }
         },
         "title": "ResetUserPasswordResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetTickListCompletionRequest": {
+        "type": "object",
+        "properties": {
+          "tcName": {
+            "type": "string",
+            "title": "tc_name"
+          },
+          "itemId": {
+            "type": "string",
+            "title": "item_id"
+          },
+          "completed": {
+            "type": "boolean",
+            "title": "completed"
+          }
+        },
+        "title": "SetTickListCompletionRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetTickListCompletionResponse": {
+        "type": "object",
+        "title": "SetTickListCompletionResponse",
         "additionalProperties": false
       },
       "sickrock.TableView": {

@@ -751,6 +751,29 @@ message DeleteUserNotificationSubscriptionResponse {
   string message = 2;
 }
 
+// Tick list state (server-side, shared across clients)
+message GetTickListStateRequest {
+  string tc_name = 1;  // Table configuration name
+}
+
+message GetTickListStateResponse {
+  map<string, bool> completed_by_item_id = 1;  // item_id -> completed
+}
+
+message SetTickListCompletionRequest {
+  string tc_name = 1;
+  string item_id = 2;
+  bool completed = 3;
+}
+
+message SetTickListCompletionResponse {}
+
+message ClearTickListStateRequest {
+  string tc_name = 1;
+}
+
+message ClearTickListStateResponse {}
+
 service SickRock {
   rpc Init(InitRequest) returns (InitResponse);
   rpc Ping(PingRequest) returns (PingResponse);
@@ -848,4 +871,9 @@ service SickRock {
   rpc GetUserNotificationSubscriptions(GetUserNotificationSubscriptionsRequest) returns (GetUserNotificationSubscriptionsResponse);
   rpc CreateUserNotificationSubscription(CreateUserNotificationSubscriptionRequest) returns (CreateUserNotificationSubscriptionResponse);
   rpc DeleteUserNotificationSubscription(DeleteUserNotificationSubscriptionRequest) returns (DeleteUserNotificationSubscriptionResponse);
+
+  // Tick list state (shared across clients)
+  rpc GetTickListState(GetTickListStateRequest) returns (GetTickListStateResponse);
+  rpc SetTickListCompletion(SetTickListCompletionRequest) returns (SetTickListCompletionResponse);
+  rpc ClearTickListState(ClearTickListStateRequest) returns (ClearTickListStateResponse);
 }

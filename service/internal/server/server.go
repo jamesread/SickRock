@@ -1664,6 +1664,55 @@ func (s *SickRockServer) DeleteUserBookmark(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&sickrockpb.DeleteUserBookmarkResponse{Deleted: true}), nil
 }
 
+// Tick list state (shared across clients)
+
+// GetTickListState returns the completion state for a table's tick list.
+func (s *SickRockServer) GetTickListState(ctx context.Context, req *connect.Request[sickrockpb.GetTickListStateRequest]) (*connect.Response[sickrockpb.GetTickListStateResponse], error) {
+	if _, err := s.getUserIDFromContext(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	tcName := strings.TrimSpace(req.Msg.GetTcName())
+	if tcName == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("tc_name is required"))
+	}
+	state, err := s.repo.GetTickListState(ctx, tcName)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&sickrockpb.GetTickListStateResponse{CompletedByItemId: state}), nil
+}
+
+// SetTickListCompletion sets one item's completed state for a table's tick list.
+func (s *SickRockServer) SetTickListCompletion(ctx context.Context, req *connect.Request[sickrockpb.SetTickListCompletionRequest]) (*connect.Response[sickrockpb.SetTickListCompletionResponse], error) {
+	if _, err := s.getUserIDFromContext(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	tcName := strings.TrimSpace(req.Msg.GetTcName())
+	itemID := strings.TrimSpace(req.Msg.GetItemId())
+	if tcName == "" || itemID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("tc_name and item_id are required"))
+	}
+	if err := s.repo.SetTickListCompletion(ctx, tcName, itemID, req.Msg.GetCompleted()); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&sickrockpb.SetTickListCompletionResponse{}), nil
+}
+
+// ClearTickListState removes all tick list completion state for a table.
+func (s *SickRockServer) ClearTickListState(ctx context.Context, req *connect.Request[sickrockpb.ClearTickListStateRequest]) (*connect.Response[sickrockpb.ClearTickListStateResponse], error) {
+	if _, err := s.getUserIDFromContext(ctx); err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	tcName := strings.TrimSpace(req.Msg.GetTcName())
+	if tcName == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("tc_name is required"))
+	}
+	if err := s.repo.ClearTickListState(ctx, tcName); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&sickrockpb.ClearTickListStateResponse{}), nil
+}
+
 // API Key Management Methods
 
 // CreateAPIKey creates a new API key for the authenticated user

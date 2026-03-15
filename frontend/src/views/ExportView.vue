@@ -43,13 +43,21 @@ const viewOptions = computed(() => {
 const visibleColumnsFromSelection = computed<string[]>(() => {
   const current = tableViews.value.find(v => v.id === selectedViewId.value) || null
   if (!current || current.columns.length === 0) {
-    // Only include explicitly visible columns; if none defined, return none.
     return []
   }
   return current.columns
     .filter(c => c.isVisible)
     .sort((a, b) => a.columnOrder - b.columnOrder)
     .map(c => c.columnName)
+})
+
+// When no view columns are selected (e.g. "All Columns" or empty view), use table structure so export has data
+const exportColumns = computed<string[]>(() => {
+  const fromView = visibleColumnsFromSelection.value
+  if (fromView.length > 0) return fromView
+  const st = structure.value
+  if (!st?.fields?.length) return ['id', 'sr_created']
+  return ['id', ...st.fields.map(f => f.name), 'sr_created']
 })
 
 function escapeCsv(value: unknown): string {
@@ -62,9 +70,7 @@ function escapeCsv(value: unknown): string {
 }
 
 function computeCsv() {
-  // Determine final columns: only include columns explicitly visible in the selected view.
-  // Do not force-add id or sr_created unless they are visible in the view.
-  const cols: string[] = [...visibleColumnsFromSelection.value]
+  const cols: string[] = [...exportColumns.value]
 
   const header = cols.map(escapeCsv).join(',')
   const lines: string[] = []

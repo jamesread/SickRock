@@ -2137,6 +2137,55 @@ func (r *Repository) DeleteUserBookmark(ctx context.Context, userID, bookmarkID 
 	return nil
 }
 
+// Tick list state (shared across clients)
+
+// GetTickListState returns the completion state for a table's tick list (item_id -> completed).
+func (r *Repository) GetTickListState(ctx context.Context, tcName string) (map[string]bool, error) {
+	query := `SELECT item_id, completed FROM tick_list_state WHERE tc_name = ?`
+	rows, err := r.db.QueryxContext(ctx, query, tcName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]bool)
+	for rows.Next() {
+		var itemID string
+		var completed int
+		if err := rows.Scan(&itemID, &completed); err != nil {
+			return nil, err
+		}
+		out[itemID] = completed != 0
+	}
+	return out, rows.Err()
+}
+
+// SetTickListCompletion sets or updates one item's completed state for a table's tick list.
+func (r *Repository) SetTickListCompletion(ctx context.Context, tcName, itemID string, completed bool) error {
+	completedInt := 0
+	if completed {
+		completedInt = 1
+	}
+	// SQLite and MySQL support INSERT ... ON DUPLICATE KEY UPDATE / INSERT OR REPLACE
+	if r.db.DriverName() == "mysql" {
+		_, err := r.db.ExecContext(ctx,
+			`INSERT INTO tick_list_state (tc_name, item_id, completed) VALUES (?, ?, ?)
+			 ON DUPLICATE KEY UPDATE completed = VALUES(completed)`,
+			tcName, itemID, completedInt)
+		return err
+	}
+	_, err := r.db.ExecContext(ctx,
+		`INSERT INTO tick_list_state (tc_name, item_id, completed) VALUES (?, ?, ?)
+		 ON CONFLICT(tc_name, item_id) DO UPDATE SET completed = excluded.completed`,
+		tcName, itemID, completedInt)
+	return err
+}
+
+// ClearTickListState removes all tick list completion state for a table.
+func (r *Repository) ClearTickListState(ctx context.Context, tcName string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM tick_list_state WHERE tc_name = ?`, tcName)
+	return err
+}
+
 // API Key related methods
 
 type APIKey struct {

@@ -50,6 +50,8 @@ var writeProcedures = map[string]bool{
 	"/sickrock.SickRock/DeleteUserNotificationChannel": true,
 	"/sickrock.SickRock/CreateUserNotificationSubscription": true,
 	"/sickrock.SickRock/DeleteUserNotificationSubscription": true,
+	"/sickrock.SickRock/SetTickListCompletion": true,
+	"/sickrock.SickRock/ClearTickListState": true,
 }
 
 // IsWriteProcedure returns true if the procedure is a mutating (write) RPC
