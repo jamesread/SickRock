@@ -676,7 +676,7 @@ const currentRoute = computed(() => router.currentRoute.value)
 const canBookmarkCurrentPage = ref(false)
 
 const isCurrentPageBookmarked = computed(() => {
-    if (!currentRoute.value.path) return false
+    if (!currentRoute.value?.path) return false
 
     // Check if current route matches any bookmarked navigation item
     const currentPath = currentRoute.value.path
@@ -711,7 +711,7 @@ async function checkCanBookmarkCurrentPage() {
         return
     }
 
-    if (!currentRoute.value.path) {
+    if (!currentRoute.value?.path) {
         canBookmarkCurrentPage.value = false
         return
     }
@@ -753,7 +753,7 @@ async function toggleCurrentPageBookmark() {
         return
     }
 
-    if (!currentRoute.value.path) return
+    if (!currentRoute.value?.path) return
 
     const currentPath = currentRoute.value.path
 

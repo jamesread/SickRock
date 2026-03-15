@@ -19,12 +19,14 @@ const apiKeys = ref<Array<{
   lastUsedAt: number;
   expiresAt: number;
   isActive: boolean;
+  readOnly: boolean;
 }>>([])
 
 const apiKeysLoading = ref(false)
 const creatingApiKey = ref(false)
 const newApiKeyName = ref('')
 const newApiKeyExpiresAt = ref(0)
+const newApiKeyReadOnly = ref(false)
 const showNewApiKey = ref(false)
 const newApiKeyValue = ref('')
 const apiKeyError = ref<string | null>(null)
@@ -41,7 +43,8 @@ async function loadAPIKeys() {
       createdAt: Number(key.createdAt),
       lastUsedAt: Number(key.lastUsedAt),
       expiresAt: Number(key.expiresAt),
-      isActive: key.isActive
+      isActive: key.isActive,
+      readOnly: key.readOnly ?? false
     }))
   } catch (e: any) {
     console.error('Failed to load API keys:', e)
@@ -62,7 +65,8 @@ async function createAPIKey() {
   try {
     const response = await client.createAPIKey({
       name: newApiKeyName.value.trim(),
-      expiresAt: BigInt(newApiKeyExpiresAt.value)
+      expiresAt: BigInt(newApiKeyExpiresAt.value),
+      readOnly: newApiKeyReadOnly.value
     })
 
     if (response.success) {
@@ -70,6 +74,7 @@ async function createAPIKey() {
       showNewApiKey.value = true
       newApiKeyName.value = ''
       newApiKeyExpiresAt.value = 0
+      newApiKeyReadOnly.value = false
       await loadAPIKeys() // Reload API keys
     } else {
       apiKeyError.value = response.message || 'Failed to create API key'
@@ -165,6 +170,16 @@ onMounted(async () => {
             :disabled="creatingApiKey"
           />
         </div>
+        <div class="form-group form-group-checkbox">
+          <label>
+            <input
+              v-model="newApiKeyReadOnly"
+              type="checkbox"
+              :disabled="creatingApiKey"
+            />
+            Read-only (can only read data; no create, edit, or delete)
+          </label>
+        </div>
         <button
           @click="createAPIKey"
           :disabled="creatingApiKey || !newApiKeyName.trim()"
@@ -222,6 +237,12 @@ onMounted(async () => {
                   <strong>Status:</strong>
                   <span :class="apiKey.isActive ? 'status-active' : 'status-inactive'">
                     {{ apiKey.isActive ? 'Active' : 'Inactive' }}
+                  </span>
+                </span>
+                <span class="detail-item">
+                  <strong>Access:</strong>
+                  <span :class="apiKey.readOnly ? 'access-readonly' : 'access-readwrite'">
+                    {{ apiKey.readOnly ? 'Read-only' : 'Read-write' }}
                   </span>
                 </span>
               </div>
@@ -475,6 +496,28 @@ onMounted(async () => {
 .status-inactive {
   color: #dc3545;
   font-weight: 500;
+}
+
+.access-readonly {
+  color: #6c757d;
+  font-weight: 500;
+}
+
+.access-readwrite {
+  color: #007bff;
+  font-weight: 500;
+}
+
+.form-group-checkbox label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.form-group-checkbox input[type="checkbox"] {
+  width: auto;
+  max-width: none;
 }
 
 .api-key-actions {

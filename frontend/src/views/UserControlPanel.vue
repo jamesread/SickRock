@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
@@ -18,7 +18,13 @@ async function handleLogout() {
   router.push('/login')
 }
 
+// Filter out any null/undefined links so picocrank's isActive(link) never receives undefined (avoids "reading 'path' of undefined")
+function onlyValidLinks(link: unknown) {
+  return link != null && typeof link === 'object'
+}
+
 onMounted(() => {
+  nextTick(() => {
   if (localNavigation.value) {
     // User Preferences
     localNavigation.value.addNavigationLink({
@@ -89,6 +95,7 @@ onMounted(() => {
     // Logout
     localNavigation.value.addCallback('Logout', async () => { await handleLogout() }, { icon: LogoutIcon })
   }
+  })
 })
 </script>
 
@@ -101,7 +108,7 @@ onMounted(() => {
       </div>
 
       <Navigation ref="localNavigation">
-        <NavigationGrid />
+        <NavigationGrid :filter="onlyValidLinks" />
       </Navigation>
 
       <div class="logout-section">

@@ -121,10 +121,22 @@ func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrock
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
 	var currentUsername string
-	username, err := s.authService.GetUserFromContext(ctx)
-	if err == nil {
-		currentUsername = username
+	// Optionally validate token from request headers; if present and valid, resolve to username
+	token := req.Header().Get("Session-Token")
+	if token == "" {
+		if authHeader := req.Header().Get("Authorization"); authHeader != "" {
+			if parts := strings.SplitN(authHeader, " ", 2); len(parts) == 2 && parts[0] == "Bearer" && parts[1] != "" {
+				token = parts[1]
+			}
+		}
 	}
+	if token != "" {
+		claims, err := s.authService.ValidateToken(ctx, token)
+		if err == nil && claims != nil {
+			currentUsername = claims.Username
+		}
+	}
+	// If no token was provided, or validation failed, currentUsername stays blank
 
 	res := connect.NewResponse(&sickrockpb.InitResponse{
 		Version:         buildinfo.Version,
