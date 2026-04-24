@@ -12,18 +12,18 @@
   "dependencies": {
     "@connectrpc/connect": "^2.1.1",
     "@connectrpc/connect-web": "^2.1.1",
-    "@tailwindcss/postcss": "^4.1.18",
-    "@vitejs/plugin-basic-ssl": "^2.1.4",
-    "picocrank": "^1.13.1",
+    "@tailwindcss/postcss": "^4.2.4",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "picocrank": "^1.14.1",
     "pinia": "^3.0.4",
-    "vite-plugin-mkcert": "^1.17.9",
-    "vue": "^3.5.27",
-    "vue-router": "^5.0.1"
+    "vite-plugin-mkcert": "^2.0.0",
+    "vue": "^3.5.33",
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.3",
-    "typescript": "^5.9.3",
-    "vite": "^7.3.1",
-    "vue-tsc": "^3.2.4"
+    "@vitejs/plugin-vue": "^6.0.6",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10",
+    "vue-tsc": "^3.2.7"
   }
 }
