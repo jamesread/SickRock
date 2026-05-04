@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import Calendar, { type CalendarEvent } from 'picocrank/vue/components/Calendar.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
+import ViewsButton from './ViewsButton.vue'
 
 const props = defineProps<{
   tableId: string
@@ -598,6 +599,12 @@ onMounted(load)
   <Section :title="sectionTitle" :padding="false" class="calendar-section">
     <template #toolbar>
       <div class="toolbar">
+        <ViewsButton
+          :table-id="props.tableId"
+          :show-view-create="true"
+          :show-view-edit="true"
+          @view-changed="(viewType: string) => emit('view-changed', viewType)"
+        />
         <button @click="goToToday" class="button neutral">Today</button>
         <button @click="prevMonth" class="button neutral">‹</button>
          <div class="date-picker-container">

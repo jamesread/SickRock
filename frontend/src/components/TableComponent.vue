@@ -233,18 +233,12 @@ async function loadTableViews() {
     const hasValidSelection = selectedViewId.value === -1 || (selectedViewId.value !== null && tableViews.value.some(v => v.id === selectedViewId.value))
 
     if (!hasValidSelection) {
-      // Emit view type change when views are loaded (only if we're setting a new default)
-      if (defaultView) {
-        emit('view-changed', defaultView.viewType)
-      }
-
       // Select the default view or first view
       if (defaultView) {
         selectedViewId.value = defaultView.id
       } else {
         // No views exist, use the default "All Columns" view
         selectedViewId.value = -1
-        emit('view-changed', 'table')
       }
     }
   } catch (error) {
