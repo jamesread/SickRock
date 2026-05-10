@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import Calendar, { type CalendarEvent } from 'picocrank/vue/components/Calendar.vue'
+import Calendar, {
+  type CalendarEvent,
+  type CalendarEventMoveRequest
+} from 'picocrank/vue/components/Calendar.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
 
@@ -46,10 +49,17 @@ const dayMenu = ref<{ visible: boolean; x: number; y: number; date: Date | null 
   date: null
 })
 
-// Quick add state
-const quickAdd = ref<{ visible: boolean; date: Date | null; name: string; icon: string }>({
+// Quick add state (`endDate` set when creating from a multi-day range selection)
+const quickAdd = ref<{
+  visible: boolean
+  date: Date | null
+  endDate: Date | null
+  name: string
+  icon: string
+}>({
   visible: false,
   date: null,
+  endDate: null,
   name: '',
   icon: ''
 })
@@ -66,6 +76,16 @@ const tableTitle = ref<string>('')
 // Check if table has icon field
 const hasIconField = computed(() => {
   return tableStructure.value?.fields?.some((f: any) => f.name === 'icon')
+})
+
+/** Picocrank calendar drag is global; only enable when the table can persist date changes. */
+const calendarEventDragEnabled = computed(() => {
+  const fields = tableStructure.value?.fields ?? []
+  return fields.some(
+    (f: { name: string; type: string }) =>
+      (f.name === 'calendar_date' && f.type === 'date') ||
+      (f.name === 'starts' && f.type === 'datetime')
+  )
 })
 
 // Computed property for the section title
@@ -118,6 +138,45 @@ function parseServerDateTime(dateStr: any): Date | null {
   )
 
   return isNaN(date.getTime()) ? null : date
+}
+
+function startOfDayLocal(d: Date): Date {
+  const x = new Date(d.getTime())
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+
+function endOfDayLocal(d: Date): Date {
+  const x = new Date(d.getTime())
+  x.setHours(23, 59, 59, 0)
+  return x
+}
+
+function shiftDateByCalendarDays(d: Date, deltaDays: number): Date {
+  const out = new Date(d.getTime())
+  out.setDate(out.getDate() + deltaDays)
+  return out
+}
+
+function toMysqlDate(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function toMysqlDateTime(d: Date): string {
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const seconds = String(d.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+function itemHasMovableDateData(item: Item): boolean {
+  return Boolean(getItemValue(item, 'calendar_date') || getItemValue(item, 'starts'))
 }
 
 // Convert SickRock items to CalendarEvents
@@ -325,6 +384,115 @@ function handleDateClick(date: Date) {
   }
 }
 
+/** Picocrank: drag across days then release; same-day selection also emits `date-click`. */
+function handleDateRangeSelect(start: Date, end: Date) {
+  const lo = startOfDayLocal(start)
+  const hi = startOfDayLocal(end)
+  if (lo.getTime() === hi.getTime()) {
+    return
+  }
+  quickAdd.value = {
+    visible: true,
+    date: new Date(lo),
+    endDate: new Date(hi),
+    name: '',
+    icon: ''
+  }
+  setTimeout(() => {
+    const input = document.querySelector('.quick-add-input') as HTMLInputElement
+    if (input) {
+      input.focus()
+    }
+  }, 100)
+}
+
+async function handleEventMoveRequest(payload: CalendarEventMoveRequest) {
+  const { event, sourceDate, targetDate, respond } = payload
+  const item = (event as { _originalItem?: Item })._originalItem
+  if (!item) {
+    respond(false)
+    return
+  }
+  if (!itemHasMovableDateData(item)) {
+    error.value =
+      'This event is shown from created time only; add `calendar_date` or `starts` to move it.'
+    respond(false)
+    return
+  }
+
+  try {
+    const structureRes =
+      tableStructure.value ?? (await client.getTableStructure({ pageId: props.tableId }))
+    if (!tableStructure.value) {
+      tableStructure.value = structureRes
+    }
+
+    const fields = structureRes.fields ?? []
+    const hasCalendarDateField = fields.some(
+      (f: { name: string; type: string }) => f.name === 'calendar_date' && f.type === 'date'
+    )
+    const hasStartsField = fields.some(
+      (f: { name: string; type: string }) => f.name === 'starts' && f.type === 'datetime'
+    )
+    const hasFinishesField = fields.some(
+      (f: { name: string; type: string }) => f.name === 'finishes' && f.type === 'datetime'
+    )
+
+    const deltaDays = Math.round(
+      (startOfDayLocal(targetDate).getTime() - startOfDayLocal(sourceDate).getTime()) /
+        (24 * 60 * 60 * 1000)
+    )
+    if (deltaDays === 0) {
+      respond(true)
+      return
+    }
+
+    const additionalFields: Record<string, string> = {}
+    const itemId = String(getItemValue(item, 'id'))
+    const calVal = getItemValue(item, 'calendar_date')
+    const startsVal = getItemValue(item, 'starts')
+    const finishesVal = getItemValue(item, 'finishes')
+
+    if (hasCalendarDateField && calVal) {
+      const parsed = parseServerDateTime(calVal)
+      if (!parsed) {
+        respond(false)
+        return
+      }
+      additionalFields.calendar_date = toMysqlDate(shiftDateByCalendarDays(parsed, deltaDays))
+    } else if (hasStartsField && startsVal) {
+      const startParsed = parseServerDateTime(startsVal)
+      if (!startParsed) {
+        respond(false)
+        return
+      }
+      additionalFields.starts = toMysqlDateTime(shiftDateByCalendarDays(startParsed, deltaDays))
+      if (hasFinishesField && finishesVal) {
+        const endParsed = parseServerDateTime(finishesVal)
+        if (endParsed) {
+          additionalFields.finishes = toMysqlDateTime(shiftDateByCalendarDays(endParsed, deltaDays))
+        }
+      }
+    } else {
+      error.value = 'This table has no date columns that can be updated for this item.'
+      respond(false)
+      return
+    }
+
+    await client.editItem({
+      pageId: props.tableId,
+      id: itemId,
+      additionalFields
+    })
+    await reloadItems()
+    respond(true)
+  } catch (e) {
+    console.error('Failed to move calendar event:', e)
+    error.value = `Failed to move item: ${e}`
+    respond(false)
+  }
+}
+
 function handleMonthChange(month: number, year: number) {
   currentMonth.value = month
   currentYear.value = year
@@ -345,6 +513,7 @@ function showQuickAdd(date: Date) {
   quickAdd.value = {
     visible: true,
     date: date,
+    endDate: null,
     name: '',
     icon: ''
   }
@@ -361,9 +530,63 @@ function hideQuickAdd() {
   quickAdd.value = {
     visible: false,
     date: null,
+    endDate: null,
     name: '',
     icon: ''
   }
+}
+
+/**
+ * Sets `calendar_date` and/or `starts`/`finishes` on `additionalFields` from quick-add state.
+ * @returns false if validation failed (`error` set)
+ */
+function appendQuickAddDateFields(
+  additionalFields: Record<string, string>,
+  structureRes: { fields?: Array<{ name: string; type: string }> }
+): boolean {
+  const fields = structureRes.fields ?? []
+  const hasCalendarDateField = fields.some(
+    (f: { name: string; type: string }) => f.name === 'calendar_date' && f.type === 'date'
+  )
+  const hasStartsField = fields.some(
+    (f: { name: string; type: string }) => f.name === 'starts' && f.type === 'datetime'
+  )
+  const hasFinishesField = fields.some(
+    (f: { name: string; type: string }) => f.name === 'finishes' && f.type === 'datetime'
+  )
+
+  const d0 = quickAdd.value.date
+  if (!d0) return false
+
+  const rangeEnd = quickAdd.value.endDate
+  const isRange = rangeEnd !== null
+
+  if (isRange) {
+    if (!hasStartsField || !hasFinishesField) {
+      error.value =
+        'Multi-day quick add requires `starts` and `finishes` datetime columns on this table.'
+      return false
+    }
+    additionalFields.starts = toMysqlDateTime(startOfDayLocal(d0))
+    additionalFields.finishes = toMysqlDateTime(endOfDayLocal(rangeEnd))
+    return true
+  }
+
+  if (hasCalendarDateField) {
+    additionalFields.calendar_date = toMysqlDate(d0)
+    return true
+  }
+  if (hasStartsField) {
+    const year = d0.getFullYear()
+    const month = String(d0.getMonth() + 1).padStart(2, '0')
+    const day = String(d0.getDate()).padStart(2, '0')
+    const hours = String(d0.getHours()).padStart(2, '0')
+    const minutes = String(d0.getMinutes()).padStart(2, '0')
+    const seconds = String(d0.getSeconds()).padStart(2, '0')
+    additionalFields.starts = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+    return true
+  }
+  return true
 }
 
 async function saveItem() {
@@ -381,29 +604,9 @@ async function saveItem() {
       additionalFields.icon = quickAdd.value.icon.trim()
     }
 
-    // Add calendar_date field if it exists in the table structure
     const structureRes = await client.getTableStructure({ pageId: props.tableId })
-    const hasCalendarDateField = structureRes.fields?.some(f => f.name === 'calendar_date' && f.type === 'date')
-
-    if (hasCalendarDateField) {
-      // Convert to MySQL date format (YYYY-MM-DD)
-      const year = quickAdd.value.date.getFullYear()
-      const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
-      const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
-      additionalFields.calendar_date = `${year}-${month}-${day}`
-    } else {
-      // Fallback to starts field if calendar_date doesn't exist
-      const hasStartsField = structureRes.fields?.some(f => f.name === 'starts' && f.type === 'datetime')
-      if (hasStartsField) {
-        // Convert to MySQL datetime format
-        const year = quickAdd.value.date.getFullYear()
-        const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
-        const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
-        const hours = String(quickAdd.value.date.getHours()).padStart(2, '0')
-        const minutes = String(quickAdd.value.date.getMinutes()).padStart(2, '0')
-        const seconds = String(quickAdd.value.date.getSeconds()).padStart(2, '0')
-        additionalFields.starts = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-      }
+    if (!appendQuickAddDateFields(additionalFields, structureRes)) {
+      return
     }
 
     await client.createItem({
@@ -439,29 +642,9 @@ async function saveAndEdit() {
       additionalFields.icon = quickAdd.value.icon.trim()
     }
 
-    // Add calendar_date field if it exists in the table structure
     const structureRes = await client.getTableStructure({ pageId: props.tableId })
-    const hasCalendarDateField = structureRes.fields?.some(f => f.name === 'calendar_date' && f.type === 'date')
-
-    if (hasCalendarDateField) {
-      // Convert to MySQL date format (YYYY-MM-DD)
-      const year = quickAdd.value.date.getFullYear()
-      const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
-      const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
-      additionalFields.calendar_date = `${year}-${month}-${day}`
-    } else {
-      // Fallback to starts field if calendar_date doesn't exist
-      const hasStartsField = structureRes.fields?.some(f => f.name === 'starts' && f.type === 'datetime')
-      if (hasStartsField) {
-        // Convert to MySQL datetime format
-        const year = quickAdd.value.date.getFullYear()
-        const month = String(quickAdd.value.date.getMonth() + 1).padStart(2, '0')
-        const day = String(quickAdd.value.date.getDate()).padStart(2, '0')
-        const hours = String(quickAdd.value.date.getHours()).padStart(2, '0')
-        const minutes = String(quickAdd.value.date.getMinutes()).padStart(2, '0')
-        const seconds = String(quickAdd.value.date.getSeconds()).padStart(2, '0')
-        additionalFields.starts = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-      }
+    if (!appendQuickAddDateFields(additionalFields, structureRes)) {
+      return
     }
 
     const res = await client.createItem({
@@ -621,12 +804,15 @@ onMounted(load)
         :current-month="currentMonth"
         :show-navigation="false"
         :current-year="currentYear"
+        :event-drag-enabled="calendarEventDragEnabled"
         :get-event-date-range="getEventDateRange"
         :format-event-time="formatEventTime"
         @event-click="handleEventClick"
         @date-click="handleDateClick"
+        @date-range-select="handleDateRangeSelect"
         @month-change="handleMonthChange"
         @event-context-menu="handleEventContextMenu"
+        @event-move-request="handleEventMoveRequest"
       >
         <template #event="{ event, date, position }">
           <div class="event-content" :title="getEventTooltip(event)">
@@ -716,7 +902,12 @@ onMounted(load)
       <div class="quick-add-content">
         <h3>Quick Add Item</h3>
         <p class="quick-add-date">
-          {{ quickAdd.date?.toLocaleDateString() }}
+          <template v-if="quickAdd.endDate && quickAdd.date">
+            {{ quickAdd.date.toLocaleDateString() }} – {{ quickAdd.endDate.toLocaleDateString() }}
+          </template>
+          <template v-else>
+            {{ quickAdd.date?.toLocaleDateString() }}
+          </template>
         </p>
         <div class="quick-add-form">
           <input
