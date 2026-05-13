@@ -319,8 +319,12 @@ func main() {
 		c.File(filepath.Join(frontendDir, "index.html"))
 	})
 
+	addr := ":" + cfg.Port
 	logListenPort(cfg.Port)
-	router.Run(":" + cfg.Port)
+	if err := router.Run(addr); err != nil {
+		log.WithError(err).WithField("addr", addr).Errorf("failed to listen or serve HTTP: %v", err)
+		os.Exit(1)
+	}
 }
 
 func runMigrations(db *sqlx.DB) error {

@@ -11,6 +11,7 @@ import (
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
+	log "github.com/sirupsen/logrus"
 )
 
 const envPrefix = "SICKROCK_"
@@ -51,18 +52,41 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Port:      coalesce(k.String("port"), os.Getenv("PORT"), "8080"),
-		LogLevel:  coalesce(k.String("log_level"), os.Getenv("LOG_LEVEL"), "info"),
-		LogFormat: coalesce(k.String("log_format"), os.Getenv("LOG_FORMAT"), "text"),
+		Port: coalesceString("port", []stringCandidate{
+			{`koanf key "port" (SICKROCK_PORT env and/or config.yaml, env loaded before file)`, k.String("port")},
+			{"PORT env", os.Getenv("PORT")},
+			{"default", "8080"},
+		}),
+		LogLevel: coalesceString("log_level", []stringCandidate{
+			{`koanf key "log_level" (SICKROCK_LOG_LEVEL env and/or config.yaml, env loaded before file)`, k.String("log_level")},
+			{"LOG_LEVEL env", os.Getenv("LOG_LEVEL")},
+			{"default", "info"},
+		}),
+		LogFormat: coalesceString("log_format", []stringCandidate{
+			{`koanf key "log_format" (SICKROCK_LOG_FORMAT env and/or config.yaml, env loaded before file)`, k.String("log_format")},
+			{"LOG_FORMAT env", os.Getenv("LOG_FORMAT")},
+			{"default", "text"},
+		}),
 		ConfigDir: dir,
 	}
 	return cfg, nil
 }
 
-func coalesce(values ...string) string {
-	for _, v := range values {
-		if v != "" {
-			return v
+type stringCandidate struct {
+	source string
+	value  string
+}
+
+// coalesceString returns the first non-empty candidate.value and logs which source won.
+func coalesceString(key string, candidates []stringCandidate) string {
+	for _, c := range candidates {
+		if c.value != "" {
+			log.WithFields(log.Fields{
+				"config_key":    key,
+				"config_source": c.source,
+				"config_value":  c.value,
+			}).Info("resolved config setting")
+			return c.value
 		}
 	}
 	return ""
