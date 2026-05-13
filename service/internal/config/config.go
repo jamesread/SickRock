@@ -53,7 +53,7 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Port: coalesceString("port", []stringCandidate{
-			{`koanf key "port" (SICKROCK_PORT env and/or config.yaml, env loaded before file)`, k.String("port")},
+			{`koanf key "port" (SICKROCK_PORT env and/or config.yaml, env loaded before file)`, k.String("listen_port")},
 			{"PORT env", os.Getenv("PORT")},
 			{"default", "8080"},
 		}),
