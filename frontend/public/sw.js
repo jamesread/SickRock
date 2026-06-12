@@ -1,5 +1,5 @@
 // Derive cache names that are scoped per deployment path to avoid collisions
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const SCOPE_PATH = (() => {
   try {
     const scopeUrl = new URL(self.registration.scope);
@@ -34,9 +34,26 @@ const EXCLUDED_ROUTES = [
   '/device-code-claimer'
 ];
 
+// Paths that must always be fetched from the network (never cached or SPA-fallback)
+const BYPASS_PATHS = [
+  '/llms.txt',
+  '/openapi.json',
+  '/openapi',
+];
+
+// Check if a URL should bypass the service worker entirely
+function shouldBypass(url) {
+  const urlPath = new URL(url).pathname;
+  return BYPASS_PATHS.includes(urlPath);
+}
+
 // Check if a URL should be cached
 function shouldCache(url) {
   const urlPath = new URL(url).pathname;
+
+  if (shouldBypass(url)) {
+    return false;
+  }
 
   // Don't cache excluded routes
   if (EXCLUDED_ROUTES.some(route => urlPath.startsWith(route))) {
@@ -158,6 +175,11 @@ self.addEventListener('fetch', (event) => {
   }
 
   const url = new URL(event.request.url);
+
+  // Always fetch from network; never cache or serve SPA fallback for these paths
+  if (shouldBypass(event.request.url)) {
+    return;
+  }
 
   // Don't cache API requests - table data is handled via IndexedDB
   if (url.pathname.startsWith('/api/')) {
