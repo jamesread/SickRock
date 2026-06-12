@@ -37,6 +37,9 @@ import (
 //go:embed gen/openapi.json
 var openAPISpec []byte
 
+//go:embed llms.txt
+var llmsTxt []byte
+
 func ginLogrusLogger() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		log.WithFields(log.Fields{
@@ -270,6 +273,12 @@ func main() {
 	router.GET("/openapi", func(c *gin.Context) {
 		c.Header("Content-Type", "application/json")
 		c.Data(http.StatusOK, "application/json", openAPISpec)
+	})
+
+	// llms.txt for LLM and agent discovery at the site root
+	router.GET("/llms.txt", func(c *gin.Context) {
+		c.Header("Content-Type", "text/plain; charset=utf-8")
+		c.Data(http.StatusOK, "text/plain; charset=utf-8", llmsTxt)
 	})
 
 	// MCP (Model Context Protocol) endpoint at /mcp — same auth as Connect API (session or API key)

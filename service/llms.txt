@@ -1,0 +1,26 @@
+# SickRock
+
+> No-code database web application builder for real databases. Integrate via the Connect RPC API, OpenAPI spec, or MCP server.
+
+SickRock exposes machine-readable integration endpoints on the same base URL as the web application.
+
+Both MCP clients and API clients must authenticate with a Bearer token (API key) in the `Authorization` header:
+
+`Authorization: Bearer <api-key>`
+
+Create API keys in the SickRock UI (Settings → API Keys). The MCP server and Connect API use the same authentication.
+
+## API
+
+- [Connect RPC API](/api): SickRock Connect/gRPC-over-HTTP API (prefix `/api`)
+- [OpenAPI spec](/openapi): OpenAPI 3.1 JSON description of the Connect RPC API
+
+## MCP
+
+- [MCP server](/mcp): Model Context Protocol (Streamable HTTP) endpoint for AI assistants and agents
+
+## Documentation
+
+- [GitHub repository](https://github.com/jamesread/SickRock): Source code, issues, and releases
+- [README](https://github.com/jamesread/SickRock#readme): Project overview and setup
+- [AGENTS.md](https://github.com/jamesread/SickRock/blob/main/AGENTS.md): AI agent integration guide and MCP tool reference
