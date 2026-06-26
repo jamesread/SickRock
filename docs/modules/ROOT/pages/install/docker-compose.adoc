@@ -1,0 +1,51 @@
+= Installation via Docker Compose
+
+Using Docker Compose is the recommended way to run SickRock. The container image is published to GitHub Container Registry.
+
+.docker-compose.yml
+[source,yaml]
+----
+---
+services:
+  sickrock:
+    container_name: SickRock
+    image: ghcr.io/jamesread/sickrock:latest
+    volumes:
+      - sickrock-config:/config
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+
+volumes:
+  sickrock-config:
+    name: sickrock-config
+    external: false
+----
+
+Save this `docker-compose.yml` in a directory of your choice, then start SickRock:
+
+[source,bash]
+----
+docker compose up -d
+----
+
+Open `http://localhost:8080` in your web browser.
+
+== Configuration
+
+SickRock reads configuration from the `/config` volume. You can place a `config.yaml` file there and set environment variables prefixed with `SICKROCK_` (for example `SICKROCK_PORT`).
+
+== Next steps
+
+If you see the SickRock web interface, proceed to the xref:getting-started.adoc[Getting Started Guide].
+
+== Troubleshooting
+
+* Ensure Docker and Docker Compose are installed and running.
+* Check container logs:
++
+[source,bash]
+----
+docker compose logs sickrock
+----
+* Visit xref:support.adoc[Support] for community help.

@@ -1,0 +1,28 @@
+= Connect API and OpenAPI
+
+SickRock serves a Connect RPC API (gRPC-over-HTTP) and publishes an OpenAPI specification for the same surface.
+
+== Connect RPC
+
+* Base path: `/api`
+* Protocol: Connect (compatible with gRPC clients and HTTP JSON)
+
+Generate client code from the protobuf definitions in the `proto/` directory, or call endpoints directly over HTTP.
+
+== OpenAPI
+
+* Spec URL: `/openapi`
+* Format: OpenAPI 3.1 JSON
+
+Use the OpenAPI spec to generate clients, explore endpoints in Swagger UI-compatible tools, or feed LLM context via the application's `llms.txt` discovery file.
+
+== Authentication
+
+All requests require an API key as a Bearer token:
+
+[source]
+----
+Authorization: Bearer <api-key>
+----
+
+Create keys in **Settings → API Keys** in the SickRock UI.

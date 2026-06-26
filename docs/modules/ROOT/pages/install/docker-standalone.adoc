@@ -1,0 +1,16 @@
+= Docker (Standalone)
+
+[source,bash]
+----
+docker pull ghcr.io/jamesread/sickrock:latest
+docker run \
+  --name SickRock \
+  -v sickrock-config:/config \
+  -p 8080:8080 \
+  --restart unless-stopped \
+  ghcr.io/jamesread/sickrock:latest
+----
+
+Open `http://localhost:8080` in your web browser.
+
+See xref:install/docker-compose.adoc[Docker Compose] for the recommended installation approach.

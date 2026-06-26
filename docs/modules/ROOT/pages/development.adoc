@@ -1,0 +1,46 @@
+= Development
+
+Build SickRock from source when you want to contribute or run unreleased changes.
+
+== Prerequisites
+
+* Go (see `service/go.mod` for the required version)
+* Node.js and npm (for the Vue frontend)
+* `make`
+
+== Build
+
+From the repository root:
+
+[source,bash]
+----
+make all
+----
+
+This generates protobuf code, builds the frontend, and compiles the Go service binary.
+
+== Run locally
+
+[source,bash]
+----
+make service-run
+----
+
+The service listens on port `8080` by default. Override with `SICKROCK_PORT` or a `config.yaml` in your config directory (see `-configdir` flag).
+
+== Other targets
+
+[source,bash]
+----
+make lint          # proto and service lint
+make service-test  # Go tests
+make frontend-build
+make docs          # build Antora documentation
+----
+
+== Project layout
+
+* `service/` — Go backend (Connect/gRPC API, MCP server)
+* `frontend/` — Vue.js 3 TypeScript UI
+* `proto/` — Protobuf definitions
+* `docs/` — Antora documentation (this site)

@@ -1,0 +1,27 @@
+---
+site:
+  title: SickRock docs
+  url: https://jamesread.github.io/SickRock/
+  start_page: ROOT::index.adoc
+  robots: allow
+content:
+  sources:
+    - url: .
+      start_paths: docs
+      branches: [ main ]
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+  supplemental_files: ./docs/theme-supplemental/
+antora:
+  extensions:
+    - '@antora/lunr-extension'
+    - '@cerbos/antora-llm-generator'
+asciidoc:
+  attributes:
+    kroki-fetch-diagram: true
+    kroki-default-format: png
+  extensions:
+    - '@asciidoctor/tabs'
+    - 'asciidoctor-kroki'

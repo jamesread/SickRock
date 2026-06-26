@@ -1,0 +1,31 @@
+= Integration
+
+SickRock exposes machine-readable integration endpoints on the same base URL as the web application.
+
+All API and MCP clients authenticate with a Bearer token (API key) in the `Authorization` header:
+
+[source]
+----
+Authorization: Bearer <api-key>
+----
+
+Create API keys in the SickRock UI (**Settings → API Keys**).
+
+== Endpoints
+
+[cols="1,2",options="header"]
+|===
+| Endpoint | Description
+
+| `/api`
+| Connect RPC (gRPC-over-HTTP) API
+
+| `/openapi`
+| OpenAPI 3.1 JSON description of the Connect API
+
+| `/mcp`
+| Model Context Protocol (Streamable HTTP) for AI assistants
+|===
+
+* xref:integration/mcp.adoc[MCP Server]
+* xref:integration/api.adoc[Connect API and OpenAPI]

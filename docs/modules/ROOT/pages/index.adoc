@@ -1,0 +1,14 @@
+= SickRock
+
+**Build no-code database web applications on real databases.**
+
+SickRock is a Go and Vue reimplementation of the Sicroc LAMP-stack application. Connect it to SQLite or MySQL, configure tables and views in the UI, and expose data through the web interface, Connect RPC API, OpenAPI spec, or MCP server.
+
+* xref:install/docker-compose.adoc[Installation Guide].
+* xref:getting-started.adoc[Getting Started Guide].
+
+This documentation site is llm.txt compatible. See https://jamesread.github.io/SickRock/llm.txt[llm.txt] and https://jamesread.github.io/SickRock/llm-full.txt[llm-full.txt].
+
+== Vibe coded project
+
+SickRock is deliberately "vibe coded" as an experiment in AI-assisted development. Most of the code is human reviewed, but it is not human written in the traditional sense. See the https://github.com/jamesread/SickRock[GitHub repository] for the full disclosure in the README.

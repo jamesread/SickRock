@@ -1,4 +1,4 @@
-.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview lint icons icons-clean
+.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview lint icons icons-clean docs
 
 all: proto-generate frontend-build service-build
 
@@ -70,3 +70,7 @@ icons-clean:
 	@echo "Cleaning generated icons..."
 	@rm -f $(foreach size,$(ICON_SIZES),$(ICON_DIR)/icon-$(size)x$(size).png)
 	@echo "Icons cleaned."
+
+docs:
+	$(MAKE) -wC docs
+	./docs/node_modules/.bin/antora antora-playbook.yml

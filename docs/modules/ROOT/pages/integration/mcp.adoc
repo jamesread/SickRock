@@ -1,0 +1,37 @@
+= MCP Server
+
+SickRock exposes an https://modelcontextprotocol.io[MCP] server as an HTTP endpoint on the same base URL as the application.
+
+== Endpoint
+
+* `GET/POST /mcp` — MCP Streamable HTTP transport
+
+== Authentication
+
+Use the same API key as the Connect API. Pass it as a Bearer token:
+
+[source]
+----
+Authorization: Bearer <api-key>
+----
+
+== Cursor configuration
+
+In Cursor MCP settings, use HTTP transport with your SickRock base URL plus `/mcp`, and set the API key per your client's documentation. No separate MCP binary is required when SickRock is reachable over HTTP.
+
+== Available tools
+
+The MCP server exposes tools including:
+
+* `sickrock_ping`
+* `sickrock_get_navigation`
+* `sickrock_get_table_configurations`
+* `sickrock_get_database_tables`
+* `sickrock_get_table_structure`
+* `sickrock_list_items`
+* `sickrock_get_item`
+* `sickrock_create_item`
+* `sickrock_edit_item`
+* `sickrock_delete_item`
+
+See https://github.com/jamesread/SickRock/blob/main/AGENTS.md[AGENTS.md] in the repository for full agent integration guidance.

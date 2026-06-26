@@ -1,4 +1,5 @@
 dist/
+build/
 /SickRock
 service/tmp
 service/SickRock

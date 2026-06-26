@@ -1,0 +1,10 @@
+* xref:index.adoc[Introduction]
+* Installation Guide
+** xref:install/docker-compose.adoc[Docker Compose]
+** xref:install/docker-standalone.adoc[Docker (Standalone)]
+* xref:getting-started.adoc[Getting Started]
+* xref:development.adoc[Development]
+* xref:integration/index.adoc[Integration]
+** xref:integration/mcp.adoc[MCP Server]
+** xref:integration/api.adoc[Connect API]
+* xref:support.adoc[Support]

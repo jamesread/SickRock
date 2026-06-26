@@ -1,0 +1,29 @@
+= Getting Started
+
+Once SickRock is xref:install/docker-compose.adoc[installed and running], open the web UI in your browser (by default at `http://localhost:8080`).
+
+== Connect a database
+
+SickRock works on top of real databases. From the UI you can:
+
+* Add a SQLite or MySQL database connection
+* Browse existing tables and their structure
+* Create table configurations that define how data appears in the UI
+
+== Configure tables and views
+
+For each table you want to expose:
+
+* Define column visibility, ordering, and display options
+* Create table views for different use cases (list, form, dashboard)
+* Set up navigation so users can browse your application
+
+== Create API keys
+
+To integrate external tools or AI assistants, create an API key from **Settings → API Keys**. The same key works for the Connect RPC API, OpenAPI clients, and the xref:integration/mcp.adoc[MCP server].
+
+== Next steps
+
+* xref:development.adoc[Development] — build and run SickRock from source
+* xref:integration/index.adoc[Integration] — MCP, Connect API, and OpenAPI
+* xref:support.adoc[Support] — community help and issue reporting
