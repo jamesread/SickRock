@@ -10,20 +10,20 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@connectrpc/connect": "^2.1.1",
-    "@connectrpc/connect-web": "^2.1.1",
-    "@tailwindcss/postcss": "^4.2.4",
+    "@connectrpc/connect": "^2.1.2",
+    "@connectrpc/connect-web": "^2.1.2",
+    "@tailwindcss/postcss": "^4.3.2",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
-    "picocrank": "^1.15.0",
+    "picocrank": "^1.18.3",
     "pinia": "^3.0.4",
-    "vite-plugin-mkcert": "^2.0.0",
-    "vue": "^3.5.33",
-    "vue-router": "^5.0.6"
+    "vite-plugin-mkcert": "^2.1.0",
+    "vue": "^3.5.39",
+    "vue-router": "^5.1.0"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^6.0.6",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.10",
-    "vue-tsc": "^3.2.7"
+    "@vitejs/plugin-vue": "^6.0.7",
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4",
+    "vue-tsc": "^3.3.7"
   }
 }

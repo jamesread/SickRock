@@ -74,6 +74,70 @@ const currentYear = ref(new Date().getFullYear())
 const tableStructure = ref<any>(null)
 const tableTitle = ref<string>('')
 
+type ConditionalFormattingRule = {
+  columnName: string
+  conditionType: string
+  conditionValue: string
+  formatType: string
+  formatValue: string
+  priority: number
+  isActive: boolean
+}
+
+const conditionalFormattingRules = ref<ConditionalFormattingRule[]>([])
+
+async function loadConditionalFormattingRules() {
+  try {
+    const response = await client.getConditionalFormattingRules({ tableName: props.tableId })
+    conditionalFormattingRules.value = response.rules.map(rule => ({
+      columnName: rule.columnName,
+      conditionType: rule.conditionType,
+      conditionValue: rule.conditionValue,
+      formatType: rule.formatType,
+      formatValue: rule.formatValue,
+      priority: rule.priority,
+      isActive: rule.isActive
+    }))
+  } catch (err) {
+    console.error('Error loading conditional formatting rules:', err)
+    conditionalFormattingRules.value = []
+  }
+}
+
+function ruleConditionMatches(rule: ConditionalFormattingRule, cellValue: unknown): boolean {
+  const content = cellValue == null ? '' : String(cellValue)
+
+  switch (rule.conditionType) {
+    case 'always':
+      return true
+    case 'equals':
+      return content === rule.conditionValue
+    case 'contains':
+      return content.toLowerCase().includes(rule.conditionValue.toLowerCase())
+    case 'greater_than':
+      return Number(content) > Number(rule.conditionValue)
+    case 'less_than':
+      return Number(content) < Number(rule.conditionValue)
+    default:
+      return false
+  }
+}
+
+/** Highest-priority matching background-color rule for calendar events (picocrank `color` prop). */
+function getItemEventColor(item: Item): string | undefined {
+  const applicableRules = conditionalFormattingRules.value
+    .filter(rule => rule.isActive && rule.formatType === 'color')
+    .sort((a, b) => b.priority - a.priority)
+
+  let color: string | undefined
+  for (const rule of applicableRules) {
+    if (ruleConditionMatches(rule, getItemValue(item, rule.columnName))) {
+      color = rule.formatValue
+    }
+  }
+  return color
+}
+
 // Check if table has icon field
 const hasIconField = computed(() => {
   return tableStructure.value?.fields?.some((f: any) => f.name === 'icon')
@@ -212,6 +276,7 @@ const calendarEvents = computed<CalendarEvent[]>(() => {
       startDate,
       endDate,
       date,
+      color: getItemEventColor(item),
       _originalItem: item // Keep reference to original item for callbacks
     }
   })
@@ -294,6 +359,10 @@ async function reloadItems() {
     if (!tableStructure.value) {
       const structureRes = await client.getTableStructure({ pageId: props.tableId })
       tableStructure.value = structureRes
+    }
+
+    if (conditionalFormattingRules.value.length === 0) {
+      await loadConditionalFormattingRules()
     }
 
     // Load table configuration title
@@ -788,6 +857,7 @@ onMounted(load)
           :show-view-edit="true"
           @view-changed="(viewType: string) => emit('view-changed', viewType)"
         />
+        <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
         <button @click="goToToday" class="button neutral">Today</button>
         <button @click="prevMonth" class="button neutral">‹</button>
          <div class="date-picker-container">
