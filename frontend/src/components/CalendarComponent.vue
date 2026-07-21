@@ -881,6 +881,7 @@ onMounted(load)
         :current-month="currentMonth"
         :show-navigation="false"
         :current-year="currentYear"
+        :short-month-suffix="true"
         :event-drag-enabled="calendarEventDragEnabled"
         :get-event-date-range="getEventDateRange"
         :format-event-time="formatEventTime"
