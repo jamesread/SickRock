@@ -2,7 +2,7 @@
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
-import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, UserIcon, CheckmarkSquare03Icon, SearchIcon, BookmarkIcon, QuestionIcon, CheckListIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, CheckmarkSquare03Icon, BookmarkIcon, QuestionIcon, CheckListIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
 import { createApiClient } from './stores/api'
 import Header from 'picocrank/vue/components/Header.vue'
 import logo from './resources/images/logo.png'
@@ -45,8 +45,8 @@ router.afterEach(() => {
     isSidebarOpen.value = false
     if (sidebar.value) sidebar.value.close()
     persistSidebarState()
-    // Close QuickSearch dialog when navigation occurs (e.g., item selected)
-    showQuickSearchDialog.value = false
+    // Close QuickSearch when navigation occurs (e.g., item selected)
+    quickSearch.value?.close?.()
     // Check if current page can be bookmarked
     checkCanBookmarkCurrentPage()
 })
@@ -148,9 +148,6 @@ const pinnedWorkflowItems = ref<Array<{ id: number; title: string; path: string;
 // Toggle state for bookmark dropdown
 const showBookmarks = ref(false)
 
-// QuickSearch dialog visibility
-const showQuickSearchDialog = ref(false)
-
 // Keyboard shortcuts state
 const showShortcutsHelp = ref(false)
 const gKeyPressed = ref(false)
@@ -250,9 +247,9 @@ function populateQuickSearchItems() {
         title: 'Keyboard Shortcuts',
         description: 'View all available keyboard shortcuts (g then ?)',
         category: 'Help',
-        path: '#keyboard-shortcuts',
-        type: 'action',
-        icon: QuestionIcon
+        type: 'callback',
+        icon: QuestionIcon,
+        callback: () => { showShortcutsHelp.value = true }
     })
 
     // Add admin/system items
@@ -636,15 +633,6 @@ watch(appTitle, (newTitle, oldTitle) => {
     }
 })
 
-// Watch for keyboard shortcuts navigation from QuickSearch
-watch(() => router.currentRoute.value.hash, (hash) => {
-    if (hash === '#keyboard-shortcuts') {
-        showShortcutsHelp.value = true
-        // Remove the hash from URL
-        router.replace({ ...router.currentRoute.value, hash: '' })
-    }
-})
-
 // Watch for bookmarks dialog opening to check if current page can be bookmarked
 watch(showBookmarks, async (isOpen) => {
     if (isOpen) {
@@ -654,22 +642,10 @@ watch(showBookmarks, async (isOpen) => {
 
 // Watch for QuickSearch component becoming available and populate it
 watch(quickSearch, (newValue) => {
-    if (newValue && navResponse && pages.value.length > 0) {
+    if (newValue && navResponse) {
         populateQuickSearchItems()
     }
 }, { immediate: true })
-
-// Watch for QuickSearch dialog opening and ensure items are populated
-watch(showQuickSearchDialog, (isOpen) => {
-    if (isOpen) {
-        // Use nextTick to ensure component is mounted
-        nextTick(() => {
-            if (quickSearch.value && navResponse) {
-                populateQuickSearchItems()
-            }
-        })
-    }
-})
 
 // Bookmark management
 const currentRoute = computed(() => router.currentRoute.value)
@@ -813,23 +789,13 @@ async function removeBookmark(bookmarkId: number) {
     }
 }
 
-function toggleToolbarView() {
-    // Use the toolbar button purely as a search trigger
-    focusQuickSearch()
-}
-
 // Keyboard shortcuts handlers
 function focusQuickSearch() {
-    // Ensure the QuickSearch dialog is visible, then focus its input
-    showQuickSearchDialog.value = true
-    nextTick(() => {
-        const searchInput = document.querySelector('.quick-search input, [class*="quick-search"] input') as HTMLInputElement
-        if (searchInput) {
-            searchInput.focus()
-        } else if (quickSearch.value && typeof (quickSearch.value as any).focus === 'function') {
-            (quickSearch.value as any).focus()
-        }
-    })
+    quickSearch.value?.open?.()
+}
+
+function goToUserControlPanel() {
+    router.push('/user-control-panel')
 }
 
 function openQuickAdd() {
@@ -903,7 +869,7 @@ function handleNavigationKey(key: string) {
     if (!gKeyPressed.value) {
         // If 'g' wasn't pressed, handle as regular key
         if (key === 'b') {
-            toggleToolbarView()
+            focusQuickSearch()
         }
         return
     }
@@ -1167,18 +1133,18 @@ onMounted(async () => {
         :logoUrl = "logo"
         :username = "user?.username"
         @toggleSidebar = "toggleSidebar"
+        @userClick = "goToUserControlPanel"
         v-if="isAuthenticated">
 
         <template #toolbar>
             <div class="toolbar-content">
-                <!-- Search Button -->
-                <button
-                    @click="toggleToolbarView"
-                    class="toolbar-toggle-button"
-                    title="Search"
-                >
-                    <HugeiconsIcon :icon="Hugeicons.SearchIcon" />
-                </button>
+                <QuickSearch
+                    ref="quickSearch"
+                    placeholder="Search..."
+                    :search-fields="['title', 'name', 'description']"
+                    :auto-import-routes="false"
+                    :enable-global-shortcut="false"
+                />
 
                 <!-- Pinned workflow quick links, styled like bookmarks -->
                 <div v-if="pinnedWorkflowItems.length" class="pinned-workflow-toolbar">
@@ -1212,42 +1178,31 @@ onMounted(async () => {
                     </div>
                 </div>
 
+                <button
+                    v-if="isInstallable && !isInstalled"
+                    @click="handlePWAInstall"
+                    :disabled="installingPWA"
+                    class="neutral pwa-install-header-button"
+                    :title="installingPWA ? 'Installing...' : 'Install App'"
+                >
+                    <HugeiconsIcon :icon="Hugeicons.Download01Icon" width="1em" height="1em" />
+                </button>
+                <button
+                    @click="showShortcutsHelp = true"
+                    class="neutral help-button"
+                    title="Keyboard Shortcuts (g then ?)"
+                >
+                    <HugeiconsIcon :icon="Hugeicons.QuestionIcon" width="1em" height="1em" />
+                </button>
+                <button
+                    @click="showBookmarks = !showBookmarks"
+                    class="neutral bookmark-button"
+                    :class="{ 'bookmarked': isCurrentPageBookmarked }"
+                    :title="isCurrentPageBookmarked ? 'Remove bookmark' : 'Add bookmark'"
+                >
+                    <HugeiconsIcon :icon="Hugeicons.CheckmarkSquare03Icon" width="1em" height="1em" />
+                </button>
             </div>
-        </template>
-
-        <template #user-info>
-            <button
-                v-if="isInstallable && !isInstalled"
-                @click="handlePWAInstall"
-                :disabled="installingPWA"
-                class="pwa-install-header-button"
-                :title="installingPWA ? 'Installing...' : 'Install App'"
-            >
-                <HugeiconsIcon :icon="Hugeicons.Download01Icon" />
-            </button>
-            <button
-                @click="showShortcutsHelp = true"
-                class="help-button"
-                title="Keyboard Shortcuts (g then ?)"
-            >
-                <HugeiconsIcon :icon="Hugeicons.QuestionIcon" />
-            </button>
-            <button
-                @click="showBookmarks = !showBookmarks"
-                class="bookmark-button"
-                :class="{ 'bookmarked': isCurrentPageBookmarked }"
-                :title="isCurrentPageBookmarked ? 'Remove bookmark' : 'Add bookmark'"
-            >
-                <HugeiconsIcon :icon="Hugeicons.CheckmarkSquare03Icon" />
-            </button>
-            <router-link
-                to="/user-control-panel"
-                class="user-preferences-button"
-                title="User Control Panel"
-            >
-                <HugeiconsIcon :icon="Hugeicons.UserIcon" />
-                <span class="username-text">{{ user?.username }}</span>
-            </router-link>
         </template>
     </Header>
 
@@ -1286,24 +1241,6 @@ onMounted(async () => {
         </div>
         </Navigation>
     </template>
-
-    <!-- QuickSearch Dialog -->
-    <div
-        v-if="showQuickSearchDialog"
-        class="modal-overlay"
-        @click="showQuickSearchDialog = false"
-        @keydown.escape="showQuickSearchDialog = false"
-        tabindex="0"
-    >
-        <div class="modal-content quicksearch-modal" @click.stop>
-            <div class="modal-body">
-                <QuickSearch
-                    ref="quickSearch"
-                    :search-fields="['title', 'name', 'description']"
-                />
-            </div>
-        </div>
-    </div>
 
     <!-- Bookmarks Dialog -->
     <div
@@ -1398,152 +1335,22 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.help-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: transparent;
-    color: white;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-right: 0.5rem;
-}
-
-.help-button:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    transform: translateY(-1px);
-}
-
-.bookmark-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: transparent;
-    color: white;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-right: 0.5rem;
-}
-
-.bookmark-button:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    transform: translateY(-1px);
-}
-
-.pwa-install-header-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: transparent;
-    color: white;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    margin-right: 0.5rem;
-}
-
-.pwa-install-header-button:hover:not(:disabled) {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    transform: translateY(-1px);
-}
-
 .pwa-install-header-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
 .bookmark-button.bookmarked {
-    background: rgba(40, 167, 69, 0.2);
     color: #28a745;
-    border-color: rgba(40, 167, 69, 0.3);
-}
-
-.bookmark-button.bookmarked:hover {
-    background: rgba(40, 167, 69, 0.3);
-    border-color: rgba(40, 167, 69, 0.4);
-    transform: translateY(-1px);
-}
-
-.user-preferences-button {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
-    background: transparent;
-    color: white;
-    text-decoration: none;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-}
-
-.user-preferences-button .username-text {
-    display: inline;
-}
-
-.user-preferences-button:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    text-decoration: none;
-    transform: translateY(-1px);
-}
-
-.user-preferences-button:focus {
-    outline: 2px solid #007bff;
-    outline-offset: 2px;
 }
 
 /* Toolbar Styles */
 .toolbar-content {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+    display: inline-flex;
+    align-self: stretch;
+    align-items: stretch;
+    gap: 0.25rem;
     position: relative;
-}
-
-.toolbar-toggle-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    padding: 0;
-    background: transparent;
-    color: white;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.toolbar-toggle-button:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    color: white;
-    transform: translateY(-1px);
 }
 
 .bookmarks-toolbar {
@@ -1686,24 +1493,6 @@ onMounted(async () => {
     padding-top: 0;
 }
 
-.quicksearch-modal {
-    max-width: 600px;
-}
-
-.quicksearch-modal .modal-body {
-    padding: 0;
-}
-
-.quicksearch-modal :deep(.quick-search),
-.quicksearch-modal :deep([class*="quick-search"]) {
-    width: 100%;
-}
-
-.quicksearch-modal :deep(input) {
-    width: 100%;
-    box-sizing: border-box;
-}
-
 .bookmarks-modal .bookmarks-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -1795,10 +1584,6 @@ onMounted(async () => {
     align-items: center;
     justify-content: center;
     gap: 8px;
-}
-
-.search-toolbar {
-    flex: 1;
 }
 
 /* G Key Overlay */
@@ -1910,14 +1695,6 @@ onMounted(async () => {
 
     .help-button {
         display: none;
-    }
-
-    .user-preferences-button .username-text {
-        display: none;
-    }
-
-    .user-preferences-button {
-        padding: 0.5rem;
     }
 
     .g-key-content {
