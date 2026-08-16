@@ -9,13 +9,17 @@ const props = withDefaults(defineProps<{
   tableId: string
   showViewCreate?: boolean
   showViewEdit?: boolean
+  iconOnly?: boolean
+  showStructureLink?: boolean
   // Optional: use external view state (for TableComponent)
   externalViews?: TableView[]
   externalSelectedViewId?: number | null
   externalCurrentView?: TableView | null
 }>(), {
   showViewCreate: true,
-  showViewEdit: true
+  showViewEdit: true,
+  iconOnly: false,
+  showStructureLink: false
 })
 
 const emit = defineEmits<{
@@ -127,10 +131,10 @@ onMounted(() => {
   <button
     @click="openViewsDialog"
     class="button neutral ss-large"
-    title="Manage views"
+    :title="showStructureLink ? 'Views and structure' : 'Manage views'"
   >
     <HugeiconsIcon :icon="Settings01Icon" />
-    Views
+    <span v-if="!iconOnly">Views</span>
   </button>
 
   <!-- Views Dialog - Teleported to body to render as overlay -->
@@ -145,7 +149,7 @@ onMounted(() => {
       <div class="modal-content views-modal" @click.stop>
         <div class="modal-header">
           <div class="modal-header-left">
-            <h3>Views</h3>
+            <h3>{{ showStructureLink ? 'Table options' : 'Views' }}</h3>
           </div>
           <button @click="closeViewsDialog" class="button neutral" title="Close">
             ✕
@@ -181,6 +185,15 @@ onMounted(() => {
               <HugeiconsIcon :icon="Edit03Icon" />
               Edit View
             </button>
+            <router-link
+              v-if="showStructureLink"
+              :to="`/table/${tableId}/column-types`"
+              class="button neutral"
+              @click="closeViewsDialog"
+            >
+              <HugeiconsIcon :icon="Settings01Icon" />
+              Structure
+            </router-link>
           </div>
         </div>
       </div>

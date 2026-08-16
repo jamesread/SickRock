@@ -855,9 +855,10 @@ onMounted(load)
           :table-id="props.tableId"
           :show-view-create="true"
           :show-view-edit="true"
+          icon-only
+          show-structure-link
           @view-changed="(viewType: string) => emit('view-changed', viewType)"
         />
-        <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
         <button @click="goToToday" class="button neutral">Today</button>
         <button @click="prevMonth" class="button neutral">‹</button>
          <div class="date-picker-container">
