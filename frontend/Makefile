@@ -1,7 +1,7 @@
 ci: deps build
 
 deps:
-	npm install
+	npm ci
 
 build:
 	npx vite build
