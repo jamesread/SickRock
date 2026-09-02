@@ -95,6 +95,8 @@ github.com/jamesread/golure v0.0.0-20260902093223-27b18778c9a5 h1:AN7u+AYEs94l0C
 github.com/jamesread/golure v0.0.0-20260902093223-27b18778c9a5/go.mod h1:BZ/CMtZJJ4LNEBDSjGfafTJMjlDPIA9FS16+reN9NUE=
 github.com/jamesread/httpauthshim v0.1.0 h1:1jWyKmRu0rurlDrubxZxM3EXCwiaJnn7ax8wJnjVbrU=
 github.com/jamesread/httpauthshim v0.1.0/go.mod h1:SvCzQpS3Llj+oykwcV3cnDEDdb/5ra7i/sh3faGFcKs=
+github.com/jamesread/httpauthshim v0.2.0 h1:0vWutwipdNBCROQyjhsONdlb6qxcbnyajNc4fl8r/Fc=
+github.com/jamesread/httpauthshim v0.2.0/go.mod h1:SvCzQpS3Llj+oykwcV3cnDEDdb/5ra7i/sh3faGFcKs=
 github.com/jmoiron/sqlx v1.4.0 h1:1PLqN7S1UYp5t4SrVVnt4nUVNemrDAtxlulVe+Qgm3o=
 github.com/jmoiron/sqlx v1.4.0/go.mod h1:ZrZ7UsYB/weZdl2Bxg6jCRO9c3YHl8r3ahlKmRT4JLY=
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=

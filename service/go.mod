@@ -10,7 +10,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jamesread/golure v0.0.0-20260902093223-27b18778c9a5
-	github.com/jamesread/httpauthshim v0.1.0
+	github.com/jamesread/httpauthshim v0.2.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/providers/env v1.1.0
