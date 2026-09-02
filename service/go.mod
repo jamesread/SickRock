@@ -21,7 +21,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/goldmark v1.8.5
 	go.akshayshah.org/connectproto v0.6.0
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.58.0
 )
