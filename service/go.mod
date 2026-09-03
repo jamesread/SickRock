@@ -19,7 +19,7 @@ require (
 	github.com/mark3labs/mcp-go v1.0.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
-	github.com/yuin/goldmark v1.8.5
+	github.com/yuin/goldmark v1.8.6
 	go.akshayshah.org/connectproto v0.6.0
 	golang.org/x/crypto v0.55.0
 	google.golang.org/protobuf v1.36.12
