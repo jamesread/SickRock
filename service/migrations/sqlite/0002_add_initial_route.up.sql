@@ -1,4 +1,3 @@
--- Add initial_route column to table_users (SQLite)
+-- initial_route is created in 0001_init.up.sql; kept for migration history parity with MySQL.
 
-ALTER TABLE table_users
-  ADD COLUMN initial_route TEXT DEFAULT '/';
+SELECT 1;

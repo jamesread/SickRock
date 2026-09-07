@@ -1,0 +1,4 @@
+configVersion: 1
+
+# listen_port omitted so PORT from the test runner selects a free port.
+log_level: debug

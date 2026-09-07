@@ -1,4 +1,4 @@
-.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview lint icons icons-clean docs
+.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview lint icons icons-clean docs integration-test it
 
 all: proto-generate frontend-build service-build
 
@@ -74,3 +74,8 @@ icons-clean:
 docs:
 	$(MAKE) -wC docs
 	./docs/node_modules/.bin/antora antora-playbook.yml
+
+integration-test: service-build frontend-build
+	$(MAKE) -wC integration-tests
+
+it: integration-test

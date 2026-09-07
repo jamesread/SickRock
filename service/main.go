@@ -132,8 +132,15 @@ func configureLogging(cfg *config.Config) {
 }
 
 func findFrontendDir() string {
-	// Try to find the frontend directory
+	if dir := os.Getenv("SICKROCK_FRONTEND_DIR"); dir != "" {
+		log.Infof("Using frontend directory from SICKROCK_FRONTEND_DIR: %s", dir)
+		return dir
+	}
+
+	// Prefer production build output when present.
 	possiblePaths := []string{
+		"../frontend/dist/",
+		"frontend/dist/",
 		"../frontend/",
 		"frontend/",
 		"/www/",

@@ -9,5 +9,9 @@ proto/tmp
 **/.swp
 **/.swo
 frontend/node_modules
+integration-tests/node_modules
+integration-tests/.runtime
+integration-tests/screenshots
+tmp/
 **/*.log
 .vscode

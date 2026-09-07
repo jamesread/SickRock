@@ -13,6 +13,5 @@
     "types": ["vite/client"]
   },
   "include": ["src/**/*", "src/**/*.vue"],
-  "exclude": ["vite.config.js"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "exclude": ["vite.config.js"]
 }
