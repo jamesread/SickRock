@@ -20,6 +20,7 @@ require (
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/goldmark v1.8.6
+	github.com/yuin/goldmark/v2 v2.0.1
 	go.akshayshah.org/connectproto v0.6.0
 	golang.org/x/crypto v0.56.0
 	google.golang.org/protobuf v1.36.12
