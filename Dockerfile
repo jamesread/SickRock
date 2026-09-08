@@ -1,4 +1,4 @@
-FROM registry.fedoraproject.org/fedora-minimal:44
+FROM registry.fedoraproject.org/fedora-minimal:46
 
 LABEL org.opencontainers.image.source https://github.com/jamesread/SickRock
 
