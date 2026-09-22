@@ -4,6 +4,7 @@ import App from './App.vue'
 import './style.css'
 import 'femtocrank/style.css'
 import 'femtocrank/dark.css'
+import 'picocrank/styles.css'
 import router from './router'
 import { useAuthStore } from './stores/auth'
 import { createApiClient } from './stores/api'
@@ -31,15 +32,14 @@ async function initializeApp() {
     // Store init response for reuse in App.vue
     authStore.setInitResponse(initResponse)
 
-    // If currentUsername is empty, user is not authenticated
     if (!initResponse.currentUsername || initResponse.currentUsername === '') {
-      // Clear any stale auth state
       authStore.user = null
-      // App will show login form via router guard
-      // No further API calls will be made
     } else {
-      // User is authenticated, validate token from localStorage
-      await authStore.validateToken()
+      authStore.setUserFromInit(initResponse)
+      const token = localStorage.getItem('session-token')
+      if (token) {
+        await authStore.validateToken()
+      }
     }
   } catch (error) {
     console.error('Failed to initialize app:', error)

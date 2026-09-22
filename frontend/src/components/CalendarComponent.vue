@@ -850,28 +850,26 @@ onMounted(load)
 <template>
   <Section :title="sectionTitle" :padding="false" class="calendar-section">
     <template #toolbar>
-      <div class="toolbar">
-        <ViewsButton
-          :table-id="props.tableId"
-          :show-view-create="true"
-          :show-view-edit="true"
-          icon-only
-          show-structure-link
-          @view-changed="(viewType: string) => emit('view-changed', viewType)"
+      <ViewsButton
+        :table-id="props.tableId"
+        :show-view-create="true"
+        :show-view-edit="true"
+        icon-only
+        show-structure-link
+        @view-changed="(viewType: string) => emit('view-changed', viewType)"
+      />
+      <button @click="goToToday" class="button neutral">Today</button>
+      <button @click="prevMonth" class="button neutral">‹</button>
+      <div class="date-picker-container">
+        <input
+          id="goto-date"
+          type="month"
+          v-model="selectedDate"
+          @change="goToSelectedDate"
+          class="date-picker-input"
         />
-        <button @click="goToToday" class="button neutral">Today</button>
-        <button @click="prevMonth" class="button neutral">‹</button>
-         <div class="date-picker-container">
-           <input
-             id="goto-date"
-             type="month"
-             v-model="selectedDate"
-             @change="goToSelectedDate"
-             class="date-picker-input"
-           />
-         </div>
-        <button @click="nextMonth" class="button neutral">›</button>
       </div>
+      <button @click="nextMonth" class="button neutral">›</button>
     </template>
 
     <div class="calendar-content">
@@ -1029,70 +1027,7 @@ onMounted(load)
 </template>
 
 <style scoped>
-
-.event-title {
-  font-weight: bold;
-}
-
-.event-time {
-  font-size: 0.8em;
-  color: #666;
-}
-
-.date-picker-container {
-  display: flex;
-  align-items: center;
-}
-
-.calendar-wrapper {
-  border-radius: 0;
-}
-
-.calendar-content {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
-.calendar-content :deep(table) {
-  height: 100%;
-  table-layout: fixed;
-}
-
-.calendar-content :deep(tbody) {
-  height: 100%;
-}
-
-.calendar-content :deep(tbody tr) {
-  height: 100%;
-}
-
-.calendar-content :deep(tbody td) {
-  height: 100%;
-  min-height: 120px;
-  vertical-align: top;
-}
-
-.date-picker-input {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  outline: none;
-  cursor: pointer;
-  min-width: 150px;
-}
-
-.date-picker-input:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.date-picker-input:hover {
-  border-color: #999;
-}
-
+/* Layout only — calendar chrome/borders come from picocrank. */
 .calendar-section {
   display: flex;
   flex-direction: column;
@@ -1109,19 +1044,63 @@ onMounted(load)
   overflow: hidden;
 }
 
-.toolbar {
+.calendar-content {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
-/* Context Menu Styles */
+.date-picker-container {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.date-picker-input {
+  padding: 0.5rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  font-size: 1rem;
+  outline: none;
+  cursor: pointer;
+  min-width: 150px;
+  background: var(--input-bg-color, transparent);
+  color: var(--input-fg-color, inherit);
+}
+
+.date-picker-input:focus {
+  border-color: var(--focus-outline-color, #007bff);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-outline-color, #007bff) 25%, transparent);
+}
+
+/* Custom #event slot (scoped; picocrank slot styles do not apply). */
+.event-title {
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: var(--calendar-event-title-fg, inherit);
+}
+
+.event-time {
+  font-size: 0.75rem;
+  color: var(--calendar-muted-fg, #666);
+  margin-top: 0.125rem;
+}
+
+.multi-day-indicator {
+  font-size: 0.7rem;
+  color: var(--calendar-accent-fg, inherit);
+  font-weight: bold;
+}
+
+/* Context menu / modals (app chrome, not the calendar grid). */
 .context-menu {
   position: fixed;
-  background: white;
-  border: 1px solid #ddd;
+  background: var(--section-bg-color, white);
+  border: 1px solid var(--border-color, #ddd);
   border-radius: 6px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--shadow-color, #000) 15%, transparent);
   z-index: 1002;
   min-width: 150px;
   overflow: hidden;
@@ -1133,12 +1112,11 @@ onMounted(load)
   gap: 0.5rem;
   padding: 0.75rem 1rem;
   cursor: pointer;
-  transition: background-color 0.2s;
   font-size: 0.9rem;
 }
 
 .context-menu-item:hover:not(.disabled) {
-  background: #f8f9fa;
+  background: var(--hover-background-color, #f8f9fa);
 }
 
 .context-menu-item.disabled {
@@ -1150,43 +1128,69 @@ onMounted(load)
   font-size: 1rem;
 }
 
-.context-menu-backdrop {
+.context-menu-backdrop,
+.quick-add-backdrop,
+.day-menu-backdrop {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
+  z-index: 1000;
+}
+
+.context-menu-backdrop {
   z-index: 1001;
   background: transparent;
 }
 
-/* Quick Add Modal */
-.quick-add-modal {
+.quick-add-backdrop,
+.day-menu-backdrop {
+  background: var(--backdrop-color, rgba(0, 0, 0, 0.5));
+}
+
+.quick-add-modal,
+.day-menu-modal {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  background: white;
+  background: var(--section-bg-color, white);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px color-mix(in srgb, var(--shadow-color, #000) 15%, transparent);
   z-index: 1001;
   min-width: 300px;
+}
+
+.quick-add-modal {
   max-width: 500px;
 }
 
-.quick-add-content {
+.day-menu-modal {
+  max-width: 400px;
+}
+
+.quick-add-content,
+.day-menu-content {
   padding: 1.5rem;
 }
 
-.quick-add-content h3 {
+.quick-add-content h3,
+.day-menu-content h3 {
   margin: 0 0 0.5rem 0;
-  color: #333;
+  color: var(--text-color, #333);
 }
 
-.quick-add-date {
+.day-menu-content h3 {
+  font-size: 1.2rem;
+}
+
+.quick-add-date,
+.day-menu-subtitle {
   margin: 0 0 1rem 0;
-  color: #666;
+  color: var(--muted-text-color, #666);
   font-size: 0.9rem;
+}
+
+.day-menu-subtitle {
+  margin-bottom: 1.5rem;
 }
 
 .quick-add-form {
@@ -1197,15 +1201,17 @@ onMounted(load)
 
 .quick-add-input {
   padding: 0.75rem;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color, #ddd);
   border-radius: 4px;
   font-size: 1rem;
   outline: none;
+  background: var(--input-bg-color, transparent);
+  color: var(--input-fg-color, inherit);
 }
 
 .quick-add-input:focus {
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+  border-color: var(--focus-outline-color, #007bff);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-outline-color, #007bff) 25%, transparent);
 }
 
 .quick-add-actions {
@@ -1215,83 +1221,9 @@ onMounted(load)
   flex-wrap: wrap;
 }
 
-.quick-add-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-
-/* Day Menu Modal */
-.day-menu-modal {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 1001;
-  min-width: 300px;
-  max-width: 400px;
-}
-
-.day-menu-content {
-  padding: 1.5rem;
-}
-
-.day-menu-content h3 {
-  margin: 0 0 0.5rem 0;
-  color: #333;
-  font-size: 1.2rem;
-}
-
-.day-menu-subtitle {
-  margin: 0 0 1.5rem 0;
-  color: #666;
-  font-size: 0.9rem;
-}
-
 .day-menu-actions {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
-}
-
-.day-menu-backdrop {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-
-@media (max-width: 768px) {
-  .calendar-content {
-    padding: 0;
-  }
-
-  .calendar-content :deep(.calendar-cell),
-  .calendar-content :deep(.day),
-  .calendar-content :deep(.date),
-  .calendar-content :deep(td),
-  .calendar-content :deep(th) {
-    font-size: 0.75rem;
-  }
-
-  .calendar-content :deep(.event-content),
-  .calendar-content :deep(.event-title),
-  .calendar-content :deep(.event-time) {
-    font-size: 0.7rem;
-  }
-
-  section {
-	margin-top: 0;
-  }
 }
 </style>

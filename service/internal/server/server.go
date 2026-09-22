@@ -2,9 +2,6 @@ package server
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
@@ -13,6 +10,7 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	armpassword "github.com/jamesread/armature-iam/password"
 	"github.com/expr-lang/expr"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -20,17 +18,17 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
-	"github.com/jamesread/SickRock/internal/auth"
 	"github.com/jamesread/SickRock/internal/buildinfo"
+	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	log "github.com/sirupsen/logrus"
 )
 
 type SickRockServer struct {
-	repo              *repo.Repository
+	repo                *repo.Repository
 	notificationService *notifications.NotificationService
-	authService       *auth.AuthService
+	auth                *iam.AuthLayer
 }
 
 // markdownRenderer is a configured goldmark instance for rendering markdown
@@ -59,30 +57,12 @@ func renderMarkdown(content string) string {
 	return buf.String()
 }
 
-func NewSickRockServer(r *repo.Repository, authService *auth.AuthService) *SickRockServer {
+func NewSickRockServer(r *repo.Repository, authLayer *iam.AuthLayer) *SickRockServer {
 	return &SickRockServer{
-		repo:              r,
+		repo:                r,
 		notificationService: notifications.NewNotificationService(r),
-		authService:       authService,
+		auth:                authLayer,
 	}
-}
-
-// getUserIDFromContext extracts the user ID from the context
-func (s *SickRockServer) getUserIDFromContext(ctx context.Context) (int, error) {
-	username, err := s.authService.GetUserFromContext(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	user, err := s.repo.GetUserByUsername(ctx, username)
-	if err != nil {
-		return 0, err
-	}
-	if user == nil {
-		return 0, fmt.Errorf("user not found")
-	}
-
-	return user.ID, nil
 }
 
 // safeInt64ToInt32 converts an int64 to int32, clamping to int32 max/min values if overflow occurs
@@ -121,29 +101,23 @@ func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrock
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
 	var currentUsername string
-	// Optionally validate token from request headers; if present and valid, resolve to username
-	token := req.Header().Get("Session-Token")
-	if token == "" {
-		if authHeader := req.Header().Get("Authorization"); authHeader != "" {
-			if parts := strings.SplitN(authHeader, " ", 2); len(parts) == 2 && parts[0] == "Bearer" && parts[1] != "" {
-				token = parts[1]
-			}
-		}
+	var rbacPerms []string
+	var rbacSuperuser bool
+
+	if au := s.authUser(ctx); au != nil && au.User != nil {
+		currentUsername, rbacPerms, rbacSuperuser = iamUserToProto(au)
+	} else if sessionUser, err := s.resolveSessionUser(ctx, req); err == nil && sessionUser != nil {
+		currentUsername, rbacPerms, rbacSuperuser = iamUserToProto(sessionUser)
 	}
-	if token != "" {
-		claims, err := s.authService.ValidateToken(ctx, token)
-		if err == nil && claims != nil {
-			currentUsername = claims.Username
-		}
-	}
-	// If no token was provided, or validation failed, currentUsername stays blank
 
 	res := connect.NewResponse(&sickrockpb.InitResponse{
-		Version:         buildinfo.Version,
-		Commit:          buildinfo.Commit,
-		Date:            buildinfo.Date,
-		DbName:          dbName,
-		CurrentUsername: currentUsername,
+		Version:          buildinfo.Version,
+		Commit:           buildinfo.Commit,
+		Date:             buildinfo.Date,
+		DbName:           dbName,
+		CurrentUsername:  currentUsername,
+		RbacPermissions:  rbacPerms,
+		RbacIsSuperuser:  rbacSuperuser,
 	})
 	return res, nil
 }
@@ -1739,28 +1713,14 @@ func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
 	}
 
-	expiresAt := req.Msg.GetExpiresAt()
-	var expiresAtTime *time.Time
-	if expiresAt > 0 {
-		t := time.Unix(expiresAt, 0)
-		expiresAtTime = &t
-	}
 	readOnly := req.Msg.GetReadOnly()
 
-	// Generate a secure API key
-	apiKey, err := s.generateSecureAPIKey()
+	apiKey, err := armpassword.GenerateAPIKey("sk_")
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to generate API key: %w", err))
 	}
 
-	// Hash the API key for storage
-	keyHash, err := s.hashAPIKey(apiKey)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to hash API key: %w", err))
-	}
-
-	// Create the API key in the database
-	createdAPIKey, err := s.repo.CreateAPIKey(ctx, userID, name, keyHash, expiresAtTime, readOnly)
+	keyID, err := s.auth.Store.CreateAPIKey(ctx, userID, name, apiKey, readOnly)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create API key: %w", err))
 	}
@@ -1768,8 +1728,8 @@ func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[
 	return connect.NewResponse(&sickrockpb.CreateAPIKeyResponse{
 		Success:  true,
 		Message:  "API key created successfully",
-		ApiKey:   apiKey, // Return the plain text key only once
-		ApiKeyId: int32(createdAPIKey.ID),
+		ApiKey:   apiKey,
+		ApiKeyId: int32(keyID),
 	}), nil
 }
 
@@ -1780,7 +1740,7 @@ func (s *SickRockServer) GetAPIKeys(ctx context.Context, req *connect.Request[si
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
 
-	apiKeys, err := s.repo.GetUserAPIKeys(ctx, userID)
+	apiKeys, err := s.auth.Store.ListAPIKeysForUser(ctx, userID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve API keys: %w", err))
 	}
@@ -1789,12 +1749,11 @@ func (s *SickRockServer) GetAPIKeys(ctx context.Context, req *connect.Request[si
 	for _, apiKey := range apiKeys {
 		pbAPIKeys = append(pbAPIKeys, &sickrockpb.APIKey{
 			Id:         int32(apiKey.ID),
-			UserId:     int32(apiKey.UserID),
+			UserId:     int32(apiKey.UserAccountID),
 			Name:       apiKey.Name,
-			CreatedAt:  apiKey.CreatedAt.Unix(),
-			LastUsedAt: s.timeToUnixPtr(apiKey.LastUsedAt),
-			ExpiresAt:  s.timeToUnixPtr(apiKey.ExpiresAt),
-			IsActive:   apiKey.IsActive,
+			CreatedAt:  parseIAMTimestamp(apiKey.CreatedAt),
+			LastUsedAt: parseIAMTimestamp(apiKey.LastUsedAt),
+			IsActive:   true,
 			ReadOnly:   apiKey.ReadOnly,
 		})
 	}
@@ -1816,7 +1775,7 @@ func (s *SickRockServer) DeleteAPIKey(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
 	}
 
-	err = s.repo.DeleteAPIKey(ctx, userID, apiKeyID)
+	err = s.auth.Store.DeleteAPIKey(ctx, apiKeyID, userID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to delete API key: %w", err))
 	}
@@ -1839,58 +1798,23 @@ func (s *SickRockServer) DeactivateAPIKey(ctx context.Context, req *connect.Requ
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
 	}
 
-	err = s.repo.DeactivateAPIKey(ctx, userID, apiKeyID)
+	err = s.auth.Store.DeleteAPIKey(ctx, apiKeyID, userID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to deactivate API key: %w", err))
 	}
 
 	return connect.NewResponse(&sickrockpb.DeactivateAPIKeyResponse{
 		Success: true,
-		Message: "API key deactivated successfully",
+		Message: "API key deleted successfully",
 	}), nil
 }
 
-// UpdateAPIKey updates an API key's name, expires_at, and/or read_only
+// UpdateAPIKey is not supported with armature-iam keys (delete and recreate instead).
 func (s *SickRockServer) UpdateAPIKey(ctx context.Context, req *connect.Request[sickrockpb.UpdateAPIKeyRequest]) (*connect.Response[sickrockpb.UpdateAPIKeyResponse], error) {
-	userID, err := s.getUserIDFromContext(ctx)
-	if err != nil {
+	if _, err := s.getUserIDFromContext(ctx); err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
-
-	apiKeyID := int(req.Msg.GetApiKeyId())
-	if apiKeyID <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
-	}
-
-	var name *string
-	if req.Msg.Name != nil {
-		n := strings.TrimSpace(req.Msg.GetName())
-		name = &n
-	}
-	var expiresAt *time.Time
-	if req.Msg.ExpiresAt != nil {
-		if req.Msg.GetExpiresAt() == 0 {
-			expiresAt = nil // no expiration
-		} else {
-			t := time.Unix(req.Msg.GetExpiresAt(), 0)
-			expiresAt = &t
-		}
-	}
-	var readOnly *bool
-	if req.Msg.ReadOnly != nil {
-		r := req.Msg.GetReadOnly()
-		readOnly = &r
-	}
-
-	err = s.repo.UpdateAPIKey(ctx, userID, apiKeyID, name, expiresAt, readOnly)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to update API key: %w", err))
-	}
-
-	return connect.NewResponse(&sickrockpb.UpdateAPIKeyResponse{
-		Success: true,
-		Message: "API key updated successfully",
-	}), nil
+	return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("update API key is not supported; delete and create a new key"))
 }
 
 // GetConditionalFormattingRules retrieves conditional formatting rules
@@ -2010,30 +1934,4 @@ func (s *SickRockServer) UpdateConditionalFormattingRule(ctx context.Context, re
 		Success: true,
 		Message: "Conditional formatting rule updated successfully",
 	}), nil
-}
-
-// Helper methods for API key generation and hashing
-
-func (s *SickRockServer) generateSecureAPIKey() (string, error) {
-	// Generate 32 random bytes
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return "", err
-	}
-
-	// Convert to hex string and add prefix
-	key := "sk_" + hex.EncodeToString(bytes)
-	return key, nil
-}
-
-func (s *SickRockServer) hashAPIKey(apiKey string) (string, error) {
-	hash := sha256.Sum256([]byte(apiKey))
-	return hex.EncodeToString(hash[:]), nil
-}
-
-func (s *SickRockServer) timeToUnixPtr(t *time.Time) int64 {
-	if t == nil {
-		return 0
-	}
-	return t.Unix()
 }

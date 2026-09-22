@@ -1413,23 +1413,23 @@ onUnmounted(() => {
           :external-current-view="currentView"
           @view-selected="selectView"
         />
-        <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button neutral ss-large">
-          <HugeiconsIcon :icon="Download01Icon" />
-          Export
+        <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button inline-icon neutral ss-large">
+          <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Export</span>
         </router-link>
-        <router-link v-if="showStructure" :to="`/table/${props.tableId}/column-types`" class="button neutral ss-large">
-          <HugeiconsIcon :icon="Settings01Icon" />
-          Structure
+        <router-link v-if="showStructure" :to="`/table/${props.tableId}/column-types`" class="button inline-icon neutral ss-large">
+          <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Structure</span>
         </router-link>
 
         <!-- Blended Insert/Quick Add Button Group -->
         <div v-if="showInsert" class="insert-button-group">
-          <router-link :to="`/table/${props.tableId}/insert-row`" class="button neutral insert-button" accesskey="n" title="Insert row">
-            <HugeiconsIcon :icon="AddCircleIcon" />
-            {{ tableStructure?.CreateButtonText ?? 'Insert row' }}
+          <router-link :to="`/table/${props.tableId}/insert-row`" class="button inline-icon neutral insert-button" accesskey="n" title="Insert row">
+            <HugeiconsIcon :icon="AddCircleIcon" width="1em" height="1em" aria-hidden="true" />
+            <span>{{ tableStructure?.CreateButtonText ?? 'Insert row' }}</span>
           </router-link>
-          <button @click="openQuickAddDialog" class="button primary quick-add-button" title="Quick Add">
-            <HugeiconsIcon :icon="Add01Icon" />
+          <button @click="openQuickAddDialog" class="button inline-icon primary quick-add-button" title="Quick Add" aria-label="Quick Add">
+            <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
             <span class="quick-add-text"></span>
           </button>
         </div>
@@ -1861,7 +1861,6 @@ onUnmounted(() => {
   overflow: hidden !important;
 }
 
-.table-component-wrapper :deep(.section > *),
 .table-component-wrapper :deep([class*="section-body"]),
 .table-component-wrapper :deep([class*="section-content"]) {
   flex: 1 !important;
@@ -2201,10 +2200,12 @@ onUnmounted(() => {
 
 .fg1 { flex-grow: 1 }
 
-/* Blended Insert/Quick Add Button Group */
+/* Blended Insert/Quick Add Button Group — do not flex-grow (picocrank grows non-button toolbar children) */
 .insert-button-group {
   display: flex;
   align-items: center;
+  flex: 0 0 auto;
+  min-width: auto;
 }
 
 /* Ensure proper spacing between buttons */

@@ -253,9 +253,9 @@ onMounted(loadData)
 <template>
   <Section title="Day view" :padding="true" class="day-view-section" @click="handleSectionClick">
     <template #toolbar>
-      <button @click="goBack" class="button neutral">
-        <HugeiconsIcon :icon="ArrowLeft01Icon" />
-        Back to Calendar
+      <button @click="goBack" class="button inline-icon neutral">
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Back to Calendar</span>
       </button>
     </template>
 

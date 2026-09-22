@@ -253,14 +253,14 @@ watch(() => newRule.value.formatType, (newFormatType) => {
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"
-        class="button neutral"
+        class="button inline-icon neutral"
       >
-        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
-        Back to Table
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Back to Table</span>
       </router-link>
-      <router-link :to="`/table/${tableId}/column-types`" class="button neutral">
-        <HugeiconsIcon :icon="Edit03Icon" />
-        Structure
+      <router-link :to="`/table/${tableId}/column-types`" class="button inline-icon neutral">
+        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Structure</span>
       </router-link>
       <button @click="showAddRuleForm = !showAddRuleForm" class="button neutral" :disabled="showEditRuleForm">
         {{ showAddRuleForm ? 'Cancel' : '+ Add Rule' }}

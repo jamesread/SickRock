@@ -6,7 +6,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { UserIcon, BookmarkIcon, SettingsIcon, KeyIcon, NotificationIcon, Download01Icon, LogoutIcon } from '@hugeicons/core-free-icons'
+import { UserIcon, BookmarkIcon, SettingsIcon, KeyIcon, NotificationIcon, Download01Icon, LogoutIcon, ShieldKeyIcon } from '@hugeicons/core-free-icons'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -68,6 +68,17 @@ onMounted(() => {
       icon: NotificationIcon,
       type: 'route',
       description: 'Configure notification channels and event subscriptions'
+    })
+
+    // My Permissions
+    localNavigation.value.addNavigationLink({
+      id: 'my-permissions',
+      name: 'my-permissions',
+      title: 'My Permissions',
+      path: '/my-permissions',
+      icon: ShieldKeyIcon,
+      type: 'route',
+      description: 'Review your group membership and effective permissions',
     })
 
     // PWA & Service Worker

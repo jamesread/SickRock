@@ -422,25 +422,25 @@ function cancelDelete() {
       <template #toolbar>
         <router-link
           :to="`/table/${tableName}`"
-          class="button neutral"
+          class="button inline-icon neutral"
         >
-          <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
-          Back to Table
+          <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Back to Table</span>
         </router-link>
         <router-link
           :to="`/table/${tableName}/${rowId}/edit`"
-          class="button neutral"
+          class="button inline-icon neutral"
         >
-          <HugeiconsIcon :icon="Edit01Icon" width="16" height="16" />
-          Edit Row
+          <HugeiconsIcon :icon="Edit01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Edit Row</span>
         </router-link>
         <button
           @click="confirmDelete"
-          class="button bad"
+          class="button inline-icon bad"
           :disabled="deleting"
         >
-          <HugeiconsIcon :icon="Delete01Icon" width="16" height="16" />
-          Delete Row
+          <HugeiconsIcon :icon="Delete01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Delete Row</span>
         </button>
       </template>
 

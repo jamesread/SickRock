@@ -7,13 +7,16 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
+	armlayer "github.com/jamesread/armature-iam/layer"
+	"github.com/google/uuid"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
+	"github.com/jamesread/SickRock/internal/iam"
 	log "github.com/sirupsen/logrus"
 )
 
 func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickrockpb.LoginRequest]) (*connect.Response[sickrockpb.LoginResponse], error) {
-	username := req.Msg.GetUsername()
+	username := strings.TrimSpace(req.Msg.GetUsername())
 	password := req.Msg.GetPassword()
 
 	if username == "" || password == "" {
@@ -23,117 +26,109 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 		}), nil
 	}
 
-	// Extract client information
-	userAgent := req.Header().Get("User-Agent")
-	ipAddress := getClientIP(req)
-
-	// Validate against database and create session
-	token, expiresAt, err := s.authService.Login(ctx, username, password, userAgent, ipAddress)
-	if err != nil {
+	user, err := s.auth.Store.GetUserByUsername(ctx, username)
+	if err != nil || user == nil {
 		return connect.NewResponse(&sickrockpb.LoginResponse{
 			Success: false,
 			Message: "Invalid credentials",
 		}), nil
 	}
 
-	// Trigger notification for user login (async, don't block login)
+	ok, err := iam.VerifyPassword(user.PasswordHash, password)
+	if err != nil || !ok {
+		return connect.NewResponse(&sickrockpb.LoginResponse{
+			Success: false,
+			Message: "Invalid credentials",
+		}), nil
+	}
+
+	userAgent := req.Header().Get("User-Agent")
+	ipAddress := getClientIP(req)
+
+	sid := uuid.New().String()
+	if err := s.auth.Store.CreateSession(ctx, sid, user.ID, nil); err != nil {
+		return connect.NewResponse(&sickrockpb.LoginResponse{
+			Success: false,
+			Message: "Failed to create session",
+		}), nil
+	}
+
 	go func() {
 		notificationCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-
 		data := map[string]interface{}{
-			"username":  username,
+			"username":   username,
 			"user_agent": userAgent,
 			"ip_address": ipAddress,
 		}
-
 		if err := s.notificationService.SendNotification(notificationCtx, "user.logged_in", data); err != nil {
 			log.WithError(err).WithField("username", username).Warn("Failed to send login notification")
 		}
 	}()
 
-	return connect.NewResponse(&sickrockpb.LoginResponse{
+	res := connect.NewResponse(&sickrockpb.LoginResponse{
 		Success:   true,
 		Message:   "Login successful",
-		Token:     token,
-		ExpiresAt: expiresAt.Unix(),
-	}), nil
+		Token:     sid,
+		ExpiresAt: sessionExpiresAt(),
+	})
+	sessionCookie := s.auth.NewSessionCookie(sid)
+	res.Header().Add("Set-Cookie", (&sessionCookie).String())
+	return res, nil
 }
 
 func (s *SickRockServer) Logout(ctx context.Context, req *connect.Request[sickrockpb.LogoutRequest]) (*connect.Response[sickrockpb.LogoutResponse], error) {
-	// Get token from Authorization header
-	authHeader := req.Header().Get("Authorization")
-	if authHeader == "" {
-		return connect.NewResponse(&sickrockpb.LogoutResponse{
-			Success: false,
-			Message: "Authorization header required",
-		}), nil
+	sid := sessionIDFromRequest(req)
+	if sid != "" {
+		_ = s.auth.Store.DeleteSession(ctx, sid)
 	}
 
-	// Extract token from "Bearer <token>"
-	parts := strings.Split(authHeader, " ")
-	if len(parts) != 2 || parts[0] != "Bearer" {
-		return connect.NewResponse(&sickrockpb.LogoutResponse{
-			Success: false,
-			Message: "Invalid authorization header format",
-		}), nil
-	}
-
-	token := parts[1]
-
-	// Invalidate session in database
-	err := s.authService.Logout(ctx, token)
-	if err != nil {
-		return connect.NewResponse(&sickrockpb.LogoutResponse{
-			Success: false,
-			Message: "Logout failed",
-		}), nil
-	}
-
-	return connect.NewResponse(&sickrockpb.LogoutResponse{
+	res := connect.NewResponse(&sickrockpb.LogoutResponse{
 		Success: true,
 		Message: "Logout successful",
-	}), nil
+	})
+	clearCookie := s.auth.ClearSessionCookie()
+	res.Header().Add("Set-Cookie", (&clearCookie).String())
+	return res, nil
 }
 
 func (s *SickRockServer) ValidateToken(ctx context.Context, req *connect.Request[sickrockpb.ValidateTokenRequest]) (*connect.Response[sickrockpb.ValidateTokenResponse], error) {
-	token := req.Msg.GetToken()
-	if token == "" {
-		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{
-			Valid: false,
-		}), nil
+	sid := strings.TrimSpace(req.Msg.GetToken())
+	if sid == "" {
+		sid = sessionIDFromRequest(req)
+	}
+	if sid == "" {
+		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{Valid: false}), nil
 	}
 
-	claims, err := s.authService.ValidateToken(ctx, token)
-	if err != nil {
-		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{
-			Valid: false,
-		}), nil
+	sess, err := s.auth.Store.GetSessionBySID(ctx, sid)
+	if err != nil || sess == nil {
+		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{Valid: false}), nil
 	}
 
-	// Get user information to retrieve initial_route
-	user, err := s.repo.GetUserByUsername(ctx, claims.Username)
+	user, err := s.auth.Store.GetUserByID(ctx, sess.UserAccountID)
 	if err != nil || user == nil {
-		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{
-			Valid: false,
-		}), nil
+		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{Valid: false}), nil
 	}
 
-	// Set default initial_route if empty
-	initialRoute := user.InitialRoute
-	if initialRoute == "" {
-		initialRoute = "/"
+	rb, err := s.auth.Store.LoadEffectiveRBAC(ctx, user.ID)
+	if err != nil {
+		return connect.NewResponse(&sickrockpb.ValidateTokenResponse{Valid: false}), nil
 	}
+
+	au := &armlayer.AuthenticatedUser{User: user, RBAC: rb}
+	_, rbacPerms, rbacSuperuser := iamUserToProto(au)
 
 	return connect.NewResponse(&sickrockpb.ValidateTokenResponse{
-		Valid:        true,
-		Username:     claims.Username,
-		ExpiresAt:    claims.ExpiresAt.Time.Unix(),
-		InitialRoute: initialRoute,
+		Valid:           true,
+		Username:        user.Username,
+		ExpiresAt:       sessionExpiresAt(),
+		InitialRoute:    s.getInitialRoute(ctx, user.ID),
+		RbacPermissions: rbacPerms,
+		RbacIsSuperuser: rbacSuperuser,
 	}), nil
 }
 
-// ResetUserPassword allows an authenticated admin to reset a user's password.
 func (s *SickRockServer) ResetUserPassword(ctx context.Context, req *connect.Request[sickrockpb.ResetUserPasswordRequest]) (*connect.Response[sickrockpb.ResetUserPasswordResponse], error) {
 	username := strings.TrimSpace(req.Msg.GetUsername())
 	newPassword := req.Msg.GetNewPassword()
@@ -141,8 +136,20 @@ func (s *SickRockServer) ResetUserPassword(ctx context.Context, req *connect.Req
 	if username == "" || newPassword == "" {
 		return connect.NewResponse(&sickrockpb.ResetUserPasswordResponse{Success: false, Message: "username and new_password are required"}), nil
 	}
+	if len(newPassword) < 8 {
+		return connect.NewResponse(&sickrockpb.ResetUserPasswordResponse{Success: false, Message: "password must be at least 8 characters"}), nil
+	}
 
-	if err := s.repo.UpdateUserPassword(ctx, username, newPassword); err != nil {
+	user, err := s.auth.Store.GetUserByUsername(ctx, username)
+	if err != nil || user == nil {
+		return connect.NewResponse(&sickrockpb.ResetUserPasswordResponse{Success: false, Message: "user not found"}), nil
+	}
+
+	hash, err := iam.HashPassword(newPassword)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if err := s.auth.Store.UpdateUserPassword(ctx, user.ID, hash); err != nil {
 		return connect.NewResponse(&sickrockpb.ResetUserPasswordResponse{Success: false, Message: err.Error()}), nil
 	}
 
@@ -150,22 +157,15 @@ func (s *SickRockServer) ResetUserPassword(ctx context.Context, req *connect.Req
 }
 
 func getClientIP(req connect.AnyRequest) string {
-	// Try to get IP from X-Forwarded-For header first
 	if forwardedFor := req.Header().Get("X-Forwarded-For"); forwardedFor != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
 		if ip := net.ParseIP(forwardedFor); ip != nil {
 			return ip.String()
 		}
 	}
-
-	// Try X-Real-IP header
 	if realIP := req.Header().Get("X-Real-IP"); realIP != "" {
 		if ip := net.ParseIP(realIP); ip != nil {
 			return ip.String()
 		}
 	}
-
-	// Fallback to remote address
-	// Note: This might not work in all cases with ConnectRPC
 	return "unknown"
 }

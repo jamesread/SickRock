@@ -159,10 +159,10 @@ function handleCreated() {
       </div>
       <router-link
         :to="`/table/${tableId}`"
-        class="button"
+        class="button inline-icon"
       >
-        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
-        Back to Table
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Back to Table</span>
       </router-link>
     </template>
     <InsertRow :table-id="tableId" :field-defs="displayFieldDefs" :selected-date="selectedDate" :initial-values="initialValues" @created="handleCreated" />

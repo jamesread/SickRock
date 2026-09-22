@@ -28,9 +28,18 @@ import UserControlPanel from './views/UserControlPanel.vue'
 import UserBookmarks from './views/UserBookmarks.vue'
 import UserAPIKeys from './views/UserAPIKeys.vue'
 import UserNotifications from './views/UserNotifications.vue'
-import UserManagement from './views/UserManagement.vue'
 import DayView from './views/DayView.vue'
+import IamHub from './views/iam/IamHub.vue'
+import IamUsers from './views/iam/IamUsers.vue'
+import IamUserDetails from './views/iam/IamUserDetails.vue'
+import IamUserGroups from './views/iam/IamUserGroups.vue'
+import IamUserGroupDetails from './views/iam/IamUserGroupDetails.vue'
+import IamRbacRoles from './views/iam/IamRbacRoles.vue'
+import IamRbacRoleDetails from './views/iam/IamRbacRoleDetails.vue'
+import IamRbacPermissions from './views/iam/IamRbacPermissions.vue'
+import IamMyPermissions from './views/iam/IamMyPermissions.vue'
 import { useAuthStore } from './stores/auth'
+import { canAccessIam } from './utils/rbacAccess'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -125,6 +134,12 @@ const router = createRouter({
       path: '/user-notifications',
       name: 'user-notifications',
       component: UserNotifications,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/my-permissions',
+      name: 'my-permissions',
+      component: IamMyPermissions,
       meta: { requiresAuth: true }
     },
     {
@@ -318,14 +333,59 @@ const router = createRouter({
       },
     },
     {
+      path: '/admin/iam',
+      name: 'iam-hub',
+      component: IamHub,
+      meta: { requiresAuth: true, requiresIam: true, title: 'IAM' }
+    },
+    {
+      path: '/admin/iam/users',
+      name: 'iam-users',
+      component: IamUsers,
+      meta: { requiresAuth: true, requiresPermission: 'users.view' }
+    },
+    {
+      path: '/admin/iam/users/:id',
+      name: 'iam-user-details',
+      component: IamUserDetails,
+      props: true,
+      meta: { requiresAuth: true, requiresPermission: 'users.view' }
+    },
+    {
+      path: '/admin/iam/groups',
+      name: 'iam-groups',
+      component: IamUserGroups,
+      meta: { requiresAuth: true, requiresPermission: 'usergroups.view' }
+    },
+    {
+      path: '/admin/iam/groups/:id',
+      name: 'iam-group-details',
+      component: IamUserGroupDetails,
+      props: true,
+      meta: { requiresAuth: true, requiresPermission: 'usergroups.view' }
+    },
+    {
+      path: '/admin/iam/rbac',
+      name: 'iam-rbac',
+      component: IamRbacRoles,
+      meta: { requiresAuth: true, requiresPermission: 'rbac.view' }
+    },
+    {
+      path: '/admin/iam/rbac/permissions',
+      name: 'iam-rbac-permissions',
+      component: IamRbacPermissions,
+      meta: { requiresAuth: true, requiresPermission: 'rbac.view' }
+    },
+    {
+      path: '/admin/iam/rbac/:id',
+      name: 'iam-rbac-role-details',
+      component: IamRbacRoleDetails,
+      props: true,
+      meta: { requiresAuth: true, requiresPermission: 'rbac.view' }
+    },
+    {
       path: '/admin/user-management',
-      name: 'user-management',
-      component: UserManagement,
-      meta: {
-        requiresAuth: true,
-        title: 'User Management',
-        icon: DatabaseAddIcon
-      },
+      redirect: { name: 'iam-users' },
     },
     {
       path: '/admin/pwa-installation',
@@ -373,8 +433,22 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // If user is authenticated, allow access
+  // If user is authenticated, check IAM route permissions
   if (authStore.isAuthenticated) {
+    const perms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
+    const superuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+
+    if (to.meta.requiresIam && !canAccessIam(perms, superuser)) {
+      next('/')
+      return
+    }
+
+    const requiredPerm = to.meta.requiresPermission as string | undefined
+    if (requiredPerm && !authStore.hasPermission(requiredPerm)) {
+      next('/')
+      return
+    }
+
     next()
     return
   }

@@ -11,8 +11,8 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
+	armlayer "github.com/jamesread/armature-iam/layer"
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
-	"github.com/jamesread/SickRock/internal/auth"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
 )
 
@@ -214,7 +214,7 @@ func handleGetItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Call
 }
 
 func handleCreateItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if auth.IsAPIKeyReadOnly(ctx) {
+	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
 		return mcp.NewToolResultError("permission denied: read-only API key cannot create items"), nil
 	}
 	pageID, err := req.RequireString("page_id")
@@ -240,7 +240,7 @@ func handleCreateItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.C
 }
 
 func handleEditItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if auth.IsAPIKeyReadOnly(ctx) {
+	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
 		return mcp.NewToolResultError("permission denied: read-only API key cannot edit items"), nil
 	}
 	pageID, err := req.RequireString("page_id")
@@ -271,7 +271,7 @@ func handleEditItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Cal
 }
 
 func handleDeleteItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if auth.IsAPIKeyReadOnly(ctx) {
+	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
 		return mcp.NewToolResultError("permission denied: read-only API key cannot delete items"), nil
 	}
 	pageID, err := req.RequireString("page_id")

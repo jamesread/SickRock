@@ -266,19 +266,4 @@ function datetimeLocalToMysql(datetimeLocal: string): string {
   opacity: 0.6;
   cursor: not-allowed;
 }
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.section-header h2 {
-  margin: 0;
-}
-
-.section-header > div {
-  display: flex;
-  gap: 1rem;
-}
 </style>

@@ -201,18 +201,18 @@ onMounted(async () => {
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"
-        class="button"
+        class="button inline-icon"
       >
-        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
-        Back to Table
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Back to Table</span>
       </router-link>
-      <router-link :to="`/table/${tableId}/column-types`" class="button neutral">
-        <HugeiconsIcon :icon="Edit03Icon" />
-        Structure
+      <router-link :to="`/table/${tableId}/column-types`" class="button inline-icon neutral">
+        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Structure</span>
       </router-link>
-      <button @click="showCreateForm = true" class="button good">
-        <HugeiconsIcon :icon="PlusSignIcon" />
-        Add Foreign Key
+      <button @click="showCreateForm = true" class="button inline-icon good">
+        <HugeiconsIcon :icon="PlusSignIcon" width="1em" height="1em" aria-hidden="true" />
+        <span>Add Foreign Key</span>
       </button>
     </template>
 

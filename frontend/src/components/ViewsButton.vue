@@ -130,10 +130,10 @@ onMounted(() => {
 <template>
   <button
     @click="openViewsDialog"
-    class="button neutral ss-large"
+    class="button inline-icon neutral ss-large"
     :title="showStructureLink ? 'Views and structure' : 'Manage views'"
   >
-    <HugeiconsIcon :icon="Settings01Icon" />
+    <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
     <span v-if="!iconOnly">Views</span>
   </button>
 
@@ -171,28 +171,28 @@ onMounted(() => {
           <div class="views-actions">
             <button
               v-if="showViewCreate"
-              class="button primary"
+              class="button inline-icon primary"
               @click="() => { closeViewsDialog(); createTableView(); }"
             >
-              <HugeiconsIcon :icon="Add01Icon" />
-              Create View
+              <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
+              <span>Create View</span>
             </button>
             <button
               v-if="showViewEdit && currentView && currentView.id !== -1"
-              class="button neutral"
+              class="button inline-icon neutral"
               @click="() => { closeViewsDialog(); editTableView(); }"
             >
-              <HugeiconsIcon :icon="Edit03Icon" />
-              Edit View
+              <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+              <span>Edit View</span>
             </button>
             <router-link
               v-if="showStructureLink"
               :to="`/table/${tableId}/column-types`"
-              class="button neutral"
+              class="button inline-icon neutral"
               @click="closeViewsDialog"
             >
-              <HugeiconsIcon :icon="Settings01Icon" />
-              Structure
+              <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
+              <span>Structure</span>
             </router-link>
           </div>
         </div>

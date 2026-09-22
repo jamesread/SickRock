@@ -10,6 +10,8 @@ export interface User {
   username: string
   token: string
   expiresAt: number
+  rbacPermissions: string[]
+  rbacIsSuperuser: boolean
 }
 
 export const useAuthStore = defineStore('auth', () => {
@@ -20,8 +22,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => {
     if (!user.value) return false
-    if (user.value.expiresAt < Date.now() / 1000) {
-      // Token expired
+    if (user.value.expiresAt > 0 && user.value.expiresAt < Date.now() / 1000) {
       user.value = null
       localStorage.removeItem(SESSION_TOKEN_KEY)
       localStorage.removeItem(LEGACY_TOKEN_KEY)
@@ -29,6 +30,27 @@ export const useAuthStore = defineStore('auth', () => {
     }
     return true
   })
+
+  const hasPermission = (permission: string) => {
+    if (!user.value) return false
+    if (user.value.rbacIsSuperuser) return true
+    return user.value.rbacPermissions.includes(permission)
+  }
+
+  const setUserFromInit = (response: InitResponse, token?: string) => {
+    if (!response.currentUsername) {
+      user.value = null
+      return
+    }
+    const storedToken = token ?? localStorage.getItem(SESSION_TOKEN_KEY) ?? ''
+    user.value = {
+      username: response.currentUsername,
+      token: storedToken,
+      expiresAt: 0,
+      rbacPermissions: [...(response.rbacPermissions ?? [])],
+      rbacIsSuperuser: response.rbacIsSuperuser ?? false,
+    }
+  }
 
   const login = async (username: string, password: string) => {
     isLoading.value = true
@@ -45,12 +67,16 @@ export const useAuthStore = defineStore('auth', () => {
         const userData: User = {
           username,
           token: response.token,
-          expiresAt: Number(response.expiresAt)
+          expiresAt: Number(response.expiresAt),
+          rbacPermissions: [],
+          rbacIsSuperuser: false,
         }
         user.value = userData
         localStorage.setItem(SESSION_TOKEN_KEY, response.token)
         localStorage.removeItem(LEGACY_TOKEN_KEY)
-        return true
+
+        const validated = await validateToken()
+        return validated
       } else {
         error.value = response.message || 'Login failed'
         return false
@@ -66,15 +92,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = async () => {
     try {
-      if (user.value) {
-        const client = createApiClient()
-        await client.logout({})
-      }
+      const client = createApiClient()
+      await client.logout({})
     } catch (err) {
       console.error('Logout error:', err)
     } finally {
       user.value = null
-      initResponse.value = null // Clear init response on logout
+      initResponse.value = null
       localStorage.removeItem(SESSION_TOKEN_KEY)
       localStorage.removeItem(LEGACY_TOKEN_KEY)
     }
@@ -87,45 +111,54 @@ export const useAuthStore = defineStore('auth', () => {
       if (token) {
         localStorage.setItem(SESSION_TOKEN_KEY, token)
         localStorage.removeItem(LEGACY_TOKEN_KEY)
-      } else {
-        return false
       }
     }
 
     try {
       const client = createApiClient()
-      const response = await client.validateToken({ token })
+      const response = await client.validateToken({ token: token ?? '' })
 
       if (response.valid) {
         user.value = {
           username: response.username,
-          token,
-          expiresAt: Number(response.expiresAt)
+          token: token ?? '',
+          expiresAt: Number(response.expiresAt),
+          rbacPermissions: [...(response.rbacPermissions ?? [])],
+          rbacIsSuperuser: response.rbacIsSuperuser ?? false,
+        }
+        if (token) {
+          localStorage.setItem(SESSION_TOKEN_KEY, token)
         }
         return true
-      } else {
-        localStorage.removeItem(SESSION_TOKEN_KEY)
-        localStorage.removeItem(LEGACY_TOKEN_KEY)
-        return false
       }
+
+      localStorage.removeItem(SESSION_TOKEN_KEY)
+      localStorage.removeItem(LEGACY_TOKEN_KEY)
+      user.value = null
+      return false
     } catch (err) {
       console.error('Token validation error:', err)
       localStorage.removeItem(SESSION_TOKEN_KEY)
       localStorage.removeItem(LEGACY_TOKEN_KEY)
+      user.value = null
       return false
     }
   }
 
   const getAuthHeaders = () => {
-    if (!user.value) return {}
-    return {
-      'Authorization': `Bearer ${user.value.token}`,
-      'Session-Token': user.value.token
+    const headers: Record<string, string> = {}
+    if (user.value?.token) {
+      headers['Authorization'] = `Bearer ${user.value.token}`
+      headers['Session-Token'] = user.value.token
     }
+    return headers
   }
 
   const setInitResponse = (response: InitResponse) => {
     initResponse.value = response
+    if (response.currentUsername) {
+      setUserFromInit(response)
+    }
   }
 
   return {
@@ -134,6 +167,8 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     isAuthenticated,
     initResponse,
+    hasPermission,
+    setUserFromInit,
     login,
     logout,
     validateToken,

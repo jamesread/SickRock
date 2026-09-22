@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, ClearTickListStateRequest, ClearTickListStateResponse, CreateAPIKeyRequest, CreateAPIKeyResponse, CreateConditionalFormattingRuleRequest, CreateConditionalFormattingRuleResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateTableConfigurationRequest, CreateTableConfigurationResponse, CreateTableRequest, CreateTableResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, CreateUserNotificationChannelRequest, CreateUserNotificationChannelResponse, CreateUserNotificationSubscriptionRequest, CreateUserNotificationSubscriptionResponse, DeactivateAPIKeyRequest, DeactivateAPIKeyResponse, DeleteAPIKeyRequest, DeleteAPIKeyResponse, DeleteConditionalFormattingRuleRequest, DeleteConditionalFormattingRuleResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DeleteUserNotificationChannelRequest, DeleteUserNotificationChannelResponse, DeleteUserNotificationSubscriptionRequest, DeleteUserNotificationSubscriptionResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetAPIKeysRequest, GetAPIKeysResponse, GetConditionalFormattingRulesRequest, GetConditionalFormattingRulesResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDatabaseTablesRequest, GetDatabaseTablesResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetNotificationEventsRequest, GetNotificationEventsResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetTickListStateRequest, GetTickListStateResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, GetUserNotificationChannelsRequest, GetUserNotificationChannelsResponse, GetUserNotificationSubscriptionsRequest, GetUserNotificationSubscriptionsResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, SetTickListCompletionRequest, SetTickListCompletionResponse, UpdateAPIKeyRequest, UpdateAPIKeyResponse, UpdateConditionalFormattingRuleRequest, UpdateConditionalFormattingRuleResponse, UpdateTableViewRequest, UpdateTableViewResponse, UpdateUserNotificationChannelRequest, UpdateUserNotificationChannelResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
+import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, ChangePasswordRequest, ChangePasswordResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, ClearTickListStateRequest, ClearTickListStateResponse, CreateAPIKeyRequest, CreateAPIKeyResponse, CreateConditionalFormattingRuleRequest, CreateConditionalFormattingRuleResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateRbacRoleRequest, CreateRbacRoleResponse, CreateTableConfigurationRequest, CreateTableConfigurationResponse, CreateTableRequest, CreateTableResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, CreateUserGroupRequest, CreateUserGroupResponse, CreateUserNotificationChannelRequest, CreateUserNotificationChannelResponse, CreateUserNotificationSubscriptionRequest, CreateUserNotificationSubscriptionResponse, CreateUserRequest, CreateUserResponse, DeactivateAPIKeyRequest, DeactivateAPIKeyResponse, DeleteAPIKeyRequest, DeleteAPIKeyResponse, DeleteConditionalFormattingRuleRequest, DeleteConditionalFormattingRuleResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteRbacRoleRequest, DeleteRbacRoleResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DeleteUserGroupRequest, DeleteUserGroupResponse, DeleteUserNotificationChannelRequest, DeleteUserNotificationChannelResponse, DeleteUserNotificationSubscriptionRequest, DeleteUserNotificationSubscriptionResponse, DeleteUserRequest, DeleteUserResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetAPIKeysRequest, GetAPIKeysResponse, GetConditionalFormattingRulesRequest, GetConditionalFormattingRulesResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDatabaseTablesRequest, GetDatabaseTablesResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetMyPermissionsAuditRequest, GetMyPermissionsAuditResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetNotificationEventsRequest, GetNotificationEventsResponse, GetRbacRoleGroupsRequest, GetRbacRoleGroupsResponse, GetRbacRoleUsersRequest, GetRbacRoleUsersResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetTickListStateRequest, GetTickListStateResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, GetUserGroupMembersRequest, GetUserGroupMembersResponse, GetUserGroupRbacRolesRequest, GetUserGroupRbacRolesResponse, GetUserNotificationChannelsRequest, GetUserNotificationChannelsResponse, GetUserNotificationSubscriptionsRequest, GetUserNotificationSubscriptionsResponse, GetUserRbacRolesRequest, GetUserRbacRolesResponse, GetUserRequest, GetUserResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, ListRbacPermissionsRequest, ListRbacPermissionsResponse, ListRbacRolesRequest, ListRbacRolesResponse, ListUserGroupsRequest, ListUserGroupsResponse, ListUsersRequest, ListUsersResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, SetTickListCompletionRequest, SetTickListCompletionResponse, SetUserGroupMembersRequest, SetUserGroupMembersResponse, SetUserGroupRbacRolesRequest, SetUserGroupRbacRolesResponse, UpdateAPIKeyRequest, UpdateAPIKeyResponse, UpdateConditionalFormattingRuleRequest, UpdateConditionalFormattingRuleResponse, UpdateRbacRoleRequest, UpdateRbacRoleResponse, UpdateTableViewRequest, UpdateTableViewResponse, UpdateUserNotificationChannelRequest, UpdateUserNotificationChannelResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -66,6 +66,197 @@ export const SickRock = {
       name: "ResetUserPassword",
       I: ResetUserPasswordRequest,
       O: ResetUserPasswordResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ChangePassword
+     */
+    changePassword: {
+      name: "ChangePassword",
+      I: ChangePasswordRequest,
+      O: ChangePasswordResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * IAM / RBAC
+     *
+     * @generated from rpc sickrock.SickRock.ListUsers
+     */
+    listUsers: {
+      name: "ListUsers",
+      I: ListUsersRequest,
+      O: ListUsersResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetUser
+     */
+    getUser: {
+      name: "GetUser",
+      I: GetUserRequest,
+      O: GetUserResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.CreateUser
+     */
+    createUser: {
+      name: "CreateUser",
+      I: CreateUserRequest,
+      O: CreateUserResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.DeleteUser
+     */
+    deleteUser: {
+      name: "DeleteUser",
+      I: DeleteUserRequest,
+      O: DeleteUserResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ListRbacPermissions
+     */
+    listRbacPermissions: {
+      name: "ListRbacPermissions",
+      I: ListRbacPermissionsRequest,
+      O: ListRbacPermissionsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ListRbacRoles
+     */
+    listRbacRoles: {
+      name: "ListRbacRoles",
+      I: ListRbacRolesRequest,
+      O: ListRbacRolesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.CreateRbacRole
+     */
+    createRbacRole: {
+      name: "CreateRbacRole",
+      I: CreateRbacRoleRequest,
+      O: CreateRbacRoleResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.UpdateRbacRole
+     */
+    updateRbacRole: {
+      name: "UpdateRbacRole",
+      I: UpdateRbacRoleRequest,
+      O: UpdateRbacRoleResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.DeleteRbacRole
+     */
+    deleteRbacRole: {
+      name: "DeleteRbacRole",
+      I: DeleteRbacRoleRequest,
+      O: DeleteRbacRoleResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetUserRbacRoles
+     */
+    getUserRbacRoles: {
+      name: "GetUserRbacRoles",
+      I: GetUserRbacRolesRequest,
+      O: GetUserRbacRolesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetUserGroupRbacRoles
+     */
+    getUserGroupRbacRoles: {
+      name: "GetUserGroupRbacRoles",
+      I: GetUserGroupRbacRolesRequest,
+      O: GetUserGroupRbacRolesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.SetUserGroupRbacRoles
+     */
+    setUserGroupRbacRoles: {
+      name: "SetUserGroupRbacRoles",
+      I: SetUserGroupRbacRolesRequest,
+      O: SetUserGroupRbacRolesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetRbacRoleUsers
+     */
+    getRbacRoleUsers: {
+      name: "GetRbacRoleUsers",
+      I: GetRbacRoleUsersRequest,
+      O: GetRbacRoleUsersResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetRbacRoleGroups
+     */
+    getRbacRoleGroups: {
+      name: "GetRbacRoleGroups",
+      I: GetRbacRoleGroupsRequest,
+      O: GetRbacRoleGroupsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetMyPermissionsAudit
+     */
+    getMyPermissionsAudit: {
+      name: "GetMyPermissionsAudit",
+      I: GetMyPermissionsAuditRequest,
+      O: GetMyPermissionsAuditResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ListUserGroups
+     */
+    listUserGroups: {
+      name: "ListUserGroups",
+      I: ListUserGroupsRequest,
+      O: ListUserGroupsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.CreateUserGroup
+     */
+    createUserGroup: {
+      name: "CreateUserGroup",
+      I: CreateUserGroupRequest,
+      O: CreateUserGroupResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.DeleteUserGroup
+     */
+    deleteUserGroup: {
+      name: "DeleteUserGroup",
+      I: DeleteUserGroupRequest,
+      O: DeleteUserGroupResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetUserGroupMembers
+     */
+    getUserGroupMembers: {
+      name: "GetUserGroupMembers",
+      I: GetUserGroupMembersRequest,
+      O: GetUserGroupMembersResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.SetUserGroupMembers
+     */
+    setUserGroupMembers: {
+      name: "SetUserGroupMembers",
+      I: SetUserGroupMembersRequest,
+      O: SetUserGroupMembersResponse,
       kind: MethodKind.Unary,
     },
     /**

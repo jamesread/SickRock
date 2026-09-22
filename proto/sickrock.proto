@@ -405,6 +405,8 @@ message InitResponse {
   string date = 3;
   string db_name = 4;
   string current_username = 5;
+  repeated string rbac_permissions = 6;
+  bool rbac_is_superuser = 7;
 }
 
 // Authentication
@@ -446,6 +448,191 @@ message ValidateTokenResponse {
   string username = 2;
   int64 expires_at = 3;
   string initial_route = 4;
+  repeated string rbac_permissions = 5;
+  bool rbac_is_superuser = 6;
+}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// IAM / RBAC (armature-iam)
+message IamUser {
+  int32 id = 1;
+  string username = 2;
+  string created_by = 3;
+}
+
+message RbacPermission {
+  int32 id = 1;
+  string name = 2;
+  string description = 3;
+}
+
+message RbacRole {
+  int32 id = 1;
+  string name = 2;
+  string description = 3;
+  repeated int32 permission_ids = 4;
+}
+
+message UserGroup {
+  int32 id = 1;
+  string name = 2;
+  int32 member_count = 3;
+}
+
+message MyPermissionAuditRow {
+  string permission = 1;
+  bool granted = 2;
+  repeated string granting_groups = 3;
+}
+
+message ListUsersRequest {}
+message ListUsersResponse {
+  repeated IamUser users = 1;
+}
+
+message GetUserRequest {
+  int32 user_id = 1;
+}
+message GetUserResponse {
+  IamUser user = 1;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string password = 2;
+}
+message CreateUserResponse {
+  IamUser user = 1;
+}
+
+message DeleteUserRequest {
+  int32 user_id = 1;
+}
+message DeleteUserResponse {
+  bool success = 1;
+}
+
+message ListRbacPermissionsRequest {}
+message ListRbacPermissionsResponse {
+  repeated RbacPermission permissions = 1;
+}
+
+message ListRbacRolesRequest {}
+message ListRbacRolesResponse {
+  repeated RbacRole roles = 1;
+}
+
+message CreateRbacRoleRequest {
+  string name = 1;
+  string description = 2;
+  repeated int32 permission_ids = 3;
+}
+message CreateRbacRoleResponse {
+  RbacRole role = 1;
+}
+
+message UpdateRbacRoleRequest {
+  int32 role_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated int32 permission_ids = 4;
+}
+message UpdateRbacRoleResponse {
+  RbacRole role = 1;
+}
+
+message DeleteRbacRoleRequest {
+  int32 role_id = 1;
+}
+message DeleteRbacRoleResponse {
+  bool success = 1;
+}
+
+message GetUserRbacRolesRequest {
+  int32 user_id = 1;
+}
+message GetUserRbacRolesResponse {
+  repeated int32 role_ids = 1;
+}
+
+message GetUserGroupRbacRolesRequest {
+  int32 group_id = 1;
+}
+message GetUserGroupRbacRolesResponse {
+  repeated int32 role_ids = 1;
+}
+
+message SetUserGroupRbacRolesRequest {
+  int32 group_id = 1;
+  repeated int32 role_ids = 2;
+}
+message SetUserGroupRbacRolesResponse {
+  bool success = 1;
+}
+
+message GetRbacRoleUsersRequest {
+  int32 role_id = 1;
+}
+message GetRbacRoleUsersResponse {
+  repeated string usernames = 1;
+}
+
+message GetRbacRoleGroupsRequest {
+  int32 role_id = 1;
+}
+message GetRbacRoleGroupsResponse {
+  repeated string group_names = 1;
+}
+
+message GetMyPermissionsAuditRequest {}
+message GetMyPermissionsAuditResponse {
+  repeated string group_names = 1;
+  repeated string role_names = 2;
+  bool is_superuser = 3;
+  repeated MyPermissionAuditRow permissions = 4;
+}
+
+message ListUserGroupsRequest {}
+message ListUserGroupsResponse {
+  repeated UserGroup groups = 1;
+}
+
+message CreateUserGroupRequest {
+  string name = 1;
+}
+message CreateUserGroupResponse {
+  UserGroup group = 1;
+}
+
+message DeleteUserGroupRequest {
+  int32 group_id = 1;
+}
+message DeleteUserGroupResponse {
+  bool success = 1;
+}
+
+message GetUserGroupMembersRequest {
+  int32 group_id = 1;
+}
+message GetUserGroupMembersResponse {
+  repeated int32 user_ids = 1;
+}
+
+message SetUserGroupMembersRequest {
+  int32 group_id = 1;
+  repeated int32 user_ids = 2;
+}
+message SetUserGroupMembersResponse {
+  bool success = 1;
 }
 
 // Device Code Authentication
@@ -783,6 +970,29 @@ service SickRock {
   rpc Logout(LogoutRequest) returns (LogoutResponse);
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
   rpc ResetUserPassword(ResetUserPasswordRequest) returns (ResetUserPasswordResponse);
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+
+  // IAM / RBAC
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc ListRbacPermissions(ListRbacPermissionsRequest) returns (ListRbacPermissionsResponse);
+  rpc ListRbacRoles(ListRbacRolesRequest) returns (ListRbacRolesResponse);
+  rpc CreateRbacRole(CreateRbacRoleRequest) returns (CreateRbacRoleResponse);
+  rpc UpdateRbacRole(UpdateRbacRoleRequest) returns (UpdateRbacRoleResponse);
+  rpc DeleteRbacRole(DeleteRbacRoleRequest) returns (DeleteRbacRoleResponse);
+  rpc GetUserRbacRoles(GetUserRbacRolesRequest) returns (GetUserRbacRolesResponse);
+  rpc GetUserGroupRbacRoles(GetUserGroupRbacRolesRequest) returns (GetUserGroupRbacRolesResponse);
+  rpc SetUserGroupRbacRoles(SetUserGroupRbacRolesRequest) returns (SetUserGroupRbacRolesResponse);
+  rpc GetRbacRoleUsers(GetRbacRoleUsersRequest) returns (GetRbacRoleUsersResponse);
+  rpc GetRbacRoleGroups(GetRbacRoleGroupsRequest) returns (GetRbacRoleGroupsResponse);
+  rpc GetMyPermissionsAudit(GetMyPermissionsAuditRequest) returns (GetMyPermissionsAuditResponse);
+  rpc ListUserGroups(ListUserGroupsRequest) returns (ListUserGroupsResponse);
+  rpc CreateUserGroup(CreateUserGroupRequest) returns (CreateUserGroupResponse);
+  rpc DeleteUserGroup(DeleteUserGroupRequest) returns (DeleteUserGroupResponse);
+  rpc GetUserGroupMembers(GetUserGroupMembersRequest) returns (GetUserGroupMembersResponse);
+  rpc SetUserGroupMembers(SetUserGroupMembersRequest) returns (SetUserGroupMembersResponse);
 
   // Device Code Authentication
   rpc GenerateDeviceCode(GenerateDeviceCodeRequest) returns (GenerateDeviceCodeResponse);

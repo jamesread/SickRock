@@ -46,6 +46,59 @@ const (
 	// SickRockResetUserPasswordProcedure is the fully-qualified name of the SickRock's
 	// ResetUserPassword RPC.
 	SickRockResetUserPasswordProcedure = "/sickrock.SickRock/ResetUserPassword"
+	// SickRockChangePasswordProcedure is the fully-qualified name of the SickRock's ChangePassword RPC.
+	SickRockChangePasswordProcedure = "/sickrock.SickRock/ChangePassword"
+	// SickRockListUsersProcedure is the fully-qualified name of the SickRock's ListUsers RPC.
+	SickRockListUsersProcedure = "/sickrock.SickRock/ListUsers"
+	// SickRockGetUserProcedure is the fully-qualified name of the SickRock's GetUser RPC.
+	SickRockGetUserProcedure = "/sickrock.SickRock/GetUser"
+	// SickRockCreateUserProcedure is the fully-qualified name of the SickRock's CreateUser RPC.
+	SickRockCreateUserProcedure = "/sickrock.SickRock/CreateUser"
+	// SickRockDeleteUserProcedure is the fully-qualified name of the SickRock's DeleteUser RPC.
+	SickRockDeleteUserProcedure = "/sickrock.SickRock/DeleteUser"
+	// SickRockListRbacPermissionsProcedure is the fully-qualified name of the SickRock's
+	// ListRbacPermissions RPC.
+	SickRockListRbacPermissionsProcedure = "/sickrock.SickRock/ListRbacPermissions"
+	// SickRockListRbacRolesProcedure is the fully-qualified name of the SickRock's ListRbacRoles RPC.
+	SickRockListRbacRolesProcedure = "/sickrock.SickRock/ListRbacRoles"
+	// SickRockCreateRbacRoleProcedure is the fully-qualified name of the SickRock's CreateRbacRole RPC.
+	SickRockCreateRbacRoleProcedure = "/sickrock.SickRock/CreateRbacRole"
+	// SickRockUpdateRbacRoleProcedure is the fully-qualified name of the SickRock's UpdateRbacRole RPC.
+	SickRockUpdateRbacRoleProcedure = "/sickrock.SickRock/UpdateRbacRole"
+	// SickRockDeleteRbacRoleProcedure is the fully-qualified name of the SickRock's DeleteRbacRole RPC.
+	SickRockDeleteRbacRoleProcedure = "/sickrock.SickRock/DeleteRbacRole"
+	// SickRockGetUserRbacRolesProcedure is the fully-qualified name of the SickRock's GetUserRbacRoles
+	// RPC.
+	SickRockGetUserRbacRolesProcedure = "/sickrock.SickRock/GetUserRbacRoles"
+	// SickRockGetUserGroupRbacRolesProcedure is the fully-qualified name of the SickRock's
+	// GetUserGroupRbacRoles RPC.
+	SickRockGetUserGroupRbacRolesProcedure = "/sickrock.SickRock/GetUserGroupRbacRoles"
+	// SickRockSetUserGroupRbacRolesProcedure is the fully-qualified name of the SickRock's
+	// SetUserGroupRbacRoles RPC.
+	SickRockSetUserGroupRbacRolesProcedure = "/sickrock.SickRock/SetUserGroupRbacRoles"
+	// SickRockGetRbacRoleUsersProcedure is the fully-qualified name of the SickRock's GetRbacRoleUsers
+	// RPC.
+	SickRockGetRbacRoleUsersProcedure = "/sickrock.SickRock/GetRbacRoleUsers"
+	// SickRockGetRbacRoleGroupsProcedure is the fully-qualified name of the SickRock's
+	// GetRbacRoleGroups RPC.
+	SickRockGetRbacRoleGroupsProcedure = "/sickrock.SickRock/GetRbacRoleGroups"
+	// SickRockGetMyPermissionsAuditProcedure is the fully-qualified name of the SickRock's
+	// GetMyPermissionsAudit RPC.
+	SickRockGetMyPermissionsAuditProcedure = "/sickrock.SickRock/GetMyPermissionsAudit"
+	// SickRockListUserGroupsProcedure is the fully-qualified name of the SickRock's ListUserGroups RPC.
+	SickRockListUserGroupsProcedure = "/sickrock.SickRock/ListUserGroups"
+	// SickRockCreateUserGroupProcedure is the fully-qualified name of the SickRock's CreateUserGroup
+	// RPC.
+	SickRockCreateUserGroupProcedure = "/sickrock.SickRock/CreateUserGroup"
+	// SickRockDeleteUserGroupProcedure is the fully-qualified name of the SickRock's DeleteUserGroup
+	// RPC.
+	SickRockDeleteUserGroupProcedure = "/sickrock.SickRock/DeleteUserGroup"
+	// SickRockGetUserGroupMembersProcedure is the fully-qualified name of the SickRock's
+	// GetUserGroupMembers RPC.
+	SickRockGetUserGroupMembersProcedure = "/sickrock.SickRock/GetUserGroupMembers"
+	// SickRockSetUserGroupMembersProcedure is the fully-qualified name of the SickRock's
+	// SetUserGroupMembers RPC.
+	SickRockSetUserGroupMembersProcedure = "/sickrock.SickRock/SetUserGroupMembers"
 	// SickRockGenerateDeviceCodeProcedure is the fully-qualified name of the SickRock's
 	// GenerateDeviceCode RPC.
 	SickRockGenerateDeviceCodeProcedure = "/sickrock.SickRock/GenerateDeviceCode"
@@ -205,6 +258,28 @@ type SickRockClient interface {
 	Logout(context.Context, *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error)
 	ValidateToken(context.Context, *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error)
 	ResetUserPassword(context.Context, *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error)
+	ChangePassword(context.Context, *connect.Request[proto.ChangePasswordRequest]) (*connect.Response[proto.ChangePasswordResponse], error)
+	// IAM / RBAC
+	ListUsers(context.Context, *connect.Request[proto.ListUsersRequest]) (*connect.Response[proto.ListUsersResponse], error)
+	GetUser(context.Context, *connect.Request[proto.GetUserRequest]) (*connect.Response[proto.GetUserResponse], error)
+	CreateUser(context.Context, *connect.Request[proto.CreateUserRequest]) (*connect.Response[proto.CreateUserResponse], error)
+	DeleteUser(context.Context, *connect.Request[proto.DeleteUserRequest]) (*connect.Response[proto.DeleteUserResponse], error)
+	ListRbacPermissions(context.Context, *connect.Request[proto.ListRbacPermissionsRequest]) (*connect.Response[proto.ListRbacPermissionsResponse], error)
+	ListRbacRoles(context.Context, *connect.Request[proto.ListRbacRolesRequest]) (*connect.Response[proto.ListRbacRolesResponse], error)
+	CreateRbacRole(context.Context, *connect.Request[proto.CreateRbacRoleRequest]) (*connect.Response[proto.CreateRbacRoleResponse], error)
+	UpdateRbacRole(context.Context, *connect.Request[proto.UpdateRbacRoleRequest]) (*connect.Response[proto.UpdateRbacRoleResponse], error)
+	DeleteRbacRole(context.Context, *connect.Request[proto.DeleteRbacRoleRequest]) (*connect.Response[proto.DeleteRbacRoleResponse], error)
+	GetUserRbacRoles(context.Context, *connect.Request[proto.GetUserRbacRolesRequest]) (*connect.Response[proto.GetUserRbacRolesResponse], error)
+	GetUserGroupRbacRoles(context.Context, *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error)
+	SetUserGroupRbacRoles(context.Context, *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error)
+	GetRbacRoleUsers(context.Context, *connect.Request[proto.GetRbacRoleUsersRequest]) (*connect.Response[proto.GetRbacRoleUsersResponse], error)
+	GetRbacRoleGroups(context.Context, *connect.Request[proto.GetRbacRoleGroupsRequest]) (*connect.Response[proto.GetRbacRoleGroupsResponse], error)
+	GetMyPermissionsAudit(context.Context, *connect.Request[proto.GetMyPermissionsAuditRequest]) (*connect.Response[proto.GetMyPermissionsAuditResponse], error)
+	ListUserGroups(context.Context, *connect.Request[proto.ListUserGroupsRequest]) (*connect.Response[proto.ListUserGroupsResponse], error)
+	CreateUserGroup(context.Context, *connect.Request[proto.CreateUserGroupRequest]) (*connect.Response[proto.CreateUserGroupResponse], error)
+	DeleteUserGroup(context.Context, *connect.Request[proto.DeleteUserGroupRequest]) (*connect.Response[proto.DeleteUserGroupResponse], error)
+	GetUserGroupMembers(context.Context, *connect.Request[proto.GetUserGroupMembersRequest]) (*connect.Response[proto.GetUserGroupMembersResponse], error)
+	SetUserGroupMembers(context.Context, *connect.Request[proto.SetUserGroupMembersRequest]) (*connect.Response[proto.SetUserGroupMembersResponse], error)
 	// Device Code Authentication
 	GenerateDeviceCode(context.Context, *connect.Request[proto.GenerateDeviceCodeRequest]) (*connect.Response[proto.GenerateDeviceCodeResponse], error)
 	ClaimDeviceCode(context.Context, *connect.Request[proto.ClaimDeviceCodeRequest]) (*connect.Response[proto.ClaimDeviceCodeResponse], error)
@@ -326,6 +401,132 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockResetUserPasswordProcedure,
 			connect.WithSchema(sickRockMethods.ByName("ResetUserPassword")),
+			connect.WithClientOptions(opts...),
+		),
+		changePassword: connect.NewClient[proto.ChangePasswordRequest, proto.ChangePasswordResponse](
+			httpClient,
+			baseURL+SickRockChangePasswordProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ChangePassword")),
+			connect.WithClientOptions(opts...),
+		),
+		listUsers: connect.NewClient[proto.ListUsersRequest, proto.ListUsersResponse](
+			httpClient,
+			baseURL+SickRockListUsersProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListUsers")),
+			connect.WithClientOptions(opts...),
+		),
+		getUser: connect.NewClient[proto.GetUserRequest, proto.GetUserResponse](
+			httpClient,
+			baseURL+SickRockGetUserProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUser")),
+			connect.WithClientOptions(opts...),
+		),
+		createUser: connect.NewClient[proto.CreateUserRequest, proto.CreateUserResponse](
+			httpClient,
+			baseURL+SickRockCreateUserProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateUser")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteUser: connect.NewClient[proto.DeleteUserRequest, proto.DeleteUserResponse](
+			httpClient,
+			baseURL+SickRockDeleteUserProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteUser")),
+			connect.WithClientOptions(opts...),
+		),
+		listRbacPermissions: connect.NewClient[proto.ListRbacPermissionsRequest, proto.ListRbacPermissionsResponse](
+			httpClient,
+			baseURL+SickRockListRbacPermissionsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListRbacPermissions")),
+			connect.WithClientOptions(opts...),
+		),
+		listRbacRoles: connect.NewClient[proto.ListRbacRolesRequest, proto.ListRbacRolesResponse](
+			httpClient,
+			baseURL+SickRockListRbacRolesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListRbacRoles")),
+			connect.WithClientOptions(opts...),
+		),
+		createRbacRole: connect.NewClient[proto.CreateRbacRoleRequest, proto.CreateRbacRoleResponse](
+			httpClient,
+			baseURL+SickRockCreateRbacRoleProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateRbacRole")),
+			connect.WithClientOptions(opts...),
+		),
+		updateRbacRole: connect.NewClient[proto.UpdateRbacRoleRequest, proto.UpdateRbacRoleResponse](
+			httpClient,
+			baseURL+SickRockUpdateRbacRoleProcedure,
+			connect.WithSchema(sickRockMethods.ByName("UpdateRbacRole")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteRbacRole: connect.NewClient[proto.DeleteRbacRoleRequest, proto.DeleteRbacRoleResponse](
+			httpClient,
+			baseURL+SickRockDeleteRbacRoleProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteRbacRole")),
+			connect.WithClientOptions(opts...),
+		),
+		getUserRbacRoles: connect.NewClient[proto.GetUserRbacRolesRequest, proto.GetUserRbacRolesResponse](
+			httpClient,
+			baseURL+SickRockGetUserRbacRolesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUserRbacRoles")),
+			connect.WithClientOptions(opts...),
+		),
+		getUserGroupRbacRoles: connect.NewClient[proto.GetUserGroupRbacRolesRequest, proto.GetUserGroupRbacRolesResponse](
+			httpClient,
+			baseURL+SickRockGetUserGroupRbacRolesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUserGroupRbacRoles")),
+			connect.WithClientOptions(opts...),
+		),
+		setUserGroupRbacRoles: connect.NewClient[proto.SetUserGroupRbacRolesRequest, proto.SetUserGroupRbacRolesResponse](
+			httpClient,
+			baseURL+SickRockSetUserGroupRbacRolesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetUserGroupRbacRoles")),
+			connect.WithClientOptions(opts...),
+		),
+		getRbacRoleUsers: connect.NewClient[proto.GetRbacRoleUsersRequest, proto.GetRbacRoleUsersResponse](
+			httpClient,
+			baseURL+SickRockGetRbacRoleUsersProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetRbacRoleUsers")),
+			connect.WithClientOptions(opts...),
+		),
+		getRbacRoleGroups: connect.NewClient[proto.GetRbacRoleGroupsRequest, proto.GetRbacRoleGroupsResponse](
+			httpClient,
+			baseURL+SickRockGetRbacRoleGroupsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetRbacRoleGroups")),
+			connect.WithClientOptions(opts...),
+		),
+		getMyPermissionsAudit: connect.NewClient[proto.GetMyPermissionsAuditRequest, proto.GetMyPermissionsAuditResponse](
+			httpClient,
+			baseURL+SickRockGetMyPermissionsAuditProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetMyPermissionsAudit")),
+			connect.WithClientOptions(opts...),
+		),
+		listUserGroups: connect.NewClient[proto.ListUserGroupsRequest, proto.ListUserGroupsResponse](
+			httpClient,
+			baseURL+SickRockListUserGroupsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListUserGroups")),
+			connect.WithClientOptions(opts...),
+		),
+		createUserGroup: connect.NewClient[proto.CreateUserGroupRequest, proto.CreateUserGroupResponse](
+			httpClient,
+			baseURL+SickRockCreateUserGroupProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateUserGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteUserGroup: connect.NewClient[proto.DeleteUserGroupRequest, proto.DeleteUserGroupResponse](
+			httpClient,
+			baseURL+SickRockDeleteUserGroupProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteUserGroup")),
+			connect.WithClientOptions(opts...),
+		),
+		getUserGroupMembers: connect.NewClient[proto.GetUserGroupMembersRequest, proto.GetUserGroupMembersResponse](
+			httpClient,
+			baseURL+SickRockGetUserGroupMembersProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUserGroupMembers")),
+			connect.WithClientOptions(opts...),
+		),
+		setUserGroupMembers: connect.NewClient[proto.SetUserGroupMembersRequest, proto.SetUserGroupMembersResponse](
+			httpClient,
+			baseURL+SickRockSetUserGroupMembersProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetUserGroupMembers")),
 			connect.WithClientOptions(opts...),
 		),
 		generateDeviceCode: connect.NewClient[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse](
@@ -669,6 +870,27 @@ type sickRockClient struct {
 	logout                             *connect.Client[proto.LogoutRequest, proto.LogoutResponse]
 	validateToken                      *connect.Client[proto.ValidateTokenRequest, proto.ValidateTokenResponse]
 	resetUserPassword                  *connect.Client[proto.ResetUserPasswordRequest, proto.ResetUserPasswordResponse]
+	changePassword                     *connect.Client[proto.ChangePasswordRequest, proto.ChangePasswordResponse]
+	listUsers                          *connect.Client[proto.ListUsersRequest, proto.ListUsersResponse]
+	getUser                            *connect.Client[proto.GetUserRequest, proto.GetUserResponse]
+	createUser                         *connect.Client[proto.CreateUserRequest, proto.CreateUserResponse]
+	deleteUser                         *connect.Client[proto.DeleteUserRequest, proto.DeleteUserResponse]
+	listRbacPermissions                *connect.Client[proto.ListRbacPermissionsRequest, proto.ListRbacPermissionsResponse]
+	listRbacRoles                      *connect.Client[proto.ListRbacRolesRequest, proto.ListRbacRolesResponse]
+	createRbacRole                     *connect.Client[proto.CreateRbacRoleRequest, proto.CreateRbacRoleResponse]
+	updateRbacRole                     *connect.Client[proto.UpdateRbacRoleRequest, proto.UpdateRbacRoleResponse]
+	deleteRbacRole                     *connect.Client[proto.DeleteRbacRoleRequest, proto.DeleteRbacRoleResponse]
+	getUserRbacRoles                   *connect.Client[proto.GetUserRbacRolesRequest, proto.GetUserRbacRolesResponse]
+	getUserGroupRbacRoles              *connect.Client[proto.GetUserGroupRbacRolesRequest, proto.GetUserGroupRbacRolesResponse]
+	setUserGroupRbacRoles              *connect.Client[proto.SetUserGroupRbacRolesRequest, proto.SetUserGroupRbacRolesResponse]
+	getRbacRoleUsers                   *connect.Client[proto.GetRbacRoleUsersRequest, proto.GetRbacRoleUsersResponse]
+	getRbacRoleGroups                  *connect.Client[proto.GetRbacRoleGroupsRequest, proto.GetRbacRoleGroupsResponse]
+	getMyPermissionsAudit              *connect.Client[proto.GetMyPermissionsAuditRequest, proto.GetMyPermissionsAuditResponse]
+	listUserGroups                     *connect.Client[proto.ListUserGroupsRequest, proto.ListUserGroupsResponse]
+	createUserGroup                    *connect.Client[proto.CreateUserGroupRequest, proto.CreateUserGroupResponse]
+	deleteUserGroup                    *connect.Client[proto.DeleteUserGroupRequest, proto.DeleteUserGroupResponse]
+	getUserGroupMembers                *connect.Client[proto.GetUserGroupMembersRequest, proto.GetUserGroupMembersResponse]
+	setUserGroupMembers                *connect.Client[proto.SetUserGroupMembersRequest, proto.SetUserGroupMembersResponse]
 	generateDeviceCode                 *connect.Client[proto.GenerateDeviceCodeRequest, proto.GenerateDeviceCodeResponse]
 	claimDeviceCode                    *connect.Client[proto.ClaimDeviceCodeRequest, proto.ClaimDeviceCodeResponse]
 	checkDeviceCode                    *connect.Client[proto.CheckDeviceCodeRequest, proto.CheckDeviceCodeResponse]
@@ -754,6 +976,111 @@ func (c *sickRockClient) ValidateToken(ctx context.Context, req *connect.Request
 // ResetUserPassword calls sickrock.SickRock.ResetUserPassword.
 func (c *sickRockClient) ResetUserPassword(ctx context.Context, req *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error) {
 	return c.resetUserPassword.CallUnary(ctx, req)
+}
+
+// ChangePassword calls sickrock.SickRock.ChangePassword.
+func (c *sickRockClient) ChangePassword(ctx context.Context, req *connect.Request[proto.ChangePasswordRequest]) (*connect.Response[proto.ChangePasswordResponse], error) {
+	return c.changePassword.CallUnary(ctx, req)
+}
+
+// ListUsers calls sickrock.SickRock.ListUsers.
+func (c *sickRockClient) ListUsers(ctx context.Context, req *connect.Request[proto.ListUsersRequest]) (*connect.Response[proto.ListUsersResponse], error) {
+	return c.listUsers.CallUnary(ctx, req)
+}
+
+// GetUser calls sickrock.SickRock.GetUser.
+func (c *sickRockClient) GetUser(ctx context.Context, req *connect.Request[proto.GetUserRequest]) (*connect.Response[proto.GetUserResponse], error) {
+	return c.getUser.CallUnary(ctx, req)
+}
+
+// CreateUser calls sickrock.SickRock.CreateUser.
+func (c *sickRockClient) CreateUser(ctx context.Context, req *connect.Request[proto.CreateUserRequest]) (*connect.Response[proto.CreateUserResponse], error) {
+	return c.createUser.CallUnary(ctx, req)
+}
+
+// DeleteUser calls sickrock.SickRock.DeleteUser.
+func (c *sickRockClient) DeleteUser(ctx context.Context, req *connect.Request[proto.DeleteUserRequest]) (*connect.Response[proto.DeleteUserResponse], error) {
+	return c.deleteUser.CallUnary(ctx, req)
+}
+
+// ListRbacPermissions calls sickrock.SickRock.ListRbacPermissions.
+func (c *sickRockClient) ListRbacPermissions(ctx context.Context, req *connect.Request[proto.ListRbacPermissionsRequest]) (*connect.Response[proto.ListRbacPermissionsResponse], error) {
+	return c.listRbacPermissions.CallUnary(ctx, req)
+}
+
+// ListRbacRoles calls sickrock.SickRock.ListRbacRoles.
+func (c *sickRockClient) ListRbacRoles(ctx context.Context, req *connect.Request[proto.ListRbacRolesRequest]) (*connect.Response[proto.ListRbacRolesResponse], error) {
+	return c.listRbacRoles.CallUnary(ctx, req)
+}
+
+// CreateRbacRole calls sickrock.SickRock.CreateRbacRole.
+func (c *sickRockClient) CreateRbacRole(ctx context.Context, req *connect.Request[proto.CreateRbacRoleRequest]) (*connect.Response[proto.CreateRbacRoleResponse], error) {
+	return c.createRbacRole.CallUnary(ctx, req)
+}
+
+// UpdateRbacRole calls sickrock.SickRock.UpdateRbacRole.
+func (c *sickRockClient) UpdateRbacRole(ctx context.Context, req *connect.Request[proto.UpdateRbacRoleRequest]) (*connect.Response[proto.UpdateRbacRoleResponse], error) {
+	return c.updateRbacRole.CallUnary(ctx, req)
+}
+
+// DeleteRbacRole calls sickrock.SickRock.DeleteRbacRole.
+func (c *sickRockClient) DeleteRbacRole(ctx context.Context, req *connect.Request[proto.DeleteRbacRoleRequest]) (*connect.Response[proto.DeleteRbacRoleResponse], error) {
+	return c.deleteRbacRole.CallUnary(ctx, req)
+}
+
+// GetUserRbacRoles calls sickrock.SickRock.GetUserRbacRoles.
+func (c *sickRockClient) GetUserRbacRoles(ctx context.Context, req *connect.Request[proto.GetUserRbacRolesRequest]) (*connect.Response[proto.GetUserRbacRolesResponse], error) {
+	return c.getUserRbacRoles.CallUnary(ctx, req)
+}
+
+// GetUserGroupRbacRoles calls sickrock.SickRock.GetUserGroupRbacRoles.
+func (c *sickRockClient) GetUserGroupRbacRoles(ctx context.Context, req *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error) {
+	return c.getUserGroupRbacRoles.CallUnary(ctx, req)
+}
+
+// SetUserGroupRbacRoles calls sickrock.SickRock.SetUserGroupRbacRoles.
+func (c *sickRockClient) SetUserGroupRbacRoles(ctx context.Context, req *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error) {
+	return c.setUserGroupRbacRoles.CallUnary(ctx, req)
+}
+
+// GetRbacRoleUsers calls sickrock.SickRock.GetRbacRoleUsers.
+func (c *sickRockClient) GetRbacRoleUsers(ctx context.Context, req *connect.Request[proto.GetRbacRoleUsersRequest]) (*connect.Response[proto.GetRbacRoleUsersResponse], error) {
+	return c.getRbacRoleUsers.CallUnary(ctx, req)
+}
+
+// GetRbacRoleGroups calls sickrock.SickRock.GetRbacRoleGroups.
+func (c *sickRockClient) GetRbacRoleGroups(ctx context.Context, req *connect.Request[proto.GetRbacRoleGroupsRequest]) (*connect.Response[proto.GetRbacRoleGroupsResponse], error) {
+	return c.getRbacRoleGroups.CallUnary(ctx, req)
+}
+
+// GetMyPermissionsAudit calls sickrock.SickRock.GetMyPermissionsAudit.
+func (c *sickRockClient) GetMyPermissionsAudit(ctx context.Context, req *connect.Request[proto.GetMyPermissionsAuditRequest]) (*connect.Response[proto.GetMyPermissionsAuditResponse], error) {
+	return c.getMyPermissionsAudit.CallUnary(ctx, req)
+}
+
+// ListUserGroups calls sickrock.SickRock.ListUserGroups.
+func (c *sickRockClient) ListUserGroups(ctx context.Context, req *connect.Request[proto.ListUserGroupsRequest]) (*connect.Response[proto.ListUserGroupsResponse], error) {
+	return c.listUserGroups.CallUnary(ctx, req)
+}
+
+// CreateUserGroup calls sickrock.SickRock.CreateUserGroup.
+func (c *sickRockClient) CreateUserGroup(ctx context.Context, req *connect.Request[proto.CreateUserGroupRequest]) (*connect.Response[proto.CreateUserGroupResponse], error) {
+	return c.createUserGroup.CallUnary(ctx, req)
+}
+
+// DeleteUserGroup calls sickrock.SickRock.DeleteUserGroup.
+func (c *sickRockClient) DeleteUserGroup(ctx context.Context, req *connect.Request[proto.DeleteUserGroupRequest]) (*connect.Response[proto.DeleteUserGroupResponse], error) {
+	return c.deleteUserGroup.CallUnary(ctx, req)
+}
+
+// GetUserGroupMembers calls sickrock.SickRock.GetUserGroupMembers.
+func (c *sickRockClient) GetUserGroupMembers(ctx context.Context, req *connect.Request[proto.GetUserGroupMembersRequest]) (*connect.Response[proto.GetUserGroupMembersResponse], error) {
+	return c.getUserGroupMembers.CallUnary(ctx, req)
+}
+
+// SetUserGroupMembers calls sickrock.SickRock.SetUserGroupMembers.
+func (c *sickRockClient) SetUserGroupMembers(ctx context.Context, req *connect.Request[proto.SetUserGroupMembersRequest]) (*connect.Response[proto.SetUserGroupMembersResponse], error) {
+	return c.setUserGroupMembers.CallUnary(ctx, req)
 }
 
 // GenerateDeviceCode calls sickrock.SickRock.GenerateDeviceCode.
@@ -1040,6 +1367,28 @@ type SickRockHandler interface {
 	Logout(context.Context, *connect.Request[proto.LogoutRequest]) (*connect.Response[proto.LogoutResponse], error)
 	ValidateToken(context.Context, *connect.Request[proto.ValidateTokenRequest]) (*connect.Response[proto.ValidateTokenResponse], error)
 	ResetUserPassword(context.Context, *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error)
+	ChangePassword(context.Context, *connect.Request[proto.ChangePasswordRequest]) (*connect.Response[proto.ChangePasswordResponse], error)
+	// IAM / RBAC
+	ListUsers(context.Context, *connect.Request[proto.ListUsersRequest]) (*connect.Response[proto.ListUsersResponse], error)
+	GetUser(context.Context, *connect.Request[proto.GetUserRequest]) (*connect.Response[proto.GetUserResponse], error)
+	CreateUser(context.Context, *connect.Request[proto.CreateUserRequest]) (*connect.Response[proto.CreateUserResponse], error)
+	DeleteUser(context.Context, *connect.Request[proto.DeleteUserRequest]) (*connect.Response[proto.DeleteUserResponse], error)
+	ListRbacPermissions(context.Context, *connect.Request[proto.ListRbacPermissionsRequest]) (*connect.Response[proto.ListRbacPermissionsResponse], error)
+	ListRbacRoles(context.Context, *connect.Request[proto.ListRbacRolesRequest]) (*connect.Response[proto.ListRbacRolesResponse], error)
+	CreateRbacRole(context.Context, *connect.Request[proto.CreateRbacRoleRequest]) (*connect.Response[proto.CreateRbacRoleResponse], error)
+	UpdateRbacRole(context.Context, *connect.Request[proto.UpdateRbacRoleRequest]) (*connect.Response[proto.UpdateRbacRoleResponse], error)
+	DeleteRbacRole(context.Context, *connect.Request[proto.DeleteRbacRoleRequest]) (*connect.Response[proto.DeleteRbacRoleResponse], error)
+	GetUserRbacRoles(context.Context, *connect.Request[proto.GetUserRbacRolesRequest]) (*connect.Response[proto.GetUserRbacRolesResponse], error)
+	GetUserGroupRbacRoles(context.Context, *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error)
+	SetUserGroupRbacRoles(context.Context, *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error)
+	GetRbacRoleUsers(context.Context, *connect.Request[proto.GetRbacRoleUsersRequest]) (*connect.Response[proto.GetRbacRoleUsersResponse], error)
+	GetRbacRoleGroups(context.Context, *connect.Request[proto.GetRbacRoleGroupsRequest]) (*connect.Response[proto.GetRbacRoleGroupsResponse], error)
+	GetMyPermissionsAudit(context.Context, *connect.Request[proto.GetMyPermissionsAuditRequest]) (*connect.Response[proto.GetMyPermissionsAuditResponse], error)
+	ListUserGroups(context.Context, *connect.Request[proto.ListUserGroupsRequest]) (*connect.Response[proto.ListUserGroupsResponse], error)
+	CreateUserGroup(context.Context, *connect.Request[proto.CreateUserGroupRequest]) (*connect.Response[proto.CreateUserGroupResponse], error)
+	DeleteUserGroup(context.Context, *connect.Request[proto.DeleteUserGroupRequest]) (*connect.Response[proto.DeleteUserGroupResponse], error)
+	GetUserGroupMembers(context.Context, *connect.Request[proto.GetUserGroupMembersRequest]) (*connect.Response[proto.GetUserGroupMembersResponse], error)
+	SetUserGroupMembers(context.Context, *connect.Request[proto.SetUserGroupMembersRequest]) (*connect.Response[proto.SetUserGroupMembersResponse], error)
 	// Device Code Authentication
 	GenerateDeviceCode(context.Context, *connect.Request[proto.GenerateDeviceCodeRequest]) (*connect.Response[proto.GenerateDeviceCodeResponse], error)
 	ClaimDeviceCode(context.Context, *connect.Request[proto.ClaimDeviceCodeRequest]) (*connect.Response[proto.ClaimDeviceCodeResponse], error)
@@ -1157,6 +1506,132 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockResetUserPasswordProcedure,
 		svc.ResetUserPassword,
 		connect.WithSchema(sickRockMethods.ByName("ResetUserPassword")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockChangePasswordHandler := connect.NewUnaryHandler(
+		SickRockChangePasswordProcedure,
+		svc.ChangePassword,
+		connect.WithSchema(sickRockMethods.ByName("ChangePassword")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListUsersHandler := connect.NewUnaryHandler(
+		SickRockListUsersProcedure,
+		svc.ListUsers,
+		connect.WithSchema(sickRockMethods.ByName("ListUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetUserHandler := connect.NewUnaryHandler(
+		SickRockGetUserProcedure,
+		svc.GetUser,
+		connect.WithSchema(sickRockMethods.ByName("GetUser")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateUserHandler := connect.NewUnaryHandler(
+		SickRockCreateUserProcedure,
+		svc.CreateUser,
+		connect.WithSchema(sickRockMethods.ByName("CreateUser")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteUserHandler := connect.NewUnaryHandler(
+		SickRockDeleteUserProcedure,
+		svc.DeleteUser,
+		connect.WithSchema(sickRockMethods.ByName("DeleteUser")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListRbacPermissionsHandler := connect.NewUnaryHandler(
+		SickRockListRbacPermissionsProcedure,
+		svc.ListRbacPermissions,
+		connect.WithSchema(sickRockMethods.ByName("ListRbacPermissions")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListRbacRolesHandler := connect.NewUnaryHandler(
+		SickRockListRbacRolesProcedure,
+		svc.ListRbacRoles,
+		connect.WithSchema(sickRockMethods.ByName("ListRbacRoles")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateRbacRoleHandler := connect.NewUnaryHandler(
+		SickRockCreateRbacRoleProcedure,
+		svc.CreateRbacRole,
+		connect.WithSchema(sickRockMethods.ByName("CreateRbacRole")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockUpdateRbacRoleHandler := connect.NewUnaryHandler(
+		SickRockUpdateRbacRoleProcedure,
+		svc.UpdateRbacRole,
+		connect.WithSchema(sickRockMethods.ByName("UpdateRbacRole")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteRbacRoleHandler := connect.NewUnaryHandler(
+		SickRockDeleteRbacRoleProcedure,
+		svc.DeleteRbacRole,
+		connect.WithSchema(sickRockMethods.ByName("DeleteRbacRole")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetUserRbacRolesHandler := connect.NewUnaryHandler(
+		SickRockGetUserRbacRolesProcedure,
+		svc.GetUserRbacRoles,
+		connect.WithSchema(sickRockMethods.ByName("GetUserRbacRoles")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetUserGroupRbacRolesHandler := connect.NewUnaryHandler(
+		SickRockGetUserGroupRbacRolesProcedure,
+		svc.GetUserGroupRbacRoles,
+		connect.WithSchema(sickRockMethods.ByName("GetUserGroupRbacRoles")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetUserGroupRbacRolesHandler := connect.NewUnaryHandler(
+		SickRockSetUserGroupRbacRolesProcedure,
+		svc.SetUserGroupRbacRoles,
+		connect.WithSchema(sickRockMethods.ByName("SetUserGroupRbacRoles")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetRbacRoleUsersHandler := connect.NewUnaryHandler(
+		SickRockGetRbacRoleUsersProcedure,
+		svc.GetRbacRoleUsers,
+		connect.WithSchema(sickRockMethods.ByName("GetRbacRoleUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetRbacRoleGroupsHandler := connect.NewUnaryHandler(
+		SickRockGetRbacRoleGroupsProcedure,
+		svc.GetRbacRoleGroups,
+		connect.WithSchema(sickRockMethods.ByName("GetRbacRoleGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetMyPermissionsAuditHandler := connect.NewUnaryHandler(
+		SickRockGetMyPermissionsAuditProcedure,
+		svc.GetMyPermissionsAudit,
+		connect.WithSchema(sickRockMethods.ByName("GetMyPermissionsAudit")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListUserGroupsHandler := connect.NewUnaryHandler(
+		SickRockListUserGroupsProcedure,
+		svc.ListUserGroups,
+		connect.WithSchema(sickRockMethods.ByName("ListUserGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateUserGroupHandler := connect.NewUnaryHandler(
+		SickRockCreateUserGroupProcedure,
+		svc.CreateUserGroup,
+		connect.WithSchema(sickRockMethods.ByName("CreateUserGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteUserGroupHandler := connect.NewUnaryHandler(
+		SickRockDeleteUserGroupProcedure,
+		svc.DeleteUserGroup,
+		connect.WithSchema(sickRockMethods.ByName("DeleteUserGroup")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetUserGroupMembersHandler := connect.NewUnaryHandler(
+		SickRockGetUserGroupMembersProcedure,
+		svc.GetUserGroupMembers,
+		connect.WithSchema(sickRockMethods.ByName("GetUserGroupMembers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetUserGroupMembersHandler := connect.NewUnaryHandler(
+		SickRockSetUserGroupMembersProcedure,
+		svc.SetUserGroupMembers,
+		connect.WithSchema(sickRockMethods.ByName("SetUserGroupMembers")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockGenerateDeviceCodeHandler := connect.NewUnaryHandler(
@@ -1503,6 +1978,48 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockValidateTokenHandler.ServeHTTP(w, r)
 		case SickRockResetUserPasswordProcedure:
 			sickRockResetUserPasswordHandler.ServeHTTP(w, r)
+		case SickRockChangePasswordProcedure:
+			sickRockChangePasswordHandler.ServeHTTP(w, r)
+		case SickRockListUsersProcedure:
+			sickRockListUsersHandler.ServeHTTP(w, r)
+		case SickRockGetUserProcedure:
+			sickRockGetUserHandler.ServeHTTP(w, r)
+		case SickRockCreateUserProcedure:
+			sickRockCreateUserHandler.ServeHTTP(w, r)
+		case SickRockDeleteUserProcedure:
+			sickRockDeleteUserHandler.ServeHTTP(w, r)
+		case SickRockListRbacPermissionsProcedure:
+			sickRockListRbacPermissionsHandler.ServeHTTP(w, r)
+		case SickRockListRbacRolesProcedure:
+			sickRockListRbacRolesHandler.ServeHTTP(w, r)
+		case SickRockCreateRbacRoleProcedure:
+			sickRockCreateRbacRoleHandler.ServeHTTP(w, r)
+		case SickRockUpdateRbacRoleProcedure:
+			sickRockUpdateRbacRoleHandler.ServeHTTP(w, r)
+		case SickRockDeleteRbacRoleProcedure:
+			sickRockDeleteRbacRoleHandler.ServeHTTP(w, r)
+		case SickRockGetUserRbacRolesProcedure:
+			sickRockGetUserRbacRolesHandler.ServeHTTP(w, r)
+		case SickRockGetUserGroupRbacRolesProcedure:
+			sickRockGetUserGroupRbacRolesHandler.ServeHTTP(w, r)
+		case SickRockSetUserGroupRbacRolesProcedure:
+			sickRockSetUserGroupRbacRolesHandler.ServeHTTP(w, r)
+		case SickRockGetRbacRoleUsersProcedure:
+			sickRockGetRbacRoleUsersHandler.ServeHTTP(w, r)
+		case SickRockGetRbacRoleGroupsProcedure:
+			sickRockGetRbacRoleGroupsHandler.ServeHTTP(w, r)
+		case SickRockGetMyPermissionsAuditProcedure:
+			sickRockGetMyPermissionsAuditHandler.ServeHTTP(w, r)
+		case SickRockListUserGroupsProcedure:
+			sickRockListUserGroupsHandler.ServeHTTP(w, r)
+		case SickRockCreateUserGroupProcedure:
+			sickRockCreateUserGroupHandler.ServeHTTP(w, r)
+		case SickRockDeleteUserGroupProcedure:
+			sickRockDeleteUserGroupHandler.ServeHTTP(w, r)
+		case SickRockGetUserGroupMembersProcedure:
+			sickRockGetUserGroupMembersHandler.ServeHTTP(w, r)
+		case SickRockSetUserGroupMembersProcedure:
+			sickRockSetUserGroupMembersHandler.ServeHTTP(w, r)
 		case SickRockGenerateDeviceCodeProcedure:
 			sickRockGenerateDeviceCodeHandler.ServeHTTP(w, r)
 		case SickRockClaimDeviceCodeProcedure:
@@ -1644,6 +2161,90 @@ func (UnimplementedSickRockHandler) ValidateToken(context.Context, *connect.Requ
 
 func (UnimplementedSickRockHandler) ResetUserPassword(context.Context, *connect.Request[proto.ResetUserPasswordRequest]) (*connect.Response[proto.ResetUserPasswordResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ResetUserPassword is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ChangePassword(context.Context, *connect.Request[proto.ChangePasswordRequest]) (*connect.Response[proto.ChangePasswordResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ChangePassword is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListUsers(context.Context, *connect.Request[proto.ListUsersRequest]) (*connect.Response[proto.ListUsersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListUsers is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUser(context.Context, *connect.Request[proto.GetUserRequest]) (*connect.Response[proto.GetUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUser is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateUser(context.Context, *connect.Request[proto.CreateUserRequest]) (*connect.Response[proto.CreateUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateUser is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteUser(context.Context, *connect.Request[proto.DeleteUserRequest]) (*connect.Response[proto.DeleteUserResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUser is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListRbacPermissions(context.Context, *connect.Request[proto.ListRbacPermissionsRequest]) (*connect.Response[proto.ListRbacPermissionsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListRbacPermissions is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListRbacRoles(context.Context, *connect.Request[proto.ListRbacRolesRequest]) (*connect.Response[proto.ListRbacRolesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListRbacRoles is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateRbacRole(context.Context, *connect.Request[proto.CreateRbacRoleRequest]) (*connect.Response[proto.CreateRbacRoleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateRbacRole is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) UpdateRbacRole(context.Context, *connect.Request[proto.UpdateRbacRoleRequest]) (*connect.Response[proto.UpdateRbacRoleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateRbacRole is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteRbacRole(context.Context, *connect.Request[proto.DeleteRbacRoleRequest]) (*connect.Response[proto.DeleteRbacRoleResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteRbacRole is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUserRbacRoles(context.Context, *connect.Request[proto.GetUserRbacRolesRequest]) (*connect.Response[proto.GetUserRbacRolesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserRbacRoles is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUserGroupRbacRoles(context.Context, *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserGroupRbacRoles is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetUserGroupRbacRoles(context.Context, *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetUserGroupRbacRoles is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetRbacRoleUsers(context.Context, *connect.Request[proto.GetRbacRoleUsersRequest]) (*connect.Response[proto.GetRbacRoleUsersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetRbacRoleUsers is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetRbacRoleGroups(context.Context, *connect.Request[proto.GetRbacRoleGroupsRequest]) (*connect.Response[proto.GetRbacRoleGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetRbacRoleGroups is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetMyPermissionsAudit(context.Context, *connect.Request[proto.GetMyPermissionsAuditRequest]) (*connect.Response[proto.GetMyPermissionsAuditResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetMyPermissionsAudit is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListUserGroups(context.Context, *connect.Request[proto.ListUserGroupsRequest]) (*connect.Response[proto.ListUserGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListUserGroups is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateUserGroup(context.Context, *connect.Request[proto.CreateUserGroupRequest]) (*connect.Response[proto.CreateUserGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateUserGroup is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteUserGroup(context.Context, *connect.Request[proto.DeleteUserGroupRequest]) (*connect.Response[proto.DeleteUserGroupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserGroup is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUserGroupMembers(context.Context, *connect.Request[proto.GetUserGroupMembersRequest]) (*connect.Response[proto.GetUserGroupMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserGroupMembers is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetUserGroupMembers(context.Context, *connect.Request[proto.SetUserGroupMembersRequest]) (*connect.Response[proto.SetUserGroupMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetUserGroupMembers is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GenerateDeviceCode(context.Context, *connect.Request[proto.GenerateDeviceCodeRequest]) (*connect.Response[proto.GenerateDeviceCodeResponse], error) {

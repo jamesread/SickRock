@@ -68,9 +68,9 @@ function goBack() {
 <template>
   <Section :title="createButtonText">
     <template #toolbar>
-      <button @click="goBack" class="button back-button">
-        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
-        Back to Row
+      <button @click="goBack" class="button inline-icon back-button">
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Back to Row</span>
       </button>
     </template>
 

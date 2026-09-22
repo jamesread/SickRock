@@ -319,18 +319,18 @@ onMounted(async () => {
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"
-        class="button neutral"
+        class="button inline-icon neutral"
       >
-        <HugeiconsIcon :icon="ArrowLeft01Icon" width="16" height="16" />
-        Back to Table
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Back to Table</span>
       </router-link>
-      <router-link :to="`/table/${tableId}/foreign-keys`" class="button neutral">
-        <HugeiconsIcon :icon="Edit03Icon" />
-        Foreign Keys
+      <router-link :to="`/table/${tableId}/foreign-keys`" class="button inline-icon neutral">
+        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Foreign Keys</span>
       </router-link>
-      <router-link :to="`/table/${tableId}/add-column`" class="button neutral">
-        <HugeiconsIcon :icon="Edit03Icon" />
-        Create Column
+      <router-link :to="`/table/${tableId}/add-column`" class="button inline-icon neutral">
+        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Create Column</span>
       </router-link>
     </template>
 

@@ -1,0 +1,9 @@
+DROP TABLE IF EXISTS rbac_group_roles;
+DROP TABLE IF EXISTS rbac_role_permissions;
+DROP TABLE IF EXISTS rbac_roles;
+DROP TABLE IF EXISTS rbac_permissions;
+DROP TABLE IF EXISTS user_group_memberships;
+DROP TABLE IF EXISTS user_groups;
+DROP TABLE IF EXISTS api_keys;
+DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS user_accounts;

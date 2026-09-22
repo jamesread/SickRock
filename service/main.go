@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"connectrpc.com/connect"
 	"github.com/gin-gonic/gin"
 	"github.com/jamesread/golure/pkg/dirs"
 	"github.com/jmoiron/sqlx"
@@ -25,10 +24,11 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
+	armstore "github.com/jamesread/armature-iam/store"
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
-	"github.com/jamesread/SickRock/internal/auth"
 	"github.com/jamesread/SickRock/internal/buildinfo"
 	"github.com/jamesread/SickRock/internal/config"
+	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/mcp"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
@@ -49,32 +49,6 @@ func ginLogrusLogger() gin.HandlerFunc {
 		}).Debugf("Gin Log")
 		return ""
 	})
-}
-
-// mcpAuthMiddleware authenticates requests to /mcp using the same logic as the Connect API
-// (session or API key). It sets the authenticated user and read-only flag on the request context.
-func mcpAuthMiddleware(authService *auth.AuthService) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authUser := authService.AuthFromHttpReq(c.Request)
-		if authUser == nil || authUser.IsGuest() {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Authorization required"})
-			return
-		}
-		ctx := auth.AddUserToContext(c.Request.Context(), authUser)
-		if authUser.Provider == "api_key" {
-			authHeader := c.GetHeader("Authorization")
-			if authHeader != "" {
-				parts := strings.Split(authHeader, " ")
-				if len(parts) == 2 && parts[0] == "Bearer" {
-					if record, err := authService.ValidateAPIKey(ctx, parts[1]); err == nil && record != nil && record.ReadOnly {
-						ctx = context.WithValue(ctx, auth.ContextKeyAPIKeyReadOnly, true)
-					}
-				}
-			}
-		}
-		c.Request = c.Request.WithContext(ctx)
-		c.Next()
-	}
 }
 
 func loadEnvFile(cfg *config.Config) {
@@ -99,7 +73,6 @@ func loadEnvFile(cfg *config.Config) {
 		}
 		defer file.Close()
 
-		// Simple env file parser
 		scanner := bufio.NewScanner(file)
 		for scanner.Scan() {
 			line := strings.TrimSpace(scanner.Text())
@@ -137,7 +110,6 @@ func findFrontendDir() string {
 		return dir
 	}
 
-	// Prefer production build output when present.
 	possiblePaths := []string{
 		"../frontend/dist/",
 		"frontend/dist/",
@@ -149,12 +121,55 @@ func findFrontendDir() string {
 	}
 
 	indexHtml, _ := dirs.GetFirstExistingFileFromDirs("frontend", possiblePaths, "index.html")
-
 	frontendDir := filepath.Dir(indexHtml)
-
 	log.Infof("Using frontend directory: %s", frontendDir)
-
 	return frontendDir
+}
+
+func bootstrapIAM(ctx context.Context, iamStore armstore.Store) error {
+	if err := iamStore.EnsureRBACBootstrap(ctx); err != nil {
+		return err
+	}
+
+	if os.Getenv("SICKROCK_RESET_ADMIN_PASSWORD") != "" {
+		log.Info("SICKROCK_RESET_ADMIN_PASSWORD is set, resetting admin password to 'admin'")
+		user, err := iamStore.GetUserByUsername(ctx, "admin")
+		if err != nil {
+			return err
+		}
+		if user != nil {
+			hash, err := iam.HashPassword("admin")
+			if err != nil {
+				return err
+			}
+			if err := iamStore.UpdateUserPassword(ctx, user.ID, hash); err != nil {
+				log.Warnf("Failed to reset admin password: %v", err)
+			} else {
+				log.Info("Admin password has been reset to 'admin'")
+			}
+		}
+	}
+
+	count, err := iamStore.CountUserAccounts(ctx)
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		log.Info("No users found, creating default admin user")
+		hash, err := iam.HashPassword("admin")
+		if err != nil {
+			return err
+		}
+		if _, err := iamStore.CreateUserAccount(ctx, "admin", hash, armstore.UserCreatedByAdmin); err != nil {
+			return err
+		}
+		if err := iamStore.EnsureRBACBootstrap(ctx); err != nil {
+			return err
+		}
+		log.Info("Default admin user created (username: admin, password: admin)")
+	}
+
+	return nil
 }
 
 func main() {
@@ -184,62 +199,34 @@ func main() {
 
 	log.Infof("Connected to database: %s", db.DriverName())
 
-	repo := repo.NewRepository(db)
+	repository := repo.NewRepository(db)
 
-	// Log database engine version before migrations
 	logDatabaseEngineVersion(db)
 
 	if err := runMigrations(db); err != nil {
 		log.Fatalf("migrations failed: %v", err)
 	}
 
-	if err := repo.UpdateSystemTableConfigurations(context.Background()); err != nil {
+	if err := repository.UpdateSystemTableConfigurations(context.Background()); err != nil {
 		log.Fatalf("update system table configurations: %v", err)
 	}
 
-	// Log database engine version after migrations
 	logDatabaseEngineVersion(db)
 
-	// Reset admin password if environment variable is set
-	if os.Getenv("SICKROCK_RESET_ADMIN_PASSWORD") != "" {
-		log.Info("SICKROCK_RESET_ADMIN_PASSWORD environment variable is set, resetting admin password to 'admin'")
-		if err := repo.UpdateUserPassword(context.Background(), "admin", "admin"); err != nil {
-			log.Warnf("Failed to reset admin password: %v", err)
-		} else {
-			log.Info("Admin password has been reset to 'admin'")
-		}
+	iamStore := iam.NewStore(db)
+	if err := bootstrapIAM(context.Background(), iamStore); err != nil {
+		log.Fatalf("IAM bootstrap failed: %v", err)
 	}
 
-	// Create default admin user if no users exist
-	hasUsers, err := repo.HasUsers(context.Background())
+	authLayer, err := iam.NewAuthLayer(iamStore)
 	if err != nil {
-		log.Fatalf("failed to check for existing users: %v", err)
-	}
-	if !hasUsers {
-		log.Info("No users found in database, creating default admin user")
-		if err := repo.CreateDefaultAdminUser(context.Background()); err != nil {
-			log.Fatalf("failed to create default admin user: %v", err)
-		}
-		log.Info("Default admin user created (username: admin, password: admin)")
+		log.Fatalf("auth layer: %v", err)
 	}
 
-	authService := auth.NewAuthService(repo)
+	srv := srvpkg.NewSickRockServer(repository, authLayer)
 
-	srv := srvpkg.NewSickRockServer(repo, authService)
+	go startDeviceCodeCleanupJob(repository)
 
-	// Ensure httpauthshim context is properly shut down on exit
-	defer func() {
-		if authShimCtx := authService.GetAuthShimContext(); authShimCtx != nil {
-			if err := authShimCtx.Shutdown(); err != nil {
-				log.WithError(err).Warn("Error shutting down httpauthshim context")
-			}
-		}
-	}()
-
-	// Start session cleanup job
-	go startSessionCleanupJob(repo)
-
-	interceptors := connect.WithInterceptors(auth.ConnectAuthMiddleware(authService))
 	jsonOpt := connectproto.WithJSON(
 		protojson.MarshalOptions{
 			EmitUnpopulated:   true,
@@ -250,7 +237,8 @@ func main() {
 			DiscardUnknown: true,
 		},
 	)
-	path, handler := sickrockpbconnect.NewSickRockHandler(srv, interceptors, jsonOpt)
+	path, handler := sickrockpbconnect.NewSickRockHandler(srv, jsonOpt)
+	handler = authLayer.WrapHandler(handler)
 
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
@@ -263,7 +251,7 @@ func main() {
 		headers := c.Writer.Header()
 		headers.Set("Access-Control-Allow-Origin", "*")
 		headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		headers.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With, Accept, connect-protocol-version")
+		headers.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With, Accept, connect-protocol-version, Session-Token")
 		headers.Set("Access-Control-Allow-Credentials", "true")
 		headers.Set("Access-Control-Max-Age", "86400")
 
@@ -276,24 +264,20 @@ func main() {
 	})
 	router.Any("/api/*any", gin.WrapH(http.StripPrefix("/api", mux)))
 
-	// OpenAPI spec for the Connect RPC API at /api
 	router.GET("/openapi", func(c *gin.Context) {
 		c.Header("Content-Type", "application/json")
 		c.Data(http.StatusOK, "application/json", openAPISpec)
 	})
 
-	// llms.txt for LLM and agent discovery at the site root
 	router.GET("/llms.txt", func(c *gin.Context) {
 		c.Header("Content-Type", "text/plain; charset=utf-8")
 		c.Data(http.StatusOK, "text/plain; charset=utf-8", llmsTxt)
 	})
 
-	// MCP (Model Context Protocol) endpoint at /mcp — same auth as Connect API (session or API key)
 	mcpHandler := mcp.NewHandler(srv)
-	router.Any("/mcp", mcpAuthMiddleware(authService), gin.WrapH(mcpHandler))
-	router.Any("/mcp/*path", mcpAuthMiddleware(authService), gin.WrapH(mcpHandler))
+	router.Any("/mcp", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
+	router.Any("/mcp/*path", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
 
-	// Serve static files from frontend directory (must be before NoRoute)
 	frontendDir := findFrontendDir()
 	router.Static("/assets", filepath.Join(frontendDir, "assets"))
 	router.Static("/css", filepath.Join(frontendDir, "css"))
@@ -301,15 +285,12 @@ func main() {
 	router.Static("/images", filepath.Join(frontendDir, "images"))
 	router.StaticFile("/favicon.ico", filepath.Join(frontendDir, "favicon.ico"))
 
-	// Serve PWA-critical files with proper Content-Type headers
-	// Manifest must be served with application/manifest+json Content-Type
 	router.GET("/manifest.json", func(c *gin.Context) {
 		manifestPath := filepath.Join(frontendDir, "manifest.json")
 		c.Header("Content-Type", "application/manifest+json")
 		c.File(manifestPath)
 	})
 
-	// Service worker must be served from root with application/javascript Content-Type
 	router.GET("/sw.js", func(c *gin.Context) {
 		swPath := filepath.Join(frontendDir, "sw.js")
 		c.Header("Content-Type", "application/javascript")
@@ -317,16 +298,10 @@ func main() {
 		c.File(swPath)
 	})
 
-	// Serve icons directory
 	router.Static("/icons", filepath.Join(frontendDir, "icons"))
-
-	// Serve offline.html
 	router.StaticFile("/offline.html", filepath.Join(frontendDir, "offline.html"))
-
-	// Serve screenshots (optional, but referenced in manifest)
 	router.Static("/screenshots", filepath.Join(frontendDir, "screenshots"))
 
-	// SPA fallback for non-API routes (must be last)
 	router.NoRoute(func(c *gin.Context) {
 		if strings.HasPrefix(c.Request.URL.Path, "/api") {
 			c.Status(http.StatusNotFound)
@@ -344,12 +319,9 @@ func main() {
 }
 
 func runMigrations(db *sqlx.DB) error {
-	// Use the underlying *sql.DB for migrate drivers
 	sqlDB := db.DB
-
 	driverName := db.DriverName()
 
-	// Select migrations directory by driver
 	cwd, _ := os.Getwd()
 	var migDir string
 	var databaseName string
@@ -358,7 +330,6 @@ func runMigrations(db *sqlx.DB) error {
 	switch driverName {
 	case "mysql":
 		migDir = filepath.Join(cwd, "migrations", "mysql")
-
 		log.Infof("MySQL detected - migrations dir: %s", migDir)
 		databaseName = "mysql"
 		md, err := mysql.WithInstance(sqlDB, &mysql.Config{})
@@ -366,7 +337,7 @@ func runMigrations(db *sqlx.DB) error {
 			return err
 		}
 		d = md
-	default: // sqlite
+	default:
 		migDir = filepath.Join(cwd, "migrations", "sqlite")
 		databaseName = "sqlite3"
 		sd, err := sqlite3.WithInstance(sqlDB, &sqlite3.Config{})
@@ -381,9 +352,7 @@ func runMigrations(db *sqlx.DB) error {
 	if err != nil {
 		return err
 	}
-	// Do not close m here; Close() would close the shared *sql.DB instance
 
-	// Version before
 	beforeVer, beforeDirty, verr := m.Version()
 	if verr == migrate.ErrNilVersion {
 		beforeVer, beforeDirty = 0, false
@@ -398,7 +367,6 @@ func runMigrations(db *sqlx.DB) error {
 		return err
 	}
 
-	// Version after
 	afterVer, afterDirty, aerr := m.Version()
 	if aerr == migrate.ErrNilVersion {
 		afterVer, afterDirty = 0, false
@@ -420,7 +388,7 @@ func logDatabaseEngineVersion(db *sqlx.DB) {
 	switch driver {
 	case "mysql":
 		err = db.Get(&version, "SELECT VERSION()")
-	default: // sqlite3
+	default:
 		err = db.Get(&version, "SELECT sqlite_version()")
 	}
 	if err != nil {
@@ -434,32 +402,23 @@ func logListenPort(port string) {
 	log.Infof("Listening on port %s", port)
 }
 
-func startSessionCleanupJob(repo *repo.Repository) {
-	ticker := time.NewTicker(7 * 24 * time.Hour) // Weekly cleanup
+func startDeviceCodeCleanupJob(repository *repo.Repository) {
+	ticker := time.NewTicker(7 * 24 * time.Hour)
 	defer ticker.Stop()
 
-	log.Info("Session cleanup job started - will run weekly")
+	log.Info("Device code cleanup job started - will run weekly")
+	cleanupDeviceCodes(repository)
 
-	// Run immediately on startup
-	cleanupSessions(repo)
-
-	// Then run weekly
 	for range ticker.C {
-		cleanupSessions(repo)
+		cleanupDeviceCodes(repository)
 	}
 }
 
-func cleanupSessions(repo *repo.Repository) {
+func cleanupDeviceCodes(repository *repo.Repository) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	err := repo.CleanupExpiredSessions(ctx)
-	if err != nil {
-		log.Errorf("Session cleanup failed: %v", err)
-	}
-
-	err = repo.CleanupExpiredDeviceCodes(ctx)
-	if err != nil {
+	if err := repository.CleanupExpiredDeviceCodes(ctx); err != nil {
 		log.Errorf("Device code cleanup failed: %v", err)
 	}
 }

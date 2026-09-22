@@ -26,6 +26,7 @@ export const createApiClient = () => {
 
   const transport = createConnectTransport({
     baseUrl: '/api',
+    fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
     interceptors: [
       authInterceptor(() => authStore.user?.token ?? localStorage.getItem(SESSION_TOKEN_KEY) ?? undefined),
     ],

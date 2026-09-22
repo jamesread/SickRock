@@ -21,8 +21,7 @@ import { isOnline } from './utils/indexedDB'
 
 const sidebar = ref(null)
 const navigation = ref(null)
-const isSidebarOpen = ref(true)
-const SIDEBAR_STATE_KEY = 'sickrock_sidebar_open'
+const topBarNavigation = ref(null)
 const PINNED_WORKFLOW_KEY = 'sickrock_pinned_workflow'
 const router = useRouter()
 const authStore = useAuthStore()
@@ -35,16 +34,7 @@ const isOffline = ref(false)
 const apiClient = createApiClient()
 provide('apiClient', apiClient)
 
-function persistSidebarState() {
-    try { localStorage.setItem(SIDEBAR_STATE_KEY, isSidebarOpen.value ? '1' : '0') } catch {}
-}
-
-// Keep sidebar state in sync with navigation (the Sidebar auto-closes on navigation,
-// so we mirror that in our local state to avoid the first toggle being a no-op).
 router.afterEach(() => {
-    isSidebarOpen.value = false
-    if (sidebar.value) sidebar.value.close()
-    persistSidebarState()
     // Close QuickSearch when navigation occurs (e.g., item selected)
     quickSearch.value?.close?.()
     // Check if current page can be bookmarked
@@ -52,10 +42,7 @@ router.afterEach(() => {
 })
 
 function toggleSidebar() {
-    isSidebarOpen.value = !isSidebarOpen.value
-    if (isSidebarOpen.value) sidebar.value.open()
-    else sidebar.value.close()
-    persistSidebarState()
+    sidebar.value?.toggle()
 }
 
 async function handleLogout() {
@@ -341,19 +328,12 @@ async function loadAppData() {
             authStore.setInitResponse(initResponse)
         } catch (error) {
             console.error('Failed to call init in loadAppData:', error)
-            // If init fails, user is not authenticated
-            if (sidebar.value) sidebar.value.close();
-            isSidebarOpen.value = false
-            persistSidebarState()
             return
         }
     }
 
     // Only load data if authenticated
     if (!authStore.isAuthenticated) {
-        if (sidebar.value) sidebar.value.close();
-        isSidebarOpen.value = false
-        persistSidebarState()
         return
     }
 
@@ -374,15 +354,6 @@ async function loadAppData() {
                 path: '/',
                 icon: HomeIcon
             })
-        }
-        if (sidebar.value) {
-            sidebar.value.stick()
-            try {
-                const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
-                isSidebarOpen.value = (stored == null ? true : stored === '1')
-            } catch { isSidebarOpen.value = true }
-            if (isSidebarOpen.value) sidebar.value.open()
-            else sidebar.value.close()
         }
         return
     }
@@ -554,16 +525,6 @@ async function loadAppData() {
 
             navigation.value.addCallback('Logout', async () => { await handleLogout() }, { icon: LogoutIcon })
         }
-        if (sidebar.value) {
-            sidebar.value.stick()
-            // Restore sidebar state from localStorage (default open)
-            try {
-                const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
-                isSidebarOpen.value = (stored == null ? true : stored === '1')
-            } catch { isSidebarOpen.value = true }
-            if (isSidebarOpen.value) sidebar.value.open()
-            else sidebar.value.close()
-        }
     } catch (error) {
         console.error('Failed to load data:', error)
 
@@ -589,15 +550,6 @@ async function loadAppData() {
                     path: '/',
                     icon: HomeIcon
                 })
-            }
-            if (sidebar.value) {
-                sidebar.value.stick()
-                try {
-                    const stored = localStorage.getItem(SIDEBAR_STATE_KEY)
-                    isSidebarOpen.value = (stored == null ? true : stored === '1')
-                } catch { isSidebarOpen.value = true }
-                if (isSidebarOpen.value) sidebar.value.open()
-                else sidebar.value.close()
             }
             return
         }
@@ -1128,84 +1080,6 @@ onMounted(async () => {
 </script>
 
 <template>
-    <Header
-        :title = "appTitle"
-        :logoUrl = "logo"
-        :username = "user?.username"
-        @toggleSidebar = "toggleSidebar"
-        @userClick = "goToUserControlPanel"
-        v-if="isAuthenticated">
-
-        <template #toolbar>
-            <div class="toolbar-content">
-                <QuickSearch
-                    ref="quickSearch"
-                    placeholder="Search..."
-                    :search-fields="['title', 'name', 'description']"
-                    :auto-import-routes="false"
-                    :enable-global-shortcut="false"
-                />
-
-                <!-- Pinned workflow quick links, styled like bookmarks -->
-                <div v-if="pinnedWorkflowItems.length" class="pinned-workflow-toolbar">
-                    <router-link
-                        v-if="pinnedWorkflowId != null"
-                        :to="`/workflow/${pinnedWorkflowId}`"
-                        class="pinned-workflow-label"
-                        :title="pinnedWorkflowName || 'Workflow'"
-                    >
-                        <span class="pinned-workflow-label-text">{{ pinnedWorkflowName }}</span>
-                    </router-link>
-                    <span v-else class="pinned-workflow-label">
-                        <span class="pinned-workflow-label-text">{{ pinnedWorkflowName }}</span>
-                    </span>
-                    <div class="bookmarks-list-toolbar">
-                        <router-link
-                            v-for="item in pinnedWorkflowItems"
-                            :key="item.id"
-                            :to="item.path"
-                            class="bookmark-toolbar-item"
-                            :title="item.title"
-                        >
-                            <HugeiconsIcon
-                                :icon="item.icon"
-                                class="bookmark-toolbar-icon"
-                            />
-                            <span class="bookmark-toolbar-text">
-                                {{ item.title }}
-                            </span>
-                        </router-link>
-                    </div>
-                </div>
-
-                <button
-                    v-if="isInstallable && !isInstalled"
-                    @click="handlePWAInstall"
-                    :disabled="installingPWA"
-                    class="neutral pwa-install-header-button"
-                    :title="installingPWA ? 'Installing...' : 'Install App'"
-                >
-                    <HugeiconsIcon :icon="Hugeicons.Download01Icon" width="1em" height="1em" />
-                </button>
-                <button
-                    @click="showShortcutsHelp = true"
-                    class="neutral help-button"
-                    title="Keyboard Shortcuts (g then ?)"
-                >
-                    <HugeiconsIcon :icon="Hugeicons.QuestionIcon" width="1em" height="1em" />
-                </button>
-                <button
-                    @click="showBookmarks = !showBookmarks"
-                    class="neutral bookmark-button"
-                    :class="{ 'bookmarked': isCurrentPageBookmarked }"
-                    :title="isCurrentPageBookmarked ? 'Remove bookmark' : 'Add bookmark'"
-                >
-                    <HugeiconsIcon :icon="Hugeicons.CheckmarkSquare03Icon" width="1em" height="1em" />
-                </button>
-            </div>
-        </template>
-    </Header>
-
     <!-- Always render router-view so login page can display -->
     <template v-if="!isAuthenticated">
         <router-view :key="$route.path" />
@@ -1213,32 +1087,114 @@ onMounted(async () => {
 
     <template v-else>
         <Navigation ref="navigation">
+            <Navigation ref="topBarNavigation">
+                <Header
+                    :title="appTitle"
+                    :logoUrl="logo"
+                    :username="user?.username"
+                    :sidebarEnabled="true"
+                    :navigation="navigation"
+                    :topBarNavigation="topBarNavigation"
+                    @toggleSidebar="toggleSidebar"
+                    @userClick="goToUserControlPanel"
+                >
+                    <template #toolbar>
+                        <div class="toolbar-content">
+                            <QuickSearch
+                                ref="quickSearch"
+                                placeholder="Search..."
+                                :search-fields="['title', 'name', 'description']"
+                                :auto-import-routes="false"
+                                :enable-global-shortcut="false"
+                            />
+
+                            <!-- Pinned workflow quick links, styled like bookmarks -->
+                            <div v-if="pinnedWorkflowItems.length" class="pinned-workflow-toolbar">
+                                <router-link
+                                    v-if="pinnedWorkflowId != null"
+                                    :to="`/workflow/${pinnedWorkflowId}`"
+                                    class="pinned-workflow-label"
+                                    :title="pinnedWorkflowName || 'Workflow'"
+                                >
+                                    <span class="pinned-workflow-label-text">{{ pinnedWorkflowName }}</span>
+                                </router-link>
+                                <span v-else class="pinned-workflow-label">
+                                    <span class="pinned-workflow-label-text">{{ pinnedWorkflowName }}</span>
+                                </span>
+                                <div class="bookmarks-list-toolbar">
+                                    <router-link
+                                        v-for="item in pinnedWorkflowItems"
+                                        :key="item.id"
+                                        :to="item.path"
+                                        class="bookmark-toolbar-item"
+                                        :title="item.title"
+                                    >
+                                        <HugeiconsIcon
+                                            :icon="item.icon"
+                                            class="bookmark-toolbar-icon"
+                                        />
+                                        <span class="bookmark-toolbar-text">
+                                            {{ item.title }}
+                                        </span>
+                                    </router-link>
+                                </div>
+                            </div>
+
+                            <button
+                                v-if="isInstallable && !isInstalled"
+                                @click="handlePWAInstall"
+                                :disabled="installingPWA"
+                                class="neutral pwa-install-header-button"
+                                :title="installingPWA ? 'Installing...' : 'Install App'"
+                            >
+                                <HugeiconsIcon :icon="Hugeicons.Download01Icon" width="1em" height="1em" />
+                            </button>
+                            <button
+                                @click="showShortcutsHelp = true"
+                                class="neutral help-button"
+                                title="Keyboard Shortcuts (g then ?)"
+                            >
+                                <HugeiconsIcon :icon="Hugeicons.QuestionIcon" width="1em" height="1em" />
+                            </button>
+                            <button
+                                @click="showBookmarks = !showBookmarks"
+                                class="neutral bookmark-button"
+                                :class="{ 'bookmarked': isCurrentPageBookmarked }"
+                                :title="isCurrentPageBookmarked ? 'Remove bookmark' : 'Add bookmark'"
+                            >
+                                <HugeiconsIcon :icon="Hugeicons.CheckmarkSquare03Icon" width="1em" height="1em" />
+                            </button>
+                        </div>
+                    </template>
+                </Header>
+            </Navigation>
+
             <div id="layout">
                 <Sidebar ref="sidebar" />
+
                 <div id="content">
-                <!-- Offline Banner -->
-                <div v-if="isOffline" class="offline-banner">
-                    <span>📡 You're offline. Some features may be unavailable.</span>
+                    <!-- Offline Banner -->
+                    <div v-if="isOffline" class="offline-banner">
+                        <span>📡 You're offline. Some features may be unavailable.</span>
+                    </div>
+                    <main>
+                        <router-view :key="$route.path" />
+                    </main>
+                    <footer v-if="version">
+                        <span>
+                            <a
+                                href="https://github.com/jamesread/SickRock"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title="View on GitHub"
+                            >
+                                SickRock
+                            </a>
+                        </span>
+                        <span>{{ version }}</span>
+                    </footer>
                 </div>
-                <main>
-                    <router-view :key="$route.path" />
-                </main>
-                <footer v-if="version">
-                    <span>
-                        <a
-                            href="https://github.com/jamesread/SickRock"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            class="github-link"
-                            title="View on GitHub"
-                        >
-                            SickRock
-                        </a>
-                    </span>
-                    <span>{{ version }}</span>
-                </footer>
             </div>
-        </div>
         </Navigation>
     </template>
 
@@ -1704,11 +1660,6 @@ onMounted(async () => {
 }
 
 /* Constrain main content area to prevent page scrolling */
-#layout {
-    display: flex;
-	flex-direction: column;
-}
-
 #content {
     flex: 1;
     display: flex;
@@ -1721,25 +1672,6 @@ onMounted(async () => {
     min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
-}
-
-footer span {
-    color: #666;
-}
-
-.github-link {
-    color: #007bff;
-    text-decoration: none;
-    transition: color 0.2s ease;
-}
-
-.github-link:hover {
-    color: #0056b3;
-    text-decoration: underline;
-}
-
-.github-link:visited {
-    color: #007bff;
 }
 
 @media (max-width: 768px) {

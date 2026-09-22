@@ -188,28 +188,26 @@ onMounted(() => {
 <template>
   <Section :title="sectionTitle" :padding="false">
     <template #toolbar>
-      <div class="toolbar">
-        <ViewsButton
-          :table-id="props.tableId"
-          :show-view-create="true"
-          :show-view-edit="true"
-          @view-changed="(viewType: string) => {
-            emit('view-changed', viewType)
-            if (viewType === 'ticklist') {
-              load()
-            }
-          }"
-        />
-        <button class="button neutral" @click="clearTicks" title="Clear all ticks">
-          <HugeiconsIcon :icon="Cancel01Icon" />
-          Clear Ticks
-        </button>
-        <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
-        <router-link :to="`/table/${props.tableId}/insert-row`" class="button primary">
-          <HugeiconsIcon :icon="CheckmarkSquare03Icon" />
-          Add Item
-        </router-link>
-      </div>
+      <ViewsButton
+        :table-id="props.tableId"
+        :show-view-create="true"
+        :show-view-edit="true"
+        @view-changed="(viewType: string) => {
+          emit('view-changed', viewType)
+          if (viewType === 'ticklist') {
+            load()
+          }
+        }"
+      />
+      <button class="button inline-icon neutral" @click="clearTicks" title="Clear all ticks">
+        <HugeiconsIcon :icon="Cancel01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Clear Ticks</span>
+      </button>
+      <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
+      <router-link :to="`/table/${props.tableId}/insert-row`" class="button inline-icon primary">
+        <HugeiconsIcon :icon="CheckmarkSquare03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Add Item</span>
+      </router-link>
     </template>
 
     <div v-if="loading" class="loading">Loading...</div>
@@ -244,13 +242,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
 .loading, .error, .warning {
   padding: 20px;
   text-align: center;
