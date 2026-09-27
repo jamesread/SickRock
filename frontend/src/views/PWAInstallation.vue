@@ -2,9 +2,16 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePWAInstall } from '../composables/usePWAInstall'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import * as Hugeicons from '@hugeicons/core-free-icons'
-import { Download01Icon, CheckmarkSquare03Icon, QuestionIcon } from '@hugeicons/core-free-icons'
+import {
+  Download01Icon,
+  CheckmarkSquare03Icon,
+  QuestionIcon,
+  RefreshIcon,
+} from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import StatusCard from 'picocrank/vue/components/StatusCard.vue'
+
+const iconStrokeWidth = 2.5
 
 // PWA Install
 const { isInstallable, isInstalled, promptInstall } = usePWAInstall()
@@ -320,6 +327,24 @@ async function loadDiagnostics() {
   diagnostics.value = await runPWADiagnostics()
 }
 
+function toggleDiagnostics() {
+  showDiagnostics.value = !showDiagnostics.value
+  if (showDiagnostics.value && diagnostics.value.length === 0) {
+    void loadDiagnostics()
+  }
+}
+
+function diagnosticKarma(status: PWADiagnostic['status']): string {
+  switch (status) {
+    case 'pass':
+      return 'good'
+    case 'fail':
+      return 'bad'
+    default:
+      return 'warning'
+  }
+}
+
 function getPWAInstallStatus() {
   if (isInstalled.value) {
     return {
@@ -388,6 +413,18 @@ function formatSWState(state: string | null): string {
   return stateMap[state] || state.charAt(0).toUpperCase() + state.slice(1)
 }
 
+function swStateTagClass(state: string | null): string {
+  switch (state) {
+    case 'activated':
+    case 'installed':
+      return 'fg-good'
+    case 'redundant':
+      return 'bad'
+    default:
+      return 'note'
+  }
+}
+
 const pwaStatus = computed(() => getPWAInstallStatus())
 
 onMounted(async () => {
@@ -404,134 +441,138 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Section title="PWA & Service Worker">
+  <Section
+    title="PWA & Service Worker"
+    subtitle="Install SickRock as an app and check offline service worker status."
+    :icon="Download01Icon"
+  >
     <div class="pwa-section">
-      <!-- Service Worker Status -->
-      <div class="sw-status">
-        <h4>Service Worker Status</h4>
-        <div v-if="swStatus.registered" class="sw-status-info registered">
-          <div class="sw-status-item">
-            <strong>Status:</strong>
-            <span class="sw-state" :class="swStatus.state">{{ formatSWState(swStatus.state) }}</span>
-          </div>
-          <div v-if="swStatus.version" class="sw-status-item">
-            <strong>Version:</strong> {{ swStatus.version }}
-          </div>
-          <div v-if="swStatus.scope" class="sw-status-item">
-            <strong>Scope:</strong> <code>{{ swStatus.scope }}</code>
+      <h3 class="subsection-title">Service worker status</h3>
+      <StatusCard :karma="swStatus.registered ? 'good' : 'bad'">
+        <template v-if="swStatus.registered">
+          <dl class="meta-list">
+            <dt>Status</dt>
+            <dd>
+              <span class="tag" :class="swStateTagClass(swStatus.state)">
+                {{ formatSWState(swStatus.state) }}
+              </span>
+            </dd>
+            <template v-if="swStatus.version">
+              <dt>Version</dt>
+              <dd>{{ swStatus.version }}</dd>
+            </template>
+            <template v-if="swStatus.scope">
+              <dt>Scope</dt>
+              <dd><code class="mono">{{ swStatus.scope }}</code></dd>
+            </template>
+          </dl>
+        </template>
+        <template v-else>
+          <p class="status-lead">Service worker is not registered.</p>
+          <p v-if="swStatus.error" class="inline-notification error">{{ swStatus.error }}</p>
+        </template>
+      </StatusCard>
+
+      <h3 class="subsection-title">App installation</h3>
+      <StatusCard v-if="isInstalled" karma="good">
+        <div class="status-block">
+          <HugeiconsIcon
+            :icon="CheckmarkSquare03Icon"
+            width="1.5em"
+            height="1.5em"
+            :strokeWidth="iconStrokeWidth"
+            class="status-block-icon"
+          />
+          <div>
+            <h4 class="status-heading">App installed</h4>
+            <p class="subtle">
+              SickRock is installed on this device. You can use it offline and open it from your home
+              screen.
+            </p>
           </div>
         </div>
-        <div v-else class="sw-status-info not-registered">
-          <div class="sw-status-item">
-            <strong>Status:</strong> Not Registered
-          </div>
-          <div v-if="swStatus.error" class="sw-status-item sw-error">
-            <strong>Error:</strong> {{ swStatus.error }}
-          </div>
-        </div>
-      </div>
+      </StatusCard>
 
-      <!-- PWA Installation Status -->
-      <div class="pwa-install-section">
-        <h4>App Installation</h4>
-
-        <div v-if="isInstalled" class="pwa-status installed">
-          <div class="pwa-status-icon">
-            <HugeiconsIcon :icon="Hugeicons.CheckmarkSquare03Icon" />
-          </div>
-          <div class="pwa-status-content">
-            <h5>App Installed</h5>
-            <p>SickRock is installed as an app on this device. You can use it offline and access it from your home screen.</p>
-          </div>
-        </div>
-
-        <div v-else-if="pwaStatus.canInstall" class="pwa-status installable">
-          <div class="pwa-status-icon">
-            <HugeiconsIcon :icon="Hugeicons.Download01Icon" />
-          </div>
-          <div class="pwa-status-content">
-            <h5>Install SickRock</h5>
-            <p>Install SickRock as an app for a better experience, offline access, and quick launch from your home screen.</p>
+      <StatusCard v-else-if="pwaStatus.canInstall" karma="note">
+        <div class="status-block">
+          <HugeiconsIcon
+            :icon="Download01Icon"
+            width="1.5em"
+            height="1.5em"
+            :strokeWidth="iconStrokeWidth"
+            class="status-block-icon"
+          />
+          <div>
+            <h4 class="status-heading">Install SickRock</h4>
+            <p class="subtle">
+              Install as an app for offline access and quick launch from your home screen.
+            </p>
             <button
-              @click="handlePWAInstall"
+              type="button"
+              class="inline-icon good"
               :disabled="installingPWA"
-              class="pwa-install-button"
+              @click="handlePWAInstall"
             >
-              <HugeiconsIcon :icon="Hugeicons.Download01Icon" />
-              {{ installingPWA ? 'Installing...' : 'Install App' }}
+              <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+              <span>{{ installingPWA ? 'Installing…' : 'Install app' }}</span>
             </button>
           </div>
         </div>
+      </StatusCard>
 
-          <div v-else class="pwa-status not-available">
-            <div class="pwa-status-icon">
-              <HugeiconsIcon :icon="Hugeicons.QuestionIcon" />
-            </div>
-            <div class="pwa-status-content">
-              <h5>Installation Not Available</h5>
-              <p>PWA installation is not currently available. Possible reasons:</p>
-              <ul class="pwa-reasons-list">
-                <li v-for="(reason, index) in pwaStatus.reasons" :key="index">
-                  {{ reason }}
-                </li>
+      <StatusCard v-else karma="warning">
+        <div class="status-block">
+          <HugeiconsIcon
+            :icon="QuestionIcon"
+            width="1.5em"
+            height="1.5em"
+            :strokeWidth="iconStrokeWidth"
+            class="status-block-icon"
+          />
+          <div>
+            <h4 class="status-heading">Installation not available</h4>
+            <p class="subtle">PWA installation is not currently available. Possible reasons:</p>
+            <ul v-if="pwaStatus.reasons?.length" class="reasons-list subtle">
+              <li v-for="(reason, index) in pwaStatus.reasons" :key="index">{{ reason }}</li>
+            </ul>
+            <div class="help-panel">
+              <p><strong>To enable installation</strong></p>
+              <ul class="reasons-list subtle">
+                <li>Use a modern browser (Chrome, Edge, Safari, or Firefox)</li>
+                <li>Serve the app over HTTPS (or localhost for development)</li>
+                <li>Confirm your browser supports PWA installation</li>
+                <li>On iOS, use Safari</li>
               </ul>
-              <div class="pwa-help">
-                <p><strong>To enable installation:</strong></p>
-                <ul>
-                  <li>Make sure you're using a modern browser (Chrome, Edge, Safari, Firefox)</li>
-                  <li>Ensure the app is served over HTTPS (or localhost for development)</li>
-                  <li>Check that your browser supports PWA installation</li>
-                  <li>On iOS, use Safari browser</li>
-                </ul>
-              </div>
             </div>
           </div>
         </div>
+      </StatusCard>
 
-      <!-- Detailed Diagnostics -->
-      <div class="diagnostics-section">
-        <div class="diagnostics-header">
-          <h4>Detailed Diagnostics</h4>
-          <button
-            @click="showDiagnostics = !showDiagnostics; if (showDiagnostics && diagnostics.length === 0) loadDiagnostics()"
-            class="diagnostics-toggle"
-          >
-            {{ showDiagnostics ? 'Hide' : 'Show' }} Diagnostics
-          </button>
-        </div>
+      <div class="diagnostics-toolbar">
+        <h3 class="subsection-title diagnostics-title">Detailed diagnostics</h3>
+        <button type="button" class="neutral" @click="toggleDiagnostics">
+          {{ showDiagnostics ? 'Hide diagnostics' : 'Show diagnostics' }}
+        </button>
+      </div>
 
-        <div v-if="showDiagnostics" class="diagnostics-content">
-          <div v-if="diagnostics.length === 0" class="diagnostics-loading">
-            Loading diagnostics...
-          </div>
-          <div v-else class="diagnostics-list">
-            <div
-              v-for="(diagnostic, index) in diagnostics"
-              :key="index"
-              class="diagnostic-item"
-              :class="diagnostic.status"
-            >
-              <div class="diagnostic-header">
-                <span class="diagnostic-status-icon">
-                  <span v-if="diagnostic.status === 'pass'">✓</span>
-                  <span v-else-if="diagnostic.status === 'fail'">✗</span>
-                  <span v-else>⚠</span>
-                </span>
-                <strong class="diagnostic-name">{{ diagnostic.name }}</strong>
-              </div>
-              <div class="diagnostic-message">{{ diagnostic.message }}</div>
-              <div v-if="diagnostic.details" class="diagnostic-details">
-                {{ diagnostic.details }}
-              </div>
-            </div>
-          </div>
-          <button
-            @click="loadDiagnostics()"
-            class="refresh-diagnostics-button"
+      <div v-if="showDiagnostics" class="diagnostics-panel">
+        <div v-if="diagnostics.length === 0" class="muted diagnostics-loading">Loading diagnostics…</div>
+        <div v-else class="diagnostics-list">
+          <StatusCard
+            v-for="(diagnostic, index) in diagnostics"
+            :key="index"
+            :karma="diagnosticKarma(diagnostic.status)"
+            compact
           >
-            Refresh Diagnostics
-          </button>
+            <h4 class="status-heading">{{ diagnostic.name }}</h4>
+            <p class="subtle">{{ diagnostic.message }}</p>
+            <p v-if="diagnostic.details" class="diagnostic-details subtle">{{ diagnostic.details }}</p>
+          </StatusCard>
         </div>
+        <button type="button" class="neutral full-width" @click="loadDiagnostics">
+          <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+          <span>Refresh diagnostics</span>
+        </button>
       </div>
     </div>
   </Section>
@@ -541,386 +582,120 @@ onMounted(async () => {
 .pwa-section {
   display: flex;
   flex-direction: column;
-  gap: 2rem;
+  gap: 0.75rem;
 }
 
-/* Service Worker Status */
-.sw-status {
-  padding: 1rem;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
+.subsection-title {
+  margin: 1.25rem 0 0.35rem;
+  color: var(--text-color, inherit);
 }
 
-.sw-status h4 {
-  margin: 0 0 1rem 0;
-  color: #333;
-  font-size: 1rem;
+.subsection-title:first-child {
+  margin-top: 0;
 }
 
-.sw-status-info {
+.status-heading {
+  margin: 0 0 0.35rem;
+  color: var(--text-color, inherit);
+  font-size: 1.05rem;
+}
+
+.status-lead {
+  margin: 0;
+  color: var(--text-color, inherit);
+}
+
+.status-block {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.status-block-icon {
+  flex-shrink: 0;
+  color: var(--text-color, inherit);
+}
+
+.meta-list {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0;
+}
+
+.meta-list dt {
+  margin: 0;
+  color: var(--muted-text-color, inherit);
+  font-weight: 500;
+}
+
+.meta-list dd {
+  margin: 0;
+  color: var(--text-color, inherit);
+}
+
+.mono {
+  word-break: break-all;
+  background: var(--standout-bg-color, transparent);
+  border: 1px solid var(--border-color, currentColor);
+  padding: 0.15rem 0.35rem;
+  border-radius: 3px;
+}
+
+.reasons-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.help-panel {
+  margin-top: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  background: var(--standout-bg-color, transparent);
+  border: 1px solid var(--border-color, currentColor);
+}
+
+.help-panel p {
+  margin: 0 0 0.35rem;
+  color: var(--text-color, inherit);
+}
+
+.diagnostics-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.diagnostics-title {
+  margin: 0;
+}
+
+.diagnostics-panel {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sw-status-info.registered {
-  border-left: 3px solid #28a745;
-  padding-left: 0.75rem;
-}
-
-.sw-status-info.not-registered {
-  border-left: 3px solid #dc3545;
-  padding-left: 0.75rem;
-}
-
-.sw-status-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.sw-status-item strong {
-  color: #333;
-  min-width: 80px;
-}
-
-.sw-status-item code {
-  background: #f8f9fa;
-  padding: 0.25rem 0.5rem;
-  border-radius: 3px;
-  font-size: 0.85rem;
-  word-break: break-all;
-}
-
-.sw-state {
-  padding: 0.25rem 0.5rem;
-  border-radius: 3px;
-  font-size: 0.85rem;
-  font-weight: 500;
-}
-
-.sw-state.installing {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.sw-state.installed {
-  background: #d1ecf1;
-  color: #0c5460;
-}
-
-.sw-state.activating {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.sw-state.activated {
-  background: #d4edda;
-  color: #155724;
-}
-
-.sw-state.redundant {
-  background: #f8d7da;
-  color: #721c24;
-}
-
-.sw-error {
-  color: #dc3545;
-}
-
-/* PWA Installation Section */
-.pwa-install-section {
-  padding: 1rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-}
-
-.pwa-install-section h4 {
-  margin: 0 0 1.5rem 0;
-  color: #333;
-}
-
-.pwa-status {
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-}
-
-.pwa-status.installed {
-  border-color: #28a745;
-  background: #d4edda;
-}
-
-.pwa-status.installable {
-  border-color: #007bff;
-  background: #e7f3ff;
-}
-
-.pwa-status.not-available {
-  border-color: #ffc107;
-  background: #fff3cd;
-}
-
-.pwa-status-icon {
-  flex-shrink: 0;
-  width: 48px;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-}
-
-.pwa-status.installed .pwa-status-icon {
-  background: #28a745;
-  color: white;
-}
-
-.pwa-status.installable .pwa-status-icon {
-  background: #007bff;
-  color: white;
-}
-
-.pwa-status.not-available .pwa-status-icon {
-  background: #ffc107;
-  color: #212529;
-}
-
-.pwa-status-icon svg {
-  width: 24px;
-  height: 24px;
-}
-
-.pwa-status-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.pwa-status-content h5 {
-  margin: 0 0 0.5rem 0;
-  color: #333;
-  font-size: 1.1rem;
-}
-
-.pwa-status-content p {
-  margin: 0 0 1rem 0;
-  color: #666;
-  line-height: 1.5;
-}
-
-.pwa-install-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
-}
-
-.pwa-install-button:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.pwa-install-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.pwa-install-button svg {
-  width: 18px;
-  height: 18px;
-}
-
-.pwa-reasons-list {
-  margin: 0.75rem 0;
-  padding-left: 1.5rem;
-  color: #666;
-}
-
-.pwa-reasons-list li {
-  margin-bottom: 0.5rem;
-  line-height: 1.5;
-}
-
-.pwa-help {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 4px;
-}
-
-.pwa-help p {
-  margin: 0 0 0.5rem 0;
-  font-weight: 500;
-  color: #333;
-}
-
-.pwa-help ul {
-  margin: 0.5rem 0 0 0;
-  padding-left: 1.5rem;
-  color: #666;
-}
-
-.pwa-help ul li {
-  margin-bottom: 0.25rem;
-  line-height: 1.5;
-}
-
-/* Diagnostics Section */
-.diagnostics-section {
-  margin-top: 2rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-}
-
-.diagnostics-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.diagnostics-header h4 {
-  margin: 0;
-  color: #333;
-  font-size: 1rem;
-}
-
-.diagnostics-toggle {
-  padding: 0.5rem 1rem;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.2s ease;
-}
-
-.diagnostics-toggle:hover {
-  background: #0056b3;
-}
-
-.diagnostics-content {
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 1rem;
-}
-
-.diagnostics-loading {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
-  font-style: italic;
+  gap: 0.75rem;
 }
 
 .diagnostics-list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.diagnostic-item {
-  padding: 0.75rem;
-  border-radius: 4px;
-  border-left: 4px solid;
-}
-
-.diagnostic-item.pass {
-  background: #d4edda;
-  border-left-color: #28a745;
-}
-
-.diagnostic-item.fail {
-  background: #f8d7da;
-  border-left-color: #dc3545;
-}
-
-.diagnostic-item.warning {
-  background: #fff3cd;
-  border-left-color: #ffc107;
-}
-
-.diagnostic-header {
-  display: flex;
-  align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.5rem;
 }
 
-.diagnostic-status-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  font-weight: bold;
-  font-size: 0.9rem;
-}
-
-.diagnostic-item.pass .diagnostic-status-icon {
-  background: #28a745;
-  color: white;
-}
-
-.diagnostic-item.fail .diagnostic-status-icon {
-  background: #dc3545;
-  color: white;
-}
-
-.diagnostic-item.warning .diagnostic-status-icon {
-  background: #ffc107;
-  color: #212529;
-}
-
-.diagnostic-name {
-  color: #333;
-  font-size: 0.95rem;
-}
-
-.diagnostic-message {
-  color: #666;
-  font-size: 0.9rem;
-  margin-bottom: 0.25rem;
+.diagnostics-loading {
+  padding: 1rem 0;
 }
 
 .diagnostic-details {
-  color: #888;
-  font-size: 0.85rem;
-  font-style: italic;
-  margin-top: 0.25rem;
+  margin: 0.35rem 0 0;
+  font-size: 0.9em;
 }
 
-.refresh-diagnostics-button {
+.full-width {
   width: 100%;
-  padding: 0.75rem;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background-color 0.2s ease;
-}
-
-.refresh-diagnostics-button:hover {
-  background: #545b62;
+  justify-content: center;
 }
 </style>

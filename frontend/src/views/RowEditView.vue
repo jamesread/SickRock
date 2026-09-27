@@ -7,7 +7,7 @@ import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from '../components/InsertRow.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, Edit03Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -66,7 +66,7 @@ function goBack() {
 </script>
 
 <template>
-  <Section :title="createButtonText">
+  <Section :title="createButtonText" :icon="Edit03Icon">
     <template #toolbar>
       <button @click="goBack" class="button inline-icon back-button">
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />

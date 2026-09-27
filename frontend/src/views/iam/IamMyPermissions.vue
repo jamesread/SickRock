@@ -46,7 +46,11 @@ onMounted(load)
 </script>
 
 <template>
-  <Section title="My Permissions" subtitle="Review your group membership and effective permissions">
+  <Section
+    title="My Permissions"
+    subtitle="Review your group membership and effective permissions"
+    :icon="ShieldKeyIcon"
+  >
     <template #toolbar>
       <router-link :to="{ name: 'user-control-panel' }" class="button inline-icon neutral">
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
@@ -62,14 +66,14 @@ onMounted(load)
     <template v-else>
       <h3 class="subsection-title">Group membership</h3>
       <p v-if="!groupNames.length" class="inline-notification note">You are not a member of any user groups.</p>
-      <p v-else>
-        <span v-for="name in groupNames" :key="name" class="role-tag">{{ name }}</span>
+      <p v-else class="inline-tags">
+        <span v-for="name in groupNames" :key="name" class="tag note">{{ name }}</span>
       </p>
 
       <h3 class="subsection-title">Effective roles</h3>
       <p v-if="!roleNames.length" class="inline-notification note">No roles via group membership.</p>
-      <p v-else>
-        <span v-for="name in roleNames" :key="name" class="role-tag">{{ name }}</span>
+      <p v-else class="inline-tags">
+        <span v-for="name in roleNames" :key="name" class="tag">{{ name }}</span>
       </p>
 
       <h3 class="subsection-title">Effective permissions</h3>
@@ -87,14 +91,17 @@ onMounted(load)
         </thead>
         <tbody>
           <tr v-for="row in auditRows" :key="row.name">
-            <td class="perm-status-col">{{ row.granted ? '✓' : '✗' }}</td>
+            <td class="perm-status-col">
+              <span v-if="row.granted" class="tag good">granted</span>
+              <span v-else class="tag bad">denied</span>
+            </td>
             <td><code>{{ row.name }}</code></td>
             <td>
-              <span v-if="isSuperuser && !row.grantingGroups.length" class="role-tag">superuser</span>
-              <template v-else>
-                <span v-for="gn in row.grantingGroups" :key="gn" class="role-tag">{{ gn }}</span>
-                <span v-if="!row.grantingGroups.length" class="muted">—</span>
-              </template>
+              <span v-if="!(isSuperuser && !row.grantingGroups.length) && !row.grantingGroups.length" class="muted">—</span>
+              <span v-else class="inline-tags">
+                <span v-if="isSuperuser && !row.grantingGroups.length" class="tag good">superuser</span>
+                <span v-for="gn in row.grantingGroups" :key="gn" class="tag note">{{ gn }}</span>
+              </span>
             </td>
           </tr>
         </tbody>
@@ -107,21 +114,17 @@ onMounted(load)
 .subsection-title {
   margin: 1.25rem 0 0.35rem;
 }
-.role-tag {
-  display: inline-block;
-  margin: 0 0.35rem 0.35rem 0;
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  background: #e2e8f0;
-  font-size: 0.85rem;
+.inline-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 .perm-audit-table {
   width: 100%;
   margin-top: 0.75rem;
 }
 .perm-status-col {
-  width: 4rem;
-  text-align: center;
+  width: 6.5rem;
 }
 .muted {
   opacity: 0.75;

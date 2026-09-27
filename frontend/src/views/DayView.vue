@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, Calendar03Icon } from '@hugeicons/core-free-icons'
 import ViewsButton from '../components/ViewsButton.vue'
 
 const route = useRoute()
@@ -251,7 +251,7 @@ onMounted(loadData)
 </script>
 
 <template>
-  <Section title="Day view" :padding="true" class="day-view-section" @click="handleSectionClick">
+  <Section title="Day view" :icon="Calendar03Icon" :padding="true" class="day-view-section" @click="handleSectionClick">
     <template #toolbar>
       <button @click="goBack" class="button inline-icon neutral">
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />

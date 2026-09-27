@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { inject } from 'vue'
 import type { createApiClient } from '../stores/api'
-import { Edit02Icon } from '@hugeicons/core-free-icons'
+import { Edit02Icon, LayoutIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 
@@ -54,20 +54,20 @@ onMounted(load)
 </script>
 
 <template>
-  <Section :title="dashboardName">
+  <Section :title="dashboardName" :icon="LayoutIcon">
     <template #toolbar>
       <div class="dashboard-actions">
         <router-link
           v-if="dashboardId"
           :to="`/table/table_dashboards/${dashboardId}`"
-          class="btn btn-outline-primary edit-dashboard-btn"
+          class="button neutral edit-dashboard-btn"
         >
           View Dashboard
         </router-link>
         <router-link
           v-if="dashboardId"
           :to="`/table/table_dashboard_components/insert-row/?dashboard=${dashboardId}&dashboardName=${encodeURIComponent(dashboardName)}`"
-          class="btn btn-primary add-widget-btn"
+          class="button good add-widget-btn"
         >
           Add Widget
         </router-link>
@@ -127,33 +127,8 @@ onMounted(load)
   gap: 10px;
   align-items: center;
 }
-.add-widget-btn {
-  padding: 8px 16px;
-  background: #007bff;
-  color: white;
-  text-decoration: none;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: background-color 0.2s;
-}
-.add-widget-btn:hover {
-  background: #0056b3;
-  color: white;
-  text-decoration: none;
-}
+.add-widget-btn,
 .edit-dashboard-btn {
-  padding: 8px 16px;
-  background: transparent;
-  color: #007bff;
-  border: 1px solid #007bff;
-  text-decoration: none;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-.edit-dashboard-btn:hover {
-  background: #007bff;
-  color: white;
   text-decoration: none;
 }
 .meta { margin: 0.25rem 0 1rem 0; color: #6c757d; }

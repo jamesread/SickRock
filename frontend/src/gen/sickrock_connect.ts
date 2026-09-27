@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, ChangePasswordRequest, ChangePasswordResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, ClearTickListStateRequest, ClearTickListStateResponse, CreateAPIKeyRequest, CreateAPIKeyResponse, CreateConditionalFormattingRuleRequest, CreateConditionalFormattingRuleResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateRbacRoleRequest, CreateRbacRoleResponse, CreateTableConfigurationRequest, CreateTableConfigurationResponse, CreateTableRequest, CreateTableResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, CreateUserGroupRequest, CreateUserGroupResponse, CreateUserNotificationChannelRequest, CreateUserNotificationChannelResponse, CreateUserNotificationSubscriptionRequest, CreateUserNotificationSubscriptionResponse, CreateUserRequest, CreateUserResponse, DeactivateAPIKeyRequest, DeactivateAPIKeyResponse, DeleteAPIKeyRequest, DeleteAPIKeyResponse, DeleteConditionalFormattingRuleRequest, DeleteConditionalFormattingRuleResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteRbacRoleRequest, DeleteRbacRoleResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DeleteUserGroupRequest, DeleteUserGroupResponse, DeleteUserNotificationChannelRequest, DeleteUserNotificationChannelResponse, DeleteUserNotificationSubscriptionRequest, DeleteUserNotificationSubscriptionResponse, DeleteUserRequest, DeleteUserResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetAPIKeysRequest, GetAPIKeysResponse, GetConditionalFormattingRulesRequest, GetConditionalFormattingRulesResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDatabaseTablesRequest, GetDatabaseTablesResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetMyPermissionsAuditRequest, GetMyPermissionsAuditResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetNotificationEventsRequest, GetNotificationEventsResponse, GetRbacRoleGroupsRequest, GetRbacRoleGroupsResponse, GetRbacRoleUsersRequest, GetRbacRoleUsersResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetTickListStateRequest, GetTickListStateResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, GetUserGroupMembersRequest, GetUserGroupMembersResponse, GetUserGroupRbacRolesRequest, GetUserGroupRbacRolesResponse, GetUserNotificationChannelsRequest, GetUserNotificationChannelsResponse, GetUserNotificationSubscriptionsRequest, GetUserNotificationSubscriptionsResponse, GetUserRbacRolesRequest, GetUserRbacRolesResponse, GetUserRequest, GetUserResponse, InitRequest, InitResponse, ListItemsRequest, ListItemsResponse, ListRbacPermissionsRequest, ListRbacPermissionsResponse, ListRbacRolesRequest, ListRbacRolesResponse, ListUserGroupsRequest, ListUserGroupsResponse, ListUsersRequest, ListUsersResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, SetTickListCompletionRequest, SetTickListCompletionResponse, SetUserGroupMembersRequest, SetUserGroupMembersResponse, SetUserGroupRbacRolesRequest, SetUserGroupRbacRolesResponse, UpdateAPIKeyRequest, UpdateAPIKeyResponse, UpdateConditionalFormattingRuleRequest, UpdateConditionalFormattingRuleResponse, UpdateRbacRoleRequest, UpdateRbacRoleResponse, UpdateTableViewRequest, UpdateTableViewResponse, UpdateUserNotificationChannelRequest, UpdateUserNotificationChannelResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
+import { AddTableColumnRequest, ChangeColumnNameRequest, ChangeColumnNameResponse, ChangeColumnTypeRequest, ChangeColumnTypeResponse, ChangePasswordRequest, ChangePasswordResponse, CheckDeviceCodeRequest, CheckDeviceCodeResponse, ClaimDeviceCodeRequest, ClaimDeviceCodeResponse, ClearTickListStateRequest, ClearTickListStateResponse, CreateAPIKeyRequest, CreateAPIKeyResponse, CreateConditionalFormattingRuleRequest, CreateConditionalFormattingRuleResponse, CreateDashboardComponentRuleRequest, CreateDashboardComponentRuleResponse, CreateForeignKeyRequest, CreateForeignKeyResponse, CreateItemRequest, CreateItemResponse, CreateRbacRoleRequest, CreateRbacRoleResponse, CreateTableConfigurationRequest, CreateTableConfigurationResponse, CreateTableRequest, CreateTableResponse, CreateTableViewRequest, CreateTableViewResponse, CreateUserBookmarkRequest, CreateUserBookmarkResponse, CreateUserGroupRequest, CreateUserGroupResponse, CreateUserNotificationChannelRequest, CreateUserNotificationChannelResponse, CreateUserNotificationSubscriptionRequest, CreateUserNotificationSubscriptionResponse, CreateUserRequest, CreateUserResponse, DeactivateAPIKeyRequest, DeactivateAPIKeyResponse, DeleteAPIKeyRequest, DeleteAPIKeyResponse, DeleteConditionalFormattingRuleRequest, DeleteConditionalFormattingRuleResponse, DeleteForeignKeyRequest, DeleteForeignKeyResponse, DeleteItemRequest, DeleteItemResponse, DeleteRbacRoleRequest, DeleteRbacRoleResponse, DeleteTableViewRequest, DeleteTableViewResponse, DeleteUserBookmarkRequest, DeleteUserBookmarkResponse, DeleteUserGroupRequest, DeleteUserGroupResponse, DeleteUserNotificationChannelRequest, DeleteUserNotificationChannelResponse, DeleteUserNotificationSubscriptionRequest, DeleteUserNotificationSubscriptionResponse, DeleteUserRequest, DeleteUserResponse, DropColumnRequest, DropColumnResponse, EditItemRequest, EditItemResponse, GenerateDeviceCodeRequest, GenerateDeviceCodeResponse, GetAPIKeysRequest, GetAPIKeysResponse, GetConditionalFormattingRulesRequest, GetConditionalFormattingRulesResponse, GetDashboardComponentRulesRequest, GetDashboardComponentRulesResponse, GetDashboardsRequest, GetDashboardsResponse, GetDatabaseTablesRequest, GetDatabaseTablesResponse, GetDeviceCodeSessionRequest, GetDeviceCodeSessionResponse, GetForeignKeysRequest, GetForeignKeysResponse, GetItemRequest, GetItemResponse, GetMostRecentlyViewedRequest, GetMostRecentlyViewedResponse, GetMyPermissionsAuditRequest, GetMyPermissionsAuditResponse, GetNavigationLinksRequest, GetNavigationLinksResponse, GetNavigationRequest, GetNavigationResponse, GetNotificationEventsRequest, GetNotificationEventsResponse, GetRbacRoleGroupsRequest, GetRbacRoleGroupsResponse, GetRbacRoleUsersRequest, GetRbacRoleUsersResponse, GetReadOnlyCalendarExportRequest, GetReadOnlyCalendarExportResponse, GetSystemInfoRequest, GetSystemInfoResponse, GetTableAccessRequest, GetTableAccessResponse, GetTableConfigurationsRequest, GetTableConfigurationsResponse, GetTableStructureRequest, GetTableStructureResponse, GetTableViewsRequest, GetTableViewsResponse, GetTickListStateRequest, GetTickListStateResponse, GetUserBookmarksRequest, GetUserBookmarksResponse, GetUserEffectiveRoleGrantsRequest, GetUserEffectiveRoleGrantsResponse, GetUserGroupMembersRequest, GetUserGroupMembersResponse, GetUserGroupRbacRolesRequest, GetUserGroupRbacRolesResponse, GetUserNotificationChannelsRequest, GetUserNotificationChannelsResponse, GetUserNotificationSubscriptionsRequest, GetUserNotificationSubscriptionsResponse, GetUserRbacRolesRequest, GetUserRbacRolesResponse, GetUserRequest, GetUserResponse, InitRequest, InitResponse, ListAccessibleReadOnlyExportsRequest, ListAccessibleReadOnlyExportsResponse, ListGroupTableRoleGrantsRequest, ListGroupTableRoleGrantsResponse, ListItemsRequest, ListItemsResponse, ListRbacPermissionsRequest, ListRbacPermissionsResponse, ListRbacRolesRequest, ListRbacRolesResponse, ListTableShareGrantsRequest, ListTableShareGrantsResponse, ListUserGroupsRequest, ListUserGroupsResponse, ListUsersRequest, ListUsersResponse, LoginRequest, LoginResponse, LogoutRequest, LogoutResponse, PingRequest, PingResponse, ResetUserPasswordRequest, ResetUserPasswordResponse, SetGroupTableRoleGrantsRequest, SetGroupTableRoleGrantsResponse, SetTableShareGrantsRequest, SetTableShareGrantsResponse, SetTickListCompletionRequest, SetTickListCompletionResponse, SetUserGroupMembersRequest, SetUserGroupMembersResponse, SetUserGroupRbacRolesRequest, SetUserGroupRbacRolesResponse, SetWorkflowNavigationMembersRequest, SetWorkflowNavigationMembersResponse, UpdateAPIKeyRequest, UpdateAPIKeyResponse, UpdateConditionalFormattingRuleRequest, UpdateConditionalFormattingRuleResponse, UpdateRbacRoleRequest, UpdateRbacRoleResponse, UpdateTableViewRequest, UpdateTableViewResponse, UpdateUserNotificationChannelRequest, UpdateUserNotificationChannelResponse, ValidateTokenRequest, ValidateTokenResponse } from "./sickrock_pb";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -170,6 +170,15 @@ export const SickRock = {
       kind: MethodKind.Unary,
     },
     /**
+     * @generated from rpc sickrock.SickRock.GetUserEffectiveRoleGrants
+     */
+    getUserEffectiveRoleGrants: {
+      name: "GetUserEffectiveRoleGrants",
+      I: GetUserEffectiveRoleGrantsRequest,
+      O: GetUserEffectiveRoleGrantsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
      * @generated from rpc sickrock.SickRock.GetUserGroupRbacRoles
      */
     getUserGroupRbacRoles: {
@@ -185,6 +194,42 @@ export const SickRock = {
       name: "SetUserGroupRbacRoles",
       I: SetUserGroupRbacRolesRequest,
       O: SetUserGroupRbacRolesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ListGroupTableRoleGrants
+     */
+    listGroupTableRoleGrants: {
+      name: "ListGroupTableRoleGrants",
+      I: ListGroupTableRoleGrantsRequest,
+      O: ListGroupTableRoleGrantsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.SetGroupTableRoleGrants
+     */
+    setGroupTableRoleGrants: {
+      name: "SetGroupTableRoleGrants",
+      I: SetGroupTableRoleGrantsRequest,
+      O: SetGroupTableRoleGrantsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ListTableShareGrants
+     */
+    listTableShareGrants: {
+      name: "ListTableShareGrants",
+      I: ListTableShareGrantsRequest,
+      O: ListTableShareGrantsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.SetTableShareGrants
+     */
+    setTableShareGrants: {
+      name: "SetTableShareGrants",
+      I: SetTableShareGrantsRequest,
+      O: SetTableShareGrantsResponse,
       kind: MethodKind.Unary,
     },
     /**
@@ -358,6 +403,35 @@ export const SickRock = {
       kind: MethodKind.Unary,
     },
     /**
+     * Assign navigation items as members of a workflow hub (does not set table_navigation.workflow_id)
+     *
+     * @generated from rpc sickrock.SickRock.SetWorkflowNavigationMembers
+     */
+    setWorkflowNavigationMembers: {
+      name: "SetWorkflowNavigationMembers",
+      I: SetWorkflowNavigationMembersRequest,
+      O: SetWorkflowNavigationMembersResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetReadOnlyCalendarExport
+     */
+    getReadOnlyCalendarExport: {
+      name: "GetReadOnlyCalendarExport",
+      I: GetReadOnlyCalendarExportRequest,
+      O: GetReadOnlyCalendarExportResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.ListAccessibleReadOnlyExports
+     */
+    listAccessibleReadOnlyExports: {
+      name: "ListAccessibleReadOnlyExports",
+      I: ListAccessibleReadOnlyExportsRequest,
+      O: ListAccessibleReadOnlyExportsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
      * Generic CRUD over items on a page
      *
      * @generated from rpc sickrock.SickRock.ListItems
@@ -413,6 +487,15 @@ export const SickRock = {
       name: "GetTableStructure",
       I: GetTableStructureRequest,
       O: GetTableStructureResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * @generated from rpc sickrock.SickRock.GetTableAccess
+     */
+    getTableAccess: {
+      name: "GetTableAccess",
+      I: GetTableAccessRequest,
+      O: GetTableAccessResponse,
       kind: MethodKind.Unary,
     },
     /**

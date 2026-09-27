@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import { Edit03Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -167,10 +168,10 @@ function datetimeLocalToMysql(datetimeLocal: string): string {
 </script>
 
 <template>
-  <Section :title="`Edit Row ${rowId}`">
+  <Section :title="`Edit Row ${rowId}`" :icon="Edit03Icon">
     <template #toolbar>
-      <button @click="cancelEdit" :disabled="saving">Cancel</button>
-      <button @click="saveChanges" :disabled="saving" class="primary">
+      <button type="button" class="neutral" @click="cancelEdit" :disabled="saving">Cancel</button>
+      <button type="button" class="good" @click="saveChanges" :disabled="saving">
         {{ saving ? 'Saving...' : 'Save Changes' }}
       </button>
     </template>
@@ -194,8 +195,8 @@ function datetimeLocalToMysql(datetimeLocal: string): string {
       </template>
 
       <div class="form-actions">
-        <button type="button" @click="cancelEdit" :disabled="saving">Cancel</button>
-        <button type="submit" :disabled="saving" class="primary">
+        <button type="button" class="neutral" @click="cancelEdit" :disabled="saving">Cancel</button>
+        <button type="submit" class="good" :disabled="saving">
           {{ saving ? 'Saving...' : 'Save Changes' }}
           </button>
         </div>
@@ -239,31 +240,4 @@ function datetimeLocalToMysql(datetimeLocal: string): string {
   gap: 1rem;
 }
 
-.form-actions button {
-  padding: 0.75rem 1.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.form-actions button.primary {
-  background: #007bff;
-  color: white;
-  border-color: #007bff;
-}
-
-.form-actions button:hover:not(:disabled) {
-  background: #f8f9fa;
-}
-
-.form-actions button.primary:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.form-actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
 </style>

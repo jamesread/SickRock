@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jamesread/armature-iam/rbac"
+	"github.com/jamesread/SickRock/internal/iam/systemroles"
 	"github.com/jamesread/armature-iam/store"
 )
 
@@ -207,7 +208,7 @@ func (s *MySQL) UpdateRBACRole(ctx context.Context, id int, name, description st
 	if err != nil {
 		return err
 	}
-	if rbac.IsSystemRole(curName) && name != curName {
+	if systemroles.IsSystemRole(curName) && name != curName {
 		return fmt.Errorf("%w %q", store.ErrRenameSystemRole, curName)
 	}
 	return s.updateRBACRoleTx(ctx, id, name, description, permissionIDs, curName)
@@ -245,7 +246,7 @@ func (s *MySQL) DeleteRBACRole(ctx context.Context, id int) error {
 	if err != nil {
 		return err
 	}
-	if rbac.IsSystemRole(name) {
+	if systemroles.IsSystemRole(name) {
 		return fmt.Errorf("%w %q", store.ErrSystemRole, name)
 	}
 	return s.execOp(ctx, "delete rbac role", `DELETE FROM rbac_roles WHERE id = ?`, id)

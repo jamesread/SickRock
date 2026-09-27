@@ -92,7 +92,7 @@ message NavigationItem {
   int32 dashboard_id = 8; // optional, 0 if not set
   string dashboard_name = 9; // optional
   string title = 10; // navigation field from table_navigation
-  int32 workflow_id = 11; // optional, 0 if not set
+  int32 workflow_id = 11; // optional: nav link opens this workflow hub (not membership)
   string workflow_name = 12; // optional
 }
 
@@ -108,6 +108,47 @@ message GetNavigationResponse {
   repeated NavigationItem items = 1;
   repeated UserBookmark bookmarks = 2;
   repeated Workflow workflows = 3;
+}
+
+message WorkflowNavigationMember {
+  int32 navigation_item_id = 1;
+  int32 ordinal = 2;
+}
+
+message SetWorkflowNavigationMembersRequest {
+  int32 workflow_id = 1;
+  repeated WorkflowNavigationMember members = 2;
+}
+
+message SetWorkflowNavigationMembersResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetReadOnlyCalendarExportRequest {
+  string slug = 1;
+}
+
+message GetReadOnlyCalendarExportResponse {
+  string title = 1;
+  string display_mode = 2;
+  bool weekends_only = 3;
+  string table_configuration = 4;
+  int32 table_view_id = 5;
+  repeated Item items = 6;
+}
+
+message ReadOnlyExportSummary {
+  string slug = 1;
+  string title = 2;
+  string table_configuration = 3;
+  string display_mode = 4;
+}
+
+message ListAccessibleReadOnlyExportsRequest {}
+
+message ListAccessibleReadOnlyExportsResponse {
+  repeated ReadOnlyExportSummary exports = 1;
 }
 
 // Items
@@ -399,6 +440,12 @@ message CreateDashboardComponentRuleResponse {
 // Build info
 message InitRequest {}
 
+message OAuthProvider {
+  string id = 1;
+  string label = 2;
+  string auth_url = 3;
+}
+
 message InitResponse {
   string version = 1;
   string commit = 2;
@@ -407,6 +454,7 @@ message InitResponse {
   string current_username = 5;
   repeated string rbac_permissions = 6;
   bool rbac_is_superuser = 7;
+  repeated OAuthProvider oauth_providers = 8;
 }
 
 // Authentication
@@ -564,6 +612,22 @@ message GetUserRbacRolesResponse {
   repeated int32 role_ids = 1;
 }
 
+message UserEffectiveRoleGrant {
+  int32 role_id = 1;
+  string role_name = 2;
+  int32 group_id = 3;
+  string group_name = 4;
+}
+
+message GetUserEffectiveRoleGrantsRequest {
+  int32 user_id = 1;
+}
+
+message GetUserEffectiveRoleGrantsResponse {
+  bool is_superuser = 1;
+  repeated UserEffectiveRoleGrant grants = 2;
+}
+
 message GetUserGroupRbacRolesRequest {
   int32 group_id = 1;
 }
@@ -576,6 +640,57 @@ message SetUserGroupRbacRolesRequest {
   repeated int32 role_ids = 2;
 }
 message SetUserGroupRbacRolesResponse {
+  bool success = 1;
+}
+
+message GroupTableRoleGrant {
+  string table_key = 1;
+  int32 role_id = 2;
+}
+
+message ListGroupTableRoleGrantsRequest {
+  int32 group_id = 1;
+}
+message ListGroupTableRoleGrantsResponse {
+  repeated GroupTableRoleGrant grants = 1;
+}
+
+message SetGroupTableRoleGrantsRequest {
+  int32 group_id = 1;
+  repeated GroupTableRoleGrant grants = 2;
+}
+message SetGroupTableRoleGrantsResponse {
+  bool success = 1;
+}
+
+message GetTableAccessRequest {
+  string table_name = 1;
+}
+message GetTableAccessResponse {
+  bool can_view = 1;
+  bool can_insert = 2;
+  bool can_edit = 3;
+  bool can_delete = 4;
+}
+
+message TableShareGrant {
+  int32 group_id = 1;
+  string group_name = 2;
+  int32 role_id = 3;
+}
+
+message ListTableShareGrantsRequest {
+  string table_key = 1;
+}
+message ListTableShareGrantsResponse {
+  repeated TableShareGrant grants = 1;
+}
+
+message SetTableShareGrantsRequest {
+  string table_key = 1;
+  repeated TableShareGrant grants = 2;
+}
+message SetTableShareGrantsResponse {
   bool success = 1;
 }
 
@@ -983,8 +1098,13 @@ service SickRock {
   rpc UpdateRbacRole(UpdateRbacRoleRequest) returns (UpdateRbacRoleResponse);
   rpc DeleteRbacRole(DeleteRbacRoleRequest) returns (DeleteRbacRoleResponse);
   rpc GetUserRbacRoles(GetUserRbacRolesRequest) returns (GetUserRbacRolesResponse);
+  rpc GetUserEffectiveRoleGrants(GetUserEffectiveRoleGrantsRequest) returns (GetUserEffectiveRoleGrantsResponse);
   rpc GetUserGroupRbacRoles(GetUserGroupRbacRolesRequest) returns (GetUserGroupRbacRolesResponse);
   rpc SetUserGroupRbacRoles(SetUserGroupRbacRolesRequest) returns (SetUserGroupRbacRolesResponse);
+  rpc ListGroupTableRoleGrants(ListGroupTableRoleGrantsRequest) returns (ListGroupTableRoleGrantsResponse);
+  rpc SetGroupTableRoleGrants(SetGroupTableRoleGrantsRequest) returns (SetGroupTableRoleGrantsResponse);
+  rpc ListTableShareGrants(ListTableShareGrantsRequest) returns (ListTableShareGrantsResponse);
+  rpc SetTableShareGrants(SetTableShareGrantsRequest) returns (SetTableShareGrantsResponse);
   rpc GetRbacRoleUsers(GetRbacRoleUsersRequest) returns (GetRbacRoleUsersResponse);
   rpc GetRbacRoleGroups(GetRbacRoleGroupsRequest) returns (GetRbacRoleGroupsResponse);
   rpc GetMyPermissionsAudit(GetMyPermissionsAuditRequest) returns (GetMyPermissionsAuditResponse);
@@ -1011,6 +1131,10 @@ service SickRock {
 
   // Navigation items from table_navigation
   rpc GetNavigation(GetNavigationRequest) returns (GetNavigationResponse);
+  // Assign navigation items as members of a workflow hub (does not set table_navigation.workflow_id)
+  rpc SetWorkflowNavigationMembers(SetWorkflowNavigationMembersRequest) returns (SetWorkflowNavigationMembersResponse);
+  rpc GetReadOnlyCalendarExport(GetReadOnlyCalendarExportRequest) returns (GetReadOnlyCalendarExportResponse);
+  rpc ListAccessibleReadOnlyExports(ListAccessibleReadOnlyExportsRequest) returns (ListAccessibleReadOnlyExportsResponse);
 
   // Generic CRUD over items on a page
   rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
@@ -1021,6 +1145,7 @@ service SickRock {
 
   // Get structure/fields for a given page/table
   rpc GetTableStructure(GetTableStructureRequest) returns (GetTableStructureResponse);
+  rpc GetTableAccess(GetTableAccessRequest) returns (GetTableAccessResponse);
 
   // Add a column to a table
   rpc AddTableColumn(AddTableColumnRequest) returns (GetTableStructureResponse);

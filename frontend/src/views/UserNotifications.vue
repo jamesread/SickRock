@@ -1,87 +1,143 @@
 <script setup lang="ts">
-import { ref, onMounted, inject } from 'vue'
+import { ref, onMounted, inject, nextTick, computed } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import * as Hugeicons from '@hugeicons/core-free-icons'
-import { Delete01Icon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  CheckListIcon,
+  Delete01Icon,
+  NotificationIcon,
+  RefreshIcon,
+} from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import FormField from 'picocrank/vue/components/FormField.vue'
+import Table from 'picocrank/vue/components/Table.vue'
 
-// Use global API client
-const client = inject<ReturnType<typeof createApiClient>>('apiClient')
+const iconStrokeWidth = 2.5
+const client = inject<ReturnType<typeof createApiClient>>('apiClient')!
 
-// Notification state
-const notificationEvents = ref<Array<{
-  id: number;
-  eventCode: string;
-  eventName: string;
-  description: string;
-}>>([])
-const notificationChannels = ref<Array<{
-  id: number;
-  userId: number;
-  channelType: string;
-  channelValue: string;
-  channelName: string;
-  isActive: boolean;
-  srCreated: number;
-  srUpdated: number;
-}>>([])
-const notificationSubscriptions = ref<Array<{
-  id: number;
-  userId: number;
-  eventId: number;
-  channelId: number;
-  event?: {
-    id: number;
-    eventCode: string;
-    eventName: string;
-    description: string;
-  };
-  channel?: {
-    id: number;
-    userId: number;
-    channelType: string;
-    channelValue: string;
-    channelName: string;
-    isActive: boolean;
-  };
-  srCreated: number;
-}>>([])
+type NotificationEvent = {
+  id: number
+  eventCode: string
+  eventName: string
+  description: string
+}
 
-const notificationsLoading = ref(false)
-const notificationError = ref<string | null>(null)
+type NotificationChannel = {
+  id: number
+  userId: number
+  channelType: string
+  channelValue: string
+  channelName: string
+  isActive: boolean
+  srCreated: number
+  srUpdated: number
+}
 
-// New channel form
+type NotificationSubscription = {
+  id: number
+  userId: number
+  eventId: number
+  channelId: number
+  event?: NotificationEvent
+  channel?: Omit<NotificationChannel, 'srCreated' | 'srUpdated'>
+  srCreated: number
+}
+
+const notificationEvents = ref<NotificationEvent[]>([])
+const notificationChannels = ref<NotificationChannel[]>([])
+const notificationSubscriptions = ref<NotificationSubscription[]>([])
+
+const channelsLoading = ref(false)
+const subscriptionsLoading = ref(false)
+const channelsError = ref('')
+const subscriptionsError = ref('')
+const channelCreateError = ref('')
+const subscriptionCreateError = ref('')
+const creatingChannel = ref(false)
+const creatingSubscription = ref(false)
+
 const newChannelType = ref('email')
 const newChannelValue = ref('')
 const newChannelName = ref('')
-const creatingChannel = ref(false)
-
-// New subscription form
 const newSubscriptionEventCode = ref('')
 const newSubscriptionChannelId = ref(0)
-const creatingSubscription = ref(false)
+
+const createChannelDialog = ref<HTMLDialogElement | null>(null)
+const createSubscriptionDialog = ref<HTMLDialogElement | null>(null)
+const channelValueInput = ref<HTMLInputElement | null>(null)
+
+const activeChannels = computed(() => notificationChannels.value.filter((c) => c.isActive))
+
+const channelValueLabel = computed(() => {
+  switch (newChannelType.value) {
+    case 'telegram':
+      return 'Telegram chat ID'
+    case 'webhook':
+      return 'Webhook URL'
+    default:
+      return 'Email address'
+  }
+})
+
+const channelValuePlaceholder = computed(() => {
+  switch (newChannelType.value) {
+    case 'telegram':
+      return '123456789'
+    case 'webhook':
+      return 'https://example.com/webhook'
+    default:
+      return 'user@example.com'
+  }
+})
+
+const subscriptionTableRows = computed(() =>
+  notificationSubscriptions.value.map((sub) => ({
+    id: sub.id,
+    eventName: sub.event?.eventName ?? 'Unknown event',
+    eventDescription: sub.event?.description ?? '',
+    channelType: sub.channel?.channelType?.toUpperCase() ?? '—',
+    channelName: sub.channel?.channelName ?? '',
+    channelValue: sub.channel?.channelValue ?? '',
+  })),
+)
+
+const channelHeaders = [
+  { key: 'channelType', label: 'Type', sortable: true, width: '7rem' },
+  { key: 'channelName', label: 'Name', sortable: true },
+  { key: 'channelValue', label: 'Destination', sortable: true },
+  { key: 'isActive', label: 'Status', sortable: true, width: '7rem' },
+  { key: 'actions', label: 'Actions', sortable: false, width: '7rem' },
+]
+
+const subscriptionHeaders = [
+  { key: 'eventName', label: 'Event', sortable: true },
+  { key: 'channelType', label: 'Channel', sortable: true, width: '8rem' },
+  { key: 'channelValue', label: 'Destination', sortable: true },
+  { key: 'actions', label: 'Actions', sortable: false, width: '7rem' },
+]
 
 async function loadNotificationEvents() {
   try {
     const response = await client.getNotificationEvents({})
-    notificationEvents.value = (response.events || []).map(event => ({
+    notificationEvents.value = (response.events || []).map((event) => ({
       id: event.id,
       eventCode: event.eventCode,
       eventName: event.eventName,
-      description: event.description
+      description: event.description,
     }))
-  } catch (e: any) {
-    console.error('Failed to load notification events:', e)
-    notificationError.value = String(e?.message || e)
+  } catch (e: unknown) {
+    subscriptionsError.value = e instanceof Error ? e.message : 'Failed to load notification events.'
   }
 }
 
 async function loadNotificationChannels() {
-  notificationsLoading.value = true
+  channelsLoading.value = true
+  channelsError.value = ''
   try {
     const response = await client.getUserNotificationChannels({})
-    notificationChannels.value = (response.channels || []).map(channel => ({
+    notificationChannels.value = (response.channels || []).map((channel) => ({
       id: channel.id,
       userId: channel.userId,
       channelType: channel.channelType,
@@ -89,141 +145,180 @@ async function loadNotificationChannels() {
       channelName: channel.channelName || '',
       isActive: channel.isActive,
       srCreated: Number(channel.srCreated),
-      srUpdated: Number(channel.srUpdated)
+      srUpdated: Number(channel.srUpdated),
     }))
-  } catch (e: any) {
-    console.error('Failed to load notification channels:', e)
-    notificationError.value = String(e?.message || e)
+  } catch (e: unknown) {
+    channelsError.value = e instanceof Error ? e.message : 'Failed to load notification channels.'
   } finally {
-    notificationsLoading.value = false
+    channelsLoading.value = false
   }
 }
 
 async function loadNotificationSubscriptions() {
+  subscriptionsLoading.value = true
+  subscriptionsError.value = ''
   try {
     const response = await client.getUserNotificationSubscriptions({})
-    notificationSubscriptions.value = (response.subscriptions || []).map(sub => ({
+    notificationSubscriptions.value = (response.subscriptions || []).map((sub) => ({
       id: sub.id,
       userId: sub.userId,
       eventId: sub.eventId,
       channelId: sub.channelId,
-      event: sub.event ? {
-        id: sub.event.id,
-        eventCode: sub.event.eventCode,
-        eventName: sub.event.eventName,
-        description: sub.event.description
-      } : undefined,
-      channel: sub.channel ? {
-        id: sub.channel.id,
-        userId: sub.channel.userId,
-        channelType: sub.channel.channelType,
-        channelValue: sub.channel.channelValue,
-        channelName: sub.channel.channelName || '',
-        isActive: sub.channel.isActive
-      } : undefined,
-      srCreated: Number(sub.srCreated)
+      event: sub.event
+        ? {
+            id: sub.event.id,
+            eventCode: sub.event.eventCode,
+            eventName: sub.event.eventName,
+            description: sub.event.description,
+          }
+        : undefined,
+      channel: sub.channel
+        ? {
+            id: sub.channel.id,
+            userId: sub.channel.userId,
+            channelType: sub.channel.channelType,
+            channelValue: sub.channel.channelValue,
+            channelName: sub.channel.channelName || '',
+            isActive: sub.channel.isActive,
+          }
+        : undefined,
+      srCreated: Number(sub.srCreated),
     }))
-  } catch (e: any) {
-    console.error('Failed to load notification subscriptions:', e)
-    notificationError.value = String(e?.message || e)
+  } catch (e: unknown) {
+    subscriptionsError.value = e instanceof Error ? e.message : 'Failed to load subscriptions.'
+  } finally {
+    subscriptionsLoading.value = false
   }
+}
+
+function resetChannelForm() {
+  newChannelType.value = 'email'
+  newChannelValue.value = ''
+  newChannelName.value = ''
+  channelCreateError.value = ''
+}
+
+function resetSubscriptionForm() {
+  newSubscriptionEventCode.value = ''
+  newSubscriptionChannelId.value = 0
+  subscriptionCreateError.value = ''
+}
+
+function openCreateChannelDialog() {
+  resetChannelForm()
+  createChannelDialog.value?.showModal()
+  nextTick(() => channelValueInput.value?.focus())
+}
+
+function closeCreateChannelDialog() {
+  createChannelDialog.value?.close()
+}
+
+function openCreateSubscriptionDialog() {
+  if (!activeChannels.value.length) {
+    subscriptionsError.value = 'Add an active notification channel before subscribing to events.'
+    return
+  }
+  resetSubscriptionForm()
+  createSubscriptionDialog.value?.showModal()
+}
+
+function closeCreateSubscriptionDialog() {
+  createSubscriptionDialog.value?.close()
 }
 
 async function createNotificationChannel() {
   if (!newChannelValue.value.trim()) {
-    notificationError.value = 'Channel value is required'
+    channelCreateError.value = 'Destination is required.'
     return
   }
 
   creatingChannel.value = true
-  notificationError.value = null
+  channelCreateError.value = ''
   try {
     const response = await client.createUserNotificationChannel({
       channelType: newChannelType.value,
       channelValue: newChannelValue.value.trim(),
-      channelName: newChannelName.value.trim() || undefined
+      channelName: newChannelName.value.trim() || undefined,
     })
 
     if (response.success) {
-      newChannelValue.value = ''
-      newChannelName.value = ''
+      closeCreateChannelDialog()
       await loadNotificationChannels()
     } else {
-      notificationError.value = response.message || 'Failed to create channel'
+      channelCreateError.value = response.message || 'Failed to create channel.'
     }
-  } catch (e: any) {
-    console.error('Failed to create notification channel:', e)
-    notificationError.value = String(e?.message || e)
+  } catch (e: unknown) {
+    channelCreateError.value = e instanceof Error ? e.message : 'Failed to create channel.'
   } finally {
     creatingChannel.value = false
   }
 }
 
 async function deleteNotificationChannel(channelId: number) {
-  if (!confirm('Are you sure you want to delete this notification channel? This will also remove all subscriptions using this channel.')) {
+  if (
+    !confirm(
+      'Delete this notification channel? Subscriptions that use it will be removed.',
+    )
+  ) {
     return
   }
 
+  channelsError.value = ''
   try {
     const response = await client.deleteUserNotificationChannel({ channelId })
     if (response.success) {
-      await Promise.all([
-        loadNotificationChannels(),
-        loadNotificationSubscriptions()
-      ])
+      await Promise.all([loadNotificationChannels(), loadNotificationSubscriptions()])
     } else {
-      notificationError.value = response.message || 'Failed to delete channel'
+      channelsError.value = response.message || 'Failed to delete channel.'
     }
-  } catch (e: any) {
-    console.error('Failed to delete notification channel:', e)
-    notificationError.value = String(e?.message || e)
+  } catch (e: unknown) {
+    channelsError.value = e instanceof Error ? e.message : 'Failed to delete channel.'
   }
 }
 
 async function createNotificationSubscription() {
   if (!newSubscriptionEventCode.value || !newSubscriptionChannelId.value) {
-    notificationError.value = 'Event and channel are required'
+    subscriptionCreateError.value = 'Event and channel are required.'
     return
   }
 
   creatingSubscription.value = true
-  notificationError.value = null
+  subscriptionCreateError.value = ''
   try {
     const response = await client.createUserNotificationSubscription({
       eventCode: newSubscriptionEventCode.value,
-      channelId: newSubscriptionChannelId.value
+      channelId: newSubscriptionChannelId.value,
     })
 
     if (response.success) {
-      newSubscriptionEventCode.value = ''
-      newSubscriptionChannelId.value = 0
+      closeCreateSubscriptionDialog()
       await loadNotificationSubscriptions()
     } else {
-      notificationError.value = response.message || 'Failed to create subscription'
+      subscriptionCreateError.value = response.message || 'Failed to create subscription.'
     }
-  } catch (e: any) {
-    console.error('Failed to create notification subscription:', e)
-    notificationError.value = String(e?.message || e)
+  } catch (e: unknown) {
+    subscriptionCreateError.value = e instanceof Error ? e.message : 'Failed to create subscription.'
   } finally {
     creatingSubscription.value = false
   }
 }
 
 async function deleteNotificationSubscription(subscriptionId: number) {
-  if (!confirm('Are you sure you want to remove this notification subscription?')) {
+  if (!confirm('Remove this event subscription?')) {
     return
   }
 
+  subscriptionsError.value = ''
   try {
     const response = await client.deleteUserNotificationSubscription({ subscriptionId })
     if (response.success) {
       await loadNotificationSubscriptions()
     } else {
-      notificationError.value = response.message || 'Failed to delete subscription'
+      subscriptionsError.value = response.message || 'Failed to delete subscription.'
     }
-  } catch (e: any) {
-    console.error('Failed to delete notification subscription:', e)
-    notificationError.value = String(e?.message || e)
+  } catch (e: unknown) {
+    subscriptionsError.value = e instanceof Error ? e.message : 'Failed to delete subscription.'
   }
 }
 
@@ -231,400 +326,283 @@ onMounted(async () => {
   await Promise.all([
     loadNotificationEvents(),
     loadNotificationChannels(),
-    loadNotificationSubscriptions()
+    loadNotificationSubscriptions(),
   ])
 })
 </script>
 
 <template>
-  <div v-if="notificationError" class="error">{{ notificationError }}</div>
+  <dialog ref="createChannelDialog" class="dialog" @close="resetChannelForm">
+    <h2>Add notification channel</h2>
+    <p>Choose how SickRock should deliver notifications to you.</p>
 
-  <!-- Notification Channels -->
-  <Section title="Notification Channels">
-    <p class="section-description">Configure how you want to receive notifications (email, Telegram, or webhooks).</p>
+    <FormLayout @submit.prevent="createNotificationChannel">
+      <FormField label="Channel type" for="channel-type" :disabled="creatingChannel">
+        <select id="channel-type" v-model="newChannelType" :disabled="creatingChannel">
+          <option value="email">Email</option>
+          <option value="telegram">Telegram</option>
+          <option value="webhook">Webhook</option>
+        </select>
+      </FormField>
 
-    <div class="notification-channels-content">
+      <FormField :label="channelValueLabel" for="channel-value" :disabled="creatingChannel">
+        <input
+          id="channel-value"
+          ref="channelValueInput"
+          v-model="newChannelValue"
+          type="text"
+          :placeholder="channelValuePlaceholder"
+          autocomplete="off"
+          :disabled="creatingChannel"
+          required
+        />
+      </FormField>
 
-      <!-- Create New Channel -->
-      <div class="create-channel">
-        <h4>Add New Channel</h4>
-        <div class="create-form">
-          <div class="form-group">
-            <label for="channel-type">Channel Type</label>
-            <select id="channel-type" v-model="newChannelType" :disabled="creatingChannel">
-              <option value="email">Email</option>
-              <option value="telegram">Telegram</option>
-              <option value="webhook">Webhook</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="channel-value">
-              {{ newChannelType === 'email' ? 'Email Address' : newChannelType === 'telegram' ? 'Telegram Chat ID' : 'Webhook URL' }}
-            </label>
-            <input
-              id="channel-value"
-              v-model="newChannelValue"
-              type="text"
-              :placeholder="newChannelType === 'email' ? 'user@example.com' : newChannelType === 'telegram' ? '123456789' : 'https://example.com/webhook'"
-              :disabled="creatingChannel"
-            />
-          </div>
-          <div v-if="newChannelType === 'webhook'" class="form-group">
-            <label for="channel-name">Channel Name (optional)</label>
-            <input
-              id="channel-name"
-              v-model="newChannelName"
-              type="text"
-              placeholder="e.g., Webhook A"
-              :disabled="creatingChannel"
-            />
-          </div>
-          <button
-            @click="createNotificationChannel"
-            :disabled="creatingChannel || !newChannelValue.trim()"
-            class="create-button"
-          >
-            {{ creatingChannel ? 'Creating...' : 'Add Channel' }}
-          </button>
-        </div>
-      </div>
+      <FormField
+        v-if="newChannelType === 'webhook'"
+        label="Channel name (optional)"
+        for="channel-name"
+        :disabled="creatingChannel"
+      >
+        <input
+          id="channel-name"
+          v-model="newChannelName"
+          type="text"
+          placeholder="e.g. Team webhook"
+          :disabled="creatingChannel"
+        />
+      </FormField>
 
-      <!-- Current Channels -->
-      <div class="current-channels">
-        <h4>Your Channels</h4>
-        <div v-if="notificationsLoading" class="loading">Loading channels...</div>
-        <div v-else-if="notificationChannels.length === 0" class="no-items">
-          <p>No channels configured. Add one above to get started.</p>
-        </div>
-        <div v-else class="channels-list">
-          <div
-            v-for="channel in notificationChannels"
-            :key="channel.id"
-            class="channel-item"
-            :class="{ inactive: !channel.isActive }"
-          >
-            <div class="channel-content">
-              <div class="channel-info">
-                <div class="channel-name">
-                  <strong>{{ channel.channelType.toUpperCase() }}</strong>
-                  <span v-if="channel.channelName"> - {{ channel.channelName }}</span>
-                </div>
-                <div class="channel-details">
-                  <span class="detail-item">{{ channel.channelValue }}</span>
-                  <span class="detail-item">
-                    <span :class="channel.isActive ? 'status-active' : 'status-inactive'">
-                      {{ channel.isActive ? 'Active' : 'Inactive' }}
-                    </span>
-                  </span>
-                </div>
-              </div>
-            </div>
+      <p v-if="channelCreateError" class="inline-notification error">{{ channelCreateError }}</p>
+
+      <template #actions>
+        <button type="button" class="neutral" :disabled="creatingChannel" @click="closeCreateChannelDialog">
+          Cancel
+        </button>
+        <button type="submit" class="good" :disabled="creatingChannel || !newChannelValue.trim()">
+          {{ creatingChannel ? 'Adding…' : 'Add channel' }}
+        </button>
+      </template>
+    </FormLayout>
+  </dialog>
+
+  <dialog ref="createSubscriptionDialog" class="dialog" @close="resetSubscriptionForm">
+    <h2>Subscribe to event</h2>
+    <p>Pick an event and the channel that should receive it.</p>
+
+    <FormLayout @submit.prevent="createNotificationSubscription">
+      <FormField label="Event" for="subscription-event" :disabled="creatingSubscription">
+        <select
+          id="subscription-event"
+          v-model="newSubscriptionEventCode"
+          :disabled="creatingSubscription"
+          required
+        >
+          <option value="">Select an event…</option>
+          <option v-for="event in notificationEvents" :key="event.id" :value="event.eventCode">
+            {{ event.eventName }} — {{ event.description }}
+          </option>
+        </select>
+      </FormField>
+
+      <FormField label="Channel" for="subscription-channel" :disabled="creatingSubscription">
+        <select
+          id="subscription-channel"
+          v-model="newSubscriptionChannelId"
+          :disabled="creatingSubscription"
+          required
+        >
+          <option :value="0">Select a channel…</option>
+          <option v-for="channel in activeChannels" :key="channel.id" :value="channel.id">
+            {{ channel.channelType.toUpperCase()
+            }}{{ channel.channelName ? ` — ${channel.channelName}` : '' }}: {{ channel.channelValue }}
+          </option>
+        </select>
+      </FormField>
+
+      <p v-if="subscriptionCreateError" class="inline-notification error">{{ subscriptionCreateError }}</p>
+
+      <template #actions>
+        <button
+          type="button"
+          class="neutral"
+          :disabled="creatingSubscription"
+          @click="closeCreateSubscriptionDialog"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="good"
+          :disabled="
+            creatingSubscription || !newSubscriptionEventCode || !newSubscriptionChannelId
+          "
+        >
+          {{ creatingSubscription ? 'Saving…' : 'Subscribe' }}
+        </button>
+      </template>
+    </FormLayout>
+  </dialog>
+
+  <Section
+    title="Notification channels"
+    subtitle="Configure email, Telegram, or webhook destinations for alerts."
+    :icon="NotificationIcon"
+    :padding="false"
+  >
+    <template #toolbar>
+      <button
+        type="button"
+        class="inline-icon neutral"
+        aria-label="Refresh channels"
+        :disabled="channelsLoading"
+        @click="loadNotificationChannels"
+      >
+        <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+      </button>
+      <button
+        type="button"
+        class="inline-icon good"
+        aria-label="Add channel"
+        :disabled="channelsLoading"
+        @click="openCreateChannelDialog"
+      >
+        <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+      </button>
+    </template>
+
+    <div v-if="channelsError" class="list-banner-pad inline-notification error">{{ channelsError }}</div>
+    <div v-if="channelsLoading && !notificationChannels.length" class="list-banner-pad muted">Loading…</div>
+
+    <template v-else>
+      <p v-if="!notificationChannels.length" class="list-banner-pad inline-notification note">
+        No notification channels yet.
+      </p>
+
+      <Table
+        v-else
+        class="notifications-table-wrap"
+        :data="notificationChannels"
+        :headers="channelHeaders"
+      >
+        <template #cell-channelType="{ value, row }">
+          <strong :class="{ muted: !row.isActive }">{{ String(value).toUpperCase() }}</strong>
+        </template>
+        <template #cell-channelName="{ value, row }">
+          <span :class="{ muted: !row.isActive }">{{ value || '—' }}</span>
+        </template>
+        <template #cell-channelValue="{ value, row }">
+          <span :class="{ muted: !row.isActive }">{{ value }}</span>
+        </template>
+        <template #cell-isActive="{ value }">
+          <span :class="value ? 'tag fg-good' : 'tag bad'">{{ value ? 'Active' : 'Inactive' }}</span>
+        </template>
+        <template #cell-actions="{ row }">
+          <div class="actions-cell">
             <button
-              @click="deleteNotificationChannel(channel.id)"
-              class="delete-button"
-              title="Delete channel"
+              type="button"
+              class="inline-icon bad small"
+              aria-label="Delete channel"
+              @click="deleteNotificationChannel(row.id)"
             >
-              <HugeiconsIcon :icon="Hugeicons.Delete01Icon" />
+              <HugeiconsIcon :icon="Delete01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
             </button>
           </div>
-        </div>
-      </div>
-    </div>
+        </template>
+      </Table>
+    </template>
   </Section>
 
-  <!-- Notification Subscriptions -->
-  <Section title="Event Subscriptions">
-    <p class="section-description">Choose which events you want to be notified about and via which channel.</p>
+  <Section
+    title="Event subscriptions"
+    subtitle="Choose which events are sent to each channel."
+    :icon="CheckListIcon"
+    :padding="false"
+  >
+    <template #toolbar>
+      <button
+        type="button"
+        class="inline-icon neutral"
+        aria-label="Refresh subscriptions"
+        :disabled="subscriptionsLoading"
+        @click="loadNotificationSubscriptions"
+      >
+        <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+      </button>
+      <button
+        type="button"
+        class="inline-icon good"
+        aria-label="Subscribe to event"
+        :disabled="subscriptionsLoading"
+        @click="openCreateSubscriptionDialog"
+      >
+        <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+      </button>
+    </template>
 
-    <div class="notification-subscriptions-content">
+    <div v-if="subscriptionsError" class="list-banner-pad inline-notification error">
+      {{ subscriptionsError }}
+    </div>
+    <div
+      v-if="subscriptionsLoading && !notificationSubscriptions.length"
+      class="list-banner-pad muted"
+    >
+      Loading…
+    </div>
 
-      <!-- Create New Subscription -->
-      <div class="create-subscription">
-        <h4>Subscribe to Event</h4>
-        <div v-if="notificationChannels.filter(c => c.isActive).length === 0" class="no-channels-placeholder">
-          <p>No active notification channels configured. Please add a channel above before creating event subscriptions.</p>
-        </div>
-        <div v-else class="create-form">
-          <div class="form-group">
-            <label for="subscription-event">Event</label>
-            <select id="subscription-event" v-model="newSubscriptionEventCode" :disabled="creatingSubscription">
-              <option value="">Select an event...</option>
-              <option
-                v-for="event in notificationEvents"
-                :key="event.id"
-                :value="event.eventCode"
-              >
-                {{ event.eventName }} - {{ event.description }}
-              </option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label for="subscription-channel">Channel</label>
-            <select id="subscription-channel" v-model="newSubscriptionChannelId" :disabled="creatingSubscription">
-              <option :value="0">Select a channel...</option>
-              <option
-                v-for="channel in notificationChannels.filter(c => c.isActive)"
-                :key="channel.id"
-                :value="channel.id"
-              >
-                {{ channel.channelType.toUpperCase() }}{{ channel.channelName ? ' - ' + channel.channelName : '' }}: {{ channel.channelValue }}
-              </option>
-            </select>
-          </div>
-          <button
-            @click="createNotificationSubscription"
-            :disabled="creatingSubscription || !newSubscriptionEventCode || !newSubscriptionChannelId"
-            class="create-button"
-          >
-            {{ creatingSubscription ? 'Creating...' : 'Subscribe' }}
-          </button>
-        </div>
-      </div>
+    <template v-else>
+      <p v-if="!notificationSubscriptions.length" class="list-banner-pad inline-notification note">
+        No event subscriptions yet.
+      </p>
 
-      <!-- Current Subscriptions -->
-      <div class="current-subscriptions">
-        <h4>Your Subscriptions</h4>
-        <div v-if="notificationSubscriptions.length === 0" class="no-items">
-          <p>No subscriptions yet. Subscribe to events above to receive notifications.</p>
-        </div>
-        <div v-else class="subscriptions-list">
-          <div
-            v-for="subscription in notificationSubscriptions"
-            :key="subscription.id"
-            class="subscription-item"
-          >
-            <div class="subscription-content">
-              <div class="subscription-info">
-                <div class="subscription-event">
-                  <strong>{{ subscription.event?.eventName || 'Unknown Event' }}</strong>
-                </div>
-                <div class="subscription-details">
-                  <span class="detail-item">
-                    <strong>Channel:</strong> {{ subscription.channel?.channelType.toUpperCase() }}{{ subscription.channel?.channelName ? ' - ' + subscription.channel.channelName : '' }}
-                  </span>
-                  <span class="detail-item">
-                    <strong>Value:</strong> {{ subscription.channel?.channelValue }}
-                  </span>
-                </div>
-              </div>
-            </div>
+      <Table
+        v-else
+        class="notifications-table-wrap"
+        :data="subscriptionTableRows"
+        :headers="subscriptionHeaders"
+      >
+        <template #cell-eventName="{ value, row }">
+          <strong>{{ value }}</strong>
+          <span v-if="row.eventDescription" class="muted text-sm block">{{ row.eventDescription }}</span>
+        </template>
+        <template #cell-channelType="{ value, row }">
+          {{ value }}{{ row.channelName ? ` — ${row.channelName}` : '' }}
+        </template>
+        <template #cell-actions="{ row }">
+          <div class="actions-cell">
             <button
-              @click="deleteNotificationSubscription(subscription.id)"
-              class="delete-button"
-              title="Remove subscription"
+              type="button"
+              class="inline-icon bad small"
+              aria-label="Remove subscription"
+              @click="deleteNotificationSubscription(row.id)"
             >
-              <HugeiconsIcon :icon="Hugeicons.Delete01Icon" />
+              <HugeiconsIcon :icon="Delete01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
             </button>
           </div>
-        </div>
-      </div>
-    </div>
+        </template>
+      </Table>
+    </template>
   </Section>
 </template>
 
 <style scoped>
-.section-description {
-  margin: 0 0 1.5rem 0;
-  color: #6c757d;
-  font-size: 0.95rem;
+.list-banner-pad {
+  padding-left: 1em;
+  padding-right: 1em;
 }
 
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  margin-bottom: 1rem;
+.notifications-table-wrap {
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
-.notification-channels-content,
-.notification-subscriptions-content {
-  margin-top: 1rem;
-}
-
-.create-channel,
-.create-subscription {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-}
-
-.create-form {
+.actions-cell {
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  justify-content: flex-end;
+  gap: 0.35rem;
 }
 
-.form-group {
-  margin-bottom: 0;
-}
-
-.form-group label {
+.block {
   display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333;
-}
-
-.create-form select,
-.create-form input {
-  width: 100%;
-  max-width: 400px;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-}
-
-.create-button {
-  padding: 0.75rem 1.5rem;
-  background: #28a745;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
-  align-self: flex-start;
-}
-
-.create-button:hover:not(:disabled) {
-  background: #218838;
-}
-
-.create-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-}
-
-.current-channels,
-.current-subscriptions {
-  margin-bottom: 2rem;
-}
-
-.loading {
-  color: #666;
-  font-style: italic;
-  padding: 1rem;
-}
-
-.no-items {
-  color: #666;
-  font-style: italic;
-  padding: 2rem;
-  text-align: center;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-}
-
-.no-channels-placeholder {
-  padding: 1.5rem;
-  background: #fff3cd;
-  border: 1px solid #ffeaa7;
-  border-radius: 6px;
-  color: #856404;
-}
-
-.no-channels-placeholder p {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.5;
-}
-
-.channels-list,
-.subscriptions-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.channel-item,
-.subscription-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.channel-item:hover,
-.subscription-item:hover {
-  border-color: #dee2e6;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.channel-item.inactive {
-  opacity: 0.6;
-  background: #f8f9fa;
-}
-
-.channel-content,
-.subscription-content {
-  flex: 1;
-}
-
-.channel-info,
-.subscription-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.channel-name,
-.subscription-event {
-  font-weight: 500;
-  color: #333;
-}
-
-.channel-details,
-.subscription-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.detail-item {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.status-active {
-  color: #28a745;
-  font-weight: 500;
-}
-
-.status-inactive {
-  color: #dc3545;
-  font-weight: 500;
-}
-
-.delete-button {
-  padding: 0.5rem;
-  background: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-  flex-shrink: 0;
-}
-
-.delete-button:hover {
-  background: #c82333;
-}
-
-.delete-button :deep(svg) {
-  width: 16px;
-  height: 16px;
 }
 </style>

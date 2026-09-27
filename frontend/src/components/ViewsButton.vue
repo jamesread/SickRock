@@ -171,7 +171,7 @@ onMounted(() => {
           <div class="views-actions">
             <button
               v-if="showViewCreate"
-              class="button inline-icon primary"
+              class="button inline-icon good"
               @click="() => { closeViewsDialog(); createTableView(); }"
             >
               <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />

@@ -1,16 +1,38 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { inject } from 'vue'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import Navigation from 'picocrank/vue/components/Navigation.vue'
+import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { DatabaseIcon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, Edit03Icon, PlayIcon, StopIcon } from '@hugeicons/core-free-icons'
 import * as Hugeicons from '@hugeicons/core-free-icons'
+import { resolveNavigationIcon } from '../utils/navigationIcon'
+
+type WorkflowItem = {
+  id: number
+  title: string
+  tableName: string
+  dashboardName: string
+  dashboardId: number
+  icon: string
+  path: string
+  ordinal: number
+}
+
+type AvailableNavItem = {
+  id: number
+  title: string
+  tableName: string
+  dashboardName: string
+  dashboardId: number
+  icon: string
+}
 
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
 const route = useRoute()
-const router = useRouter()
 
 const loading = ref(true)
 const error = ref<string | null>(null)
@@ -19,31 +41,63 @@ const workflowId = ref<number | null>(null)
 const workflowIcon = ref<string>('')
 const PINNED_WORKFLOW_KEY = 'sickrock_pinned_workflow'
 const isPinned = ref(false)
-const items = ref<Array<{
-  id: number;
-  title: string;
-  tableName: string;
-  dashboardName: string;
-  dashboardId: number;
-  icon: string;
-  path: string;
-  ordinal: number;
-}>>([])
-const reordering = ref(false)
+const items = ref<WorkflowItem[]>([])
+const workflowNavigation = ref<InstanceType<typeof Navigation> | null>(null)
 
-// Modal state
+const sectionIcon = computed(() =>
+  resolveNavigationIcon({
+    icon: workflowIcon.value,
+    workflowId: workflowId.value ?? undefined,
+    path: workflowId.value ? `/workflow/${workflowId.value}` : undefined,
+  }),
+)
+
 const showAddModal = ref(false)
-const availableItems = ref<Array<{
-  id: number;
-  title: string;
-  tableName: string;
-  dashboardName: string;
-  dashboardId: number;
-  icon: string;
-  workflowId: number;
-}>>([])
+const availableItems = ref<AvailableNavItem[]>([])
 const selectedItemIds = ref<Set<number>>(new Set())
+const orderedSelectedIds = ref<number[]>([])
 const addingItems = ref(false)
+
+function itemSubtitle(item: { dashboardId: number; tableName?: string }) {
+  if (item.dashboardId > 0) return 'Dashboard'
+  return item.tableName ? `Table · ${item.tableName}` : 'Table'
+}
+
+function resolveItemIcon(item: { icon: string; dashboardId: number; path?: string }) {
+  const iconName = item.icon?.trim()
+  if (iconName && (Hugeicons as Record<string, unknown>)[iconName]) {
+    return (Hugeicons as Record<string, typeof DatabaseIcon>)[iconName]
+  }
+  return resolveNavigationIcon({
+    icon: item.icon,
+    dashboardId: item.dashboardId,
+    path: item.path,
+  })
+}
+
+function populateWorkflowNavigation() {
+  const nav = workflowNavigation.value
+  if (!nav) return
+  nav.clearNavigationLinks()
+  for (const item of items.value) {
+    nav.addNavigationLink({
+      id: `workflow-item-${item.id}`,
+      name: `workflow-item-${item.id}`,
+      title: item.title,
+      path: item.path,
+      to: item.path,
+      icon: resolveItemIcon(item),
+      type: 'route',
+      description: itemSubtitle(item),
+    })
+  }
+}
+
+function refreshWorkflowNavigation() {
+  nextTick(() => populateWorkflowNavigation())
+}
+
+watch(items, refreshWorkflowNavigation, { deep: true })
 
 async function load() {
   loading.value = true
@@ -54,93 +108,136 @@ async function load() {
       throw new Error('Invalid workflow id')
     }
 
-    const navResponse = await client.getNavigation({})
-    const workflow = (navResponse as any).workflows?.find((w: any) => Number(w.id) === idParam)
+    const navResponse = await client!.getNavigation({})
+    const workflow = (navResponse as { workflows?: Array<{ id: number; name?: string; icon?: string; items?: unknown[] }> })
+      .workflows?.find((w) => Number(w.id) === idParam)
 
     if (!workflow) {
       throw new Error(`Workflow not found: ${idParam}`)
     }
 
     workflowId.value = workflow.id
-    workflowIcon.value = workflow.icon || 'DatabaseIcon'
+    workflowIcon.value = workflow.icon || ''
     workflowName.value = workflow.name || String(workflow.id)
 
-    items.value = (workflow.items || []).map((item: any) => {
+    items.value = (workflow.items || []).map((raw: unknown) => {
+      const item = raw as {
+        id: number
+        title?: string
+        tableTitle?: string
+        tableName?: string
+        dashboardName?: string
+        dashboardId?: number
+        icon?: string
+        ordinal?: number
+      }
       const title = item.title || item.tableTitle || item.tableName || String(item.id)
-      const path = item.dashboardId > 0
-        ? `/dashboard/${item.dashboardName}`
-        : `/table/${item.tableName}`
-      const icon = item.icon || 'DatabaseIcon'
-
+      const dashboardId = item.dashboardId ?? 0
+      const path = dashboardId > 0 ? `/dashboard/${item.dashboardName}` : `/table/${item.tableName}`
       return {
         id: item.id,
         title,
-        tableName: item.tableName,
-        dashboardName: item.dashboardName,
-        dashboardId: item.dashboardId,
-        icon,
+        tableName: item.tableName ?? '',
+        dashboardName: item.dashboardName ?? '',
+        dashboardId,
+        icon: item.icon || '',
         path,
-        ordinal: item.ordinal || 0
+        ordinal: item.ordinal || 0,
       }
     })
 
-    // Sort by ordinal to ensure correct order
     items.value.sort((a, b) => a.ordinal - b.ordinal)
 
-    // Sync pin state for this workflow
     try {
       const stored = localStorage.getItem(PINNED_WORKFLOW_KEY)
       isPinned.value = !!stored && stored === workflowName.value
     } catch {
       isPinned.value = false
     }
-  } catch (e: any) {
-    error.value = String(e?.message || e)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
+    refreshWorkflowNavigation()
   }
+}
+
+async function saveWorkflowMembers(orderedNavIds: number[]) {
+  if (!workflowId.value) return
+  await client!.setWorkflowNavigationMembers({
+    workflowId: workflowId.value,
+    members: orderedNavIds.map((navigationItemId, idx) => ({
+      navigationItemId,
+      ordinal: (idx + 1) * 10,
+    })),
+  })
 }
 
 async function openAddModal() {
   showAddModal.value = true
   selectedItemIds.value = new Set()
+  orderedSelectedIds.value = []
 
   try {
-    const navResponse = await client.getNavigation({})
-    // Get ALL navigation items (not just those not in workflow)
-    const allItems = navResponse.items || []
+    const navResponse = await client!.getNavigation({})
+    const allItems = (navResponse.items || []).filter(
+      (item: { tableName?: string; dashboardId?: number }) => item.tableName || (item.dashboardId && item.dashboardId > 0),
+    )
 
-    availableItems.value = allItems.map((item: any) => {
+    availableItems.value = allItems.map((item: {
+      id: number
+      title?: string
+      tableTitle?: string
+      tableName?: string
+      dashboardName?: string
+      dashboardId?: number
+      icon?: string
+    }) => {
       const title = item.title || item.tableTitle || item.tableName || String(item.id)
-      const isInThisWorkflow = item.workflowId === workflowId.value
-
-      // Pre-check items that are already in this workflow
-      if (isInThisWorkflow) {
-        selectedItemIds.value.add(item.id)
-      }
-
       return {
         id: item.id,
         title,
-        tableName: item.tableName,
-        dashboardName: item.dashboardName,
-        dashboardId: item.dashboardId,
-        icon: item.icon || 'DatabaseIcon',
-        workflowId: item.workflowId
+        tableName: item.tableName ?? '',
+        dashboardName: item.dashboardName ?? '',
+        dashboardId: item.dashboardId ?? 0,
+        icon: item.icon || '',
       }
     })
-  } catch (e: any) {
-    error.value = String(e?.message || e)
+
+    orderedSelectedIds.value = items.value.map((it) => it.id)
+    selectedItemIds.value = new Set(orderedSelectedIds.value)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : String(e)
     showAddModal.value = false
   }
+}
+
+function availableItemById(id: number): AvailableNavItem | undefined {
+  return availableItems.value.find((it) => it.id === id)
 }
 
 function toggleItemSelection(itemId: number) {
   if (selectedItemIds.value.has(itemId)) {
     selectedItemIds.value.delete(itemId)
+    orderedSelectedIds.value = orderedSelectedIds.value.filter((id) => id !== itemId)
   } else {
     selectedItemIds.value.add(itemId)
+    orderedSelectedIds.value.push(itemId)
   }
+}
+
+function moveModalMemberUp(index: number) {
+  if (index <= 0 || addingItems.value) return
+  const next = [...orderedSelectedIds.value]
+  ;[next[index - 1], next[index]] = [next[index], next[index - 1]]
+  orderedSelectedIds.value = next
+}
+
+function moveModalMemberDown(index: number) {
+  if (index >= orderedSelectedIds.value.length - 1 || addingItems.value) return
+  const next = [...orderedSelectedIds.value]
+  ;[next[index], next[index + 1]] = [next[index + 1], next[index]]
+  orderedSelectedIds.value = next
 }
 
 async function addSelectedItems() {
@@ -148,44 +245,12 @@ async function addSelectedItems() {
   error.value = null
 
   try {
-    // Get current items in this workflow
-    const currentItemIds = new Set(items.value.map(item => item.id))
-
-    // Items to add: selected but not currently in workflow
-    const itemsToAdd = Array.from(selectedItemIds.value).filter(id => !currentItemIds.has(id))
-
-    // Items to remove: currently in workflow but not selected
-    const itemsToRemove = Array.from(currentItemIds).filter(id => !selectedItemIds.value.has(id))
-
-    // Update items to add (set workflow_id)
-    const addPromises = itemsToAdd.map(itemId => {
-      return client.editItem({
-        id: String(itemId),
-        pageId: 'table_navigation',
-        additionalFields: {
-          workflow_id: String(workflowId.value)
-        }
-      })
-    })
-
-    // Update items to remove (clear workflow_id to NULL)
-    const removePromises = itemsToRemove.map(itemId => {
-      return client.editItem({
-        id: String(itemId),
-        pageId: 'table_navigation',
-        additionalFields: {
-          workflow_id: ''
-        }
-      })
-    })
-
-    await Promise.all([...addPromises, ...removePromises])
-
-    // Close modal and reload workflow
+    const orderedIds = orderedSelectedIds.value.filter((id) => selectedItemIds.value.has(id))
+    await saveWorkflowMembers(orderedIds)
     showAddModal.value = false
     await load()
-  } catch (e: any) {
-    error.value = String(e?.message || e)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : String(e)
   } finally {
     addingItems.value = false
   }
@@ -194,6 +259,7 @@ async function addSelectedItems() {
 function closeModal() {
   showAddModal.value = false
   selectedItemIds.value = new Set()
+  orderedSelectedIds.value = []
 }
 
 function togglePin() {
@@ -205,244 +271,144 @@ function togglePin() {
       localStorage.setItem(PINNED_WORKFLOW_KEY, workflowName.value)
       isPinned.value = true
     }
-    // Notify App.vue to refresh pinned workflow header
     window.dispatchEvent(new CustomEvent('pinned-workflow-changed'))
   } catch {
     // ignore storage errors
   }
 }
 
-async function moveItemUp(index: number) {
-  if (index === 0 || reordering.value) return
-
-  reordering.value = true
-  error.value = null
-
-  try {
-    // Swap items in the array
-    const item = items.value[index]
-    const previousItem = items.value[index - 1]
-    items.value[index] = previousItem
-    items.value[index - 1] = item
-
-    // Reassign ordinals based on new positions (multiply by 10 for spacing)
-    const updates = items.value.map((it, idx) => ({
-      id: it.id,
-      ordinal: (idx + 1) * 10
-    }))
-
-    // Update all items in the database with new ordinals
-    const updatePromises = updates.map(update =>
-      client.editItem({
-        id: String(update.id),
-        pageId: 'table_navigation',
-        additionalFields: {
-          ordinal: String(update.ordinal)
-        }
-      })
-    )
-
-    await Promise.all(updatePromises)
-
-    // Update local ordinals
-    items.value.forEach((it, idx) => {
-      it.ordinal = (idx + 1) * 10
-    })
-
-    // Small delay to ensure database has committed
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    // Reload to ensure consistency
-    await load()
-  } catch (e: any) {
-    error.value = String(e?.message || e)
-    // Reload on error to restore correct state
-    await load()
-  } finally {
-    reordering.value = false
-  }
-}
-
-async function moveItemDown(index: number) {
-  if (index === items.value.length - 1 || reordering.value) return
-
-  reordering.value = true
-  error.value = null
-
-  try {
-    // Swap items in the array
-    const item = items.value[index]
-    const nextItem = items.value[index + 1]
-    items.value[index] = nextItem
-    items.value[index + 1] = item
-
-    // Reassign ordinals based on new positions (multiply by 10 for spacing)
-    const updates = items.value.map((it, idx) => ({
-      id: it.id,
-      ordinal: (idx + 1) * 10
-    }))
-
-    // Update all items in the database with new ordinals
-    const updatePromises = updates.map(update =>
-      client.editItem({
-        id: String(update.id),
-        pageId: 'table_navigation',
-        additionalFields: {
-          ordinal: String(update.ordinal)
-        }
-      })
-    )
-
-    await Promise.all(updatePromises)
-
-    // Update local ordinals
-    items.value.forEach((it, idx) => {
-      it.ordinal = (idx + 1) * 10
-    })
-
-    // Small delay to ensure database has committed
-    await new Promise(resolve => setTimeout(resolve, 100))
-
-    // Reload to ensure consistency
-    await load()
-  } catch (e: any) {
-    error.value = String(e?.message || e)
-    // Reload on error to restore correct state
-    await load()
-  } finally {
-    reordering.value = false
-  }
-}
+const unselectedAvailableItems = computed(() =>
+  availableItems.value.filter((item) => !selectedItemIds.value.has(item.id)),
+)
 
 onMounted(load)
 </script>
 
 <template>
-  <Section :title="workflowName">
+  <Section :title="workflowName" :icon="sectionIcon">
     <template #toolbar>
-      <div class="workflow-actions">
-        <button
-          v-if="workflowId"
-          @click="openAddModal"
-          class="btn btn-primary add-navigation-link-btn"
-        >
-          Change Navigation Links
-        </button>
-        <button
-          v-if="workflowId"
-          @click="togglePin"
-          :class="['btn', 'btn-outline-primary', 'pin-workflow-btn', { 'bad': isPinned }]"
-        >
-          {{ isPinned ? 'Stop Workflow' : 'Start Workflow' }}
-        </button>
-      </div>
+      <button
+        v-if="workflowId"
+        type="button"
+        class="button inline-icon neutral"
+        @click="openAddModal"
+      >
+        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Change Navigation Links</span>
+      </button>
+      <button
+        v-if="workflowId"
+        type="button"
+        class="button inline-icon"
+        :class="isPinned ? 'bad' : 'good'"
+        @click="togglePin"
+      >
+        <HugeiconsIcon
+          :icon="isPinned ? StopIcon : PlayIcon"
+          width="1em"
+          height="1em"
+          aria-hidden="true"
+        />
+        <span>{{ isPinned ? 'Stop Workflow' : 'Start Workflow' }}</span>
+      </button>
     </template>
-    <div v-if="loading">Loading…</div>
-    <div v-else>
-      <div v-if="error" class="error">{{ error }}</div>
-      <div v-else>
-        <div v-if="items.length === 0" class="workflow-empty-state">
-          <div class="empty-state-icon">
-            <HugeiconsIcon :icon="Hugeicons[workflowIcon] || DatabaseIcon" />
-          </div>
-          <div class="empty-state-title">No navigation links yet</div>
-          <div class="empty-state-description">
-            Get started by adding navigation links to this workflow. Click "Add Navigation Link" above to begin.
-          </div>
-        </div>
-        <div v-else class="workflow-items">
-          <div
-            v-for="(item, index) in items"
-            :key="item.id"
-            class="workflow-item"
-          >
-            <div class="workflow-item-reorder">
+
+    <div v-if="loading" class="muted">Loading…</div>
+    <div v-else-if="error" class="inline-notification error">{{ error }}</div>
+    <template v-else>
+      <p v-if="items.length === 0" class="inline-notification note">
+        No navigation links yet. Use <strong>Change Navigation Links</strong> in the toolbar to add steps to this workflow.
+      </p>
+      <Navigation v-else ref="workflowNavigation">
+        <NavigationGrid />
+      </Navigation>
+    </template>
+  </Section>
+
+  <div v-if="showAddModal" class="modal-overlay" @click.self="closeModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Workflow members for {{ workflowName }}</h2>
+        <button type="button" class="modal-close neutral" @click="closeModal" aria-label="Close">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="subtle modal-hint">
+          Choose sidebar links for this workflow and set their order. To add a sidebar entry that opens a workflow
+          directly, edit Navigation — not this dialog.
+        </p>
+
+        <h3 class="modal-subtitle">Selected members (order)</h3>
+        <p v-if="!orderedSelectedIds.length" class="subtle">No members selected. Add links below.</p>
+        <ul v-else class="member-order-list">
+          <li v-for="(memberId, index) in orderedSelectedIds" :key="memberId" class="member-order-row">
+            <div class="member-order-main">
+              <HugeiconsIcon
+                :icon="resolveItemIcon(availableItemById(memberId) ?? { icon: '', dashboardId: 0 })"
+                width="1.25em"
+                height="1.25em"
+                aria-hidden="true"
+              />
+              <span class="member-order-title">{{ availableItemById(memberId)?.title ?? `Link #${memberId}` }}</span>
+            </div>
+            <div class="member-order-actions">
               <button
-                @click.stop="moveItemUp(index)"
-                :disabled="index === 0 || reordering"
-                class="reorder-button reorder-up"
+                type="button"
+                class="inline-icon neutral"
                 title="Move up"
                 aria-label="Move up"
+                :disabled="index === 0 || addingItems"
+                @click="moveModalMemberUp(index)"
               >
                 ↑
               </button>
               <button
-                @click.stop="moveItemDown(index)"
-                :disabled="index === items.length - 1 || reordering"
-                class="reorder-button reorder-down"
+                type="button"
+                class="inline-icon neutral"
                 title="Move down"
                 aria-label="Move down"
+                :disabled="index === orderedSelectedIds.length - 1 || addingItems"
+                @click="moveModalMemberDown(index)"
               >
                 ↓
               </button>
+              <button
+                type="button"
+                class="inline-icon bad"
+                title="Remove from workflow"
+                aria-label="Remove from workflow"
+                :disabled="addingItems"
+                @click="toggleItemSelection(memberId)"
+              >
+                ✕
+              </button>
             </div>
-            <div class="workflow-item-main" @click="router.push(item.path)">
-              <div class="workflow-item-icon">
-                <HugeiconsIcon :icon="Hugeicons[item.icon] || DatabaseIcon" />
-              </div>
-              <div class="workflow-item-content">
-                <div class="workflow-item-title">{{ item.title }}</div>
-                <div class="workflow-item-subtitle">
-                  {{ item.dashboardId > 0 ? 'Dashboard' : 'Table' }}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </Section>
+          </li>
+        </ul>
 
-  <!-- Change Navigation Links Modal -->
-  <div v-if="showAddModal" class="modal-overlay" @click.self="closeModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Change Navigation Links for {{ workflowName }}</h2>
-        <button class="modal-close" @click="closeModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <div v-if="availableItems.length === 0" class="no-items-message">
-          No navigation links available.
-        </div>
-        <div v-else class="items-list">
-          <div
-            v-for="item in availableItems"
+        <h3 class="modal-subtitle">Add navigation links</h3>
+        <p v-if="!unselectedAvailableItems.length" class="subtle">All navigation links are already members.</p>
+        <ul v-else class="items-list">
+          <li
+            v-for="item in unselectedAvailableItems"
             :key="item.id"
             class="item-option"
-            :class="{ selected: selectedItemIds.has(item.id) }"
             @click="toggleItemSelection(item.id)"
           >
-            <div class="item-checkbox">
-              <input
-                type="checkbox"
-                :checked="selectedItemIds.has(item.id)"
-                @change="toggleItemSelection(item.id)"
-                @click.stop
-              />
-            </div>
-            <div class="item-icon">
-              <HugeiconsIcon :icon="Hugeicons[item.icon] || DatabaseIcon" />
-            </div>
+            <HugeiconsIcon :icon="resolveItemIcon(item)" width="1.25em" height="1.25em" aria-hidden="true" />
             <div class="item-info">
               <div class="item-title">{{ item.title }}</div>
-              <div class="item-subtitle">
-                {{ item.dashboardId > 0 ? 'Dashboard' : 'Table' }}
-                <span v-if="item.workflowId > 0 && item.workflowId !== workflowId" class="workflow-badge">In another workflow</span>
-              </div>
+              <div class="subtle item-subtitle">{{ itemSubtitle(item) }}</div>
             </div>
-          </div>
-        </div>
+            <span class="tag note">Add</span>
+          </li>
+        </ul>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-secondary" @click="closeModal" :disabled="addingItems">
+        <button type="button" class="button neutral" @click="closeModal" :disabled="addingItems">
           Cancel
         </button>
-        <button
-          class="btn btn-primary"
-          @click="addSelectedItems"
-          :disabled="addingItems"
-        >
-          {{ addingItems ? 'Saving...' : 'Save Changes' }}
+        <button type="button" class="button good" @click="addSelectedItems" :disabled="addingItems">
+          {{ addingItems ? 'Saving…' : 'Save Changes' }}
         </button>
       </div>
     </div>
@@ -450,200 +416,10 @@ onMounted(load)
 </template>
 
 <style scoped>
-.workflow-items {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.workflow-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.workflow-item-reorder {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
-  flex-shrink: 0;
-}
-
-.reorder-button {
-  background: white;
-  border: 1px solid #dee2e6;
-  border-radius: 4px;
-  width: 32px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  color: #495057;
-  transition: all 0.2s ease;
-  padding: 0;
-}
-
-.reorder-button:hover:not(:disabled) {
-  background: #e9ecef;
-  border-color: #007bff;
-  color: #007bff;
-}
-
-.reorder-button:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.workflow-item-main {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  flex: 1;
-  cursor: pointer;
-  min-width: 0;
-}
-
-.workflow-item-main:hover {
-  background: #e9ecef;
-}
-
-.workflow-item:hover {
-  border-color: #007bff;
-  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
-}
-
-.workflow-item-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 48px;
-  height: 48px;
-  background: white;
-  border-radius: 8px;
-  color: #007bff;
-  flex-shrink: 0;
-}
-
-.workflow-item-icon :deep(svg) {
-  width: 24px;
-  height: 24px;
-}
-
-.workflow-item-content {
-  flex: 1;
-  min-width: 0;
-}
-
-.workflow-item-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.workflow-item-subtitle {
-  font-size: 14px;
-  color: #6c757d;
-}
-
-.workflow-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-  margin-top: 20px;
-}
-
-.empty-state-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 80px;
-  background: #f8f9fa;
-  border-radius: 50%;
-  color: #6c757d;
-  margin-bottom: 24px;
-}
-
-.empty-state-icon :deep(svg) {
-  width: 40px;
-  height: 40px;
-}
-
-.empty-state-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: #212529;
-  margin-bottom: 8px;
-}
-
-.empty-state-description {
-  font-size: 14px;
-  color: #6c757d;
-  max-width: 400px;
-  line-height: 1.5;
-}
-
-.workflow-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.pin-workflow-btn {
-  padding: 8px 12px;
-  font-size: 13px;
-}
-
-.add-navigation-link-btn {
-  padding: 8px 16px;
-  background: #007bff;
-  color: white;
-  text-decoration: none;
-  border-radius: 4px;
-  font-size: 14px;
-  transition: background-color 0.2s;
-  border: none;
-  cursor: pointer;
-}
-
-.add-navigation-link-btn:hover {
-  background: #0056b3;
-  color: white;
-  text-decoration: none;
-}
-
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-}
-
-/* Modal Styles */
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  inset: 0;
+  background: color-mix(in srgb, var(--body-bg-color, #000) 45%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -652,10 +428,11 @@ onMounted(load)
 }
 
 .modal-content {
-  background: white;
+  background: var(--section-bg-color, #fff);
+  color: var(--text-color, inherit);
   border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  max-width: 600px;
+  box-shadow: var(--menu-dropdown-shadow, 0 4px 20px rgba(0, 0, 0, 0.15));
+  max-width: 640px;
   width: 100%;
   max-height: 80vh;
   display: flex;
@@ -666,102 +443,89 @@ onMounted(load)
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px;
-  border-bottom: 1px solid #e9ecef;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border-color, #e9ecef);
 }
 
 .modal-header h2 {
   margin: 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #212529;
+  font-size: 1.15rem;
 }
 
 .modal-close {
-  background: none;
-  border: none;
-  font-size: 28px;
-  color: #6c757d;
-  cursor: pointer;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: background-color 0.2s;
-}
-
-.modal-close:hover {
-  background: #f8f9fa;
-  color: #212529;
+  font-size: 1.5rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
 }
 
 .modal-body {
-  padding: 20px;
+  padding: 1rem 1.25rem;
   overflow-y: auto;
   flex: 1;
 }
 
-.no-items-message {
-  text-align: center;
-  padding: 40px 20px;
-  color: #6c757d;
+.modal-hint {
+  margin-top: 0;
 }
 
+.modal-subtitle {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.member-order-list,
 .items-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.5rem;
+}
+
+.member-order-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--border-color, #e9ecef);
+  border-radius: 6px;
+  background: var(--standout-bg-color, #f8f9fa);
+}
+
+.member-order-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.member-order-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-order-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
 }
 
 .item-option {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px;
-  border: 2px solid #e9ecef;
-  border-radius: 8px;
+  gap: 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-color, #e9ecef);
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .item-option:hover {
-  border-color: #007bff;
-  background: #f8f9ff;
-}
-
-.item-option.selected {
-  border-color: #007bff;
-  background: #e7f3ff;
-}
-
-.item-checkbox {
-  flex-shrink: 0;
-}
-
-.item-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-}
-
-.item-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: #f8f9fa;
-  border-radius: 6px;
-  color: #007bff;
-  flex-shrink: 0;
-}
-
-.item-icon :deep(svg) {
-  width: 20px;
-  height: 20px;
+  background: var(--hover-background-color, #f8f9fa);
 }
 
 .item-info {
@@ -770,79 +534,22 @@ onMounted(load)
 }
 
 .item-title {
-  font-size: 15px;
   font-weight: 600;
-  color: #212529;
-  margin-bottom: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .item-subtitle {
-  font-size: 13px;
-  color: #6c757d;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.workflow-badge {
-  background: #fff3cd;
-  color: #856404;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 0.9rem;
 }
 
 .modal-footer {
   display: flex;
-  align-items: center;
   justify-content: flex-end;
-  gap: 12px;
-  padding: 20px;
-  border-top: 1px solid #e9ecef;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border-color, #e9ecef);
 }
 
-.modal-footer .btn {
-  padding: 8px 16px;
-  border-radius: 4px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-}
-
-.modal-footer .btn-secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.modal-footer .btn-secondary:hover:not(:disabled) {
-  background: #5a6268;
-}
-
-.modal-footer .btn-primary {
-  background: #007bff;
-  color: white;
-}
-
-.modal-footer .btn-primary:hover:not(:disabled) {
-  background: #0056b3;
-}
-
-.modal-footer .btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
+.muted {
+  color: var(--muted-text-color, #6c757d);
 }
 </style>

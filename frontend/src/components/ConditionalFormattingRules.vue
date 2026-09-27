@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Delete01Icon, ArrowLeft01Icon, Edit03Icon } from '@hugeicons/core-free-icons'
+import { Delete01Icon, ArrowLeft01Icon, Edit03Icon, PaintBrushIcon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const tableId = route.params.tableName as string
@@ -249,7 +249,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
 </script>
 
 <template>
-  <Section :title="`Conditional Formatting Rules: ${tableId}`">
+  <Section :title="`Conditional Formatting Rules: ${tableId}`" :icon="PaintBrushIcon">
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"

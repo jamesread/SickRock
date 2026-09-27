@@ -21,17 +21,21 @@ const tableHeaders = [
   { key: 'rolesLabel', label: 'Granted by roles', sortable: true },
 ]
 
-const tableRows = computed(() =>
+type PermissionTableRow = RbacPermission & {
+  description: string
+  rolesLabel: string
+  roles: RbacRole[]
+}
+
+const tableRows = computed((): PermissionTableRow[] =>
   permissions.value.map((p) => {
-    const grantingRoles = roles.value.filter((r) =>
-      (r.permissionIds ?? []).map(Number).includes(Number(p.id)),
-    )
+    const grantingRoles = roles.value
+      .filter((r) => (r.permissionIds ?? []).map(Number).includes(Number(p.id)))
+      .sort((a, b) => String(a.name).localeCompare(String(b.name)))
     return {
       ...p,
       description: p.description || '—',
-      rolesLabel: grantingRoles.length
-        ? grantingRoles.map((r) => r.name).sort().join(', ')
-        : '—',
+      rolesLabel: grantingRoles.map((r) => r.name).join(', '),
       roles: grantingRoles,
     }
   }),
@@ -59,16 +63,11 @@ onMounted(loadAll)
 
 <template>
   <Section
+    title="Permission Catalog"
     subtitle="All RBAC permissions. Permissions reach users through roles assigned to their groups."
+    :icon="ShieldKeyIcon"
     :padding="false"
   >
-    <template #title>
-      <span class="section-title-with-icon">
-        <HugeiconsIcon :icon="ShieldKeyIcon" width="22" height="22" aria-hidden="true" />
-        Permission Catalog
-      </span>
-    </template>
-
     <template #toolbar>
       <router-link :to="{ name: 'iam-rbac' }" class="button inline-icon neutral">Back to Roles</router-link>
       <button type="button" class="inline-icon neutral" aria-label="Refresh" :disabled="loading" @click="loadAll">
@@ -85,17 +84,18 @@ onMounted(loadAll)
         <template #cell-name="{ value }">
           <code>{{ value }}</code>
         </template>
+        <template #cell-rolesLabel="{ row }">
+          <span v-if="!(row as PermissionTableRow).roles.length" class="muted">—</span>
+          <span v-else class="inline-tags">
+            <span v-for="role in (row as PermissionTableRow).roles" :key="role.id" class="tag">{{ role.name }}</span>
+          </span>
+        </template>
       </Table>
     </template>
   </Section>
 </template>
 
 <style scoped>
-.section-title-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-}
 .list-banner-pad {
   padding-left: 1em;
   padding-right: 1em;
@@ -103,5 +103,13 @@ onMounted(loadAll)
 .permissions-table-wrap {
   margin-top: 0.5rem;
   margin-bottom: 1.5rem;
+}
+.inline-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.muted {
+  opacity: 0.75;
 }
 </style>

@@ -70,12 +70,27 @@ const (
 	// SickRockGetUserRbacRolesProcedure is the fully-qualified name of the SickRock's GetUserRbacRoles
 	// RPC.
 	SickRockGetUserRbacRolesProcedure = "/sickrock.SickRock/GetUserRbacRoles"
+	// SickRockGetUserEffectiveRoleGrantsProcedure is the fully-qualified name of the SickRock's
+	// GetUserEffectiveRoleGrants RPC.
+	SickRockGetUserEffectiveRoleGrantsProcedure = "/sickrock.SickRock/GetUserEffectiveRoleGrants"
 	// SickRockGetUserGroupRbacRolesProcedure is the fully-qualified name of the SickRock's
 	// GetUserGroupRbacRoles RPC.
 	SickRockGetUserGroupRbacRolesProcedure = "/sickrock.SickRock/GetUserGroupRbacRoles"
 	// SickRockSetUserGroupRbacRolesProcedure is the fully-qualified name of the SickRock's
 	// SetUserGroupRbacRoles RPC.
 	SickRockSetUserGroupRbacRolesProcedure = "/sickrock.SickRock/SetUserGroupRbacRoles"
+	// SickRockListGroupTableRoleGrantsProcedure is the fully-qualified name of the SickRock's
+	// ListGroupTableRoleGrants RPC.
+	SickRockListGroupTableRoleGrantsProcedure = "/sickrock.SickRock/ListGroupTableRoleGrants"
+	// SickRockSetGroupTableRoleGrantsProcedure is the fully-qualified name of the SickRock's
+	// SetGroupTableRoleGrants RPC.
+	SickRockSetGroupTableRoleGrantsProcedure = "/sickrock.SickRock/SetGroupTableRoleGrants"
+	// SickRockListTableShareGrantsProcedure is the fully-qualified name of the SickRock's
+	// ListTableShareGrants RPC.
+	SickRockListTableShareGrantsProcedure = "/sickrock.SickRock/ListTableShareGrants"
+	// SickRockSetTableShareGrantsProcedure is the fully-qualified name of the SickRock's
+	// SetTableShareGrants RPC.
+	SickRockSetTableShareGrantsProcedure = "/sickrock.SickRock/SetTableShareGrants"
 	// SickRockGetRbacRoleUsersProcedure is the fully-qualified name of the SickRock's GetRbacRoleUsers
 	// RPC.
 	SickRockGetRbacRoleUsersProcedure = "/sickrock.SickRock/GetRbacRoleUsers"
@@ -127,6 +142,15 @@ const (
 	SickRockGetDatabaseTablesProcedure = "/sickrock.SickRock/GetDatabaseTables"
 	// SickRockGetNavigationProcedure is the fully-qualified name of the SickRock's GetNavigation RPC.
 	SickRockGetNavigationProcedure = "/sickrock.SickRock/GetNavigation"
+	// SickRockSetWorkflowNavigationMembersProcedure is the fully-qualified name of the SickRock's
+	// SetWorkflowNavigationMembers RPC.
+	SickRockSetWorkflowNavigationMembersProcedure = "/sickrock.SickRock/SetWorkflowNavigationMembers"
+	// SickRockGetReadOnlyCalendarExportProcedure is the fully-qualified name of the SickRock's
+	// GetReadOnlyCalendarExport RPC.
+	SickRockGetReadOnlyCalendarExportProcedure = "/sickrock.SickRock/GetReadOnlyCalendarExport"
+	// SickRockListAccessibleReadOnlyExportsProcedure is the fully-qualified name of the SickRock's
+	// ListAccessibleReadOnlyExports RPC.
+	SickRockListAccessibleReadOnlyExportsProcedure = "/sickrock.SickRock/ListAccessibleReadOnlyExports"
 	// SickRockListItemsProcedure is the fully-qualified name of the SickRock's ListItems RPC.
 	SickRockListItemsProcedure = "/sickrock.SickRock/ListItems"
 	// SickRockCreateItemProcedure is the fully-qualified name of the SickRock's CreateItem RPC.
@@ -140,6 +164,8 @@ const (
 	// SickRockGetTableStructureProcedure is the fully-qualified name of the SickRock's
 	// GetTableStructure RPC.
 	SickRockGetTableStructureProcedure = "/sickrock.SickRock/GetTableStructure"
+	// SickRockGetTableAccessProcedure is the fully-qualified name of the SickRock's GetTableAccess RPC.
+	SickRockGetTableAccessProcedure = "/sickrock.SickRock/GetTableAccess"
 	// SickRockAddTableColumnProcedure is the fully-qualified name of the SickRock's AddTableColumn RPC.
 	SickRockAddTableColumnProcedure = "/sickrock.SickRock/AddTableColumn"
 	// SickRockCreateTableViewProcedure is the fully-qualified name of the SickRock's CreateTableView
@@ -270,8 +296,13 @@ type SickRockClient interface {
 	UpdateRbacRole(context.Context, *connect.Request[proto.UpdateRbacRoleRequest]) (*connect.Response[proto.UpdateRbacRoleResponse], error)
 	DeleteRbacRole(context.Context, *connect.Request[proto.DeleteRbacRoleRequest]) (*connect.Response[proto.DeleteRbacRoleResponse], error)
 	GetUserRbacRoles(context.Context, *connect.Request[proto.GetUserRbacRolesRequest]) (*connect.Response[proto.GetUserRbacRolesResponse], error)
+	GetUserEffectiveRoleGrants(context.Context, *connect.Request[proto.GetUserEffectiveRoleGrantsRequest]) (*connect.Response[proto.GetUserEffectiveRoleGrantsResponse], error)
 	GetUserGroupRbacRoles(context.Context, *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error)
 	SetUserGroupRbacRoles(context.Context, *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error)
+	ListGroupTableRoleGrants(context.Context, *connect.Request[proto.ListGroupTableRoleGrantsRequest]) (*connect.Response[proto.ListGroupTableRoleGrantsResponse], error)
+	SetGroupTableRoleGrants(context.Context, *connect.Request[proto.SetGroupTableRoleGrantsRequest]) (*connect.Response[proto.SetGroupTableRoleGrantsResponse], error)
+	ListTableShareGrants(context.Context, *connect.Request[proto.ListTableShareGrantsRequest]) (*connect.Response[proto.ListTableShareGrantsResponse], error)
+	SetTableShareGrants(context.Context, *connect.Request[proto.SetTableShareGrantsRequest]) (*connect.Response[proto.SetTableShareGrantsResponse], error)
 	GetRbacRoleUsers(context.Context, *connect.Request[proto.GetRbacRoleUsersRequest]) (*connect.Response[proto.GetRbacRoleUsersResponse], error)
 	GetRbacRoleGroups(context.Context, *connect.Request[proto.GetRbacRoleGroupsRequest]) (*connect.Response[proto.GetRbacRoleGroupsResponse], error)
 	GetMyPermissionsAudit(context.Context, *connect.Request[proto.GetMyPermissionsAuditRequest]) (*connect.Response[proto.GetMyPermissionsAuditResponse], error)
@@ -294,6 +325,10 @@ type SickRockClient interface {
 	GetDatabaseTables(context.Context, *connect.Request[proto.GetDatabaseTablesRequest]) (*connect.Response[proto.GetDatabaseTablesResponse], error)
 	// Navigation items from table_navigation
 	GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error)
+	// Assign navigation items as members of a workflow hub (does not set table_navigation.workflow_id)
+	SetWorkflowNavigationMembers(context.Context, *connect.Request[proto.SetWorkflowNavigationMembersRequest]) (*connect.Response[proto.SetWorkflowNavigationMembersResponse], error)
+	GetReadOnlyCalendarExport(context.Context, *connect.Request[proto.GetReadOnlyCalendarExportRequest]) (*connect.Response[proto.GetReadOnlyCalendarExportResponse], error)
+	ListAccessibleReadOnlyExports(context.Context, *connect.Request[proto.ListAccessibleReadOnlyExportsRequest]) (*connect.Response[proto.ListAccessibleReadOnlyExportsResponse], error)
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
@@ -302,6 +337,7 @@ type SickRockClient interface {
 	DeleteItem(context.Context, *connect.Request[proto.DeleteItemRequest]) (*connect.Response[proto.DeleteItemResponse], error)
 	// Get structure/fields for a given page/table
 	GetTableStructure(context.Context, *connect.Request[proto.GetTableStructureRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
+	GetTableAccess(context.Context, *connect.Request[proto.GetTableAccessRequest]) (*connect.Response[proto.GetTableAccessResponse], error)
 	// Add a column to a table
 	AddTableColumn(context.Context, *connect.Request[proto.AddTableColumnRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
 	// Table Views
@@ -469,6 +505,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("GetUserRbacRoles")),
 			connect.WithClientOptions(opts...),
 		),
+		getUserEffectiveRoleGrants: connect.NewClient[proto.GetUserEffectiveRoleGrantsRequest, proto.GetUserEffectiveRoleGrantsResponse](
+			httpClient,
+			baseURL+SickRockGetUserEffectiveRoleGrantsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUserEffectiveRoleGrants")),
+			connect.WithClientOptions(opts...),
+		),
 		getUserGroupRbacRoles: connect.NewClient[proto.GetUserGroupRbacRolesRequest, proto.GetUserGroupRbacRolesResponse](
 			httpClient,
 			baseURL+SickRockGetUserGroupRbacRolesProcedure,
@@ -479,6 +521,30 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockSetUserGroupRbacRolesProcedure,
 			connect.WithSchema(sickRockMethods.ByName("SetUserGroupRbacRoles")),
+			connect.WithClientOptions(opts...),
+		),
+		listGroupTableRoleGrants: connect.NewClient[proto.ListGroupTableRoleGrantsRequest, proto.ListGroupTableRoleGrantsResponse](
+			httpClient,
+			baseURL+SickRockListGroupTableRoleGrantsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListGroupTableRoleGrants")),
+			connect.WithClientOptions(opts...),
+		),
+		setGroupTableRoleGrants: connect.NewClient[proto.SetGroupTableRoleGrantsRequest, proto.SetGroupTableRoleGrantsResponse](
+			httpClient,
+			baseURL+SickRockSetGroupTableRoleGrantsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetGroupTableRoleGrants")),
+			connect.WithClientOptions(opts...),
+		),
+		listTableShareGrants: connect.NewClient[proto.ListTableShareGrantsRequest, proto.ListTableShareGrantsResponse](
+			httpClient,
+			baseURL+SickRockListTableShareGrantsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListTableShareGrants")),
+			connect.WithClientOptions(opts...),
+		),
+		setTableShareGrants: connect.NewClient[proto.SetTableShareGrantsRequest, proto.SetTableShareGrantsResponse](
+			httpClient,
+			baseURL+SickRockSetTableShareGrantsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetTableShareGrants")),
 			connect.WithClientOptions(opts...),
 		),
 		getRbacRoleUsers: connect.NewClient[proto.GetRbacRoleUsersRequest, proto.GetRbacRoleUsersResponse](
@@ -589,6 +655,24 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("GetNavigation")),
 			connect.WithClientOptions(opts...),
 		),
+		setWorkflowNavigationMembers: connect.NewClient[proto.SetWorkflowNavigationMembersRequest, proto.SetWorkflowNavigationMembersResponse](
+			httpClient,
+			baseURL+SickRockSetWorkflowNavigationMembersProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetWorkflowNavigationMembers")),
+			connect.WithClientOptions(opts...),
+		),
+		getReadOnlyCalendarExport: connect.NewClient[proto.GetReadOnlyCalendarExportRequest, proto.GetReadOnlyCalendarExportResponse](
+			httpClient,
+			baseURL+SickRockGetReadOnlyCalendarExportProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetReadOnlyCalendarExport")),
+			connect.WithClientOptions(opts...),
+		),
+		listAccessibleReadOnlyExports: connect.NewClient[proto.ListAccessibleReadOnlyExportsRequest, proto.ListAccessibleReadOnlyExportsResponse](
+			httpClient,
+			baseURL+SickRockListAccessibleReadOnlyExportsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListAccessibleReadOnlyExports")),
+			connect.WithClientOptions(opts...),
+		),
 		listItems: connect.NewClient[proto.ListItemsRequest, proto.ListItemsResponse](
 			httpClient,
 			baseURL+SickRockListItemsProcedure,
@@ -623,6 +707,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockGetTableStructureProcedure,
 			connect.WithSchema(sickRockMethods.ByName("GetTableStructure")),
+			connect.WithClientOptions(opts...),
+		),
+		getTableAccess: connect.NewClient[proto.GetTableAccessRequest, proto.GetTableAccessResponse](
+			httpClient,
+			baseURL+SickRockGetTableAccessProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetTableAccess")),
 			connect.WithClientOptions(opts...),
 		),
 		addTableColumn: connect.NewClient[proto.AddTableColumnRequest, proto.GetTableStructureResponse](
@@ -881,8 +971,13 @@ type sickRockClient struct {
 	updateRbacRole                     *connect.Client[proto.UpdateRbacRoleRequest, proto.UpdateRbacRoleResponse]
 	deleteRbacRole                     *connect.Client[proto.DeleteRbacRoleRequest, proto.DeleteRbacRoleResponse]
 	getUserRbacRoles                   *connect.Client[proto.GetUserRbacRolesRequest, proto.GetUserRbacRolesResponse]
+	getUserEffectiveRoleGrants         *connect.Client[proto.GetUserEffectiveRoleGrantsRequest, proto.GetUserEffectiveRoleGrantsResponse]
 	getUserGroupRbacRoles              *connect.Client[proto.GetUserGroupRbacRolesRequest, proto.GetUserGroupRbacRolesResponse]
 	setUserGroupRbacRoles              *connect.Client[proto.SetUserGroupRbacRolesRequest, proto.SetUserGroupRbacRolesResponse]
+	listGroupTableRoleGrants           *connect.Client[proto.ListGroupTableRoleGrantsRequest, proto.ListGroupTableRoleGrantsResponse]
+	setGroupTableRoleGrants            *connect.Client[proto.SetGroupTableRoleGrantsRequest, proto.SetGroupTableRoleGrantsResponse]
+	listTableShareGrants               *connect.Client[proto.ListTableShareGrantsRequest, proto.ListTableShareGrantsResponse]
+	setTableShareGrants                *connect.Client[proto.SetTableShareGrantsRequest, proto.SetTableShareGrantsResponse]
 	getRbacRoleUsers                   *connect.Client[proto.GetRbacRoleUsersRequest, proto.GetRbacRoleUsersResponse]
 	getRbacRoleGroups                  *connect.Client[proto.GetRbacRoleGroupsRequest, proto.GetRbacRoleGroupsResponse]
 	getMyPermissionsAudit              *connect.Client[proto.GetMyPermissionsAuditRequest, proto.GetMyPermissionsAuditResponse]
@@ -901,12 +996,16 @@ type sickRockClient struct {
 	createTableConfiguration           *connect.Client[proto.CreateTableConfigurationRequest, proto.CreateTableConfigurationResponse]
 	getDatabaseTables                  *connect.Client[proto.GetDatabaseTablesRequest, proto.GetDatabaseTablesResponse]
 	getNavigation                      *connect.Client[proto.GetNavigationRequest, proto.GetNavigationResponse]
+	setWorkflowNavigationMembers       *connect.Client[proto.SetWorkflowNavigationMembersRequest, proto.SetWorkflowNavigationMembersResponse]
+	getReadOnlyCalendarExport          *connect.Client[proto.GetReadOnlyCalendarExportRequest, proto.GetReadOnlyCalendarExportResponse]
+	listAccessibleReadOnlyExports      *connect.Client[proto.ListAccessibleReadOnlyExportsRequest, proto.ListAccessibleReadOnlyExportsResponse]
 	listItems                          *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
 	createItem                         *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
 	getItem                            *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
 	editItem                           *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
 	deleteItem                         *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
 	getTableStructure                  *connect.Client[proto.GetTableStructureRequest, proto.GetTableStructureResponse]
+	getTableAccess                     *connect.Client[proto.GetTableAccessRequest, proto.GetTableAccessResponse]
 	addTableColumn                     *connect.Client[proto.AddTableColumnRequest, proto.GetTableStructureResponse]
 	createTableView                    *connect.Client[proto.CreateTableViewRequest, proto.CreateTableViewResponse]
 	updateTableView                    *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
@@ -1033,6 +1132,11 @@ func (c *sickRockClient) GetUserRbacRoles(ctx context.Context, req *connect.Requ
 	return c.getUserRbacRoles.CallUnary(ctx, req)
 }
 
+// GetUserEffectiveRoleGrants calls sickrock.SickRock.GetUserEffectiveRoleGrants.
+func (c *sickRockClient) GetUserEffectiveRoleGrants(ctx context.Context, req *connect.Request[proto.GetUserEffectiveRoleGrantsRequest]) (*connect.Response[proto.GetUserEffectiveRoleGrantsResponse], error) {
+	return c.getUserEffectiveRoleGrants.CallUnary(ctx, req)
+}
+
 // GetUserGroupRbacRoles calls sickrock.SickRock.GetUserGroupRbacRoles.
 func (c *sickRockClient) GetUserGroupRbacRoles(ctx context.Context, req *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error) {
 	return c.getUserGroupRbacRoles.CallUnary(ctx, req)
@@ -1041,6 +1145,26 @@ func (c *sickRockClient) GetUserGroupRbacRoles(ctx context.Context, req *connect
 // SetUserGroupRbacRoles calls sickrock.SickRock.SetUserGroupRbacRoles.
 func (c *sickRockClient) SetUserGroupRbacRoles(ctx context.Context, req *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error) {
 	return c.setUserGroupRbacRoles.CallUnary(ctx, req)
+}
+
+// ListGroupTableRoleGrants calls sickrock.SickRock.ListGroupTableRoleGrants.
+func (c *sickRockClient) ListGroupTableRoleGrants(ctx context.Context, req *connect.Request[proto.ListGroupTableRoleGrantsRequest]) (*connect.Response[proto.ListGroupTableRoleGrantsResponse], error) {
+	return c.listGroupTableRoleGrants.CallUnary(ctx, req)
+}
+
+// SetGroupTableRoleGrants calls sickrock.SickRock.SetGroupTableRoleGrants.
+func (c *sickRockClient) SetGroupTableRoleGrants(ctx context.Context, req *connect.Request[proto.SetGroupTableRoleGrantsRequest]) (*connect.Response[proto.SetGroupTableRoleGrantsResponse], error) {
+	return c.setGroupTableRoleGrants.CallUnary(ctx, req)
+}
+
+// ListTableShareGrants calls sickrock.SickRock.ListTableShareGrants.
+func (c *sickRockClient) ListTableShareGrants(ctx context.Context, req *connect.Request[proto.ListTableShareGrantsRequest]) (*connect.Response[proto.ListTableShareGrantsResponse], error) {
+	return c.listTableShareGrants.CallUnary(ctx, req)
+}
+
+// SetTableShareGrants calls sickrock.SickRock.SetTableShareGrants.
+func (c *sickRockClient) SetTableShareGrants(ctx context.Context, req *connect.Request[proto.SetTableShareGrantsRequest]) (*connect.Response[proto.SetTableShareGrantsResponse], error) {
+	return c.setTableShareGrants.CallUnary(ctx, req)
 }
 
 // GetRbacRoleUsers calls sickrock.SickRock.GetRbacRoleUsers.
@@ -1133,6 +1257,21 @@ func (c *sickRockClient) GetNavigation(ctx context.Context, req *connect.Request
 	return c.getNavigation.CallUnary(ctx, req)
 }
 
+// SetWorkflowNavigationMembers calls sickrock.SickRock.SetWorkflowNavigationMembers.
+func (c *sickRockClient) SetWorkflowNavigationMembers(ctx context.Context, req *connect.Request[proto.SetWorkflowNavigationMembersRequest]) (*connect.Response[proto.SetWorkflowNavigationMembersResponse], error) {
+	return c.setWorkflowNavigationMembers.CallUnary(ctx, req)
+}
+
+// GetReadOnlyCalendarExport calls sickrock.SickRock.GetReadOnlyCalendarExport.
+func (c *sickRockClient) GetReadOnlyCalendarExport(ctx context.Context, req *connect.Request[proto.GetReadOnlyCalendarExportRequest]) (*connect.Response[proto.GetReadOnlyCalendarExportResponse], error) {
+	return c.getReadOnlyCalendarExport.CallUnary(ctx, req)
+}
+
+// ListAccessibleReadOnlyExports calls sickrock.SickRock.ListAccessibleReadOnlyExports.
+func (c *sickRockClient) ListAccessibleReadOnlyExports(ctx context.Context, req *connect.Request[proto.ListAccessibleReadOnlyExportsRequest]) (*connect.Response[proto.ListAccessibleReadOnlyExportsResponse], error) {
+	return c.listAccessibleReadOnlyExports.CallUnary(ctx, req)
+}
+
 // ListItems calls sickrock.SickRock.ListItems.
 func (c *sickRockClient) ListItems(ctx context.Context, req *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error) {
 	return c.listItems.CallUnary(ctx, req)
@@ -1161,6 +1300,11 @@ func (c *sickRockClient) DeleteItem(ctx context.Context, req *connect.Request[pr
 // GetTableStructure calls sickrock.SickRock.GetTableStructure.
 func (c *sickRockClient) GetTableStructure(ctx context.Context, req *connect.Request[proto.GetTableStructureRequest]) (*connect.Response[proto.GetTableStructureResponse], error) {
 	return c.getTableStructure.CallUnary(ctx, req)
+}
+
+// GetTableAccess calls sickrock.SickRock.GetTableAccess.
+func (c *sickRockClient) GetTableAccess(ctx context.Context, req *connect.Request[proto.GetTableAccessRequest]) (*connect.Response[proto.GetTableAccessResponse], error) {
+	return c.getTableAccess.CallUnary(ctx, req)
 }
 
 // AddTableColumn calls sickrock.SickRock.AddTableColumn.
@@ -1379,8 +1523,13 @@ type SickRockHandler interface {
 	UpdateRbacRole(context.Context, *connect.Request[proto.UpdateRbacRoleRequest]) (*connect.Response[proto.UpdateRbacRoleResponse], error)
 	DeleteRbacRole(context.Context, *connect.Request[proto.DeleteRbacRoleRequest]) (*connect.Response[proto.DeleteRbacRoleResponse], error)
 	GetUserRbacRoles(context.Context, *connect.Request[proto.GetUserRbacRolesRequest]) (*connect.Response[proto.GetUserRbacRolesResponse], error)
+	GetUserEffectiveRoleGrants(context.Context, *connect.Request[proto.GetUserEffectiveRoleGrantsRequest]) (*connect.Response[proto.GetUserEffectiveRoleGrantsResponse], error)
 	GetUserGroupRbacRoles(context.Context, *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error)
 	SetUserGroupRbacRoles(context.Context, *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error)
+	ListGroupTableRoleGrants(context.Context, *connect.Request[proto.ListGroupTableRoleGrantsRequest]) (*connect.Response[proto.ListGroupTableRoleGrantsResponse], error)
+	SetGroupTableRoleGrants(context.Context, *connect.Request[proto.SetGroupTableRoleGrantsRequest]) (*connect.Response[proto.SetGroupTableRoleGrantsResponse], error)
+	ListTableShareGrants(context.Context, *connect.Request[proto.ListTableShareGrantsRequest]) (*connect.Response[proto.ListTableShareGrantsResponse], error)
+	SetTableShareGrants(context.Context, *connect.Request[proto.SetTableShareGrantsRequest]) (*connect.Response[proto.SetTableShareGrantsResponse], error)
 	GetRbacRoleUsers(context.Context, *connect.Request[proto.GetRbacRoleUsersRequest]) (*connect.Response[proto.GetRbacRoleUsersResponse], error)
 	GetRbacRoleGroups(context.Context, *connect.Request[proto.GetRbacRoleGroupsRequest]) (*connect.Response[proto.GetRbacRoleGroupsResponse], error)
 	GetMyPermissionsAudit(context.Context, *connect.Request[proto.GetMyPermissionsAuditRequest]) (*connect.Response[proto.GetMyPermissionsAuditResponse], error)
@@ -1403,6 +1552,10 @@ type SickRockHandler interface {
 	GetDatabaseTables(context.Context, *connect.Request[proto.GetDatabaseTablesRequest]) (*connect.Response[proto.GetDatabaseTablesResponse], error)
 	// Navigation items from table_navigation
 	GetNavigation(context.Context, *connect.Request[proto.GetNavigationRequest]) (*connect.Response[proto.GetNavigationResponse], error)
+	// Assign navigation items as members of a workflow hub (does not set table_navigation.workflow_id)
+	SetWorkflowNavigationMembers(context.Context, *connect.Request[proto.SetWorkflowNavigationMembersRequest]) (*connect.Response[proto.SetWorkflowNavigationMembersResponse], error)
+	GetReadOnlyCalendarExport(context.Context, *connect.Request[proto.GetReadOnlyCalendarExportRequest]) (*connect.Response[proto.GetReadOnlyCalendarExportResponse], error)
+	ListAccessibleReadOnlyExports(context.Context, *connect.Request[proto.ListAccessibleReadOnlyExportsRequest]) (*connect.Response[proto.ListAccessibleReadOnlyExportsResponse], error)
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
@@ -1411,6 +1564,7 @@ type SickRockHandler interface {
 	DeleteItem(context.Context, *connect.Request[proto.DeleteItemRequest]) (*connect.Response[proto.DeleteItemResponse], error)
 	// Get structure/fields for a given page/table
 	GetTableStructure(context.Context, *connect.Request[proto.GetTableStructureRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
+	GetTableAccess(context.Context, *connect.Request[proto.GetTableAccessRequest]) (*connect.Response[proto.GetTableAccessResponse], error)
 	// Add a column to a table
 	AddTableColumn(context.Context, *connect.Request[proto.AddTableColumnRequest]) (*connect.Response[proto.GetTableStructureResponse], error)
 	// Table Views
@@ -1574,6 +1728,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("GetUserRbacRoles")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetUserEffectiveRoleGrantsHandler := connect.NewUnaryHandler(
+		SickRockGetUserEffectiveRoleGrantsProcedure,
+		svc.GetUserEffectiveRoleGrants,
+		connect.WithSchema(sickRockMethods.ByName("GetUserEffectiveRoleGrants")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockGetUserGroupRbacRolesHandler := connect.NewUnaryHandler(
 		SickRockGetUserGroupRbacRolesProcedure,
 		svc.GetUserGroupRbacRoles,
@@ -1584,6 +1744,30 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockSetUserGroupRbacRolesProcedure,
 		svc.SetUserGroupRbacRoles,
 		connect.WithSchema(sickRockMethods.ByName("SetUserGroupRbacRoles")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListGroupTableRoleGrantsHandler := connect.NewUnaryHandler(
+		SickRockListGroupTableRoleGrantsProcedure,
+		svc.ListGroupTableRoleGrants,
+		connect.WithSchema(sickRockMethods.ByName("ListGroupTableRoleGrants")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetGroupTableRoleGrantsHandler := connect.NewUnaryHandler(
+		SickRockSetGroupTableRoleGrantsProcedure,
+		svc.SetGroupTableRoleGrants,
+		connect.WithSchema(sickRockMethods.ByName("SetGroupTableRoleGrants")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListTableShareGrantsHandler := connect.NewUnaryHandler(
+		SickRockListTableShareGrantsProcedure,
+		svc.ListTableShareGrants,
+		connect.WithSchema(sickRockMethods.ByName("ListTableShareGrants")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetTableShareGrantsHandler := connect.NewUnaryHandler(
+		SickRockSetTableShareGrantsProcedure,
+		svc.SetTableShareGrants,
+		connect.WithSchema(sickRockMethods.ByName("SetTableShareGrants")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockGetRbacRoleUsersHandler := connect.NewUnaryHandler(
@@ -1694,6 +1878,24 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("GetNavigation")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockSetWorkflowNavigationMembersHandler := connect.NewUnaryHandler(
+		SickRockSetWorkflowNavigationMembersProcedure,
+		svc.SetWorkflowNavigationMembers,
+		connect.WithSchema(sickRockMethods.ByName("SetWorkflowNavigationMembers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetReadOnlyCalendarExportHandler := connect.NewUnaryHandler(
+		SickRockGetReadOnlyCalendarExportProcedure,
+		svc.GetReadOnlyCalendarExport,
+		connect.WithSchema(sickRockMethods.ByName("GetReadOnlyCalendarExport")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListAccessibleReadOnlyExportsHandler := connect.NewUnaryHandler(
+		SickRockListAccessibleReadOnlyExportsProcedure,
+		svc.ListAccessibleReadOnlyExports,
+		connect.WithSchema(sickRockMethods.ByName("ListAccessibleReadOnlyExports")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockListItemsHandler := connect.NewUnaryHandler(
 		SickRockListItemsProcedure,
 		svc.ListItems,
@@ -1728,6 +1930,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockGetTableStructureProcedure,
 		svc.GetTableStructure,
 		connect.WithSchema(sickRockMethods.ByName("GetTableStructure")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetTableAccessHandler := connect.NewUnaryHandler(
+		SickRockGetTableAccessProcedure,
+		svc.GetTableAccess,
+		connect.WithSchema(sickRockMethods.ByName("GetTableAccess")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockAddTableColumnHandler := connect.NewUnaryHandler(
@@ -2000,10 +2208,20 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockDeleteRbacRoleHandler.ServeHTTP(w, r)
 		case SickRockGetUserRbacRolesProcedure:
 			sickRockGetUserRbacRolesHandler.ServeHTTP(w, r)
+		case SickRockGetUserEffectiveRoleGrantsProcedure:
+			sickRockGetUserEffectiveRoleGrantsHandler.ServeHTTP(w, r)
 		case SickRockGetUserGroupRbacRolesProcedure:
 			sickRockGetUserGroupRbacRolesHandler.ServeHTTP(w, r)
 		case SickRockSetUserGroupRbacRolesProcedure:
 			sickRockSetUserGroupRbacRolesHandler.ServeHTTP(w, r)
+		case SickRockListGroupTableRoleGrantsProcedure:
+			sickRockListGroupTableRoleGrantsHandler.ServeHTTP(w, r)
+		case SickRockSetGroupTableRoleGrantsProcedure:
+			sickRockSetGroupTableRoleGrantsHandler.ServeHTTP(w, r)
+		case SickRockListTableShareGrantsProcedure:
+			sickRockListTableShareGrantsHandler.ServeHTTP(w, r)
+		case SickRockSetTableShareGrantsProcedure:
+			sickRockSetTableShareGrantsHandler.ServeHTTP(w, r)
 		case SickRockGetRbacRoleUsersProcedure:
 			sickRockGetRbacRoleUsersHandler.ServeHTTP(w, r)
 		case SickRockGetRbacRoleGroupsProcedure:
@@ -2040,6 +2258,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetDatabaseTablesHandler.ServeHTTP(w, r)
 		case SickRockGetNavigationProcedure:
 			sickRockGetNavigationHandler.ServeHTTP(w, r)
+		case SickRockSetWorkflowNavigationMembersProcedure:
+			sickRockSetWorkflowNavigationMembersHandler.ServeHTTP(w, r)
+		case SickRockGetReadOnlyCalendarExportProcedure:
+			sickRockGetReadOnlyCalendarExportHandler.ServeHTTP(w, r)
+		case SickRockListAccessibleReadOnlyExportsProcedure:
+			sickRockListAccessibleReadOnlyExportsHandler.ServeHTTP(w, r)
 		case SickRockListItemsProcedure:
 			sickRockListItemsHandler.ServeHTTP(w, r)
 		case SickRockCreateItemProcedure:
@@ -2052,6 +2276,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockDeleteItemHandler.ServeHTTP(w, r)
 		case SickRockGetTableStructureProcedure:
 			sickRockGetTableStructureHandler.ServeHTTP(w, r)
+		case SickRockGetTableAccessProcedure:
+			sickRockGetTableAccessHandler.ServeHTTP(w, r)
 		case SickRockAddTableColumnProcedure:
 			sickRockAddTableColumnHandler.ServeHTTP(w, r)
 		case SickRockCreateTableViewProcedure:
@@ -2207,12 +2433,32 @@ func (UnimplementedSickRockHandler) GetUserRbacRoles(context.Context, *connect.R
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserRbacRoles is not implemented"))
 }
 
+func (UnimplementedSickRockHandler) GetUserEffectiveRoleGrants(context.Context, *connect.Request[proto.GetUserEffectiveRoleGrantsRequest]) (*connect.Response[proto.GetUserEffectiveRoleGrantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserEffectiveRoleGrants is not implemented"))
+}
+
 func (UnimplementedSickRockHandler) GetUserGroupRbacRoles(context.Context, *connect.Request[proto.GetUserGroupRbacRolesRequest]) (*connect.Response[proto.GetUserGroupRbacRolesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserGroupRbacRoles is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) SetUserGroupRbacRoles(context.Context, *connect.Request[proto.SetUserGroupRbacRolesRequest]) (*connect.Response[proto.SetUserGroupRbacRolesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetUserGroupRbacRoles is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListGroupTableRoleGrants(context.Context, *connect.Request[proto.ListGroupTableRoleGrantsRequest]) (*connect.Response[proto.ListGroupTableRoleGrantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListGroupTableRoleGrants is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetGroupTableRoleGrants(context.Context, *connect.Request[proto.SetGroupTableRoleGrantsRequest]) (*connect.Response[proto.SetGroupTableRoleGrantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetGroupTableRoleGrants is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListTableShareGrants(context.Context, *connect.Request[proto.ListTableShareGrantsRequest]) (*connect.Response[proto.ListTableShareGrantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListTableShareGrants is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetTableShareGrants(context.Context, *connect.Request[proto.SetTableShareGrantsRequest]) (*connect.Response[proto.SetTableShareGrantsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetTableShareGrants is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetRbacRoleUsers(context.Context, *connect.Request[proto.GetRbacRoleUsersRequest]) (*connect.Response[proto.GetRbacRoleUsersResponse], error) {
@@ -2287,6 +2533,18 @@ func (UnimplementedSickRockHandler) GetNavigation(context.Context, *connect.Requ
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetNavigation is not implemented"))
 }
 
+func (UnimplementedSickRockHandler) SetWorkflowNavigationMembers(context.Context, *connect.Request[proto.SetWorkflowNavigationMembersRequest]) (*connect.Response[proto.SetWorkflowNavigationMembersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetWorkflowNavigationMembers is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetReadOnlyCalendarExport(context.Context, *connect.Request[proto.GetReadOnlyCalendarExportRequest]) (*connect.Response[proto.GetReadOnlyCalendarExportResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetReadOnlyCalendarExport is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListAccessibleReadOnlyExports(context.Context, *connect.Request[proto.ListAccessibleReadOnlyExportsRequest]) (*connect.Response[proto.ListAccessibleReadOnlyExportsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListAccessibleReadOnlyExports is not implemented"))
+}
+
 func (UnimplementedSickRockHandler) ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListItems is not implemented"))
 }
@@ -2309,6 +2567,10 @@ func (UnimplementedSickRockHandler) DeleteItem(context.Context, *connect.Request
 
 func (UnimplementedSickRockHandler) GetTableStructure(context.Context, *connect.Request[proto.GetTableStructureRequest]) (*connect.Response[proto.GetTableStructureResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetTableStructure is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetTableAccess(context.Context, *connect.Request[proto.GetTableAccessRequest]) (*connect.Response[proto.GetTableAccessResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetTableAccess is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) AddTableColumn(context.Context, *connect.Request[proto.AddTableColumnRequest]) (*connect.Response[proto.GetTableStructureResponse], error) {

@@ -2,11 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon, RefreshIcon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, RefreshIcon, UserIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../../stores/api'
 import { useRbac } from '../../composables/useRbac'
-import type { IamUser } from '../../gen/sickrock_pb'
+import type { IamUser, UserEffectiveRoleGrant } from '../../gen/sickrock_pb'
 
 const iconStrokeWidth = 2.5
 const route = useRoute()
@@ -14,7 +14,8 @@ const { hasPermission } = useRbac()
 const client = createApiClient()
 
 const user = ref<IamUser | null>(null)
-const roleNames = ref<string[]>([])
+const roleGrants = ref<UserEffectiveRoleGrant[]>([])
+const isSuperuser = ref(false)
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
@@ -32,13 +33,12 @@ async function load() {
     const res = await client.getUser({ userId: userId.value })
     user.value = res.user ?? null
     if (user.value) {
-      const rolesRes = await client.getUserRbacRoles({ userId: userId.value })
-      const allRoles = await client.listRbacRoles({})
-      const idSet = new Set((rolesRes.roleIds ?? []).map(Number))
-      roleNames.value = (allRoles.roles ?? [])
-        .filter((r) => idSet.has(Number(r.id)))
-        .map((r) => r.name)
-        .sort()
+      const grantsRes = await client.getUserEffectiveRoleGrants({ userId: userId.value })
+      isSuperuser.value = Boolean(grantsRes.isSuperuser)
+      roleGrants.value = grantsRes.grants ?? []
+    } else {
+      isSuperuser.value = false
+      roleGrants.value = []
     }
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : 'Failed to load user'
@@ -82,7 +82,11 @@ onMounted(load)
 </script>
 
 <template>
-  <Section :title="user?.username || 'User'" subtitle="Account details and effective access">
+  <Section
+    :title="user?.username || 'User'"
+    subtitle="Account details and effective access"
+    :icon="UserIcon"
+  >
     <template #toolbar>
       <router-link :to="{ name: 'iam-users' }" class="button inline-icon neutral">
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
@@ -107,11 +111,33 @@ onMounted(load)
       </dl>
 
       <h3 class="subsection-title">Effective roles</h3>
-      <p class="section-hint">Inherited via group membership (read-only).</p>
-      <p v-if="!roleNames.length" class="inline-notification note">No roles via group membership.</p>
-      <p v-else>
-        <span v-for="name in roleNames" :key="name" class="role-tag">{{ name }}</span>
+      <p class="section-hint">Each row is a role granted through a user group membership.</p>
+      <p v-if="isSuperuser" class="inline-notification note">
+        This user has the <strong>superuser</strong> role and effectively has all permissions.
       </p>
+      <p v-if="!roleGrants.length && !isSuperuser" class="inline-notification note">No roles via group membership.</p>
+      <table v-else-if="roleGrants.length" class="data-table role-grants-table">
+        <thead>
+          <tr>
+            <th scope="col">Role</th>
+            <th scope="col">Granted via group</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="grant in roleGrants" :key="`${grant.roleId}-${grant.groupId}`">
+            <td>
+              <router-link :to="{ name: 'iam-rbac-role-details', params: { id: String(grant.roleId) } }">
+                {{ grant.roleName }}
+              </router-link>
+            </td>
+            <td>
+              <router-link :to="{ name: 'iam-group-details', params: { id: String(grant.groupId) } }">
+                {{ grant.groupName }}
+              </router-link>
+            </td>
+          </tr>
+        </tbody>
+      </table>
 
       <div v-if="canResetPassword" class="reset-section">
         <h3 class="subsection-title">Reset password</h3>
@@ -147,13 +173,9 @@ onMounted(load)
   font-size: 0.9rem;
   margin: 0 0 0.75rem;
 }
-.role-tag {
-  display: inline-block;
-  margin: 0 0.35rem 0.35rem 0;
-  padding: 0.2rem 0.55rem;
-  border-radius: 4px;
-  background: #e2e8f0;
-  font-size: 0.85rem;
+.role-grants-table {
+  width: 100%;
+  max-width: 36rem;
 }
 .reset-section {
   margin-top: 2rem;

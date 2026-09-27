@@ -2,7 +2,8 @@
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
-import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, LogoutIcon, HomeIcon, CheckmarkSquare03Icon, BookmarkIcon, QuestionIcon, CheckListIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, HomeIcon, CheckmarkSquare03Icon, BookmarkIcon, QuestionIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
+import { canAccessControlPanel } from './utils/rbacAccess'
 import { createApiClient } from './stores/api'
 import Header from 'picocrank/vue/components/Header.vue'
 import logo from './resources/images/logo.png'
@@ -18,6 +19,7 @@ import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
 import PWAInstallPrompt from './components/PWAInstallPrompt.vue'
 import { usePWAInstall } from './composables/usePWAInstall'
 import { isOnline } from './utils/indexedDB'
+import { resolveNavigationIcon } from './utils/navigationIcon'
 
 const sidebar = ref(null)
 const navigation = ref(null)
@@ -45,12 +47,17 @@ function toggleSidebar() {
     sidebar.value?.toggle()
 }
 
-async function handleLogout() {
-    await authStore.logout()
-    router.push('/login')
-}
-
-const pages = ref<Array<{ id: string; title: string; slug: string; view: string; icon: string, path: string }>>([])
+const pages = ref<Array<{
+    id: string
+    navigationItemId: number
+    title: string
+    slug: string
+    view: string
+    icon: string
+    path: string
+    workflowId: number
+    dashboardId: number
+}>>([])
 const version = ref<string>('')
 const quickSearch = ref(null)
 const appTitle = ref<string>('SickRock') // Default to 'SickRock', will be loaded from settings
@@ -188,30 +195,15 @@ function populateQuickSearchItems() {
         icon: HomeIcon
     })
 
-    // Add workflows
-    const workflows = (navResponse as any)?.workflows || []
-    const sortedWorkflows = [...workflows].sort((a: any, b: any) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
-    sortedWorkflows.forEach((workflow: any) => {
-        const workflowIconName = workflow.icon || 'DatabaseIcon'
-        const workflowIcon = (Hugeicons as any)[workflowIconName] || DatabaseIcon
-        const workflowPath = `/workflow/${workflow.id}`
-        quickSearch.value.addItem({
-            id: `workflow-${workflow.id}`,
-            name: workflow.name || '',
-            title: workflow.name || '',
-            description: `Workflow with ${workflow.items?.length || 0} items`,
-            category: 'Workflows',
-            path: workflowPath,
-            type: 'route',
-            icon: workflowIcon
-        })
-    })
-
-    // Add navigation items (pages)
+    // Add navigation items (pages) from table_navigation
     pages.value.forEach(pg => {
         const isDashboard = pg.path.startsWith('/dashboard/')
-        const defaultIcon = isDashboard ? LayoutIcon : DatabaseIcon
-        const icon = Hugeicons[pg.icon] || defaultIcon
+        const icon = resolveNavigationIcon({
+            icon: pg.icon,
+            workflowId: pg.workflowId,
+            dashboardId: pg.dashboardId,
+            path: pg.path
+        })
         const description = isDashboard
             ? `Dashboard: ${pg.title}`
             : `Table: ${pg.title}`
@@ -239,72 +231,94 @@ function populateQuickSearchItems() {
         callback: () => { showShortcutsHelp.value = true }
     })
 
-    // Add admin/system items
-    quickSearch.value.addItem({
-        id: 'table-configurations',
-        name: 'Table Configurations',
-        title: 'Table Configurations',
-        description: 'Manage table configurations',
-        category: 'Navigation',
-        path: '/table/table_configurations',
-        type: 'route',
-        icon: DatabaseSettingIcon
-    })
+    const navWorkflows = ((navResponse as { workflows?: Array<{ id: number; name?: string; icon?: string; ordinal?: number }> })?.workflows) || []
+    for (const wf of [...navWorkflows].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0) || String(a.name || '').localeCompare(String(b.name || '')))) {
+        quickSearch.value.addItem({
+            id: `workflow-${wf.id}`,
+            name: wf.name || `Workflow ${wf.id}`,
+            title: wf.name || `Workflow ${wf.id}`,
+            description: 'Workflow hub',
+            category: 'Workflows',
+            path: `/workflow/${wf.id}`,
+            type: 'route',
+            icon: resolveNavigationIcon({
+                icon: wf.icon,
+                workflowId: wf.id,
+                path: `/workflow/${wf.id}`,
+            }),
+        })
+    }
 
-    quickSearch.value.addItem({
-        id: 'workflows',
-        name: 'Workflows',
-        title: 'Workflows',
-        description: 'Manage workflows',
-        category: 'Navigation',
-        path: '/table/table_workflows',
-        type: 'route',
-        icon: DatabaseSettingIcon
-    })
+    const rbacPerms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
+    const rbacSuperuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+    if (canAccessControlPanel(rbacPerms, rbacSuperuser)) {
+        quickSearch.value.addItem({
+            id: 'control-panel',
+            name: 'Control Panel',
+            title: 'Control Panel',
+            description: 'Administrative control panel',
+            category: 'System',
+            path: '/admin/control-panel',
+            type: 'route',
+            icon: DatabaseSettingIcon
+        })
+    }
 
-    quickSearch.value.addItem({
-        id: 'nav-items',
-        name: 'Navigation',
-        title: 'Navigation',
-        description: 'Manage navigation items',
-        category: 'Navigation',
-        path: '/table/table_navigation',
-        type: 'route',
-        icon: DatabaseSettingIcon
-    })
+    if (rbacSuperuser || rbacPerms.includes('system.settings')) {
+        quickSearch.value.addItem({
+            id: 'table-configurations',
+            name: 'Table Configurations',
+            title: 'Table Configurations',
+            description: 'Manage table configurations',
+            category: 'System',
+            path: '/table/table_configurations',
+            type: 'route',
+            icon: DatabaseSettingIcon
+        })
+        quickSearch.value.addItem({
+            id: 'workflows-admin',
+            name: 'Workflows (admin)',
+            title: 'Workflows (admin)',
+            description: 'Manage workflow definitions',
+            category: 'System',
+            path: '/table/table_workflows',
+            type: 'route',
+            icon: DatabaseSettingIcon
+        })
+        quickSearch.value.addItem({
+            id: 'nav-items',
+            name: 'Navigation',
+            title: 'Navigation',
+            description: 'Manage navigation items',
+            category: 'System',
+            path: '/table/table_navigation',
+            type: 'route',
+            icon: DatabaseSettingIcon
+        })
+        quickSearch.value.addItem({
+            id: 'table-create',
+            name: 'Create Table',
+            title: 'Create Table',
+            description: 'Create a new table',
+            category: 'System',
+            path: '/admin/table/create',
+            type: 'route',
+            icon: DatabaseSettingIcon
+        })
+    }
 
-    quickSearch.value.addItem({
-        id: 'table-create',
-        name: 'Create Table',
-        title: 'Create Table',
-        description: 'Create a new table',
-        category: 'Navigation',
-        path: '/admin/table/create',
-        type: 'route',
-        icon: DatabaseSettingIcon
-    })
-
-    quickSearch.value.addItem({
-        id: 'control-panel',
-        name: 'Control Panel',
-        title: 'Control Panel',
-        description: 'Administrative control panel',
-        category: 'Navigation',
-        path: '/admin/control-panel',
-        type: 'route',
-        icon: DatabaseSettingIcon
-    })
-
-    quickSearch.value.addItem({
-        id: 'device-code-claimer',
-        name: 'Device Code Claimer',
-        title: 'Device Code Claimer',
-        description: 'Complete device code authentication',
-        category: 'Navigation',
-        path: '/device-code-claimer',
-        type: 'route',
-        icon: DatabaseSettingIcon
-    })
+    if (authStore.hasPermission('devicecode.claim')) {
+        quickSearch.value.addItem({
+            id: 'device-code-claimer',
+            name: 'Device Code Claimer',
+            title: 'Device Code Claimer',
+            description: 'Complete device code authentication',
+            category: 'Navigation',
+            path: '/device-code-claimer',
+            type: 'route',
+            icon: DatabaseSettingIcon
+        })
+    }
 }
 
 async function loadAppData() {
@@ -404,22 +418,41 @@ async function loadAppData() {
         pages.value = sortedItems
             .map(item => {
                 const title = item.title || String(item.id)
-                const slug = item.tableName || item.dashboardName || ''
-                // Use CheckListIcon for workflow items, LayoutIcon for dashboards, DatabaseIcon for tables
+                const workflowId = item.workflowId || 0
+                const dashboardId = item.dashboardId || 0
+                let path = ''
+                if (workflowId > 0 && !item.tableName && !(dashboardId > 0 && item.dashboardName)) {
+                    path = `/workflow/${workflowId}`
+                } else if (dashboardId > 0 && item.dashboardName) {
+                    path = `/dashboard/${item.dashboardName}`
+                } else if (item.tableName) {
+                    path = `/table/${item.tableName}`
+                } else if (workflowId > 0) {
+                    path = `/workflow/${workflowId}`
+                }
+                const slug = item.tableName || item.dashboardName || (workflowId > 0 ? `workflow-${workflowId}` : '')
                 let defaultIcon = 'DatabaseIcon'
-                if (item.workflowId && item.workflowId > 0) {
-                    defaultIcon = 'CheckListIcon'
-                } else if (item.dashboardId && item.dashboardId > 0) {
+                if (dashboardId > 0) {
                     defaultIcon = 'LayoutIcon'
+                } else if (workflowId > 0) {
+                    defaultIcon = 'WorkflowIcon'
                 }
                 const icon = item.icon || defaultIcon
                 const view = item.tableView || ''
-                const id = title
-                const name = title
-                const path = item.dashboardId > 0 ? `/dashboard/${item.dashboardName}` : `/table/${item.tableName}`
-                return { id, name, title, slug, icon, view, path }
+                const navKey = `navigation-item-${item.id}`
+                return {
+                    id: navKey,
+                    navigationItemId: item.id,
+                    title,
+                    slug,
+                    icon,
+                    view,
+                    path,
+                    workflowId,
+                    dashboardId
+                }
             })
-            .filter(pg => !!pg.slug)
+            .filter(pg => !!pg.path)
 
         // Build pinned workflow quick links, if any
         pinnedWorkflowId.value = null
@@ -442,10 +475,12 @@ async function loadAppData() {
                     const path = item.dashboardId > 0
                         ? `/dashboard/${item.dashboardName}`
                         : `/table/${item.tableName}`
-                    // Use LayoutIcon for dashboards, DatabaseIcon for tables
-                    const defaultIconName = (item.dashboardId && item.dashboardId > 0) ? 'LayoutIcon' : 'DatabaseIcon'
-                    const iconName = item.icon || defaultIconName
-                    const icon = (Hugeicons as any)[iconName] || (item.dashboardId && item.dashboardId > 0 ? LayoutIcon : DatabaseIcon)
+                    const icon = resolveNavigationIcon({
+                        icon: item.icon,
+                        workflowId: item.workflowId,
+                        dashboardId: item.dashboardId,
+                        path
+                    })
                     return { id: item.id, title, path, icon }
                 })
             }
@@ -467,63 +502,86 @@ async function loadAppData() {
                 icon: HomeIcon
             })
 
-            // Add workflows to sidebar
-            const workflows = (navResponse as any).workflows || []
-            const sortedWorkflows = [...workflows].sort((a: any, b: any) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
-            sortedWorkflows.forEach((workflow: any) => {
-                const workflowIconName = workflow.icon || 'DatabaseIcon'
-                const workflowIcon = (Hugeicons as any)[workflowIconName] || DatabaseIcon
-                const workflowPath = `/workflow/${workflow.id}`
-                navigation.value.addNavigationLink({
-                    id: `workflow-${workflow.id}`,
-                    name: workflow.name || '',
-                    title: workflow.name || '',
-                    path: workflowPath,
-                    icon: workflowIcon
-                })
-            })
-
-            // Add pages to sidebar
+            // Sidebar links from table_navigation only (ordinal order from pages)
             pages.value.forEach(pg => {
-                const isDashboard = pg.path.startsWith('/dashboard/')
-                const defaultIcon = isDashboard ? LayoutIcon : DatabaseIcon
-                const icon = Hugeicons[pg.icon] || defaultIcon
                 navigation.value.addNavigationLink({
                     id: pg.id,
                     name: pg.id,
                     title: pg.title,
                     path: pg.path,
-                    icon: icon
+                    icon: resolveNavigationIcon({
+                        icon: pg.icon,
+                        workflowId: pg.workflowId,
+                        dashboardId: pg.dashboardId,
+                        path: pg.path
+                    })
                 })
             })
+
+            const navWorkflows = (navResponse as { workflows?: Array<{ id: number; name?: string; icon?: string; ordinal?: number }> }).workflows || []
+            const sortedWorkflows = [...navWorkflows].sort(
+                (a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0) || String(a.name || '').localeCompare(String(b.name || '')),
+            )
+            if (sortedWorkflows.length > 0) {
+                navigation.value.addSeparator()
+                navigation.value.addSection('Workflows', { name: 'nav-section-workflows' })
+                for (const wf of sortedWorkflows) {
+                    const title = wf.name || `Workflow ${wf.id}`
+                    navigation.value.addNavigationLink({
+                        id: `sidebar-workflow-${wf.id}`,
+                        name: title,
+                        title,
+                        path: `/workflow/${wf.id}`,
+                        icon: resolveNavigationIcon({
+                            icon: wf.icon,
+                            workflowId: wf.id,
+                            path: `/workflow/${wf.id}`,
+                        }),
+                    })
+                }
+            }
         }
 
         // Populate QuickSearch if available, otherwise it will be populated when component becomes available
         populateQuickSearchItems()
 
         if (navigation.value) {
-            navigation.value.addSeparator()
-
-            // Table configurations
-            navigation.value.addNavigationLink({
-                id: 'table-configurations',
-                name: 'Table Configurations',
-                title: 'Table Configurations',
-                path: '/table/table_configurations',
-                icon: DatabaseSettingIcon
-            })
-            // Workflows
-            navigation.value.addNavigationLink({
-                id: 'workflows',
-                name: 'Workflows',
-                title: 'Workflows',
-                path: '/table/table_workflows',
-                icon: DatabaseSettingIcon
-            })
-
-            navigation.value.addRouterLink('control-panel')
-
-            navigation.value.addCallback('Logout', async () => { await handleLogout() }, { icon: LogoutIcon })
+            const rbacPerms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
+            const rbacSuperuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+            const canSystemSettings = rbacSuperuser || rbacPerms.includes('system.settings')
+            const canAuditView = rbacSuperuser || rbacPerms.includes('audit.view')
+            if (canAccessControlPanel(rbacPerms, rbacSuperuser) || canSystemSettings || canAuditView) {
+                navigation.value.addSeparator()
+                navigation.value.addSection('System', { name: 'nav-section-system' })
+            }
+            if (canAccessControlPanel(rbacPerms, rbacSuperuser)) {
+                navigation.value.addRouterLink('control-panel')
+            }
+            if (canSystemSettings) {
+                navigation.value.addNavigationLink({
+                    id: 'table-configurations',
+                    name: 'Table Configurations',
+                    title: 'Table Configurations',
+                    path: '/table/table_configurations',
+                    icon: DatabaseSettingIcon
+                })
+                navigation.value.addNavigationLink({
+                    id: 'workflows-admin',
+                    name: 'Workflows (admin)',
+                    title: 'Workflows (admin)',
+                    path: '/table/table_workflows',
+                    icon: DatabaseSettingIcon
+                })
+            }
+            if (canAuditView) {
+                navigation.value.addNavigationLink({
+                    id: 'audit-logs',
+                    name: 'Audit logs',
+                    title: 'Audit logs',
+                    path: '/table/table_logs',
+                    icon: DatabaseSettingIcon
+                })
+            }
         }
     } catch (error) {
         console.error('Failed to load data:', error)
@@ -864,9 +922,14 @@ function handleNavigationKey(key: string) {
                 // Navigate to first table or home (which shows tables)
                 router.push('/')
                 break
-            case 'c':
-                router.push('/admin/control-panel')
+            case 'c': {
+                const cpPerms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
+                const cpSuper = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+                if (canAccessControlPanel(cpPerms, cpSuper)) {
+                    router.push('/admin/control-panel')
+                }
                 break
+            }
             case '?':
                 showShortcutsHelp.value = true
                 break
@@ -1221,7 +1284,7 @@ onMounted(async () => {
                     <div v-if="!isCurrentPageBookmarked && canBookmarkCurrentPage" class="bookmark-this-page-section">
                         <button
                             @click="toggleCurrentPageBookmark"
-                            class="button primary bookmark-this-page-button"
+                            class="button good bookmark-this-page-button"
                         >
                             <HugeiconsIcon :icon="Hugeicons.BookmarkIcon" />
                             Bookmark this page

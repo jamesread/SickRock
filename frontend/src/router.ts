@@ -12,6 +12,7 @@ import ForeignKeyManagement from './views/ForeignKeyManagement.vue'
 import ColumnTypeManagement from './views/ColumnTypeManagement.vue'
 import ConditionalFormattingRules from './components/ConditionalFormattingRules.vue'
 import ExportView from './views/ExportView.vue'
+import ReadOnlyCalendarExportView from './views/ReadOnlyCalendarExportView.vue'
 import TableCreate from './views/TableCreate.vue'
 import ControlPanel from './views/ControlPanel.vue'
 import PWAInstallation from './views/PWAInstallation.vue'
@@ -39,7 +40,35 @@ import IamRbacRoleDetails from './views/iam/IamRbacRoleDetails.vue'
 import IamRbacPermissions from './views/iam/IamRbacPermissions.vue'
 import IamMyPermissions from './views/iam/IamMyPermissions.vue'
 import { useAuthStore } from './stores/auth'
-import { canAccessIam } from './utils/rbacAccess'
+import {
+  canAccessAdminTableConfiguration,
+  canAccessControlPanel,
+  canAccessIam,
+} from './utils/rbacAccess'
+
+function isAuthenticatedRouteAllowed(
+  to: { meta: Record<string, unknown>; params: Record<string, unknown> },
+  authStore: ReturnType<typeof useAuthStore>,
+): boolean {
+  const perms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
+  const superuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+
+  if (to.meta.requiresControlPanel && !canAccessControlPanel(perms, superuser)) {
+    return false
+  }
+  if (to.meta.requiresIam && !canAccessIam(perms, superuser)) {
+    return false
+  }
+  const requiredPerm = to.meta.requiresPermission as string | undefined
+  if (requiredPerm && !authStore.hasPermission(requiredPerm)) {
+    return false
+  }
+  const tableName = to.params.tableName
+  if (typeof tableName === 'string' && !canAccessAdminTableConfiguration(tableName, perms, superuser)) {
+    return false
+  }
+  return true
+}
 
 const router = createRouter({
   history: createWebHistory(),
@@ -49,6 +78,19 @@ const router = createRouter({
       name: 'login',
       component: LoginView,
       meta: { requiresAuth: false }
+    },
+    {
+      path: '/exports/:slug',
+      name: 'read-only-calendar-export',
+      component: ReadOnlyCalendarExportView,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: (route: { params: { slug?: string } }) => [
+          { name: 'Calendar export' },
+          { name: String(route.params.slug ?? '') },
+        ],
+      },
     },
     {
       path: '/table/:tableName/export',
@@ -128,7 +170,7 @@ const router = createRouter({
       path: '/user-api-keys',
       name: 'user-api-keys',
       component: UserAPIKeys,
-      meta: { requiresAuth: true }
+      meta: { requiresAuth: true, requiresPermission: 'apikeys.use' }
     },
     {
       path: '/user-notifications',
@@ -308,6 +350,7 @@ const router = createRouter({
       component: TableCreate,
       meta: {
         requiresAuth: true,
+        requiresPermission: 'system.settings',
         title: 'Create Table',
         icon: DatabaseAddIcon
       },
@@ -318,6 +361,7 @@ const router = createRouter({
       component: DatabaseBrowser,
       meta: {
         requiresAuth: true,
+        requiresPermission: 'system.settings',
         title: 'Database Browser',
         icon: DatabaseAddIcon
       },
@@ -328,6 +372,7 @@ const router = createRouter({
       component: ControlPanel,
       meta: {
         requiresAuth: true,
+        requiresControlPanel: true,
         title: 'Control Panel',
         icon: DatabaseAddIcon
       },
@@ -403,6 +448,7 @@ const router = createRouter({
       component: DeviceCodeClaimerView,
       meta: {
         requiresAuth: true,
+        requiresPermission: 'devicecode.claim',
         title: 'Device Code Claimer',
         icon: DatabaseAddIcon
       },
@@ -433,22 +479,12 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // If user is authenticated, check IAM route permissions
+  // If user is authenticated, check route permissions
   if (authStore.isAuthenticated) {
-    const perms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
-    const superuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
-
-    if (to.meta.requiresIam && !canAccessIam(perms, superuser)) {
+    if (!isAuthenticatedRouteAllowed(to, authStore)) {
       next('/')
       return
     }
-
-    const requiredPerm = to.meta.requiresPermission as string | undefined
-    if (requiredPerm && !authStore.hasPermission(requiredPerm)) {
-      next('/')
-      return
-    }
-
     next()
     return
   }
@@ -470,6 +506,10 @@ router.beforeEach(async (to, from, next) => {
     try {
       const ok = await authStore.validateToken()
       if (ok) {
+        if (!isAuthenticatedRouteAllowed(to, authStore)) {
+          next('/')
+          return
+        }
         next()
         return
       }

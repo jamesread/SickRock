@@ -11,7 +11,7 @@ import InsertRow from './InsertRow.vue'
 import { GetTableStructureResponse } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon, Add01Icon, Download01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
+import { DatabaseIcon, ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon, Add01Icon, Download01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../composables/useKeyboardShortcuts'
 import { useTableViewManager } from '../composables/useTableViewManager'
@@ -1401,7 +1401,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Section :title="sectionTitle" :padding="false" class="table-component-wrapper">
+  <Section :title="sectionTitle" :icon="DatabaseIcon" :padding="false" class="table-component-wrapper">
     <template v-if="showToolbar" #toolbar>
         <ViewsButton
           v-if="showViewSwitcher || showViewEdit || showViewCreate"
@@ -1428,7 +1428,7 @@ onUnmounted(() => {
             <HugeiconsIcon :icon="AddCircleIcon" width="1em" height="1em" aria-hidden="true" />
             <span>{{ tableStructure?.CreateButtonText ?? 'Insert row' }}</span>
           </router-link>
-          <button @click="openQuickAddDialog" class="button inline-icon primary quick-add-button" title="Quick Add" aria-label="Quick Add">
+          <button @click="openQuickAddDialog" class="button inline-icon good quick-add-button" title="Quick Add" aria-label="Quick Add">
             <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
             <span class="quick-add-text"></span>
           </button>
@@ -1633,7 +1633,7 @@ onUnmounted(() => {
       <div v-if="pagedItems.length > 0 && hasSelectedItems" class="selection-controls padding">
         <button
           @click="confirmDeleteSelected"
-          class="button delete-button"
+          class="button bad"
           :disabled="deleting"
         >
           🗑️ Delete Selected ({{ selectedKeys.size }})
@@ -1658,10 +1658,10 @@ onUnmounted(() => {
         <h3>Confirm Delete</h3>
         <p>Are you sure you want to delete {{ selectedKeys.size }} selected row(s)? This action cannot be undone.</p>
         <div class="modal-actions">
-          <button @click="cancelDeleteSelected" class="button cancel-button" :disabled="deleting">
+          <button @click="cancelDeleteSelected" class="button neutral" :disabled="deleting">
             Cancel
           </button>
-          <button @click="deleteSelectedItems" class="button confirm-delete-button" :disabled="deleting">
+          <button @click="deleteSelectedItems" class="button bad" :disabled="deleting">
             {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.size} Row(s)` }}
           </button>
         </div>
@@ -1741,7 +1741,7 @@ onUnmounted(() => {
         @click.stop
       />
       <div class="filter-actions">
-        <button class="btn small" @click.stop="applyColumnFilter">Apply</button>
+        <button type="button" class="button good small" @click.stop="applyColumnFilter">Apply</button>
       </div>
     </div>
   </div>
@@ -1990,30 +1990,6 @@ onUnmounted(() => {
   flex-wrap: wrap;
 }
 
-.button.small {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8rem;
-  border-radius: 3px;
-}
-
-.delete-button {
-  background: #dc3545;
-  color: white;
-  border: none;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.delete-button:hover:not(:disabled) {
-  background: #c82333;
-}
-
-.delete-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
 /* Modal Dialog Styles */
 .modal-overlay {
   position: fixed;
@@ -2049,49 +2025,6 @@ onUnmounted(() => {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-}
-
-.cancel-button {
-  background: #6c757d;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.cancel-button:hover:not(:disabled) {
-  background: #545b62;
-}
-
-.cancel-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.confirm-delete-button {
-  background: #dc3545;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.confirm-delete-button:hover:not(:disabled) {
-  background: #c82333;
-}
-
-.confirm-delete-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-  opacity: 0.6;
 }
 
 /* Empty State Styles */
@@ -2609,20 +2542,6 @@ onUnmounted(() => {
 .column-context-menu .filter-actions {
   display: flex;
   justify-content: flex-end;
-}
-
-.column-context-menu .btn.small {
-  padding: 6px 10px;
-  font-size: 13px;
-  border: 1px solid #007bff;
-  background: #007bff;
-  color: white;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.column-context-menu .btn.small:hover {
-  background: #0056b3;
 }
 
 .filter-indicator {

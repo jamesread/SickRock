@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon, RefreshIcon, UserGroupIcon } from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowLeft01Icon, RefreshIcon, UserGroupIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
@@ -145,15 +145,17 @@ onMounted(loadAll)
     </FormLayout>
   </dialog>
 
-  <Section subtitle="Manage user groups. Groups carry RBAC roles to their members." :padding="false">
-    <template #title>
-      <span class="section-title-with-icon">
-        <HugeiconsIcon :icon="UserGroupIcon" width="22" height="22" aria-hidden="true" />
-        User Groups
-      </span>
-    </template>
-
+  <Section
+    title="User Groups"
+    subtitle="Manage user groups. Groups carry RBAC roles to their members."
+    :icon="UserGroupIcon"
+    :padding="false"
+  >
     <template #toolbar>
+      <router-link :to="{ name: 'iam-hub' }" class="button inline-icon neutral">
+        <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+        <span>Back to IAM</span>
+      </router-link>
       <button type="button" class="inline-icon neutral" aria-label="Refresh" :disabled="loading" @click="loadAll">
         <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
       </button>
@@ -202,11 +204,6 @@ onMounted(loadAll)
 </template>
 
 <style scoped>
-.section-title-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-}
 .list-banner-pad {
   padding-left: 1em;
   padding-right: 1em;

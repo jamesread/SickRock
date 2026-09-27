@@ -7,13 +7,11 @@
 
     <Login
       ref="loginFormRef"
-      :oauth-providers="[]"
+      :oauth-providers="oauthProviders"
       :show-default-tabs="false"
-      :custom-tabs="[
-        { id: 'local', label: 'Username & Password' },
-        { id: 'device-code', label: 'Device Code' }
-      ]"
+      :custom-tabs="loginTabs"
       @local-login="handleLocalLogin"
+      @oauth-login="handleOAuthLogin"
       @tab-change="onTabChange"
     >
       <template #tab-device-code>
@@ -24,16 +22,50 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import Login from 'picocrank/vue/components/Login.vue'
 import DeviceCodeLogin from './DeviceCodeLogin.vue'
 import logo from '../resources/images/logo.png'
+import { createApiClient } from '../stores/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const loginFormRef = ref<InstanceType<typeof Login> | null>(null)
+const client = createApiClient()
+
+const oauthProviders = computed(() => {
+  const list = authStore.initResponse?.oauthProviders ?? []
+  return list.map(p => ({
+    id: p.id,
+    name: p.label || p.id,
+    authUrl: p.authUrl,
+    class: 'neutral',
+  }))
+})
+
+const loginTabs = computed(() => {
+  const tabs: Array<{ id: string; label: string }> = [
+    { id: 'local', label: 'Username & Password' },
+  ]
+  if (oauthProviders.value.length > 0) {
+    tabs.push({ id: 'oauth', label: 'OAuth2' })
+  }
+  tabs.push({ id: 'device-code', label: 'Device Code' })
+  return tabs
+})
+
+onMounted(async () => {
+  if (!authStore.initResponse) {
+    try {
+      const response = await client.init({})
+      authStore.setInitResponse(response)
+    } catch (error) {
+      console.warn('Failed to load Init for OAuth providers:', error)
+    }
+  }
+})
 
 // Redirect to home if already authenticated (runs whenever authentication state changes)
 watch(() => authStore.isAuthenticated, (isAuthenticated) => {
@@ -45,7 +77,6 @@ watch(() => authStore.isAuthenticated, (isAuthenticated) => {
 const handleLocalLogin = async (credentials: { username: string; password: string }) => {
   if (!loginFormRef.value) return
 
-  // Clear any previous error
   loginFormRef.value.setLocalLoginError('')
 
   try {
@@ -54,7 +85,6 @@ const handleLocalLogin = async (credentials: { username: string; password: strin
       const redirectParam = (router.currentRoute.value.query.redirect as string) || '/'
       router.replace(redirectParam)
     } else {
-      // Set error message from auth store
       const errorMessage = authStore.error || 'Login failed. Please check your credentials.'
       loginFormRef.value.setLocalLoginError(errorMessage)
     }
@@ -65,8 +95,24 @@ const handleLocalLogin = async (credentials: { username: string; password: strin
   }
 }
 
-const onTabChange = (tab: any, tabId: string) => {
-  // Clear errors when switching tabs
+const handleOAuthLogin = (provider: { authUrl?: string; auth_url?: string }) => {
+  const url = provider.authUrl || provider.auth_url
+  if (!url) {
+    return
+  }
+  const redirect = (router.currentRoute.value.query.redirect as string) || '/'
+  try {
+    const target = new URL(url, window.location.origin)
+    if (redirect && redirect !== '/') {
+      target.searchParams.set('redirect', redirect)
+    }
+    window.location.href = target.toString()
+  } catch {
+    window.location.href = url
+  }
+}
+
+const onTabChange = () => {
   if (loginFormRef.value) {
     loginFormRef.value.setLocalLoginError('')
   }

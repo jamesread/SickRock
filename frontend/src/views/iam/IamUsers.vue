@@ -100,17 +100,12 @@ onMounted(loadAll)
   <IamCreateUserDialog ref="createDialog" @created="onUserCreated" />
 
   <Section
+    title="Users"
     subtitle="View users, create new accounts, or remove users you no longer need."
     classes="settings-users"
+    :icon="UserMultiple02Icon"
     :padding="false"
   >
-    <template #title>
-      <span class="section-title-with-icon">
-        <HugeiconsIcon :icon="UserMultiple02Icon" width="22" height="22" aria-hidden="true" />
-        Users
-      </span>
-    </template>
-
     <template #toolbar>
       <button type="button" class="inline-icon neutral" aria-label="Refresh" :disabled="loading" @click="loadAll">
         <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
@@ -163,11 +158,6 @@ onMounted(loadAll)
 </template>
 
 <style scoped>
-.section-title-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-}
 .list-banner-pad {
   padding-left: 1em;
   padding-right: 1em;

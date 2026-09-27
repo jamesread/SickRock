@@ -5,7 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
-import { HugeiconsIcon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ArrowLeft01Icon, ViewIcon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -283,7 +284,7 @@ async function deleteTableView() {
 </script>
 
 <template>
-  <Section :title="pageTitle">
+  <Section :title="pageTitle" :icon="ViewIcon">
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"
@@ -618,12 +619,6 @@ async function deleteTableView() {
   gap: 0.25rem;
 }
 
-.button.small {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.8rem;
-  min-width: auto;
-}
-
 .sort-select {
   padding: 0.5rem;
   border: 1px solid #ddd;
@@ -636,20 +631,6 @@ async function deleteTableView() {
   gap: 1rem;
   justify-content: flex-end;
   margin-top: 2rem;
-}
-
-.button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.button.neutral {
-  background: #6c757d;
-  color: white;
-}
-
-.button.neutral:hover:not(:disabled) {
-  background: #5a6268;
 }
 
 .modal-overlay {

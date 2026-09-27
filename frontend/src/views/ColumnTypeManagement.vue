@@ -6,7 +6,9 @@ import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import ConditionalFormattingRules from '../components/ConditionalFormattingRules.vue'
-import { HugeiconsIcon, ArrowLeft01Icon, Edit03Icon, CheckmarkSquare03Icon, Delete01Icon } from '@hugeicons/core-free-icons'
+import TableShareSection from '../components/TableShareSection.vue'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ArrowLeft01Icon, Edit03Icon, CheckmarkSquare03Icon, Delete01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -315,7 +317,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Section :title="`Column Types: ${tableId}`">
+  <Section :title="`Column Types: ${tableId}`" :icon="Settings01Icon">
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"
@@ -489,7 +491,11 @@ onMounted(async () => {
   </Section>
 
   <!-- Standard Fields Section -->
-  <Section v-if="!loading && missingStandardFields.length > 0 && columns.length > 0" title="Standard Fields">
+  <Section
+    v-if="!loading && missingStandardFields.length > 0 && columns.length > 0"
+    title="Standard Fields"
+    :icon="AddCircleIcon"
+  >
     <p class="section-description">Standard fields are recommended columns that improve table organization and functionality.</p>
     <div class="standard-fields-list">
       <div v-for="field in missingStandardFields" :key="field.name" class="standard-field-item">
@@ -511,6 +517,8 @@ onMounted(async () => {
       </div>
     </div>
   </Section>
+
+  <TableShareSection :table-key="tableId" />
 
   <!-- Conditional Formatting Rules Section -->
   <ConditionalFormattingRules />

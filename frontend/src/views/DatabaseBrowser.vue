@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import { DatabaseIcon } from '@hugeicons/core-free-icons'
 import { RouterLink } from 'vue-router'
 
 const client = createApiClient()
@@ -41,7 +42,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Section title="Database Browser">
+  <Section title="Database Browser" :icon="DatabaseIcon">
     <div class="database-browser">
       <div class="controls">
         <div class="form-group">
@@ -54,7 +55,7 @@ onMounted(() => {
             @keyup.enter="onDatabaseChange"
           />
         </div>
-        <button @click="loadTables" class="button primary" :disabled="loading">
+        <button @click="loadTables" class="button good" :disabled="loading">
           {{ loading ? 'Loading...' : 'Refresh' }}
         </button>
       </div>
@@ -97,7 +98,7 @@ onMounted(() => {
               <RouterLink
                 v-else
                 :to="`/admin/table/create?table=${table.tableName}&database=${database}`"
-                class="button small secondary"
+                class="button small neutral"
               >
                 Configure
               </RouterLink>
@@ -215,20 +216,6 @@ onMounted(() => {
 
 .actions {
   text-align: center;
-}
-
-.button.small {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-}
-
-.button.secondary {
-  background: #6c757d;
-  color: white;
-}
-
-.button.secondary:hover {
-  background: #5a6268;
 }
 
 .error-message {

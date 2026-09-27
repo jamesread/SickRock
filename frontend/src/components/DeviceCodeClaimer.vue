@@ -1,5 +1,5 @@
 <template>
-  <Section title = "Claim Device Code" class = "small" style = "margin: auto">
+  <Section title="Claim Device Code" :icon="KeyIcon" class="small" style="margin: auto">
     <div style="max-width: 28rem; margin: 0 auto;">
       <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 1rem;">Enter the 4-digit code shown on the other device to complete authentication.</p>
 
@@ -58,6 +58,7 @@
 import { ref, computed } from 'vue'
 import { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import { KeyIcon } from '@hugeicons/core-free-icons'
 
 const apiClient = createApiClient()
 

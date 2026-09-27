@@ -6,7 +6,7 @@ import { createApiClient } from '../stores/api'
 import type { GetTableStructureResponse } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, Download01Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -230,7 +230,7 @@ async function copyToClipboard() {
 </script>
 
 <template>
-  <Section :title="`Export: ${tableId}`">
+  <Section :title="`Export: ${tableId}`" :icon="Download01Icon">
     <template #toolbar>
       <div class="actions">
         <label for="format-select">Format:</label>
@@ -282,12 +282,6 @@ async function copyToClipboard() {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-}
-.actions .button {
-  padding: 0.4rem 0.75rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: #f9f9f9;
 }
 .plaintext-toggle {
   display: inline-flex;

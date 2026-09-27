@@ -141,6 +141,12 @@ An **MCP (Model Context Protocol)** server is exposed as an HTTP endpoint on the
 - **Transport**: MCP Streamable HTTP; point your MCP client at `https://your-host/mcp`.
 - **Tools**: `sickrock_ping`, `sickrock_get_navigation`, `sickrock_get_table_configurations`, `sickrock_get_database_tables`, `sickrock_get_table_structure`, `sickrock_list_items`, `sickrock_get_item`, `sickrock_create_item`, `sickrock_edit_item`, `sickrock_delete_item`
 
+## Read-only calendar exports
+
+Table and workflow access uses global permissions (`table.view`, `table.insert`, `table.edit`, `table.delete`, `workflow.view`, `workflow.start`, `dashboard.view`) plus per-resource rows in **`rbac_resource_grants`** (scoped by IAM group). **`GetNavigation`** omits links the user cannot view. The system **`viewer`** role (`app.read`, `exports.view`, `table.view`, `workflow.view`, `dashboard.view`) is read-only; **`member`** adds write caps. Assign **`viewer`** or **`member`** to groups and grant resources via **`rbac_resource_grants`** (seeded for **Everyone** on migrate).
+
+Authenticated users can open **`/exports/{slug}`** (for example `/exports/free_weekends`). Export definitions live in **`read_only_calendar_exports`** and are managed via the system table **`table_read_only_exports`** (Control Panel → Read-only calendar exports). Each row defines the source table configuration, optional calendar `table_view_id`, server-side `where_json` filters (supports `%` LIKE patterns), `weekends_only` post-filter, `display_mode` (`full` or `free_busy`), and `allowed_group_ids` (JSON array of IAM group ids). Data is loaded only through **`GetReadOnlyCalendarExport`** (slug only — clients never send table names or arbitrary `where` clauses). OAuth login providers can be advertised via Init (`SICKROCK_OAUTH_PROVIDERS` JSON env); group ACL applies to OAuth users the same as local users.
+
 **Cursor**: In MCP settings use the HTTP transport with URL `https://your-sickrock-host/mcp` and set the API key in the request (per your client’s docs). No separate binary is required when SickRock is reachable over HTTP.
 
 ## Agent Integration Patterns

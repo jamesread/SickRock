@@ -3,7 +3,6 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
-import { HugeiconsIcon } from '@hugeicons/vue'
 import {
   UserMultiple02Icon,
   UserGroupIcon,
@@ -74,27 +73,12 @@ onMounted(() => {
 
 <template>
   <Section
+    title="Identity &amp; Access Management"
     subtitle="Manage users, groups, and role-based access control."
-    :padding="false"
+    :icon="WebSecurityIcon"
   >
-    <template #title>
-      <span class="section-title-with-icon">
-        <HugeiconsIcon :icon="WebSecurityIcon" width="22" height="22" aria-hidden="true" />
-        Identity &amp; Access Management
-      </span>
-    </template>
-
     <Navigation ref="localNavigation">
       <NavigationGrid />
     </Navigation>
   </Section>
 </template>
-
-<style scoped>
-.section-title-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-  vertical-align: middle;
-}
-</style>

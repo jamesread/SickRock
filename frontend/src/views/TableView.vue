@@ -8,10 +8,15 @@ import TableComponent from '../components/TableComponent.vue'
 import CalendarComponent from '../components/CalendarComponent.vue'
 import TickListComponent from '../components/TickListComponent.vue'
 import { useTableViewManager } from '../composables/useTableViewManager'
+import { useTableAccess } from '../composables/useTableAccess'
+import { useRbac } from '../composables/useRbac'
 
 const route = useRoute()
 const props = defineProps<{ tableName?: string }>()
 const tableId = computed(() => (props.tableName ?? (route.params.tableName as string)))
+const { access: tableAccess } = useTableAccess(tableId)
+const { hasPermission } = useRbac()
+const showStructure = computed(() => hasPermission('system.settings'))
 
 // Transport handled by authenticated client
 const client = createApiClient()
@@ -71,6 +76,19 @@ onMounted(async () => {
   <template v-else>
     <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" :view-name="currentViewName" @view-changed="handleViewChanged" />
     <TickListComponent v-else-if="currentViewType === 'ticklist'" :table-id="tableId" @view-changed="handleViewChanged" />
-    <TableComponent v-else :table-id="tableId" :table-structure="tableStructure" :show-toolbar="true" :show-view-switcher="true" :show-export="true" :show-structure="true" :show-insert="true" :show-pagination="true" :show-view-create="true" :show-view-edit="true" @view-changed="handleViewChanged"/>
+    <TableComponent
+      v-else
+      :table-id="tableId"
+      :table-structure="tableStructure"
+      :show-toolbar="true"
+      :show-view-switcher="true"
+      :show-export="tableAccess.canView"
+      :show-structure="showStructure"
+      :show-insert="tableAccess.canInsert"
+      :show-pagination="true"
+      :show-view-create="tableAccess.canEdit"
+      :show-view-edit="tableAccess.canEdit"
+      @view-changed="handleViewChanged"
+    />
   </template>
 </template>

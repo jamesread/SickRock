@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
+import { CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -50,7 +51,10 @@ function returnToDashboard() {
 </script>
 
 <template>
-  <Section :title="isFromColumnAddition ? 'Column Added Successfully' : 'Row Added Successfully'">
+  <Section
+    :title="isFromColumnAddition ? 'Column Added Successfully' : 'Row Added Successfully'"
+    :icon="CheckmarkSquare03Icon"
+  >
     <div class="success-message">
       <h3>{{ isFromColumnAddition ? '✅ Column added successfully!' : '✅ Row added successfully!' }}</h3>
       <p>What would you like to do next?</p>

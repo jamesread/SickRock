@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { SickRock } from '../gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon, Edit01Icon, Delete01Icon } from '@hugeicons/core-free-icons'
+import { ArrowLeft01Icon, DatabaseIcon, Edit01Icon, Delete01Icon, ViewIcon } from '@hugeicons/core-free-icons'
 import Table from '../components/TableComponent.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import type { createApiClient } from '../stores/api'
@@ -418,7 +418,7 @@ function cancelDelete() {
 <template>
   <div>
     <!-- Main Row Section -->
-    <Section :title="sectionTitle">
+    <Section :title="sectionTitle" :icon="ViewIcon">
       <template #toolbar>
         <router-link
           :to="`/table/${tableName}`"
@@ -470,7 +470,7 @@ function cancelDelete() {
     <!-- Related Tables as Top-Level Sections -->
     <template v-if="foreignKeys.length > 0">
       <template v-for="table in relatedTables" :key="`${table.tableName}.${table.columnName}`">
-        <Section :title="table.title">
+        <Section :title="table.title" :icon="DatabaseIcon">
           <template #toolbar>
             <router-link :to="`/table/${table.tableName}`" class="button">Open Table</router-link>
             <router-link :to="{ path: `/table/${table.tableName}/export`, query: { where: JSON.stringify(table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) } }" class="button">Export</router-link>

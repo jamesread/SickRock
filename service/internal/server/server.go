@@ -118,6 +118,7 @@ func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrock
 		CurrentUsername:  currentUsername,
 		RbacPermissions:  rbacPerms,
 		RbacIsSuperuser:  rbacSuperuser,
+		OauthProviders:   loadOAuthProvidersFromEnv(),
 	})
 	return res, nil
 }
@@ -149,6 +150,9 @@ func (s *SickRockServer) GetTableConfigurations(ctx context.Context, req *connec
 	}
 	pages := make([]*sickrockpb.Page, 0, len(configs))
 	for _, config := range configs {
+		if !s.canDiscoverTableConfiguration(ctx, config.Name) {
+			continue
+		}
 		// Default to "main" if database is NULL or empty
 		dbName := "main"
 		if config.Db.Valid && config.Db.String != "" {
@@ -225,6 +229,9 @@ func (s *SickRockServer) CreateTableConfiguration(ctx context.Context, req *conn
 			Message: fmt.Sprintf("Failed to create table configuration: %v", err),
 		}), nil
 	}
+	if grantErr := s.repo.EnsureEveryoneTableRole(ctx, name, "member"); grantErr != nil {
+		log.Warnf("Failed to seed Everyone grant for table %s: %v", name, grantErr)
+	}
 
 	return connect.NewResponse(&sickrockpb.CreateTableConfigurationResponse{
 		Success: true,
@@ -233,6 +240,9 @@ func (s *SickRockServer) CreateTableConfiguration(ctx context.Context, req *conn
 }
 
 func (s *SickRockServer) GetDatabaseTables(ctx context.Context, req *connect.Request[sickrockpb.GetDatabaseTablesRequest]) (*connect.Response[sickrockpb.GetDatabaseTablesResponse], error) {
+	if err := s.requireSystemSettings(ctx); err != nil {
+		return nil, err
+	}
 	database := req.Msg.GetDatabase()
 	if database == "" {
 		database = "main"
@@ -257,6 +267,38 @@ func (s *SickRockServer) GetDatabaseTables(ctx context.Context, req *connect.Req
 	return res, nil
 }
 
+func navigationItemRepoToProto(item repo.NavigationItem, tableView string) *sickrockpb.NavigationItem {
+	return &sickrockpb.NavigationItem{
+		Id:      int32(item.ID),
+		Ordinal: int32(item.Ordinal),
+		TableConfiguration: func() int32 {
+			if item.TableConfiguration.Valid {
+				return int32(item.TableConfiguration.Int64)
+			}
+			return 0
+		}(),
+		TableName:  item.TableName.String,
+		TableTitle: item.TableTitle.String,
+		Icon:       item.Icon.String,
+		TableView:  tableView,
+		DashboardId: func() int32 {
+			if item.DashboardID.Valid {
+				return int32(item.DashboardID.Int64)
+			}
+			return 0
+		}(),
+		DashboardName: item.DashboardName.String,
+		Title:         item.Navigation.String,
+		WorkflowId: func() int32 {
+			if item.WorkflowID.Valid {
+				return int32(item.WorkflowID.Int64)
+			}
+			return 0
+		}(),
+		WorkflowName: item.WorkflowName.String,
+	}
+}
+
 func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request[sickrockpb.GetNavigationRequest]) (*connect.Response[sickrockpb.GetNavigationResponse], error) {
 	items, err := s.repo.GetNavigation(ctx)
 	if err != nil {
@@ -265,35 +307,10 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 
 	navigationItems := make([]*sickrockpb.NavigationItem, 0, len(items))
 	for _, item := range items {
-		navigationItems = append(navigationItems, &sickrockpb.NavigationItem{
-			Id:      int32(item.ID),
-			Ordinal: int32(item.Ordinal),
-			TableConfiguration: func() int32 {
-				if item.TableConfiguration.Valid {
-					return int32(item.TableConfiguration.Int64)
-				}
-				return 0
-			}(),
-			TableName:  item.TableName.String,
-			TableTitle: item.TableTitle.String,
-			Icon:       item.Icon.String,
-			TableView:  "", // View type is now stored on views, not table configurations
-			DashboardId: func() int32 {
-				if item.DashboardID.Valid {
-					return int32(item.DashboardID.Int64)
-				}
-				return 0
-			}(),
-			DashboardName: item.DashboardName.String,
-			Title:         item.Navigation.String,
-			WorkflowId: func() int32 {
-				if item.WorkflowID.Valid {
-					return int32(item.WorkflowID.Int64)
-				}
-				return 0
-			}(),
-			WorkflowName: item.WorkflowName.String,
-		})
+		if !s.canViewNavigationItem(ctx, item) {
+			continue
+		}
+		navigationItems = append(navigationItems, navigationItemRepoToProto(item, ""))
 	}
 
 	// Get user bookmarks if authenticated
@@ -307,6 +324,9 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 		} else {
 			// Convert to protobuf format
 			for _, bookmark := range userBookmarks {
+				if bookmark.NavigationItem != nil && !s.canViewNavigationItem(ctx, *bookmark.NavigationItem) {
+					continue
+				}
 				var navItem *sickrockpb.NavigationItem
 				if bookmark.NavigationItem != nil {
 					navItem = &sickrockpb.NavigationItem{
@@ -358,23 +378,59 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 		workflows = []repo.Workflow{}
 	}
 
-	// Create a map of workflow ID to navigation items
+	// Workflow hub members (workflow_navigation_members), not table_navigation.workflow_id
 	workflowItemsMap := make(map[int32][]*sickrockpb.NavigationItem)
-	for _, item := range navigationItems {
-		if item.WorkflowId > 0 {
-			workflowItemsMap[item.WorkflowId] = append(workflowItemsMap[item.WorkflowId], item)
+	memberGroups, err := s.repo.GetNavigationItemsForWorkflowMembership(ctx)
+	if err != nil {
+		log.Warnf("Failed to load workflow navigation members: %v", err)
+	} else {
+		for workflowID, memberItems := range memberGroups {
+			if s.requireWorkflowAccess(ctx, workflowID, repo.ResourceActionView) != nil {
+				continue
+			}
+			for _, memberItem := range memberItems {
+				if !s.canViewNavigationItem(ctx, memberItem) {
+					continue
+				}
+				workflowItemsMap[int32(workflowID)] = append(workflowItemsMap[int32(workflowID)], navigationItemRepoToProto(memberItem, ""))
+			}
 		}
 	}
 
-	// Convert workflows to protobuf format
+	// Convert workflows to protobuf format (only workflows the user may view and use)
 	workflowProtos := make([]*sickrockpb.Workflow, 0, len(workflows))
 	for _, workflow := range workflows {
+		if s.requireWorkflowAccess(ctx, workflow.ID, repo.ResourceActionView) != nil {
+			continue
+		}
+		members := workflowItemsMap[int32(workflow.ID)]
+		if len(members) == 0 {
+			hasHubNavLink := false
+			for _, item := range items {
+				if !item.WorkflowID.Valid || int(item.WorkflowID.Int64) != workflow.ID {
+					continue
+				}
+				if item.TableName.Valid && item.TableName.String != "" {
+					continue
+				}
+				if item.DashboardName.Valid && item.DashboardName.String != "" {
+					continue
+				}
+				if s.canViewNavigationItem(ctx, item) {
+					hasHubNavLink = true
+					break
+				}
+			}
+			if !hasHubNavLink {
+				continue
+			}
+		}
 		workflowProto := &sickrockpb.Workflow{
 			Id:      int32(workflow.ID),
 			Name:    workflow.Name,
 			Ordinal: int32(workflow.Ordinal),
 			Icon:    workflow.Icon.String,
-			Items:   workflowItemsMap[int32(workflow.ID)],
+			Items:   members,
 		}
 		workflowProtos = append(workflowProtos, workflowProto)
 	}
@@ -387,9 +443,51 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 	return res, nil
 }
 
+func (s *SickRockServer) SetWorkflowNavigationMembers(ctx context.Context, req *connect.Request[sickrockpb.SetWorkflowNavigationMembersRequest]) (*connect.Response[sickrockpb.SetWorkflowNavigationMembersResponse], error) {
+	workflowID := int(req.Msg.GetWorkflowId())
+	if workflowID <= 0 {
+		return connect.NewResponse(&sickrockpb.SetWorkflowNavigationMembersResponse{
+			Success: false,
+			Message: "workflow_id is required",
+		}), nil
+	}
+	if err := s.requireWorkflowAccess(ctx, workflowID, repo.ResourceActionStart); err != nil {
+		return connect.NewResponse(&sickrockpb.SetWorkflowNavigationMembersResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+
+	members := make([]repo.WorkflowNavigationMemberInput, 0, len(req.Msg.GetMembers()))
+	for _, m := range req.Msg.GetMembers() {
+		members = append(members, repo.WorkflowNavigationMemberInput{
+			NavigationItemID: int(m.GetNavigationItemId()),
+			Ordinal:          int(m.GetOrdinal()),
+		})
+	}
+
+	if err := s.repo.SetWorkflowNavigationMembers(ctx, workflowID, members); err != nil {
+		return connect.NewResponse(&sickrockpb.SetWorkflowNavigationMembersResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+
+	return connect.NewResponse(&sickrockpb.SetWorkflowNavigationMembersResponse{
+		Success: true,
+		Message: "Workflow navigation members updated",
+	}), nil
+}
+
 func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sickrockpb.ListItemsRequest]) (*connect.Response[sickrockpb.ListItemsResponse], error) {
 	// Use page_id as table name for this simple mapping
 	table := req.Msg.GetTcName()
+	if err := s.requireExportsManageForTable(ctx, table); err != nil {
+		return nil, err
+	}
+	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionView); err != nil {
+		return nil, err
+	}
 
 	// Build where map from request
 	where := map[string]string{}
@@ -523,6 +621,15 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 	if table == "" {
 		table = "items"
 	}
+	if err := s.requireExportsManageForTable(ctx, table); err != nil {
+		return nil, err
+	}
+	if err := s.denyAuditLogMutation(ctx, table); err != nil {
+		return nil, err
+	}
+	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionInsert); err != nil {
+		return nil, err
+	}
 
 	it, err := s.repo.CreateItemInTableWithTimestamp(ctx, table, req.Msg.GetAdditionalFields())
 	if err != nil {
@@ -572,6 +679,9 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 	if table == "" {
 		table = "items"
 	}
+	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionView); err != nil {
+		return nil, err
+	}
 
 	tc, err := s.repo.GetTableConfiguration(ctx, table)
 	if err != nil {
@@ -583,13 +693,15 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 		return nil, err
 	}
 
-	// Track this item as recently viewed
-	if err := s.repo.InsertRecentlyViewed(ctx, table, req.Msg.GetId()); err != nil {
+	// Track this item as recently viewed for the authenticated user
+	if userID, uerr := s.getUserIDFromContext(ctx); uerr == nil && userID > 0 {
+		if err := s.repo.InsertRecentlyViewed(ctx, userID, table, req.Msg.GetId()); err != nil {
 		// Log the error but don't fail the request
 		log.WithError(err).WithFields(log.Fields{
 			"table": table,
 			"id":    req.Msg.GetId(),
 		}).Warn("Failed to track recently viewed item")
+		}
 	}
 
 	// Convert dynamic fields to string map for protobuf
@@ -745,6 +857,15 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 	if table == "" {
 		table = "items"
 	}
+	if err := s.requireExportsManageForTable(ctx, table); err != nil {
+		return nil, err
+	}
+	if err := s.denyAuditLogMutation(ctx, table); err != nil {
+		return nil, err
+	}
+	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
 
 	// Get additional fields from the request
 	additionalFields := req.Msg.GetAdditionalFields()
@@ -798,6 +919,15 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 
 func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[sickrockpb.DeleteItemRequest]) (*connect.Response[sickrockpb.DeleteItemResponse], error) {
 	table := req.Msg.GetPageId()
+	if err := s.requireExportsManageForTable(ctx, table); err != nil {
+		return nil, err
+	}
+	if err := s.denyAuditLogMutation(ctx, table); err != nil {
+		return nil, err
+	}
+	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionDelete); err != nil {
+		return nil, err
+	}
 
 	ok, err := s.repo.DeleteItemInTable(ctx, table, req.Msg.GetId())
 	if err != nil {
@@ -808,6 +938,12 @@ func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[si
 
 func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Request[sickrockpb.GetTableStructureRequest]) (*connect.Response[sickrockpb.GetTableStructureResponse], error) {
 	tcName := req.Msg.GetPageId()
+	if err := s.requireExportsManageForTable(ctx, tcName); err != nil {
+		return nil, err
+	}
+	if err := s.requireDataTableAccess(ctx, tcName, repo.ResourceActionView); err != nil {
+		return nil, err
+	}
 
 	tc, err := s.repo.GetTableConfiguration(ctx, tcName)
 	if err != nil {
@@ -956,6 +1092,9 @@ func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Reque
 			Message: "Table name and view name are required",
 		}), nil
 	}
+	if err := s.requireDataTableAccess(ctx, tableName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
 
 	// Convert protobuf columns to repository columns
 	var columns []repo.TableViewColumn
@@ -999,6 +1138,9 @@ func (s *SickRockServer) UpdateTableView(ctx context.Context, req *connect.Reque
 			Message: "View ID, table name and view name are required",
 		}), nil
 	}
+	if err := s.requireDataTableAccess(ctx, tableName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
 
 	// Convert protobuf columns to repository columns
 	var columns []repo.TableViewColumn
@@ -1037,6 +1179,9 @@ func (s *SickRockServer) GetTableViews(ctx context.Context, req *connect.Request
 		return connect.NewResponse(&sickrockpb.GetTableViewsResponse{
 			Views: []*sickrockpb.TableView{},
 		}), nil
+	}
+	if err := s.requireDataTableAccess(ctx, tableName, repo.ResourceActionView); err != nil {
+		return nil, err
 	}
 
 	views, err := s.repo.GetTableViews(ctx, tableName)
@@ -1317,19 +1462,31 @@ func (s *SickRockServer) ChangeColumnName(ctx context.Context, req *connect.Requ
 }
 
 func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect.Request[sickrockpb.GetMostRecentlyViewedRequest]) (*connect.Response[sickrockpb.GetMostRecentlyViewedResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil || userID <= 0 {
+		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
+	}
+
 	limit := int(req.Msg.GetLimit())
 	if limit <= 0 {
 		limit = 10 // Default limit
 	}
 
-	items, err := s.repo.GetMostRecentlyViewed(ctx, limit)
+	fetchLimit := limit * 5
+	if fetchLimit < limit {
+		fetchLimit = limit
+	}
+
+	items, err := s.repo.GetMostRecentlyViewed(ctx, userID, fetchLimit)
 	if err != nil {
 		return nil, err
 	}
 
-	// Convert repository items to protobuf items
-	var pbItems []*sickrockpb.RecentlyViewedItem
+	pbItems := make([]*sickrockpb.RecentlyViewedItem, 0, limit)
 	for _, item := range items {
+		if s.requireTableAccess(ctx, item.Name, repo.ResourceActionView) != nil {
+			continue
+		}
 		pbItems = append(pbItems, &sickrockpb.RecentlyViewedItem{
 			Name:          item.Name,
 			TableId:       item.TableID,
@@ -1338,6 +1495,9 @@ func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect
 			ItemName:      item.ItemName,
 			TableTitle:    item.TableTitle,
 		})
+		if len(pbItems) >= limit {
+			break
+		}
 	}
 
 	return connect.NewResponse(&sickrockpb.GetMostRecentlyViewedResponse{
@@ -1346,6 +1506,9 @@ func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect
 }
 
 func (s *SickRockServer) GetSystemInfo(ctx context.Context, req *connect.Request[sickrockpb.GetSystemInfoRequest]) (*connect.Response[sickrockpb.GetSystemInfoResponse], error) {
+	if err := s.requireSystemSettings(ctx); err != nil {
+		return nil, err
+	}
 	total, err := s.repo.GetApproxTotalRows(ctx)
 	if err != nil {
 		return nil, err
@@ -1363,6 +1526,9 @@ func (s *SickRockServer) GetDashboards(ctx context.Context, req *connect.Request
 
 	out := make([]*sickrockpb.Dashboard, 0, len(dashboards))
 	for _, d := range dashboards {
+		if err := s.requireDashboardAccess(ctx, d.Name); err != nil {
+			continue
+		}
 		comps, err := s.repo.ListDashboardComponents(ctx, d.ID)
 		if err != nil {
 			return nil, err

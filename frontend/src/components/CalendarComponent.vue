@@ -6,17 +6,58 @@ import Calendar, {
   type CalendarEventMoveRequest
 } from 'picocrank/vue/components/Calendar.vue'
 import Section from 'picocrank/vue/components/Section.vue'
+import { Calendar03Icon, Link04Icon } from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/vue'
 import { createApiClient } from '../stores/api'
 import ViewsButton from './ViewsButton.vue'
+import ReadOnlyExportDialog from './ReadOnlyExportDialog.vue'
+import { useTableViewManager } from '../composables/useTableViewManager'
+import { useRbac } from '../composables/useRbac'
 
 const props = defineProps<{
-  tableId: string
+  tableId?: string
   viewName?: string
+  exportSlug?: string
+  readOnly?: boolean
+  freeBusy?: boolean
 }>()
+
+const exportTableId = ref('')
+const exportFreeBusy = ref(false)
+
+const effectiveTableId = computed(() => props.tableId || exportTableId.value)
+const effectiveFreeBusy = computed(() => props.freeBusy === true || exportFreeBusy.value)
 
 const emit = defineEmits<{
   'view-changed': [viewType: string]
 }>()
+
+const { hasPermission } = useRbac()
+const canManageExports = computed(() => hasPermission('exports.manage'))
+
+const viewManager = props.tableId
+  ? useTableViewManager(props.tableId, view => {
+      emit('view-changed', view?.viewType || 'table')
+    })
+  : null
+
+const exportDialogOpen = ref(false)
+
+const calendarViewIdForExport = computed(() => {
+  const view = viewManager?.currentView.value
+  if (!view || view.id <= 0 || view.viewType !== 'calendar') {
+    return null
+  }
+  return view.id
+})
+
+const exportDefaultTitle = computed(() => {
+  return props.viewName || viewManager?.currentView.value?.viewName || tableTitle.value || props.tableId || ''
+})
+
+const externalTableViews = computed(() => viewManager?.tableViews.value ?? [])
+const externalSelectedViewId = computed(() => viewManager?.selectedViewId.value ?? null)
+const externalCurrentView = computed(() => viewManager?.currentView.value ?? null)
 
 const router = useRouter()
 
@@ -145,6 +186,9 @@ const hasIconField = computed(() => {
 
 /** Picocrank calendar drag is global; only enable when the table can persist date changes. */
 const calendarEventDragEnabled = computed(() => {
+  if (props.readOnly) {
+    return false
+  }
   const fields = tableStructure.value?.fields ?? []
   return fields.some(
     (f: { name: string; type: string }) =>
@@ -155,7 +199,7 @@ const calendarEventDragEnabled = computed(() => {
 
 // Computed property for the section title
 const sectionTitle = computed(() => {
-  return props.viewName || tableTitle.value || `Table: ${props.tableId}`
+  return props.viewName || tableTitle.value || `Table: ${effectiveTableId.value || 'calendar'}`
 })
 
 // Transport handled by authenticated client
@@ -270,9 +314,14 @@ const calendarEvents = computed<CalendarEvent[]>(() => {
     }
 
 
+    const titleField = name ?? getItemValue(item, 'title')
     return {
       id: String(id),
-      title: name ? String(name) : `Item ${id || 'Unknown'}`,
+      title: effectiveFreeBusy.value
+        ? 'Busy'
+        : titleField
+          ? String(titleField)
+          : `Item ${id || 'Unknown'}`,
       startDate,
       endDate,
       date,
@@ -343,6 +392,9 @@ async function load() {
 
   selectedDate.value = `${newYear}-${String(newMonth + 1).padStart(2, '0')}`
 
+  if (viewManager) {
+    await viewManager.loadTableViews()
+  }
   await reloadItems()
 }
 
@@ -351,22 +403,34 @@ async function reloadItems() {
   loading.value = true
   error.value = null
   try {
-    // Load items
-    const res = await client.listItems({ tcName: props.tableId })
-    items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
+    if (props.exportSlug) {
+      const res = await client.getReadOnlyCalendarExport({ slug: props.exportSlug })
+      exportTableId.value = res.tableConfiguration
+      exportFreeBusy.value = res.displayMode === 'free_busy'
+      items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
+      if (res.title) {
+        tableTitle.value = res.title
+      }
+    } else {
+      if (!props.tableId) {
+        throw new Error('tableId is required')
+      }
+      const res = await client.listItems({ tcName: props.tableId })
+      items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
+    }
 
-    // Load table structure (only on first load or if not already loaded)
-    if (!tableStructure.value) {
-      const structureRes = await client.getTableStructure({ pageId: props.tableId })
+    const structurePageId = effectiveTableId.value
+    // Shared export viewers are authorized via the export slug, not table ACLs.
+    if (!tableStructure.value && structurePageId && !props.exportSlug) {
+      const structureRes = await client.getTableStructure({ pageId: structurePageId })
       tableStructure.value = structureRes
     }
 
-    if (conditionalFormattingRules.value.length === 0) {
+    if (!props.readOnly && !props.exportSlug && conditionalFormattingRules.value.length === 0 && structurePageId) {
       await loadConditionalFormattingRules()
     }
 
-    // Load table configuration title
-    if (!tableTitle.value) {
+    if (!tableTitle.value && props.tableId) {
       try {
         const configs = await client.getTableConfigurations({})
         const config = configs.pages?.find(p => p.id === props.tableId)
@@ -437,14 +501,21 @@ function formatEventTime(event: CalendarEvent, date: Date): string {
 
 // Event handlers
 function handleEventClick(event: CalendarEvent) {
+  if (props.readOnly || effectiveFreeBusy.value) {
+    return
+  }
   const item = (event as any)._originalItem
   const itemId = getItemValue(item, 'id')
-  if (itemId) {
-    window.location.href = `/table/${props.tableId}/${itemId}`
+  const tableId = effectiveTableId.value
+  if (itemId && tableId) {
+    window.location.href = `/table/${tableId}/${itemId}`
   }
 }
 
 function handleDateClick(date: Date) {
+  if (props.readOnly) {
+    return
+  }
   // Show day menu dialog
   dayMenu.value = {
     visible: true,
@@ -456,6 +527,9 @@ function handleDateClick(date: Date) {
 
 /** Picocrank: drag across days then release; same-day selection also emits `date-click`. */
 function handleDateRangeSelect(start: Date, end: Date) {
+  if (props.readOnly) {
+    return
+  }
   const lo = startOfDayLocal(start)
   const hi = startOfDayLocal(end)
   if (lo.getTime() === hi.getTime()) {
@@ -477,6 +551,10 @@ function handleDateRangeSelect(start: Date, end: Date) {
 }
 
 async function handleEventMoveRequest(payload: CalendarEventMoveRequest) {
+  if (props.readOnly) {
+    payload.respond(false)
+    return
+  }
   const { event, sourceDate, targetDate, respond } = payload
   const item = (event as { _originalItem?: Item })._originalItem
   if (!item) {
@@ -569,6 +647,9 @@ function handleMonthChange(month: number, year: number) {
 }
 
 function handleEventContextMenu(event: CalendarEvent, mouseEvent: MouseEvent) {
+  if (props.readOnly) {
+    return
+  }
   const item = (event as any)._originalItem
   contextMenu.value = {
     visible: true,
@@ -848,19 +929,33 @@ onMounted(load)
 </script>
 
 <template>
-  <Section :title="sectionTitle" :padding="false" class="calendar-section">
+  <Section :title="sectionTitle" :icon="Calendar03Icon" :padding="false" class="calendar-section">
     <template #toolbar>
       <ViewsButton
-        :table-id="props.tableId"
+        v-if="!readOnly && effectiveTableId && viewManager"
+        :table-id="effectiveTableId"
         :show-view-create="true"
         :show-view-edit="true"
         icon-only
         show-structure-link
-        @view-changed="(viewType: string) => emit('view-changed', viewType)"
+        :external-views="externalTableViews"
+        :external-selected-view-id="externalSelectedViewId"
+        :external-current-view="externalCurrentView"
+        @view-selected="(id: number) => viewManager?.selectView(id)"
       />
-      <button @click="goToToday" class="button neutral">Today</button>
-      <button @click="prevMonth" class="button neutral">‹</button>
-      <div class="date-picker-container">
+      <button
+        v-if="!readOnly && canManageExports && effectiveTableId"
+        type="button"
+        class="button inline-icon neutral ss-large"
+        title="Create read-only export for this calendar"
+        @click="exportDialogOpen = true"
+      >
+        <HugeiconsIcon :icon="Link04Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Share export</span>
+      </button>
+      <div class="calendar-toolbar-nav flex-row g1" role="group" aria-label="Calendar navigation">
+        <button @click="goToToday" class="button neutral">Today</button>
+        <button @click="prevMonth" class="button neutral">‹</button>
         <input
           id="goto-date"
           type="month"
@@ -868,8 +963,8 @@ onMounted(load)
           @change="goToSelectedDate"
           class="date-picker-input"
         />
+        <button @click="nextMonth" class="button neutral">›</button>
       </div>
-      <button @click="nextMonth" class="button neutral">›</button>
     </template>
 
     <div class="calendar-content">
@@ -907,9 +1002,17 @@ onMounted(load)
       </Calendar>
     </div>
 
+    <ReadOnlyExportDialog
+      :open="exportDialogOpen"
+      :table-configuration="effectiveTableId"
+      :table-view-id="calendarViewIdForExport"
+      :default-title="exportDefaultTitle"
+      @close="exportDialogOpen = false"
+    />
+
     <!-- Context Menu -->
     <div
-      v-if="contextMenu.visible"
+      v-if="!readOnly && contextMenu.visible"
       class="context-menu"
       :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
       @click.stop
@@ -926,7 +1029,7 @@ onMounted(load)
 
     <!-- Backdrop to close context menu -->
     <div
-      v-if="contextMenu.visible"
+      v-if="!readOnly && contextMenu.visible"
       class="context-menu-backdrop"
       @click="hideContextMenu"
     ></div>
@@ -943,10 +1046,10 @@ onMounted(load)
         </h3>
         <p class="day-menu-subtitle">Choose an action</p>
         <div class="day-menu-actions">
-          <button @click="goToDayView" class="button primary">
+          <button @click="goToDayView" class="button good">
             View Day
           </button>
-          <button @click="openQuickAddFromMenu" class="button secondary">
+          <button @click="openQuickAddFromMenu" class="button neutral">
             Quick Add
           </button>
           <button @click="hideDayMenu" class="button neutral">
@@ -1009,10 +1112,10 @@ onMounted(load)
             <button @click="hideQuickAdd" class="button neutral" :disabled="creating">
               Cancel
             </button>
-            <button @click="saveItem" class="button primary" :disabled="creating || !quickAdd.name.trim() || !quickAdd.date">
+            <button @click="saveItem" class="button good" :disabled="creating || !quickAdd.name.trim() || !quickAdd.date">
               {{ creating ? 'Saving...' : 'Save' }}
             </button>
-            <button @click="saveAndEdit" class="button secondary" :disabled="creating || !quickAdd.name.trim() || !quickAdd.date">
+            <button @click="saveAndEdit" class="button neutral" :disabled="creating || !quickAdd.name.trim() || !quickAdd.date">
               {{ creating ? 'Saving...' : 'Save & Edit' }}
             </button>
           </div>
@@ -1051,23 +1154,32 @@ onMounted(load)
   min-height: 0;
 }
 
-.date-picker-container {
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
-  min-width: 0;
+.calendar-section :deep([role='toolbar'] > .calendar-toolbar-nav) {
+  flex: 0 0 auto;
+  width: fit-content;
 }
 
 .date-picker-input {
-  padding: 0.5rem;
+  flex: 0 0 auto;
+  width: fit-content;
+  min-width: 0;
+  max-width: 11em;
+  field-sizing: content;
+  padding: 0.35em 0.55em;
   border: 1px solid var(--border-color, #ddd);
   border-radius: 4px;
   font-size: 1rem;
+  line-height: 1;
   outline: none;
   cursor: pointer;
-  min-width: 150px;
   background: var(--input-bg-color, transparent);
   color: var(--input-fg-color, inherit);
+  color-scheme: light dark;
+}
+
+.date-picker-input::-webkit-calendar-picker-indicator {
+  margin-inline-start: 0.15em;
+  padding: 0;
 }
 
 .date-picker-input:focus {

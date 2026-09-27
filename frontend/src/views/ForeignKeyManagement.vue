@@ -5,7 +5,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
-import { HugeiconsIcon, ArrowLeft01Icon, PlusSignIcon, ColumnDeleteIcon, Edit03Icon} from '@hugeicons/core-free-icons'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { ArrowLeft01Icon, PlusSignIcon, ColumnDeleteIcon, Edit03Icon, Link01Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -197,7 +198,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Section :title="`Foreign Keys: ${tableId}`">
+  <Section :title="`Foreign Keys: ${tableId}`" :icon="Link01Icon">
     <template #toolbar>
       <router-link
         :to="`/table/${tableId}`"

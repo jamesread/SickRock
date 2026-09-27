@@ -145,6 +145,24 @@ async function loadForeignKeys() {
       referencedTableTcName: fk.referencedTableTcName
     }))
 
+    const fallbacks = FALLBACK_FK_BY_TABLE[props.tableId]
+    if (fallbacks) {
+      for (const [columnName, referencedTcName] of Object.entries(fallbacks)) {
+        if (!foreignKeys.value.some(fk => fk.columnName === columnName)) {
+          foreignKeys.value.push({
+            constraintName: `fallback_${columnName}`,
+            tableName: props.tableId,
+            columnName,
+            referencedTable: referencedTcName,
+            referencedColumn: 'id',
+            onDeleteAction: 'SET NULL',
+            onUpdateAction: 'NO ACTION',
+            referencedTableTcName: referencedTcName
+          })
+        }
+      }
+    }
+
     // Load referenced table data for each foreign key
     await loadReferencedTableData()
   } catch (err) {
@@ -173,9 +191,58 @@ async function loadReferencedTableData() {
   referencedTableData.value = data
 }
 
+/** Nullable FK columns on built-in tables (used when DB driver omits FK metadata, e.g. SQLite). */
+const KNOWN_NULLABLE_FK_COLUMNS = new Set(['workflow_id', 'dashboard_id', 'table_configuration'])
+
+const FALLBACK_FK_BY_TABLE: Record<string, Record<string, string>> = {
+  table_navigation: {
+    workflow_id: 'table_workflows',
+    dashboard_id: 'table_dashboards',
+    table_configuration: 'table_configurations'
+  }
+}
+
 // Check if a field is a foreign key
 function isForeignKey(fieldName: string): boolean {
   return foreignKeys.value.some(fk => fk.columnName === fieldName)
+    || KNOWN_NULLABLE_FK_COLUMNS.has(fieldName)
+}
+
+function getFieldDef(fieldName: string) {
+  return props.fieldDefs.find(f => f.name === fieldName)
+}
+
+function canClearForeignKey(fieldName: string): boolean {
+  if (!isForeignKey(fieldName)) return false
+  const fieldDef = getFieldDef(fieldName)
+  return !fieldDef?.required
+}
+
+function isIntegerLikeFieldType(fieldType: string): boolean {
+  const t = fieldType.toLowerCase()
+  return t.includes('int') || t === 'integer' || t === 'bigint'
+}
+
+/** Value sent to API to clear a nullable column (server maps "" and "0" to NULL for FK ints). */
+function clearedFieldPayloadValue(field: { name: string; type: string }): string {
+  if (isForeignKey(field.name) || isIntegerLikeFieldType(field.type)) {
+    return '0'
+  }
+  return ''
+}
+
+function hadStoredValue(fieldName: string): boolean {
+  if (!props.existingItem?.additionalFields) return false
+  const orig = props.existingItem.additionalFields[fieldName]
+  if (orig == null || orig === '') return false
+  return String(orig) !== '0'
+}
+
+function shouldSendClearedFieldOnEdit(fieldName: string, value: unknown): boolean {
+  if (!isEditMode.value) return false
+  if (value != null && value !== '') return false
+  // Only send NULL/empty clears when the row previously had a value (avoids wiping FKs on unrelated edits)
+  return hadStoredValue(fieldName)
 }
 
 // Get the foreign key info for a field
@@ -244,6 +311,10 @@ function filterItems(fieldName: string, query: string) {
 function onSearchInput(fieldName: string, query: string) {
   searchQueries.value[fieldName] = query
   filterItems(fieldName, query)
+  // Clearing the visible label must clear the stored FK id (search box is not bound to form value)
+  if (!query.trim() && form.value[fieldName] && canClearForeignKey(fieldName)) {
+    form.value[fieldName] = ''
+  }
 }
 
 // Handle dropdown toggle
@@ -262,11 +333,15 @@ function selectItem(fieldName: string, item: any) {
   showDropdowns.value[fieldName] = false
 }
 
-// Clear selection
+// Clear selection (set FK to null on save)
 function clearSelection(fieldName: string) {
   form.value[fieldName] = ''
   searchQueries.value[fieldName] = ''
   showDropdowns.value[fieldName] = false
+}
+
+function selectNone(fieldName: string) {
+  clearSelection(fieldName)
 }
 
 // Handle blur with delay
@@ -407,10 +482,15 @@ watch(referencedTableData, () => {
     applyInitialValues()
   }
 
-  // Handle edit mode: update search queries for existing foreign key values
+  // Handle edit mode: ensure FK ids and labels are set once referenced rows are loaded
   if (isEditMode.value && props.existingItem && props.existingItem.additionalFields) {
     Object.entries(props.existingItem.additionalFields).forEach(([key, value]) => {
-      if (isForeignKey(key) && form.value[key] && !searchQueries.value[key]) {
+      if (!isForeignKey(key)) return
+      if (value == null || value === '' || value === '0') return
+      if (!form.value[key]) {
+        form.value[key] = String(value)
+      }
+      if (!searchQueries.value[key]) {
         const list = referencedTableData.value[key] || []
         const found = list.find((it: any) => String(it.id) === String(value))
         if (found) {
@@ -471,7 +551,12 @@ async function submit() {
   for (const f of props.fieldDefs) {
     if (f.name === 'id') continue
     const v = form.value[f.name]
-    if (v == null || v === '') continue
+    if (v == null || v === '') {
+      if (shouldSendClearedFieldOnEdit(f.name, v)) {
+        payload[f.name] = clearedFieldPayloadValue(f)
+      }
+      continue
+    }
 
     if (f.type === 'datetime' || f.type === 'timestamp') {
       // For datetime fields, convert to MySQL-compatible format (YYYY-MM-DD HH:MM:SS)
@@ -558,7 +643,7 @@ function cancel() {
                   class="search-input"
                 />
                 <button
-                  v-if="form[f.name]"
+                  v-if="form[f.name] || searchQueries[f.name]"
                   @click="clearSelection(f.name)"
                   type="button"
                   class="clear-button"
@@ -582,6 +667,14 @@ function cancel() {
                 class="dropdown-results"
               >
                 <div
+                  v-if="canClearForeignKey(f.name)"
+                  @mousedown.prevent="selectNone(f.name)"
+                  class="dropdown-item dropdown-item-none"
+                  :class="{ selected: !form[f.name] }"
+                >
+                  — None —
+                </div>
+                <div
                   v-if="(filteredData[f.name] || []).length === 0"
                   class="no-results"
                 >
@@ -592,7 +685,7 @@ function cancel() {
                   :key="item.id"
                   @click="selectItem(f.name, item)"
                   class="dropdown-item"
-                  :class="{ 'selected': form[f.name] === item.id }"
+                  :class="{ 'selected': String(form[f.name]) === String(item.id) }"
                 >
                   {{ getDisplayText(item, getForeignKeyInfo(f.name)) }}
                 </div>
@@ -643,6 +736,7 @@ function cancel() {
         <button
           v-if="isEditMode"
           type="button"
+          class="neutral"
           @click="cancel"
           :disabled="loading || saving"
         >
@@ -650,8 +744,8 @@ function cancel() {
         </button>
         <button
           type="submit"
+          class="good"
           :disabled="loading || saving"
-          class="primary"
         >
           {{ isEditMode ? (saving ? 'Saving...' : 'Save Changes') : (loading ? 'Adding...' : 'Add') }}
         </button>
@@ -907,11 +1001,6 @@ select:disabled {
   display: flex;
   gap: 1rem;
   justify-content: flex-end;
-}
-
-.form-actions button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 /* Error styling */

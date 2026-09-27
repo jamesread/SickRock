@@ -117,16 +117,11 @@ onMounted(loadAll)
   <IamCreateRoleDialog ref="createDialog" :permissions="permissions" @created="onRoleCreated" />
 
   <Section
+    title="Roles &amp; Permissions"
     subtitle="Manage RBAC roles and link them to permissions. Assign roles to groups — not users directly."
+    :icon="WebSecurityIcon"
     :padding="false"
   >
-    <template #title>
-      <span class="section-title-with-icon">
-        <HugeiconsIcon :icon="WebSecurityIcon" width="22" height="22" aria-hidden="true" />
-        Roles &amp; Permissions
-      </span>
-    </template>
-
     <template #toolbar>
       <button type="button" class="inline-icon neutral" aria-label="Refresh" :disabled="loading" @click="loadAll">
         <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
@@ -182,11 +177,6 @@ onMounted(loadAll)
 </template>
 
 <style scoped>
-.section-title-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-}
 .list-banner-pad {
   padding-left: 1em;
   padding-right: 1em;

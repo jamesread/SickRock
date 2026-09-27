@@ -4,7 +4,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import { createApiClient } from '../stores/api'
 import ViewsButton from './ViewsButton.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { CheckmarkSquare03Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Cancel01Icon, CheckListIcon, CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
 
 const props = defineProps<{
   tableId: string
@@ -186,7 +186,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Section :title="sectionTitle" :padding="false">
+  <Section :title="sectionTitle" :icon="CheckListIcon" :padding="false">
     <template #toolbar>
       <ViewsButton
         :table-id="props.tableId"
@@ -204,7 +204,7 @@ onMounted(() => {
         <span>Clear Ticks</span>
       </button>
       <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
-      <router-link :to="`/table/${props.tableId}/insert-row`" class="button inline-icon primary">
+      <router-link :to="`/table/${props.tableId}/insert-row`" class="button inline-icon good">
         <HugeiconsIcon :icon="CheckmarkSquare03Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Add Item</span>
       </router-link>

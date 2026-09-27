@@ -11,7 +11,9 @@ import (
 	"github.com/google/uuid"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
+	"github.com/jamesread/SickRock/internal/audit"
 	"github.com/jamesread/SickRock/internal/iam"
+	"github.com/jamesread/SickRock/internal/repo"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,8 +28,19 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 		}), nil
 	}
 
+	userAgent := req.Header().Get("User-Agent")
+	ipAddress := getClientIP(req)
+
 	user, err := s.auth.Store.GetUserByUsername(ctx, username)
 	if err != nil || user == nil {
+		s.recordAudit(ctx, repo.AuditLogEntry{
+			EventType:    audit.EventLoginFailed,
+			Message:      "invalid credentials",
+			RelatedUser:  username,
+			IPAddress:    ipAddress,
+			UserAgent:    userAgent,
+			Success:      false,
+		})
 		return connect.NewResponse(&sickrockpb.LoginResponse{
 			Success: false,
 			Message: "Invalid credentials",
@@ -36,14 +49,19 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 
 	ok, err := iam.VerifyPassword(user.PasswordHash, password)
 	if err != nil || !ok {
+		s.recordAudit(ctx, repo.AuditLogEntry{
+			EventType:    audit.EventLoginFailed,
+			Message:      "invalid credentials",
+			RelatedUser:  username,
+			IPAddress:    ipAddress,
+			UserAgent:    userAgent,
+			Success:      false,
+		})
 		return connect.NewResponse(&sickrockpb.LoginResponse{
 			Success: false,
 			Message: "Invalid credentials",
 		}), nil
 	}
-
-	userAgent := req.Header().Get("User-Agent")
-	ipAddress := getClientIP(req)
 
 	sid := uuid.New().String()
 	if err := s.auth.Store.CreateSession(ctx, sid, user.ID, nil); err != nil {
@@ -52,6 +70,17 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 			Message: "Failed to create session",
 		}), nil
 	}
+
+	s.recordAudit(ctx, repo.AuditLogEntry{
+		EventType:     audit.EventLogin,
+		Message:       "login successful",
+		ActorUserID:   user.ID,
+		ActorUsername: username,
+		RelatedUser:   username,
+		IPAddress:     ipAddress,
+		UserAgent:     userAgent,
+		Success:       true,
+	})
 
 	go func() {
 		notificationCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -78,10 +107,25 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 }
 
 func (s *SickRockServer) Logout(ctx context.Context, req *connect.Request[sickrockpb.LogoutRequest]) (*connect.Response[sickrockpb.LogoutResponse], error) {
+	actorID, actorName := s.auditActorFromContext(ctx)
+	ipAddress := getClientIP(req)
+	userAgent := req.Header().Get("User-Agent")
+
 	sid := sessionIDFromRequest(req)
 	if sid != "" {
 		_ = s.auth.Store.DeleteSession(ctx, sid)
 	}
+
+	s.recordAudit(ctx, repo.AuditLogEntry{
+		EventType:     audit.EventLogout,
+		Message:       "logout",
+		ActorUserID:   actorID,
+		ActorUsername: actorName,
+		RelatedUser:   actorName,
+		IPAddress:     ipAddress,
+		UserAgent:     userAgent,
+		Success:       true,
+	})
 
 	res := connect.NewResponse(&sickrockpb.LogoutResponse{
 		Success: true,

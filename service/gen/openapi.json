@@ -2973,6 +2973,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/GetReadOnlyCalendarExport": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "GetReadOnlyCalendarExport",
+        "operationId": "sickrock.SickRock.GetReadOnlyCalendarExport",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetReadOnlyCalendarExportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetReadOnlyCalendarExportResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/GetSystemInfo": {
       "post": {
         "tags": [
@@ -3025,6 +3083,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.GetSystemInfoResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/GetTableAccess": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "GetTableAccess",
+        "operationId": "sickrock.SickRock.GetTableAccess",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetTableAccessRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetTableAccessResponse"
                 }
               }
             }
@@ -3384,6 +3500,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/GetUserEffectiveRoleGrants": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "GetUserEffectiveRoleGrants",
+        "operationId": "sickrock.SickRock.GetUserEffectiveRoleGrants",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetUserEffectiveRoleGrantsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetUserEffectiveRoleGrantsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/GetUserGroupMembers": {
       "post": {
         "tags": [
@@ -3732,6 +3906,122 @@
         }
       }
     },
+    "/api/sickrock.SickRock/ListAccessibleReadOnlyExports": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "ListAccessibleReadOnlyExports",
+        "operationId": "sickrock.SickRock.ListAccessibleReadOnlyExports",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ListAccessibleReadOnlyExportsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ListAccessibleReadOnlyExportsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/ListGroupTableRoleGrants": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "ListGroupTableRoleGrants",
+        "operationId": "sickrock.SickRock.ListGroupTableRoleGrants",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ListGroupTableRoleGrantsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ListGroupTableRoleGrantsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/ListItems": {
       "post": {
         "tags": [
@@ -3900,6 +4190,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.ListRbacRolesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/ListTableShareGrants": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "ListTableShareGrants",
+        "operationId": "sickrock.SickRock.ListTableShareGrants",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ListTableShareGrantsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ListTableShareGrantsResponse"
                 }
               }
             }
@@ -4257,6 +4605,122 @@
         }
       }
     },
+    "/api/sickrock.SickRock/SetGroupTableRoleGrants": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetGroupTableRoleGrants",
+        "operationId": "sickrock.SickRock.SetGroupTableRoleGrants",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetGroupTableRoleGrantsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetGroupTableRoleGrantsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetTableShareGrants": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetTableShareGrants",
+        "operationId": "sickrock.SickRock.SetTableShareGrants",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetTableShareGrantsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetTableShareGrantsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/SetTickListCompletion": {
       "post": {
         "tags": [
@@ -4424,6 +4888,65 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.SetUserGroupRbacRolesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetWorkflowNavigationMembers": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "Assign navigation items as members of a workflow hub (does not set table_navigation.workflow_id)",
+        "description": "Assign navigation items as members of a workflow hub (does not set table_navigation.workflow_id)",
+        "operationId": "sickrock.SickRock.SetWorkflowNavigationMembers",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetWorkflowNavigationMembersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetWorkflowNavigationMembersResponse"
                 }
               }
             }
@@ -6726,6 +7249,52 @@
         "title": "GetRbacRoleUsersResponse",
         "additionalProperties": false
       },
+      "sickrock.GetReadOnlyCalendarExportRequest": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "slug"
+          }
+        },
+        "title": "GetReadOnlyCalendarExportRequest",
+        "additionalProperties": false
+      },
+      "sickrock.GetReadOnlyCalendarExportResponse": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "displayMode": {
+            "type": "string",
+            "title": "display_mode"
+          },
+          "weekendsOnly": {
+            "type": "boolean",
+            "title": "weekends_only"
+          },
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "tableViewId": {
+            "type": "integer",
+            "title": "table_view_id",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.Item"
+            },
+            "title": "items"
+          }
+        },
+        "title": "GetReadOnlyCalendarExportResponse",
+        "additionalProperties": false
+      },
       "sickrock.GetSystemInfoRequest": {
         "type": "object",
         "title": "GetSystemInfoRequest",
@@ -6745,6 +7314,40 @@
           }
         },
         "title": "GetSystemInfoResponse",
+        "additionalProperties": false
+      },
+      "sickrock.GetTableAccessRequest": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "title": "table_name"
+          }
+        },
+        "title": "GetTableAccessRequest",
+        "additionalProperties": false
+      },
+      "sickrock.GetTableAccessResponse": {
+        "type": "object",
+        "properties": {
+          "canView": {
+            "type": "boolean",
+            "title": "can_view"
+          },
+          "canInsert": {
+            "type": "boolean",
+            "title": "can_insert"
+          },
+          "canEdit": {
+            "type": "boolean",
+            "title": "can_edit"
+          },
+          "canDelete": {
+            "type": "boolean",
+            "title": "can_delete"
+          }
+        },
+        "title": "GetTableAccessResponse",
         "additionalProperties": false
       },
       "sickrock.GetTableConfigurationsRequest": {
@@ -6897,6 +7500,36 @@
         "title": "GetUserBookmarksResponse",
         "additionalProperties": false
       },
+      "sickrock.GetUserEffectiveRoleGrantsRequest": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "title": "user_id",
+            "format": "int32"
+          }
+        },
+        "title": "GetUserEffectiveRoleGrantsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.GetUserEffectiveRoleGrantsResponse": {
+        "type": "object",
+        "properties": {
+          "isSuperuser": {
+            "type": "boolean",
+            "title": "is_superuser"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.UserEffectiveRoleGrant"
+            },
+            "title": "grants"
+          }
+        },
+        "title": "GetUserEffectiveRoleGrantsResponse",
+        "additionalProperties": false
+      },
       "sickrock.GetUserGroupMembersRequest": {
         "type": "object",
         "properties": {
@@ -7039,6 +7672,22 @@
         "title": "GetUserResponse",
         "additionalProperties": false
       },
+      "sickrock.GroupTableRoleGrant": {
+        "type": "object",
+        "properties": {
+          "tableKey": {
+            "type": "string",
+            "title": "table_key"
+          },
+          "roleId": {
+            "type": "integer",
+            "title": "role_id",
+            "format": "int32"
+          }
+        },
+        "title": "GroupTableRoleGrant",
+        "additionalProperties": false
+      },
       "sickrock.IamUser": {
         "type": "object",
         "properties": {
@@ -7099,6 +7748,13 @@
           "rbacIsSuperuser": {
             "type": "boolean",
             "title": "rbac_is_superuser"
+          },
+          "oauthProviders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.OAuthProvider"
+            },
+            "title": "oauth_providers"
           }
         },
         "title": "InitResponse",
@@ -7166,6 +7822,51 @@
           }
         },
         "title": "AdditionalFieldsEntry",
+        "additionalProperties": false
+      },
+      "sickrock.ListAccessibleReadOnlyExportsRequest": {
+        "type": "object",
+        "title": "ListAccessibleReadOnlyExportsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ListAccessibleReadOnlyExportsResponse": {
+        "type": "object",
+        "properties": {
+          "exports": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.ReadOnlyExportSummary"
+            },
+            "title": "exports"
+          }
+        },
+        "title": "ListAccessibleReadOnlyExportsResponse",
+        "additionalProperties": false
+      },
+      "sickrock.ListGroupTableRoleGrantsRequest": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "title": "group_id",
+            "format": "int32"
+          }
+        },
+        "title": "ListGroupTableRoleGrantsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ListGroupTableRoleGrantsResponse": {
+        "type": "object",
+        "properties": {
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.GroupTableRoleGrant"
+            },
+            "title": "grants"
+          }
+        },
+        "title": "ListGroupTableRoleGrantsResponse",
         "additionalProperties": false
       },
       "sickrock.ListItemsRequest": {
@@ -7253,6 +7954,31 @@
           }
         },
         "title": "ListRbacRolesResponse",
+        "additionalProperties": false
+      },
+      "sickrock.ListTableShareGrantsRequest": {
+        "type": "object",
+        "properties": {
+          "tableKey": {
+            "type": "string",
+            "title": "table_key"
+          }
+        },
+        "title": "ListTableShareGrantsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ListTableShareGrantsResponse": {
+        "type": "object",
+        "properties": {
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.TableShareGrant"
+            },
+            "title": "grants"
+          }
+        },
+        "title": "ListTableShareGrantsResponse",
         "additionalProperties": false
       },
       "sickrock.ListUserGroupsRequest": {
@@ -7433,7 +8159,7 @@
             "type": "integer",
             "title": "workflow_id",
             "format": "int32",
-            "description": "optional, 0 if not set"
+            "description": "optional: nav link opens this workflow hub (not membership)"
           },
           "workflowName": {
             "type": "string",
@@ -7483,6 +8209,25 @@
         "title": "NotificationEvent",
         "additionalProperties": false,
         "description": "Notification System"
+      },
+      "sickrock.OAuthProvider": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "id"
+          },
+          "label": {
+            "type": "string",
+            "title": "label"
+          },
+          "authUrl": {
+            "type": "string",
+            "title": "auth_url"
+          }
+        },
+        "title": "OAuthProvider",
+        "additionalProperties": false
       },
       "sickrock.Page": {
         "type": "object",
@@ -7600,6 +8345,29 @@
         "title": "RbacRole",
         "additionalProperties": false
       },
+      "sickrock.ReadOnlyExportSummary": {
+        "type": "object",
+        "properties": {
+          "slug": {
+            "type": "string",
+            "title": "slug"
+          },
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "displayMode": {
+            "type": "string",
+            "title": "display_mode"
+          }
+        },
+        "title": "ReadOnlyExportSummary",
+        "additionalProperties": false
+      },
       "sickrock.RecentlyViewedItem": {
         "type": "object",
         "properties": {
@@ -7669,6 +8437,65 @@
           }
         },
         "title": "ResetUserPasswordResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetGroupTableRoleGrantsRequest": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "title": "group_id",
+            "format": "int32"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.GroupTableRoleGrant"
+            },
+            "title": "grants"
+          }
+        },
+        "title": "SetGroupTableRoleGrantsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetGroupTableRoleGrantsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          }
+        },
+        "title": "SetGroupTableRoleGrantsResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetTableShareGrantsRequest": {
+        "type": "object",
+        "properties": {
+          "tableKey": {
+            "type": "string",
+            "title": "table_key"
+          },
+          "grants": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.TableShareGrant"
+            },
+            "title": "grants"
+          }
+        },
+        "title": "SetTableShareGrantsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetTableShareGrantsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          }
+        },
+        "title": "SetTableShareGrantsResponse",
         "additionalProperties": false
       },
       "sickrock.SetTickListCompletionRequest": {
@@ -7755,6 +8582,61 @@
           }
         },
         "title": "SetUserGroupRbacRolesResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetWorkflowNavigationMembersRequest": {
+        "type": "object",
+        "properties": {
+          "workflowId": {
+            "type": "integer",
+            "title": "workflow_id",
+            "format": "int32"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.WorkflowNavigationMember"
+            },
+            "title": "members"
+          }
+        },
+        "title": "SetWorkflowNavigationMembersRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetWorkflowNavigationMembersResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SetWorkflowNavigationMembersResponse",
+        "additionalProperties": false
+      },
+      "sickrock.TableShareGrant": {
+        "type": "object",
+        "properties": {
+          "groupId": {
+            "type": "integer",
+            "title": "group_id",
+            "format": "int32"
+          },
+          "groupName": {
+            "type": "string",
+            "title": "group_name"
+          },
+          "roleId": {
+            "type": "integer",
+            "title": "role_id",
+            "format": "int32"
+          }
+        },
+        "title": "TableShareGrant",
         "additionalProperties": false
       },
       "sickrock.TableView": {
@@ -8088,6 +8970,31 @@
         "title": "UserBookmark",
         "additionalProperties": false
       },
+      "sickrock.UserEffectiveRoleGrant": {
+        "type": "object",
+        "properties": {
+          "roleId": {
+            "type": "integer",
+            "title": "role_id",
+            "format": "int32"
+          },
+          "roleName": {
+            "type": "string",
+            "title": "role_name"
+          },
+          "groupId": {
+            "type": "integer",
+            "title": "group_id",
+            "format": "int32"
+          },
+          "groupName": {
+            "type": "string",
+            "title": "group_name"
+          }
+        },
+        "title": "UserEffectiveRoleGrant",
+        "additionalProperties": false
+      },
       "sickrock.UserGroup": {
         "type": "object",
         "properties": {
@@ -8284,6 +9191,23 @@
           }
         },
         "title": "Workflow",
+        "additionalProperties": false
+      },
+      "sickrock.WorkflowNavigationMember": {
+        "type": "object",
+        "properties": {
+          "navigationItemId": {
+            "type": "integer",
+            "title": "navigation_item_id",
+            "format": "int32"
+          },
+          "ordinal": {
+            "type": "integer",
+            "title": "ordinal",
+            "format": "int32"
+          }
+        },
+        "title": "WorkflowNavigationMember",
         "additionalProperties": false
       }
     }

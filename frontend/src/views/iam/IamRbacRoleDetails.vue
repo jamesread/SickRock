@@ -94,13 +94,11 @@ onMounted(load)
 </script>
 
 <template>
-  <Section :subtitle="role ? 'Edit role permissions and metadata.' : ''">
-    <template #title>
-      <span class="section-title-with-icon">
-        <HugeiconsIcon :icon="WebSecurityIcon" width="22" height="22" aria-hidden="true" />
-        {{ role?.name || 'Role' }}
-      </span>
-    </template>
+  <Section
+    :title="role?.name || 'Role'"
+    :subtitle="role ? 'Edit role permissions and metadata.' : ''"
+    :icon="WebSecurityIcon"
+  >
     <template #toolbar>
       <router-link :to="{ name: 'iam-rbac' }" class="button inline-icon neutral">
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
@@ -125,7 +123,7 @@ onMounted(load)
 
       <FormLayout @submit.prevent="save">
         <FormField label="Name" for="role-name" :disabled="readOnly || saving">
-          <input id="role-name" v-model="form.name" type="text" :disabled="readOnly || saving || role.name === 'member'" />
+          <input id="role-name" v-model="form.name" type="text" :disabled="readOnly || saving || role.name === 'member' || role.name === 'viewer'" />
         </FormField>
         <FormField label="Description" for="role-desc" :disabled="readOnly || saving">
           <input id="role-desc" v-model="form.description" type="text" :disabled="readOnly || saving" />
@@ -172,11 +170,6 @@ onMounted(load)
 </template>
 
 <style scoped>
-.section-title-with-icon {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45em;
-}
 .perm-table {
   width: 100%;
 }

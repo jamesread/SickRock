@@ -1,132 +1,59 @@
 <script setup lang="ts">
-import { ref, onMounted, inject } from 'vue'
+import { ref, onMounted, inject, nextTick } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import * as Hugeicons from '@hugeicons/core-free-icons'
-import { Delete01Icon, Copy01Icon, PauseIcon } from '@hugeicons/core-free-icons'
+import {
+  Add01Icon,
+  Copy01Icon,
+  Delete01Icon,
+  KeyIcon,
+  PauseIcon,
+  RefreshIcon,
+} from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import FormField from 'picocrank/vue/components/FormField.vue'
+import Table from 'picocrank/vue/components/Table.vue'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
 
-// Use global API client
-const client = inject<ReturnType<typeof createApiClient>>('apiClient')
+const iconStrokeWidth = 2.5
+const client = inject<ReturnType<typeof createApiClient>>('apiClient')!
 
-// API Keys state
-const apiKeys = ref<Array<{
-  id: number;
-  userId: number;
-  name: string;
-  createdAt: number;
-  lastUsedAt: number;
-  expiresAt: number;
-  isActive: boolean;
-  readOnly: boolean;
-}>>([])
+type ApiKeyRow = {
+  id: number
+  userId: number
+  name: string
+  createdAt: number
+  lastUsedAt: number
+  expiresAt: number
+  isActive: boolean
+  readOnly: boolean
+}
 
-const apiKeysLoading = ref(false)
-const creatingApiKey = ref(false)
+const apiKeys = ref<ApiKeyRow[]>([])
+const loading = ref(false)
+const saving = ref(false)
+const errorMessage = ref('')
+const createError = ref('')
+
 const newApiKeyName = ref('')
-const newApiKeyExpiresAt = ref(0)
+const newApiKeyExpiresAt = ref('')
 const newApiKeyReadOnly = ref(false)
-const showNewApiKey = ref(false)
 const newApiKeyValue = ref('')
-const apiKeyError = ref<string | null>(null)
 
-async function loadAPIKeys() {
-  apiKeysLoading.value = true
-  apiKeyError.value = null
-  try {
-    const response = await client.getAPIKeys({})
-    apiKeys.value = (response.apiKeys || []).map(key => ({
-      id: key.id,
-      userId: key.userId,
-      name: key.name,
-      createdAt: Number(key.createdAt),
-      lastUsedAt: Number(key.lastUsedAt),
-      expiresAt: Number(key.expiresAt),
-      isActive: key.isActive,
-      readOnly: key.readOnly ?? false
-    }))
-  } catch (e: any) {
-    console.error('Failed to load API keys:', e)
-    apiKeyError.value = String(e?.message || e)
-  } finally {
-    apiKeysLoading.value = false
-  }
-}
+const createDialog = ref<HTMLDialogElement | null>(null)
+const newKeyDialog = ref<HTMLDialogElement | null>(null)
+const createNameInput = ref<HTMLInputElement | null>(null)
 
-async function createAPIKey() {
-  if (!newApiKeyName.value.trim()) {
-    apiKeyError.value = 'API key name is required'
-    return
-  }
-
-  creatingApiKey.value = true
-  apiKeyError.value = null
-  try {
-    const response = await client.createAPIKey({
-      name: newApiKeyName.value.trim(),
-      expiresAt: BigInt(newApiKeyExpiresAt.value),
-      readOnly: newApiKeyReadOnly.value
-    })
-
-    if (response.success) {
-      newApiKeyValue.value = response.apiKey
-      showNewApiKey.value = true
-      newApiKeyName.value = ''
-      newApiKeyExpiresAt.value = 0
-      newApiKeyReadOnly.value = false
-      await loadAPIKeys() // Reload API keys
-    } else {
-      apiKeyError.value = response.message || 'Failed to create API key'
-    }
-  } catch (e: any) {
-    console.error('Failed to create API key:', e)
-    apiKeyError.value = String(e?.message || e)
-  } finally {
-    creatingApiKey.value = false
-  }
-}
-
-async function deleteAPIKey(apiKeyId: number) {
-  if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
-    return
-  }
-
-  try {
-    const response = await client.deleteAPIKey({ apiKeyId })
-    if (response.success) {
-      await loadAPIKeys() // Reload API keys
-    } else {
-      apiKeyError.value = response.message || 'Failed to delete API key'
-    }
-  } catch (e: any) {
-    console.error('Failed to delete API key:', e)
-    apiKeyError.value = String(e?.message || e)
-  }
-}
-
-async function deactivateAPIKey(apiKeyId: number) {
-  try {
-    const response = await client.deactivateAPIKey({ apiKeyId })
-    if (response.success) {
-      await loadAPIKeys() // Reload API keys
-    } else {
-      apiKeyError.value = response.message || 'Failed to deactivate API key'
-    }
-  } catch (e: any) {
-    console.error('Failed to deactivate API key:', e)
-    apiKeyError.value = String(e?.message || e)
-  }
-}
-
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text).then(() => {
-    // Could add a toast notification here
-    console.log('API key copied to clipboard')
-  }).catch(err => {
-    console.error('Failed to copy to clipboard:', err)
-  })
-}
+const tableHeaders = [
+  { key: 'name', label: 'Name', sortable: true },
+  { key: 'createdAt', label: 'Created', sortable: true, width: '10rem' },
+  { key: 'lastUsedAt', label: 'Last used', sortable: true, width: '10rem' },
+  { key: 'expiresAt', label: 'Expires', sortable: true, width: '10rem' },
+  { key: 'isActive', label: 'Status', sortable: true, width: '7rem' },
+  { key: 'readOnly', label: 'Access', sortable: true, width: '8rem' },
+  { key: 'actions', label: 'Actions', sortable: false, width: '7rem' },
+]
 
 function formatDate(timestamp: number): string {
   if (timestamp === 0) return 'Never'
@@ -138,424 +65,316 @@ function formatExpirationDate(timestamp: number): string {
   return formatUnixTimestamp(timestamp)
 }
 
-onMounted(async () => {
-  await loadAPIKeys()
-})
+function expiresAtToUnix(value: string): bigint {
+  if (!value.trim()) return 0n
+  return BigInt(Math.floor(new Date(value).getTime() / 1000))
+}
+
+async function loadAPIKeys() {
+  loading.value = true
+  errorMessage.value = ''
+  try {
+    const response = await client.getAPIKeys({})
+    apiKeys.value = (response.apiKeys || []).map((key) => ({
+      id: key.id,
+      userId: key.userId,
+      name: key.name,
+      createdAt: Number(key.createdAt),
+      lastUsedAt: Number(key.lastUsedAt),
+      expiresAt: Number(key.expiresAt),
+      isActive: key.isActive,
+      readOnly: key.readOnly ?? false,
+    }))
+  } catch (e: unknown) {
+    errorMessage.value = e instanceof Error ? e.message : 'Failed to load API keys.'
+  } finally {
+    loading.value = false
+  }
+}
+
+function resetCreateForm() {
+  newApiKeyName.value = ''
+  newApiKeyExpiresAt.value = ''
+  newApiKeyReadOnly.value = false
+  createError.value = ''
+}
+
+function openCreateDialog() {
+  resetCreateForm()
+  createDialog.value?.showModal()
+  nextTick(() => createNameInput.value?.focus())
+}
+
+function closeCreateDialog() {
+  createDialog.value?.close()
+}
+
+function openNewKeyDialog() {
+  newKeyDialog.value?.showModal()
+}
+
+function closeNewKeyDialog() {
+  newKeyDialog.value?.close()
+  newApiKeyValue.value = ''
+}
+
+async function createAPIKey() {
+  if (!newApiKeyName.value.trim()) {
+    createError.value = 'API key name is required.'
+    return
+  }
+
+  saving.value = true
+  createError.value = ''
+  try {
+    const response = await client.createAPIKey({
+      name: newApiKeyName.value.trim(),
+      expiresAt: expiresAtToUnix(newApiKeyExpiresAt.value),
+      readOnly: newApiKeyReadOnly.value,
+    })
+
+    if (response.success) {
+      newApiKeyValue.value = response.apiKey
+      closeCreateDialog()
+      openNewKeyDialog()
+      await loadAPIKeys()
+    } else {
+      createError.value = response.message || 'Failed to create API key.'
+    }
+  } catch (e: unknown) {
+    createError.value = e instanceof Error ? e.message : 'Failed to create API key.'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deleteAPIKey(apiKeyId: number) {
+  if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
+    return
+  }
+
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    const response = await client.deleteAPIKey({ apiKeyId })
+    if (response.success) {
+      await loadAPIKeys()
+    } else {
+      errorMessage.value = response.message || 'Failed to delete API key.'
+    }
+  } catch (e: unknown) {
+    errorMessage.value = e instanceof Error ? e.message : 'Failed to delete API key.'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function deactivateAPIKey(apiKeyId: number) {
+  saving.value = true
+  errorMessage.value = ''
+  try {
+    const response = await client.deactivateAPIKey({ apiKeyId })
+    if (response.success) {
+      await loadAPIKeys()
+    } else {
+      errorMessage.value = response.message || 'Failed to deactivate API key.'
+    }
+  } catch (e: unknown) {
+    errorMessage.value = e instanceof Error ? e.message : 'Failed to deactivate API key.'
+  } finally {
+    saving.value = false
+  }
+}
+
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text).catch((err) => {
+    console.error('Failed to copy to clipboard:', err)
+  })
+}
+
+onMounted(loadAPIKeys)
 </script>
 
 <template>
-  <Section title="API Keys">
-    <div v-if="apiKeyError" class="error">{{ apiKeyError }}</div>
+  <dialog ref="createDialog" class="dialog" @close="resetCreateForm">
+    <h2>Create API key</h2>
+    <p>Create a key for programmatic access to SickRock.</p>
 
-    <!-- Create New API Key -->
-    <div class="create-api-key">
-      <h3>Create New API Key</h3>
-      <div class="create-form">
-        <div class="form-group">
-          <label for="api-key-name">Name</label>
-          <input
-            id="api-key-name"
-            v-model="newApiKeyName"
-            type="text"
-            placeholder="e.g., My App API Key"
-            :disabled="creatingApiKey"
-          />
-        </div>
-        <div class="form-group">
-          <label for="api-key-expires">Expires At (optional)</label>
-          <input
-            id="api-key-expires"
-            v-model="newApiKeyExpiresAt"
-            type="datetime-local"
-            :disabled="creatingApiKey"
-          />
-        </div>
-        <div class="form-group form-group-checkbox">
-          <label>
-            <input
-              v-model="newApiKeyReadOnly"
-              type="checkbox"
-              :disabled="creatingApiKey"
-            />
-            Read-only (can only read data; no create, edit, or delete)
-          </label>
-        </div>
-        <button
-          @click="createAPIKey"
-          :disabled="creatingApiKey || !newApiKeyName.trim()"
-          class="create-button"
-        >
-          {{ creatingApiKey ? 'Creating...' : 'Create API Key' }}
+    <FormLayout @submit.prevent="createAPIKey">
+      <FormField label="Name" for="api-key-name" :disabled="saving">
+        <input
+          id="api-key-name"
+          ref="createNameInput"
+          v-model="newApiKeyName"
+          type="text"
+          placeholder="e.g., My App API Key"
+          autocomplete="off"
+          :disabled="saving"
+          required
+        />
+      </FormField>
+
+      <FormField label="Expires at (optional)" for="api-key-expires" :disabled="saving">
+        <input
+          id="api-key-expires"
+          v-model="newApiKeyExpiresAt"
+          type="datetime-local"
+          :disabled="saving"
+        />
+      </FormField>
+
+      <FormField label="Read-only access" for="api-key-readonly" :disabled="saving">
+        <input
+          id="api-key-readonly"
+          v-model="newApiKeyReadOnly"
+          type="checkbox"
+          :disabled="saving"
+        />
+      </FormField>
+
+      <p v-if="createError" class="inline-notification error">{{ createError }}</p>
+
+      <template #actions>
+        <button type="button" class="neutral" :disabled="saving" @click="closeCreateDialog">Cancel</button>
+        <button type="submit" class="good" :disabled="saving || !newApiKeyName.trim()">
+          {{ saving ? 'Creating…' : 'Create API key' }}
         </button>
-      </div>
-    </div>
+      </template>
+    </FormLayout>
+  </dialog>
 
-    <!-- New API Key Display -->
-    <div v-if="showNewApiKey" class="new-api-key-display">
-      <h3>New API Key Created</h3>
-      <div class="api-key-warning">
-        <strong>Important:</strong> This is the only time you'll see this API key. Copy it now and store it securely.
-      </div>
-      <div class="api-key-value">
-        <code>{{ newApiKeyValue }}</code>
-        <button @click="copyToClipboard(newApiKeyValue)" class="copy-button">
-          <HugeiconsIcon :icon="Hugeicons.Copy01Icon" />
-          Copy
-        </button>
-      </div>
-      <button @click="showNewApiKey = false" class="close-button">Close</button>
+  <dialog ref="newKeyDialog" class="dialog" @close="newApiKeyValue = ''">
+    <h2>API key created</h2>
+    <p class="inline-notification note">
+      This is the only time you will see this API key. Copy it now and store it securely.
+    </p>
+    <div class="new-key-value">
+      <code>{{ newApiKeyValue }}</code>
+      <button type="button" class="inline-icon good" @click="copyToClipboard(newApiKeyValue)">
+        <HugeiconsIcon :icon="Copy01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+        <span>Copy</span>
+      </button>
     </div>
+    <div class="dialog-actions">
+      <button type="button" class="neutral" @click="closeNewKeyDialog">Close</button>
+    </div>
+  </dialog>
 
-    <!-- Current API Keys -->
-    <div class="current-api-keys">
-      <h3>Current API Keys</h3>
-      <div v-if="apiKeysLoading" class="loading">Loading API keys...</div>
-      <div v-else-if="apiKeys.length === 0" class="no-api-keys">
-        <p>No API keys yet. Create one above to get started.</p>
-      </div>
-      <div v-else class="api-keys-list">
-        <div
-          v-for="apiKey in apiKeys"
-          :key="apiKey.id"
-          class="api-key-item"
-          :class="{ inactive: !apiKey.isActive }"
-        >
-          <div class="api-key-content">
-            <div class="api-key-info">
-              <div class="api-key-name">{{ apiKey.name }}</div>
-              <div class="api-key-details">
-                <span class="detail-item">
-                  <strong>Created:</strong> {{ formatDate(apiKey.createdAt) }}
-                </span>
-                <span class="detail-item">
-                  <strong>Last Used:</strong> {{ formatDate(apiKey.lastUsedAt) }}
-                </span>
-                <span class="detail-item">
-                  <strong>Expires:</strong> {{ formatExpirationDate(apiKey.expiresAt) }}
-                </span>
-                <span class="detail-item">
-                  <strong>Status:</strong>
-                  <span :class="apiKey.isActive ? 'status-active' : 'status-inactive'">
-                    {{ apiKey.isActive ? 'Active' : 'Inactive' }}
-                  </span>
-                </span>
-                <span class="detail-item">
-                  <strong>Access:</strong>
-                  <span :class="apiKey.readOnly ? 'access-readonly' : 'access-readwrite'">
-                    {{ apiKey.readOnly ? 'Read-only' : 'Read-write' }}
-                  </span>
-                </span>
-              </div>
-            </div>
-          </div>
-          <div class="api-key-actions">
+  <Section
+    title="API Keys"
+    subtitle="Create and manage API keys for programmatic access to SickRock."
+    :icon="KeyIcon"
+    :padding="false"
+  >
+
+    <template #toolbar>
+      <button type="button" class="inline-icon neutral" aria-label="Refresh" :disabled="loading" @click="loadAPIKeys">
+        <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+      </button>
+      <button
+        type="button"
+        class="inline-icon good"
+        aria-label="Create API key"
+        :disabled="loading"
+        @click="openCreateDialog"
+      >
+        <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+      </button>
+    </template>
+
+    <div v-if="errorMessage" class="list-banner-pad inline-notification error">{{ errorMessage }}</div>
+    <div v-if="loading && !apiKeys.length" class="list-banner-pad muted">Loading…</div>
+
+    <template v-else>
+      <p v-if="!apiKeys.length" class="list-banner-pad inline-notification note">No API keys yet.</p>
+
+      <Table
+        v-else
+        class="api-keys-table-wrap"
+        :data="apiKeys"
+        :headers="tableHeaders"
+      >
+        <template #cell-name="{ value, row }">
+          <strong :class="{ muted: !row.isActive }">{{ value }}</strong>
+        </template>
+        <template #cell-createdAt="{ value }">
+          {{ formatDate(value) }}
+        </template>
+        <template #cell-lastUsedAt="{ value }">
+          {{ formatDate(value) }}
+        </template>
+        <template #cell-expiresAt="{ value }">
+          {{ formatExpirationDate(value) }}
+        </template>
+        <template #cell-isActive="{ value }">
+          <span :class="value ? 'tag fg-good' : 'tag bad'">
+            {{ value ? 'Active' : 'Inactive' }}
+          </span>
+        </template>
+        <template #cell-readOnly="{ value }">
+          {{ value ? 'Read-only' : 'Read-write' }}
+        </template>
+        <template #cell-actions="{ row }">
+          <div class="actions-cell">
             <button
-              v-if="apiKey.isActive"
-              @click="deactivateAPIKey(apiKey.id)"
-              class="deactivate-button"
-              title="Deactivate API key"
+              v-if="row.isActive"
+              type="button"
+              class="inline-icon neutral small"
+              aria-label="Deactivate API key"
+              :disabled="saving"
+              @click="deactivateAPIKey(row.id)"
             >
-              <HugeiconsIcon :icon="Hugeicons.PauseIcon" />
+              <HugeiconsIcon :icon="PauseIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
             </button>
             <button
-              @click="deleteAPIKey(apiKey.id)"
-              class="delete-button"
-              title="Delete API key"
+              type="button"
+              class="inline-icon bad small"
+              aria-label="Delete API key"
+              :disabled="saving"
+              @click="deleteAPIKey(row.id)"
             >
-              <HugeiconsIcon :icon="Hugeicons.Delete01Icon" />
+              <HugeiconsIcon :icon="Delete01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
             </button>
           </div>
-        </div>
-      </div>
-    </div>
+        </template>
+      </Table>
+    </template>
   </Section>
 </template>
 
 <style scoped>
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  margin-bottom: 1rem;
+.list-banner-pad {
+  padding-left: 1em;
+  padding-right: 1em;
 }
 
-.create-api-key {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
+.api-keys-table-wrap {
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
-.create-api-key h3 {
-  margin: 0 0 1rem 0;
-  color: #333;
-}
-
-.create-form {
+.actions-cell {
   display: flex;
-  flex-direction: column;
-  gap: 1rem;
+  justify-content: flex-end;
+  gap: 0.35rem;
 }
 
-.form-group {
-  margin-bottom: 0;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #333;
-}
-
-.create-form input {
-  width: 100%;
-  max-width: 400px;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-}
-
-.create-button {
-  padding: 0.75rem 1.5rem;
-  background: #28a745;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease;
-  align-self: flex-start;
-}
-
-.create-button:hover:not(:disabled) {
-  background: #218838;
-}
-
-.create-button:disabled {
-  background: #6c757d;
-  cursor: not-allowed;
-}
-
-.new-api-key-display {
-  margin-bottom: 2rem;
-  padding: 1.5rem;
-  background: #d4edda;
-  border: 1px solid #c3e6cb;
-  border-radius: 6px;
-}
-
-.new-api-key-display h3 {
-  margin: 0 0 1rem 0;
-  color: #155724;
-}
-
-.api-key-warning {
-  background: #fff3cd;
-  color: #856404;
-  padding: 0.75rem;
-  border: 1px solid #ffeaa7;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
-.api-key-value {
+.new-key-value {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: 0.75rem;
+  margin: 1rem 0;
 }
 
-.api-key-value code {
-  flex: 1;
-  padding: 0.75rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.9rem;
+.new-key-value code {
+  flex: 1 1 16rem;
   word-break: break-all;
 }
 
-.copy-button {
-  padding: 0.5rem 1rem;
-  background: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+.dialog-actions {
   display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 0.5rem;
-  transition: background-color 0.2s ease;
-}
-
-.copy-button:hover {
-  background: #0056b3;
-}
-
-.close-button {
-  padding: 0.5rem 1rem;
-  background: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.close-button:hover {
-  background: #545b62;
-}
-
-.current-api-keys {
-  margin-bottom: 2rem;
-}
-
-.current-api-keys h3 {
-  margin: 0 0 1rem 0;
-  color: #333;
-}
-
-.loading {
-  color: #666;
-  font-style: italic;
-  padding: 1rem;
-}
-
-.no-api-keys {
-  color: #666;
-  font-style: italic;
-  padding: 2rem;
-  text-align: center;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-}
-
-.api-keys-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.api-key-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem;
-  background: white;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.api-key-item:hover {
-  border-color: #dee2e6;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.api-key-item.inactive {
-  opacity: 0.6;
-  background: #f8f9fa;
-}
-
-.api-key-content {
-  flex: 1;
-}
-
-.api-key-name {
-  font-weight: 500;
-  color: #333;
-  margin-bottom: 0.5rem;
-}
-
-.api-key-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1rem;
-  font-size: 0.9rem;
-  color: #666;
-}
-
-.detail-item {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.status-active {
-  color: #28a745;
-  font-weight: 500;
-}
-
-.status-inactive {
-  color: #dc3545;
-  font-weight: 500;
-}
-
-.access-readonly {
-  color: #6c757d;
-  font-weight: 500;
-}
-
-.access-readwrite {
-  color: #007bff;
-  font-weight: 500;
-}
-
-.form-group-checkbox label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.form-group-checkbox input[type="checkbox"] {
-  width: auto;
-  max-width: none;
-}
-
-.api-key-actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.deactivate-button {
-  padding: 0.5rem;
-  background: #ffc107;
-  color: #212529;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.deactivate-button:hover {
-  background: #e0a800;
-}
-
-.delete-button {
-  padding: 0.5rem;
-  background: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.delete-button:hover {
-  background: #c82333;
-}
-
-.deactivate-button :deep(svg),
-.delete-button :deep(svg) {
-  width: 16px;
-  height: 16px;
 }
 </style>

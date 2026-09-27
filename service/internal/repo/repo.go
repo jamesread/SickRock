@@ -262,6 +262,108 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 	return items, rows.Err()
 }
 
+// WorkflowNavigationMemberInput is one navigation row assigned to a workflow hub.
+type WorkflowNavigationMemberInput struct {
+	NavigationItemID int
+	Ordinal          int
+}
+
+// GetNavigationItemsForWorkflowMembership returns navigation rows grouped by workflow hub id.
+// Each item's Ordinal reflects membership order (not global sidebar order).
+func (r *Repository) GetNavigationItemsForWorkflowMembership(ctx context.Context) (map[int][]NavigationItem, error) {
+	query := `
+		SELECT
+			wnm.workflow_id,
+			wnm.ordinal as member_ordinal,
+			tn.id,
+			tn.ordinal,
+			tn.table_configuration,
+			tc.name as table_name,
+			COALESCE(tc.title, tc.name) as table_title,
+			tc.icon as icon,
+            tn.dashboard_id as dashboard_id,
+            td.name as dashboard_name,
+            tn.name as navigation,
+            tn.workflow_id as nav_workflow_id,
+            tw.name as workflow_name
+		FROM workflow_navigation_members wnm
+		INNER JOIN table_navigation tn ON wnm.navigation_item_id = tn.id
+		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
+        LEFT JOIN table_dashboards td ON tn.dashboard_id = td.id
+        LEFT JOIN table_workflows tw ON tn.workflow_id = tw.id
+		ORDER BY wnm.workflow_id ASC, wnm.ordinal ASC, tn.id ASC
+	`
+
+	rows, err := r.db.QueryxContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[int][]NavigationItem)
+	for rows.Next() {
+		var bucketWorkflowID int
+		var memberOrdinal int
+		var item NavigationItem
+		var navWorkflowID sql.NullInt64
+		if err := rows.Scan(
+			&bucketWorkflowID,
+			&memberOrdinal,
+			&item.ID,
+			&item.Ordinal,
+			&item.TableConfiguration,
+			&item.TableName,
+			&item.TableTitle,
+			&item.Icon,
+			&item.DashboardID,
+			&item.DashboardName,
+			&item.Navigation,
+			&navWorkflowID,
+			&item.WorkflowName,
+		); err != nil {
+			return nil, err
+		}
+		item.Ordinal = memberOrdinal
+		item.WorkflowID = navWorkflowID
+		result[bucketWorkflowID] = append(result[bucketWorkflowID], item)
+	}
+	return result, rows.Err()
+}
+
+func (r *Repository) SetWorkflowNavigationMembers(ctx context.Context, workflowID int, members []WorkflowNavigationMemberInput) error {
+	if workflowID <= 0 {
+		return fmt.Errorf("workflow_id is required")
+	}
+
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_navigation_members WHERE workflow_id = ?", workflowID); err != nil {
+		return fmt.Errorf("clear workflow members: %w", err)
+	}
+
+	for _, m := range members {
+		if m.NavigationItemID <= 0 {
+			continue
+		}
+		ord := m.Ordinal
+		if ord <= 0 {
+			ord = 99
+		}
+		if _, err := tx.ExecContext(ctx,
+			"INSERT INTO workflow_navigation_members (workflow_id, navigation_item_id, ordinal) VALUES (?, ?, ?)",
+			workflowID, m.NavigationItemID, ord,
+		); err != nil {
+			return fmt.Errorf("insert workflow member: %w", err)
+		}
+	}
+
+	return tx.Commit()
+}
+
 type Workflow struct {
 	ID      int
 	Name    string
@@ -1044,8 +1146,8 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 		// If so, set it to NULL instead of the empty string
 		shouldSetNull := false
 
-		// Special handling for workflow_id (nullable foreign key)
-		if fieldName == "workflow_id" && (fieldValue == "" || fieldValue == "0") {
+		// Nullable FK ints on navigation (explicit names for reliable clears from the UI)
+		if (fieldName == "workflow_id" || fieldName == "dashboard_id") && (fieldValue == "" || fieldValue == "0") {
 			shouldSetNull = true
 		} else {
 			// Check column metadata for other nullable fields
@@ -1362,6 +1464,8 @@ func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error 
 		{"table_workflows", "Workflows", "table_workflows", 2},
 		{"table_navigation", "Navigation", "table_navigation", 3},
 		{"table_dashboards", "Dashboards", "table_dashboards", 4},
+		{"table_read_only_exports", "Read-only calendar exports", "read_only_calendar_exports", 5},
+		{"table_logs", "Audit logs", "audit_logs", 6},
 	}
 	switch r.db.DriverName() {
 	case "mysql":
@@ -1737,10 +1841,34 @@ func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]Fo
 			foreignKeys = append(foreignKeys, fk)
 		}
 	default: // SQLite
-		// SQLite doesn't have a comprehensive information schema for foreign keys
-		// We'll return an empty list for now, but in a real implementation
-		// you might want to parse the CREATE TABLE statements
-		foreignKeys = []ForeignKey{}
+		type sqliteFkRow struct {
+			ID       int    `db:"id"`
+			Seq      int    `db:"seq"`
+			Table    string `db:"table"`
+			From     string `db:"from"`
+			To       string `db:"to"`
+			OnUpdate string `db:"on_update"`
+			OnDelete string `db:"on_delete"`
+			Match    string `db:"match"`
+		}
+		var rows []sqliteFkRow
+		pragma := fmt.Sprintf("PRAGMA foreign_key_list(%s)", tc.Table.String)
+		if err := r.db.SelectContext(ctx, &rows, pragma); err != nil {
+			return nil, err
+		}
+		for _, row := range rows {
+			foreignKeys = append(foreignKeys, ForeignKey{
+				ConstraintName:   fmt.Sprintf("sqlite_fk_%s_%s", tc.Table.String, row.From),
+				TableSchema:      tc.Db.String,
+				TableName:        tc.Table.String,
+				ColumnName:       row.From,
+				ReferencedSchema: tc.Db.String,
+				ReferencedTable:  row.Table,
+				ReferencedColumn: row.To,
+				OnDeleteAction:   row.OnDelete,
+				OnUpdateAction:   row.OnUpdate,
+			})
+		}
 	}
 
 	log.Infof("Foreign keys for table: %v = %v", tableName, foreignKeys)
@@ -1855,22 +1983,25 @@ func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnN
 	return err
 }
 
-// InsertRecentlyViewed adds a table and item ID to the recently viewed tracking table
-func (r *Repository) InsertRecentlyViewed(ctx context.Context, tableName, itemID string) error {
+// InsertRecentlyViewed adds a table and item ID to the recently viewed tracking table for one user.
+func (r *Repository) InsertRecentlyViewed(ctx context.Context, userID int, tableName, itemID string) error {
+	if userID <= 0 || tableName == "" || itemID == "" {
+		return nil
+	}
 	// First, try to update existing record if it exists
 	var updateQuery string
 	switch r.db.DriverName() {
 	case "mysql":
 		updateQuery = `UPDATE table_recently_viewed
 			SET updated_at_unix = UNIX_TIMESTAMP()
-			WHERE name = ? AND table_id = ?`
+			WHERE user_account_id = ? AND name = ? AND table_id = ?`
 	default: // SQLite
 		updateQuery = `UPDATE table_recently_viewed
 			SET updated_at_unix = strftime('%s', 'now')
-			WHERE name = ? AND table_id = ?`
+			WHERE user_account_id = ? AND name = ? AND table_id = ?`
 	}
 
-	result, err := r.db.ExecContext(ctx, updateQuery, tableName, itemID)
+	result, err := r.db.ExecContext(ctx, updateQuery, userID, tableName, itemID)
 	if err != nil {
 		return err
 	}
@@ -1886,14 +2017,14 @@ func (r *Repository) InsertRecentlyViewed(ctx context.Context, tableName, itemID
 		var insertQuery string
 		switch r.db.DriverName() {
 		case "mysql":
-			insertQuery = `INSERT INTO table_recently_viewed (name, table_id, sr_created, updated_at_unix)
-				VALUES (?, ?, NOW(), UNIX_TIMESTAMP())`
+			insertQuery = `INSERT INTO table_recently_viewed (user_account_id, name, table_id, sr_created, updated_at_unix)
+				VALUES (?, ?, ?, NOW(), UNIX_TIMESTAMP())`
 		default: // SQLite
-			insertQuery = `INSERT INTO table_recently_viewed (name, table_id, sr_created, updated_at_unix)
-				VALUES (?, ?, datetime('now'), strftime('%s', 'now'))`
+			insertQuery = `INSERT INTO table_recently_viewed (user_account_id, name, table_id, sr_created, updated_at_unix)
+				VALUES (?, ?, ?, datetime('now'), strftime('%s', 'now'))`
 		}
 
-		_, err = r.db.ExecContext(ctx, insertQuery, tableName, itemID)
+		_, err = r.db.ExecContext(ctx, insertQuery, userID, tableName, itemID)
 		return err
 	}
 
@@ -1910,8 +2041,11 @@ type RecentlyViewedItem struct {
 	TableTitle    string `db:"title"`
 }
 
-// GetMostRecentlyViewed returns the most recently viewed items with table configuration details
-func (r *Repository) GetMostRecentlyViewed(ctx context.Context, limit int) ([]RecentlyViewedItem, error) {
+// GetMostRecentlyViewed returns the most recently viewed items for a user with table configuration details.
+func (r *Repository) GetMostRecentlyViewed(ctx context.Context, userID, limit int) ([]RecentlyViewedItem, error) {
+	if userID <= 0 {
+		return nil, nil
+	}
 	if limit <= 0 {
 		limit = 10 // Default limit
 	}
@@ -1925,12 +2059,13 @@ func (r *Repository) GetMostRecentlyViewed(ctx context.Context, limit int) ([]Re
             COALESCE(tc.title, rv.name) as title
 		FROM table_recently_viewed rv
 		LEFT JOIN table_configurations tc ON rv.name = tc.name
+		WHERE rv.user_account_id = ?
 		ORDER BY rv.updated_at_unix DESC
 		LIMIT ?
 	`
 
 	var items []RecentlyViewedItem
-	err := r.db.SelectContext(ctx, &items, query, limit)
+	err := r.db.SelectContext(ctx, &items, query, userID, limit)
 	if err != nil {
 		return nil, err
 	}

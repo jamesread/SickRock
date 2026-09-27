@@ -3,7 +3,7 @@ import { ref, onMounted, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import * as Hugeicons from '@hugeicons/core-free-icons'
-import { DatabaseIcon, Delete01Icon } from '@hugeicons/core-free-icons'
+import { BookmarkIcon, DatabaseIcon, Delete01Icon } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 
@@ -94,7 +94,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Section title="Bookmarks">
+  <Section title="Bookmarks" :icon="BookmarkIcon">
     <div v-if="error" class="error">{{ error }}</div>
 
     <div v-if="bookmarksLoading" class="loading">Loading bookmarks...</div>

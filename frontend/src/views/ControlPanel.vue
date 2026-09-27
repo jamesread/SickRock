@@ -13,8 +13,15 @@ import {
   DatabaseIcon,
   DatabaseSettingIcon,
   WebSecurityIcon,
+  ComputerIcon,
+  Calendar03Icon,
 } from '@hugeicons/core-free-icons'
-import { canAccessIam } from '../utils/rbacAccess'
+import {
+  canAccessIam,
+  canManageExports,
+  canManageSystemSettings,
+  canViewAuditLogs,
+} from '../utils/rbacAccess'
 import { useAuthStore } from '../stores/auth'
 
 const authStore = useAuthStore()
@@ -29,35 +36,38 @@ const error = ref<string | null>(null)
 const totalTables = ref<number>(0)
 const totalItems = ref<number>(0)
 
-const localNavigation = ref(null)
+const localNavigation = ref<InstanceType<typeof Navigation> | null>(null)
 
 onMounted(async () => {
   await loadBuildInfo()
   await loadDatabaseStats()
 
   if (localNavigation.value) {
-    localNavigation.value.addNavigationLink({
-      id: 'create-table',
-      name: 'create-table',
-      title: 'Create New Table',
-      path: '/admin/table/create',
-      icon: AddIcon,
-      type: 'route',
-      description: 'Create a new database table'
-    })
-
-    localNavigation.value.addNavigationLink({
-      id: 'database-browser',
-      name: 'database-browser',
-      title: 'Database Browser',
-      path: '/admin/database-browser',
-      icon: DatabaseIcon,
-      type: 'route',
-      description: 'Browse and explore database structure'
-    })
-
     const perms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
     const superuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+
+    if (canManageSystemSettings(perms, superuser)) {
+      localNavigation.value.addNavigationLink({
+        id: 'create-table',
+        name: 'create-table',
+        title: 'Create New Table',
+        path: '/admin/table/create',
+        icon: AddIcon,
+        type: 'route',
+        description: 'Create a new database table',
+      })
+
+      localNavigation.value.addNavigationLink({
+        id: 'database-browser',
+        name: 'database-browser',
+        title: 'Database Browser',
+        path: '/admin/database-browser',
+        icon: DatabaseIcon,
+        type: 'route',
+        description: 'Browse and explore database structure',
+      })
+    }
+
     if (canAccessIam(perms, superuser)) {
       localNavigation.value.addNavigationLink({
         id: 'iam-hub',
@@ -70,35 +80,62 @@ onMounted(async () => {
       })
     }
 
-    localNavigation.value.addNavigationLink({
-      id: 'view-device-codes',
-      name: 'view-device-codes',
-      title: 'View Device Codes',
-      path: '/table/device_codes',
-      icon: KeyIcon,
-      type: 'route',
-      description: 'Manage device authentication codes'
-    })
+    if (canManageSystemSettings(perms, superuser)) {
+      localNavigation.value.addNavigationLink({
+        id: 'view-device-codes',
+        name: 'view-device-codes',
+        title: 'View Device Codes',
+        path: '/table/device_codes',
+        icon: KeyIcon,
+        type: 'route',
+        description: 'Manage device authentication codes',
+      })
 
-    localNavigation.value.addNavigationLink({
-      id: 'settings',
-      name: 'settings',
-      title: 'Settings',
-      path: '/table/table_settings',
-      icon: DatabaseSettingIcon,
-      type: 'route',
-      description: 'Manage application settings'
-    })
+      localNavigation.value.addNavigationLink({
+        id: 'settings',
+        name: 'settings',
+        title: 'Settings',
+        path: '/table/table_settings',
+        icon: DatabaseSettingIcon,
+        type: 'route',
+        description: 'Manage application settings',
+      })
 
-    localNavigation.value.addNavigationLink({
-      id: 'nav-items',
-      name: 'nav-items',
-      title: 'Navigation',
-      path: '/table/table_navigation',
-      icon: DatabaseSettingIcon,
-      type: 'route',
-      description: 'Manage navigation items'
-    })
+      localNavigation.value.addNavigationLink({
+        id: 'nav-items',
+        name: 'nav-items',
+        title: 'Navigation',
+        path: '/table/table_navigation',
+        icon: DatabaseSettingIcon,
+        type: 'route',
+        description: 'Manage navigation items',
+      })
+    }
+
+    if (canManageExports(perms, superuser)) {
+      localNavigation.value.addNavigationLink({
+        id: 'read-only-exports',
+        name: 'read-only-exports',
+        title: 'Read-only calendar exports',
+        path: '/table/table_read_only_exports',
+        icon: Calendar03Icon,
+        type: 'route',
+        description:
+          'Configure authenticated calendar exports at /exports/{slug} (filters, weekends-only, free/busy, allowed groups)',
+      })
+    }
+
+    if (canViewAuditLogs(perms, superuser)) {
+      localNavigation.value.addNavigationLink({
+        id: 'audit-logs',
+        name: 'audit-logs',
+        title: 'Audit logs',
+        path: '/table/table_logs',
+        icon: DatabaseSettingIcon,
+        type: 'route',
+        description: 'Security and access audit trail (login, table access, exports)',
+      })
+    }
 
     localNavigation.value.addNavigationLink({
       id: 'go-home',
@@ -107,7 +144,7 @@ onMounted(async () => {
       path: '/',
       icon: HomeIcon,
       type: 'route',
-      description: 'Return to the home dashboard'
+      description: 'Return to the home dashboard',
     })
   }
 })
@@ -125,6 +162,11 @@ async function loadBuildInfo() {
 }
 
 async function loadDatabaseStats() {
+  const perms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
+  const superuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+  if (!canManageSystemSettings(perms, superuser)) {
+    return
+  }
   try {
     const pages = await client.getTableConfigurations({})
     totalTables.value = pages.pages.length
@@ -144,13 +186,17 @@ async function loadDatabaseStats() {
     </div>
 
     <div class="control-sections">
-      <Section title="Control Panel" subtitle="Administrative tools and quick actions">
+      <Section
+        title="Control Panel"
+        subtitle="Administrative tools and quick actions"
+        :icon="DatabaseSettingIcon"
+      >
         <Navigation ref="localNavigation">
           <NavigationGrid />
         </Navigation>
       </Section>
 
-      <Section title="System Diagnostics">
+      <Section title="System Diagnostics" :icon="ComputerIcon">
         <div class="grid-boxed">
           <StatusCard karma="info">
             <h4>Version</h4>
@@ -171,7 +217,11 @@ async function loadDatabaseStats() {
         </div>
       </Section>
 
-      <Section title="Database Diagnostics">
+      <Section
+        v-if="authStore.hasPermission('system.settings')"
+        title="Database Diagnostics"
+        :icon="DatabaseIcon"
+      >
         <div class="grid-boxed">
           <StatusCard karma="good">
             <h4>Total Tables</h4>

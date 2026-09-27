@@ -7,7 +7,7 @@ import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from '../components/InsertRow.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,7 +141,7 @@ function handleCreated() {
 </script>
 
 <template>
-  <Section :title="createButtonText">
+  <Section :title="createButtonText" :icon="Add01Icon">
     <template #toolbar>
       <div class="toolbar-group">
         <div class="view-selector">

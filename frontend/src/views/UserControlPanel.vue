@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useRouter } from 'vue-router'
+import { useRbac } from '../composables/useRbac'
 import Section from 'picocrank/vue/components/Section.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
@@ -10,6 +11,7 @@ import { UserIcon, BookmarkIcon, SettingsIcon, KeyIcon, NotificationIcon, Downlo
 
 const authStore = useAuthStore()
 const router = useRouter()
+const { hasPermission } = useRbac()
 const user = computed(() => authStore.user)
 const localNavigation = ref(null)
 
@@ -48,16 +50,17 @@ onMounted(() => {
       description: 'View and manage your saved bookmarks'
     })
 
-    // API Keys
-    localNavigation.value.addNavigationLink({
-      id: 'user-api-keys',
-      name: 'user-api-keys',
-      title: 'API Keys',
-      path: '/user-api-keys',
-      icon: KeyIcon,
-      type: 'route',
-      description: 'Create and manage your API keys for programmatic access'
-    })
+    if (hasPermission('apikeys.use')) {
+      localNavigation.value.addNavigationLink({
+        id: 'user-api-keys',
+        name: 'user-api-keys',
+        title: 'API Keys',
+        path: '/user-api-keys',
+        icon: KeyIcon,
+        type: 'route',
+        description: 'Create and manage your API keys for programmatic access',
+      })
+    }
 
     // Notifications
     localNavigation.value.addNavigationLink({
@@ -92,30 +95,32 @@ onMounted(() => {
       description: 'Manage Progressive Web App installation and service worker'
     })
 
-    // Device Code Claimer
-    localNavigation.value.addNavigationLink({
-      id: 'device-code-claimer',
-      name: 'device-code-claimer',
-      title: 'Device Code Claimer',
-      path: '/device-code-claimer',
-      icon: KeyIcon,
-      type: 'route',
-      description: 'Complete device code authentication'
-    })
-
-    // Logout
-    localNavigation.value.addCallback('Logout', async () => { await handleLogout() }, { icon: LogoutIcon })
+    if (hasPermission('devicecode.claim')) {
+      localNavigation.value.addNavigationLink({
+        id: 'device-code-claimer',
+        name: 'device-code-claimer',
+        title: 'Device Code Claimer',
+        path: '/device-code-claimer',
+        icon: KeyIcon,
+        type: 'route',
+        description: 'Complete device code authentication',
+      })
+    }
   }
   })
 })
 </script>
 
 <template>
-  <Section title="User Control Panel" subtitle="Manage your account settings and preferences">
+  <Section
+    title="User Control Panel"
+    subtitle="Manage your account settings and preferences"
+    :icon="UserIcon"
+  >
     <div class="control-panel-container">
       <div class="user-welcome">
         <h2>Welcome, {{ user?.username }}</h2>
-        <p class="welcome-message">Manage your account settings and preferences</p>
+        <p class="subtle welcome-message">Manage your account settings and preferences</p>
       </div>
 
       <Navigation ref="localNavigation">
@@ -123,8 +128,8 @@ onMounted(() => {
       </Navigation>
 
       <div class="logout-section">
-        <button @click="handleLogout" class="logout-button">
-          <HugeiconsIcon :icon="LogoutIcon" />
+        <button type="button" class="inline-icon bad" @click="handleLogout">
+          <HugeiconsIcon :icon="LogoutIcon" width="1em" height="1em" />
           <span>Logout</span>
         </button>
       </div>
@@ -146,53 +151,21 @@ onMounted(() => {
 
 .user-welcome h2 {
   margin: 0 0 0.5rem 0;
-  color: #212529;
+  color: var(--text-color, inherit);
   font-size: 1.75rem;
   font-weight: 600;
 }
 
 .welcome-message {
   margin: 0;
-  color: #6c757d;
-  font-size: 1rem;
 }
 
 .logout-section {
   margin-top: 2rem;
   padding-top: 2rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.3);
+  border-top: 1px solid var(--border-color, currentColor);
   display: flex;
   justify-content: center;
-}
-
-.logout-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
-  background: #dc2626;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.logout-button:hover {
-  background: #b91c1c;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.logout-button:active {
-  transform: translateY(0);
-}
-
-.logout-button svg {
-  width: 20px;
-  height: 20px;
 }
 
 /* Responsive design */

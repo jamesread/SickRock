@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, inject } from 'vue'
+import { ref, onMounted, computed, inject, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { HugeiconsIcon } from '@hugeicons/vue'
-import * as Hugeicons from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import Navigation from 'picocrank/vue/components/Navigation.vue'
+import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
+import { Calendar03Icon, HomeIcon, Link04Icon, ViewIcon, WorkflowIcon } from '@hugeicons/core-free-icons'
+import { resolveNavigationIcon } from '../utils/navigationIcon'
 
-// Use global API client
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
 const authStore = useAuthStore()
 const isAuthenticated = computed(() => authStore.isAuthenticated)
@@ -28,11 +29,16 @@ const recentlyViewed = ref<Array<{
   table_title?: string
 }>>([])
 const workflows = ref<Array<{ id: number; name: string; icon?: string }>>([])
+const readOnlyExports = ref<Array<{ slug: string; title: string; tableConfiguration: string; displayMode: string }>>([])
+
+const workflowNavigation = ref<InstanceType<typeof Navigation> | null>(null)
+const exportsNavigation = ref<InstanceType<typeof Navigation> | null>(null)
+const recentNavByGroup = new Map<string, InstanceType<typeof Navigation>>()
 
 const hasRecentlyViewed = computed(() => recentlyViewed.value.length > 0)
 const hasWorkflows = computed(() => workflows.value.length > 0)
+const hasReadOnlyExports = computed(() => readOnlyExports.value.length > 0)
 
-// Group recently viewed items by table name
 const groupedRecentlyViewed = computed(() => {
   const groups = new Map<string, { name: string; title: string; icon: string | undefined; items: typeof recentlyViewed.value }>()
   for (const item of recentlyViewed.value) {
@@ -41,13 +47,11 @@ const groupedRecentlyViewed = computed(() => {
     const existing = groups.get(key)
     if (existing) {
       existing.items.push(item)
-      // keep most recent first within group
       existing.items.sort((a, b) => Number(b.updated_at_unix) - Number(a.updated_at_unix))
     } else {
       groups.set(key, { name: key, title: displayTitle, icon: item.icon, items: [item] })
     }
   }
-  // order groups by most recent item in each group
   return Array.from(groups.values()).sort((a, b) => {
     const aLatest = a.items.length ? Number(a.items[0].updated_at_unix) : 0
     const bLatest = b.items.length ? Number(b.items[0].updated_at_unix) : 0
@@ -57,19 +61,120 @@ const groupedRecentlyViewed = computed(() => {
 
 function formatTime(unixTimestamp: number | bigint): string {
   const timestamp = typeof unixTimestamp === 'bigint' ? Number(unixTimestamp) : unixTimestamp
-  const date = new Date(timestamp * 1000)
+  const viewedAt = new Date(timestamp * 1000)
   const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
+  const diffMs = now.getTime() - viewedAt.getTime()
   const diffMins = Math.floor(diffMs / (1000 * 60))
-  const diffHours = Math.floor((diffMs) / (1000 * 60 * 60))
-  const diffDays = Math.floor((diffMs) / (1000 * 60 * 60 * 24))
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
 
   if (diffMins < 1) return 'Just now'
   if (diffMins < 60) return `${diffMins}m ago`
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 7) return `${diffDays}d ago`
-  return date.toLocaleDateString()
+  return viewedAt.toLocaleDateString()
 }
+
+function startWorkflow(wf: { id: number; name: string }) {
+  try {
+    localStorage.setItem(PINNED_WORKFLOW_KEY, wf.name)
+  } catch {
+    // ignore storage errors
+  }
+  window.dispatchEvent(new CustomEvent('pinned-workflow-changed'))
+  router.push(`/workflow/${wf.id}`)
+}
+
+function setRecentNavRef(groupName: string, el: unknown) {
+  if (el) {
+    recentNavByGroup.set(groupName, el as InstanceType<typeof Navigation>)
+    nextTick(() => populateRecentNavigation())
+  } else {
+    recentNavByGroup.delete(groupName)
+  }
+}
+
+function populateExportsNavigation() {
+  const nav = exportsNavigation.value
+  if (!nav) return
+  nav.clearNavigationLinks()
+  for (const exp of readOnlyExports.value) {
+    const path = `/exports/${encodeURIComponent(exp.slug)}`
+    const modeLabel = exp.displayMode === 'free_busy' ? 'Free/busy' : 'Full calendar'
+    nav.addNavigationLink({
+      id: `home-export-${exp.slug}`,
+      name: `home-export-${exp.slug}`,
+      title: exp.title,
+      path,
+      to: path,
+      icon: Link04Icon,
+      type: 'route',
+      description: `${exp.tableConfiguration} · ${modeLabel}`,
+    })
+  }
+}
+
+function populateWorkflowNavigation() {
+  const nav = workflowNavigation.value
+  if (!nav) return
+  nav.clearNavigationLinks()
+  for (const wf of workflows.value) {
+    nav.addCallback(wf.name, () => startWorkflow(wf), {
+      name: `home-workflow-${wf.id}`,
+      icon: resolveNavigationIcon({
+        icon: wf.icon,
+        workflowId: wf.id,
+        path: `/workflow/${wf.id}`,
+      }),
+      description: 'Start workflow (pins to header)',
+    })
+  }
+}
+
+function populateRecentNavigation() {
+  for (const group of groupedRecentlyViewed.value) {
+    const nav = recentNavByGroup.get(group.name)
+    if (!nav) continue
+    nav.clearNavigationLinks()
+    const tableIcon = resolveNavigationIcon({
+      icon: group.icon,
+      path: `/table/${group.name}`,
+    })
+    nav.addNavigationLink({
+      id: `home-table-${group.name}`,
+      name: `home-table-${group.name}`,
+      title: 'View table',
+      path: `/table/${group.name}`,
+      to: `/table/${group.name}`,
+      icon: tableIcon,
+      type: 'route',
+      description: group.title,
+    })
+    for (const item of group.items) {
+      const linkName = `home-recent-${group.name}-${item.table_id}`
+      nav.addNavigationLink({
+        id: linkName,
+        name: linkName,
+        title: item.item_name || `Row ${item.table_id}`,
+        path: `/table/${item.name}/${item.table_id}`,
+        to: `/table/${item.name}/${item.table_id}`,
+        icon: tableIcon,
+        type: 'route',
+        description: `${formatTime(item.updated_at_unix)} · ID ${item.table_id}`,
+      })
+    }
+  }
+}
+
+function refreshNavigationGrids() {
+  nextTick(() => {
+    populateExportsNavigation()
+    populateWorkflowNavigation()
+    populateRecentNavigation()
+  })
+}
+
+watch([workflows, readOnlyExports, groupedRecentlyViewed], refreshNavigationGrids)
 
 async function load() {
   loading.value = true
@@ -84,53 +189,55 @@ async function load() {
     commit.value = init.commit
     date.value = init.date
 
-    // Load recently viewed items
     try {
       const recentRes = await client!.getMostRecentlyViewed({ limit: 5 })
-      recentlyViewed.value = (recentRes.items || []).map(item => ({
+      recentlyViewed.value = (recentRes.items || []).map((item) => ({
         name: item.name,
         table_id: item.tableId,
         icon: item.icon,
         updated_at_unix: item.updatedAtUnix,
         item_name: item.itemName,
-        table_title: item.tableTitle
+        table_title: item.tableTitle,
       }))
     } catch (e) {
-      // Don't fail the entire load if recently viewed fails
       console.warn('Failed to load recently viewed items:', e)
     }
 
-    // Load workflows
+    try {
+      const exportsRes = await client!.listAccessibleReadOnlyExports({})
+      readOnlyExports.value = (exportsRes.exports ?? [])
+        .map((e) => ({
+          slug: e.slug,
+          title: e.title || e.slug,
+          tableConfiguration: e.tableConfiguration,
+          displayMode: e.displayMode || 'full',
+        }))
+        .sort((a, b) => a.title.localeCompare(b.title))
+    } catch (e) {
+      console.warn('Failed to load read-only exports:', e)
+      readOnlyExports.value = []
+    }
+
     try {
       const navRes = await client!.getNavigation({})
-      const wfList = (navRes as any).workflows || []
+      const wfList = (navRes as { workflows?: Array<{ id: number; name?: string; icon?: string }> }).workflows || []
       workflows.value = wfList
-        .map((w: any) => ({
+        .map((w) => ({
           id: w.id,
           name: w.name || `Workflow ${w.id}`,
-          icon: w.icon || 'DatabaseIcon'
+          icon: w.icon || '',
         }))
-        .sort((a: any, b: any) => a.name.localeCompare(b.name))
+        .sort((a, b) => a.name.localeCompare(b.name))
     } catch (e) {
       console.warn('Failed to load workflows:', e)
       workflows.value = []
     }
-  } catch (e: any) {
-    error.value = String(e?.message || e)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : String(e)
   } finally {
     loading.value = false
+    refreshNavigationGrids()
   }
-}
-
-function startWorkflow(wf: { id: number; name: string }) {
-  try {
-    localStorage.setItem(PINNED_WORKFLOW_KEY, wf.name)
-  } catch {
-    // ignore storage errors
-  }
-  // Notify App.vue to refresh pinned workflow header
-  window.dispatchEvent(new CustomEvent('pinned-workflow-changed'))
-  router.push(`/workflow/${wf.id}`)
 }
 
 onMounted(load)
@@ -138,95 +245,61 @@ onMounted(load)
 
 <template>
   <div>
-    <Section title="Welcome">
+    <Section title="Welcome" :icon="HomeIcon">
       <div v-if="loading">Loading…</div>
       <div v-else>
         <div v-if="!isAuthenticated" class="subtle">Please log in to view your recently viewed items.</div>
         <div v-else-if="error" class="error">{{ error }}</div>
-        <div class="meta" v-else>
-          <p class="version">Version: {{ version }} <span v-if="commit">({{ commit }})</span> <span v-if="date">on {{ date }}</span></p>
+        <div v-else class="meta">
+          <p class="version">
+            Version: {{ version }}
+            <span v-if="commit">({{ commit }})</span>
+            <span v-if="date"> on {{ date }}</span>
+          </p>
         </div>
       </div>
     </Section>
 
-    <Section v-if="!loading && isAuthenticated && !error && hasWorkflows" title="Workflows">
-      <div class="workflows-grid">
-        <div
-          v-for="wf in workflows"
-          :key="wf.id"
-          class="workflow-card"
-        >
-          <router-link
-            :to="`/workflow/${wf.id}`"
-            class="workflow-card-main"
-            :title="wf.name"
-          >
-            <HugeiconsIcon
-              :icon="(Hugeicons as any)[wf.icon || 'DatabaseIcon'] || Hugeicons.DatabaseIcon"
-              class="workflow-card-icon"
-            />
-            <div class="workflow-card-info">
-              <h4 class="workflow-card-title">{{ wf.name }}</h4>
-              <p class="workflow-card-subtitle">Workflow</p>
-            </div>
-          </router-link>
-          <div class="workflow-card-actions">
-            <button
-              type="button"
-              class="button primary small good"
-              @click="startWorkflow(wf)"
-            >
-              Start Workflow
-            </button>
-          </div>
-        </div>
-      </div>
+    <Section
+      v-if="!loading && isAuthenticated && !error && hasReadOnlyExports"
+      title="Shared calendars"
+      subtitle="Read-only calendar exports you can open."
+      :icon="Calendar03Icon"
+    >
+      <Navigation ref="exportsNavigation">
+        <NavigationGrid />
+      </Navigation>
     </Section>
 
-    <Section v-if="!loading && isAuthenticated && !error" title="Recently Viewed">
-      <div v-if="hasRecentlyViewed">
-        <div class="recently-viewed-groups">
-          <div
-            v-for="group in groupedRecentlyViewed"
-            :key="group.name"
-            class="recent-group"
-          >
-            <div class="group-header">
-              <router-link
-                :to="`/table/${group.name}`"
-                class="table-heading-link"
-                title="View table"
-              >
-                <HugeiconsIcon
-                  v-if="group.icon && (Hugeicons as any)[group.icon]"
-                  :icon="(Hugeicons as any)[group.icon]"
-                />
-                <h4>{{ group.title }}</h4>
-              </router-link>
-            </div>
+    <Section
+      v-if="!loading && isAuthenticated && !error && hasWorkflows"
+      title="Workflows"
+      :icon="WorkflowIcon"
+    >
+      <Navigation ref="workflowNavigation">
+        <NavigationGrid />
+      </Navigation>
+    </Section>
 
-            <div class="recently-viewed">
-              <router-link
-                v-for="item in group.items"
-                :key="`${item.name}-${item.table_id}`"
-                :to="`/table/${item.name}/${item.table_id}`"
-                class="recent-item"
-              >
-                <div class="item-header">
-                  <div class="item-info">
-                    <span class="item-name">{{ item.item_name }}</span>
-                    <span class="table-name">ID: {{ item.table_id }}</span>
-                  </div>
-                </div>
-                <div class="item-details">
-                  <span class="item-time">{{ formatTime(item.updated_at_unix) }}</span>
-                </div>
-              </router-link>
-            </div>
+    <Section
+      v-if="!loading && isAuthenticated && !error"
+      title="Recently Viewed"
+      :icon="ViewIcon"
+      :padding="false"
+    >
+      <template v-if="hasRecentlyViewed">
+        <template v-for="group in groupedRecentlyViewed" :key="group.name">
+          <div class="section-subheader">
+            <h3>{{ group.title }}</h3>
           </div>
-        </div>
-      </div>
-      <div v-else>
+          <div class="section-content padding">
+            <Navigation :ref="(el) => setRecentNavRef(group.name, el)">
+              <NavigationGrid compact />
+            </Navigation>
+          </div>
+        </template>
+      </template>
+      <div v-else class="section-content padding">
         <p class="subtle">No recently viewed items yet. Browse your tables to see them here.</p>
       </div>
     </Section>
@@ -239,236 +312,18 @@ onMounted(load)
 }
 
 .version {
-  color: #666;
-}
-
-/* Workflows list styled similarly to recently viewed cards */
-.workflows-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 0.75rem;
-}
-
-.workflow-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-}
-
-.workflow-card:hover {
-  background: #e9ecef;
-  border-color: #dee2e6;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.workflow-card-main {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  text-decoration: none;
-  color: inherit;
-  flex: 1;
-}
-
-.workflow-card-icon {
-  width: 20px;
-  height: 20px;
-}
-
-.workflow-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.workflow-card-title {
-  margin: 0;
-  font-weight: 500;
-  font-size: 0.95rem;
-}
-
-.workflow-card-subtitle {
-  margin: 0;
-  font-size: 0.8rem;
-  color: #6c757d;
-}
-
-.workflow-card-actions {
-  display: flex;
-  align-items: center;
-  margin-left: 0.75rem;
-  flex-shrink: 0;
-}
-
-.workflow-card-main {
-  min-width: 0;
-  overflow: hidden;
-}
-
-.workflow-card-title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-@media (max-width: 768px) {
-  .workflows-grid {
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-  }
-
-  .workflow-card {
-    flex-wrap: wrap;
-    padding: 0.75rem;
-  }
-
-  .workflow-card-main {
-    flex: 1 1 100%;
-    min-width: 0;
-  }
-
-  .workflow-card-actions {
-    flex: 1 1 100%;
-    margin-left: 0;
-    margin-top: 0.5rem;
-    justify-content: flex-start;
-  }
-
-  .workflow-card-actions .button {
-    width: 100%;
-  }
-
-  .recently-viewed-groups {
-    grid-template-columns: 1fr;
-  }
-
-  .recent-item {
-    flex-wrap: wrap;
-  }
-
-  .item-details {
-    flex: 1 1 100%;
-    margin: 0.5rem 0 0 0;
-  }
-}
-
-/* Groups */
-.recently-viewed-groups {
-  display: grid;
-  grid-auto-flow: dense;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.recent-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.group-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.table-heading-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  text-decoration: none;
-  color: inherit;
-  transition: color 0.2s ease;
-}
-
-.table-heading-link:hover {
-  color: #007bff;
-}
-
-.table-heading-link h4 {
-  margin: 0;
-}
-
-/* Recently Viewed Styles */
-.recently-viewed {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.recent-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  text-decoration: none;
-  color: inherit;
-  transition: all 0.2s ease;
-  cursor: pointer;
-}
-
-.recent-item:hover {
-  background: #e9ecef;
-  border-color: #dee2e6;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.item-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-}
-
-.item-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-}
-
-.item-name {
-  font-weight: 500;
-  font-size: 0.95rem;
-}
-
-.table-name {
-  font-size: 0.8rem;
-  color: #6c757d;
-  font-weight: 400;
-}
-
-.item-details {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  margin: 0 1rem;
-  font-size: 0.875rem;
-  color: #6c757d;
-}
-
-.item-time {
-  font-size: 0.75rem;
+  color: var(--muted-text-color, #666);
 }
 
 .subtle {
-  color: #777;
+  color: var(--muted-text-color, #777);
 }
 
 .error {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--karma-bad-tint, #f8d7da);
+  color: var(--text-color, #721c24);
   padding: 0.75rem;
-  border: 1px solid #f5c6cb;
+  border: 1px solid var(--border-color, #f5c6cb);
   border-radius: 4px;
 }
 </style>
