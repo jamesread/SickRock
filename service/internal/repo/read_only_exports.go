@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -147,11 +146,14 @@ func parseExportWhereJSON(raw string) (map[string]string, error) {
 }
 
 // calendarExportColumnAllowlist returns columns to SELECT for calendar exports.
-func calendarExportColumnAllowlist(freeBusy bool, tableColumns []FieldSpec) []string {
-	always := map[string]bool{"id": true, "sr_created": true, "sr_updated": true, "calendar_date": true, "starts": true, "finishes": true}
+func calendarExportColumnAllowlist(freeBusy bool, tableColumns []FieldSpec, pkColumn string) []string {
+	if pkColumn == "" {
+		pkColumn = defaultTableKeyColumn
+	}
+	always := map[string]bool{pkColumn: true, "sr_created": true, "sr_updated": true, "calendar_date": true, "starts": true, "finishes": true}
 	names := make([]string, 0, 8)
 	seen := map[string]bool{}
-	for _, n := range []string{"id", "sr_created", "sr_updated", "calendar_date", "starts", "finishes"} {
+	for _, n := range []string{pkColumn, "sr_created", "sr_updated", "calendar_date", "starts", "finishes"} {
 		for _, col := range tableColumns {
 			if col.Name == n && !seen[n] {
 				names = append(names, n)
@@ -194,22 +196,13 @@ func (r *Repository) ListItemsForReadOnlyExport(ctx context.Context, exp *ReadOn
 	}
 
 	freeBusy := exp.DisplayMode == "free_busy"
-	selectCols := calendarExportColumnAllowlist(freeBusy, columns)
+	pkColumn := tc.PrimaryKeyColumnName()
+	selectCols := calendarExportColumnAllowlist(freeBusy, columns, pkColumn)
 	if len(selectCols) == 0 {
-		selectCols = []string{"id", "sr_created"}
+		selectCols = []string{pkColumn}
 	}
 
-	sortColumn := "sr_created"
-	hasSort := false
-	for _, c := range selectCols {
-		if c == sortColumn {
-			hasSort = true
-			break
-		}
-	}
-	if !hasSort {
-		sortColumn = "id"
-	}
+	sortColumn := tc.SortColumnName(selectCols)
 
 	var whereClause string
 	var args []interface{}
@@ -243,34 +236,7 @@ func (r *Repository) ListItemsForReadOnlyExport(ctx context.Context, exp *ReadOn
 		if err := rows.MapScan(rowMap); err != nil {
 			return nil, err
 		}
-		item := Item{Fields: make(map[string]interface{})}
-		if id, ok := rowMap["id"]; ok {
-			switch v := id.(type) {
-			case int64:
-				item.ID = strconv.FormatInt(v, 10)
-			case []uint8:
-				item.ID = string(v)
-			default:
-				item.ID = fmt.Sprint(id)
-			}
-		}
-		if createdAt, ok := rowMap["sr_created"]; ok {
-			item.SrCreated = parseTimeField(createdAt)
-		}
-		if updatedAt, ok := rowMap["sr_updated"]; ok {
-			item.SrUpdated = parseTimeField(updatedAt)
-		}
-		for colName, value := range rowMap {
-			if colName == "id" || colName == "sr_created" || colName == "sr_updated" {
-				continue
-			}
-			if valueBytes, ok := value.([]uint8); ok {
-				item.Fields[colName] = string(valueBytes)
-			} else {
-				item.Fields[colName] = value
-			}
-		}
-		items = append(items, item)
+		items = append(items, scanRowToItem(rowMap, pkColumn))
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

@@ -20,6 +20,7 @@ import PWAInstallPrompt from './components/PWAInstallPrompt.vue'
 import { usePWAInstall } from './composables/usePWAInstall'
 import { isOnline } from './utils/indexedDB'
 import { resolveNavigationIcon } from './utils/navigationIcon'
+import { appTitle, setAppTitle } from './appTitle'
 
 const sidebar = ref(null)
 const navigation = ref(null)
@@ -60,8 +61,6 @@ const pages = ref<Array<{
 }>>([])
 const version = ref<string>('')
 const quickSearch = ref(null)
-const appTitle = ref<string>('SickRock') // Default to 'SickRock', will be loaded from settings
-
 // Dynamically generate PWA manifest from template based on appTitle
 async function updateManifest(title: string) {
     try {
@@ -276,16 +275,6 @@ function populateQuickSearchItems() {
             icon: DatabaseSettingIcon
         })
         quickSearch.value.addItem({
-            id: 'workflows-admin',
-            name: 'Workflows (admin)',
-            title: 'Workflows (admin)',
-            description: 'Manage workflow definitions',
-            category: 'System',
-            path: '/table/table_workflows',
-            type: 'route',
-            icon: DatabaseSettingIcon
-        })
-        quickSearch.value.addItem({
             id: 'nav-items',
             name: 'Navigation',
             title: 'Navigation',
@@ -382,7 +371,7 @@ async function loadAppData() {
                 const appTitleItem = settingsResponse.items[0]
                 const stringVal = appTitleItem.additionalFields?.string_val
                 if (stringVal) {
-                    appTitle.value = stringVal
+                    setAppTitle(stringVal)
                 }
             }
         } catch (e) {
@@ -517,29 +506,6 @@ async function loadAppData() {
                     })
                 })
             })
-
-            const navWorkflows = (navResponse as { workflows?: Array<{ id: number; name?: string; icon?: string; ordinal?: number }> }).workflows || []
-            const sortedWorkflows = [...navWorkflows].sort(
-                (a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0) || String(a.name || '').localeCompare(String(b.name || '')),
-            )
-            if (sortedWorkflows.length > 0) {
-                navigation.value.addSeparator()
-                navigation.value.addSection('Workflows', { name: 'nav-section-workflows' })
-                for (const wf of sortedWorkflows) {
-                    const title = wf.name || `Workflow ${wf.id}`
-                    navigation.value.addNavigationLink({
-                        id: `sidebar-workflow-${wf.id}`,
-                        name: title,
-                        title,
-                        path: `/workflow/${wf.id}`,
-                        icon: resolveNavigationIcon({
-                            icon: wf.icon,
-                            workflowId: wf.id,
-                            path: `/workflow/${wf.id}`,
-                        }),
-                    })
-                }
-            }
         }
 
         // Populate QuickSearch if available, otherwise it will be populated when component becomes available
@@ -549,8 +515,7 @@ async function loadAppData() {
             const rbacPerms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
             const rbacSuperuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
             const canSystemSettings = rbacSuperuser || rbacPerms.includes('system.settings')
-            const canAuditView = rbacSuperuser || rbacPerms.includes('audit.view')
-            if (canAccessControlPanel(rbacPerms, rbacSuperuser) || canSystemSettings || canAuditView) {
+            if (canAccessControlPanel(rbacPerms, rbacSuperuser) || canSystemSettings) {
                 navigation.value.addSeparator()
                 navigation.value.addSection('System', { name: 'nav-section-system' })
             }
@@ -563,22 +528,6 @@ async function loadAppData() {
                     name: 'Table Configurations',
                     title: 'Table Configurations',
                     path: '/table/table_configurations',
-                    icon: DatabaseSettingIcon
-                })
-                navigation.value.addNavigationLink({
-                    id: 'workflows-admin',
-                    name: 'Workflows (admin)',
-                    title: 'Workflows (admin)',
-                    path: '/table/table_workflows',
-                    icon: DatabaseSettingIcon
-                })
-            }
-            if (canAuditView) {
-                navigation.value.addNavigationLink({
-                    id: 'audit-logs',
-                    name: 'Audit logs',
-                    title: 'Audit logs',
-                    path: '/table/table_logs',
                     icon: DatabaseSettingIcon
                 })
             }

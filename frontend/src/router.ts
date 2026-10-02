@@ -1,4 +1,6 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { watch } from 'vue'
+import { createRouter, createWebHistory, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { appTitle } from './appTitle'
 import HomeView from './views/HomeView.vue'
 import AboutView from './views/AboutView.vue'
 import TableView from './views/TableView.vue'
@@ -522,74 +524,18 @@ router.beforeEach(async (to, from, next) => {
   next({ path: '/login', query: { redirect: to.fullPath } })
 })
 
-// Cache for appTitle to avoid loading it on every route change
-let cachedAppTitle: string | null = null
-let appTitleLoadPromise: Promise<string> | null = null
-
-async function getAppTitle(): Promise<string> {
-  // Return cached value if available
-  if (cachedAppTitle !== null) {
-    return cachedAppTitle
-  }
-
-  // If already loading, return the existing promise
-  if (appTitleLoadPromise) {
-    return appTitleLoadPromise
-  }
-
-  // Load appTitle from settings
-  appTitleLoadPromise = (async () => {
-    try {
-      // Check authentication before making API call
-      // Use auth store to check if user is authenticated (init has already been called)
-      const { useAuthStore } = await import('./stores/auth')
-      const authStore = useAuthStore()
-
-      // Don't make API calls if user is not authenticated (init determined currentUser is empty)
-      if (!authStore.isAuthenticated) {
-        cachedAppTitle = 'SickRock'
-        return 'SickRock'
-      }
-
-      const { createApiClient } = await import('./stores/api')
-      const client = createApiClient()
-      const settingsResponse = await client.listItems({ tcName: 'table_settings', where: { setting_key: 'appTitle' } })
-      if (settingsResponse.items && settingsResponse.items.length > 0) {
-        const appTitleItem = settingsResponse.items[0]
-        const stringVal = appTitleItem.additionalFields?.string_val
-        if (stringVal) {
-          cachedAppTitle = stringVal
-          return stringVal
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load appTitle setting, using default:', e)
-    }
-    // Default fallback
-    cachedAppTitle = 'SickRock'
-    return 'SickRock'
-  })()
-
-  return appTitleLoadPromise
-}
-
-// Set document title based on route
-router.afterEach(async (to) => {
-  const appTitle = await getAppTitle()
-  let title = appTitle
+async function updateDocumentTitle(to: RouteLocationNormalizedLoaded) {
+  const baseTitle = appTitle.value
+  let title = baseTitle
 
   // Special handling for table route - load table configuration title
   if (to.name === 'table' && to.params.tableName) {
     try {
-      // Check authentication before making API call
-      // Use auth store to check if user is authenticated (init has already been called)
       const { useAuthStore } = await import('./stores/auth')
       const authStore = useAuthStore()
 
-      // Don't make API calls if user is not authenticated (init determined currentUser is empty)
       if (!authStore.isAuthenticated) {
-        // Skip API call if not authenticated, use default title
-        document.title = `${to.params.tableName} - ${appTitle}`
+        document.title = `${to.params.tableName} - ${baseTitle}`
         return
       }
 
@@ -598,51 +544,45 @@ router.afterEach(async (to) => {
       const configs = await client.getTableConfigurations({})
       const config = configs.pages?.find(p => p.id === String(to.params.tableName))
       if (config && config.title) {
-        title = `${config.title} - ${appTitle}`
-        document.title = title
+        document.title = `${config.title} - ${baseTitle}`
         return
       }
     } catch (e) {
       console.warn('Failed to load table configuration for document title:', e)
-      // Fall through to breadcrumb handling
     }
   }
 
-  // If route has a title in meta, use it
   if (to.meta.title) {
-    title = `${to.meta.title} - ${appTitle}`
-  }
-  // Otherwise, try to get title from breadcrumbs
-  else if (to.meta.breadcrumbs && typeof to.meta.breadcrumbs === 'function') {
+    title = `${to.meta.title} - ${baseTitle}`
+  } else if (to.meta.breadcrumbs && typeof to.meta.breadcrumbs === 'function') {
     try {
       const breadcrumbs = to.meta.breadcrumbs(to)
       if (breadcrumbs && breadcrumbs.length > 0) {
-        // Use the last breadcrumb as the title
         const lastBreadcrumb = breadcrumbs[breadcrumbs.length - 1]
         if (lastBreadcrumb && lastBreadcrumb.name) {
-          title = `${lastBreadcrumb.name} - ${appTitle}`
+          title = `${lastBreadcrumb.name} - ${baseTitle}`
         }
       }
     } catch (e) {
-      // If breadcrumbs function throws an error, fall through to next option
       console.warn('Error generating breadcrumbs for title:', e)
     }
-  }
-  // Fallback to route name formatted nicely
-  else if (to.name && to.name !== 'not-found') {
+  } else if (to.name && to.name !== 'not-found') {
     const routeName = String(to.name)
       .split('-')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
       .join(' ')
-    title = `${routeName} - ${appTitle}`
+    title = `${routeName} - ${baseTitle}`
   }
 
   document.title = title
+}
+
+router.afterEach((to) => {
+  void updateDocumentTitle(to)
 })
 
-// Set initial title (will be updated when appTitle loads)
-getAppTitle().then(title => {
-  document.title = title
+watch(appTitle, () => {
+  void updateDocumentTitle(router.currentRoute.value)
 })
 
 export default router

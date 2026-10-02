@@ -199,6 +199,10 @@ const FALLBACK_FK_BY_TABLE: Record<string, Record<string, string>> = {
     workflow_id: 'table_workflows',
     dashboard_id: 'table_dashboards',
     table_configuration: 'table_configurations'
+  },
+  table_dashboard_components: {
+    dashboard: 'table_dashboards',
+    tc_id: 'table_configurations'
   }
 }
 

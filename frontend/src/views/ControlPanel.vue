@@ -15,6 +15,7 @@ import {
   WebSecurityIcon,
   ComputerIcon,
   Calendar03Icon,
+  LayoutIcon,
 } from '@hugeicons/core-free-icons'
 import {
   canAccessIam,
@@ -65,6 +66,36 @@ onMounted(async () => {
         icon: DatabaseIcon,
         type: 'route',
         description: 'Browse and explore database structure',
+      })
+
+      localNavigation.value.addNavigationLink({
+        id: 'table-configurations',
+        name: 'table-configurations',
+        title: 'Table Configurations',
+        path: '/table/table_configurations',
+        icon: DatabaseSettingIcon,
+        type: 'route',
+        description: 'Manage table configurations, titles, and database mapping',
+      })
+
+      localNavigation.value.addNavigationLink({
+        id: 'workflows',
+        name: 'workflows',
+        title: 'Workflows',
+        path: '/table/table_workflows',
+        icon: DatabaseSettingIcon,
+        type: 'route',
+        description: 'Manage workflow definitions and navigation membership',
+      })
+
+      localNavigation.value.addNavigationLink({
+        id: 'dashboards',
+        name: 'dashboards',
+        title: 'Dashboards',
+        path: '/table/table_dashboards',
+        icon: LayoutIcon,
+        type: 'route',
+        description: 'Manage dashboard definitions and components.',
       })
     }
 
@@ -120,8 +151,7 @@ onMounted(async () => {
         path: '/table/table_read_only_exports',
         icon: Calendar03Icon,
         type: 'route',
-        description:
-          'Configure authenticated calendar exports at /exports/{slug} (filters, weekends-only, free/busy, allowed groups)',
+        description: 'Configure read-only calendar exports at /exports/{slug}.',
       })
     }
 

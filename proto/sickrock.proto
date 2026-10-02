@@ -226,6 +226,10 @@ message GetTableStructureResponse {
   string CreateButtonText = 2;
   string view = 3;
   repeated ForeignKey foreign_keys = 4;
+  // Column on the physical table used as row primary key (table_configurations.primary_key_column, default "id").
+  string primary_key_column = 5;
+  // Default ORDER BY column for list queries (table_configurations.default_sort_column, default "id").
+  string default_sort_column = 6;
 }
 
 message AddTableColumnRequest {

@@ -7406,6 +7406,16 @@
               "$ref": "#/components/schemas/sickrock.ForeignKey"
             },
             "title": "foreign_keys"
+          },
+          "primaryKeyColumn": {
+            "type": "string",
+            "title": "primary_key_column",
+            "description": "Column on the physical table used as row primary key (table_configurations.primary_key_column, default \"id\")."
+          },
+          "defaultSortColumn": {
+            "type": "string",
+            "title": "default_sort_column",
+            "description": "Default ORDER BY column for list queries (table_configurations.default_sort_column, default \"id\")."
           }
         },
         "title": "GetTableStructureResponse",

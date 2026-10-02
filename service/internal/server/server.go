@@ -1052,11 +1052,17 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		}
 	}
 
+	colNames := make([]string, len(cols))
+	for i, c := range cols {
+		colNames[i] = c.Name
+	}
 	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
-		Fields:           fields,
-		CreateButtonText: createButtonText,
-		View:             viewType,
-		ForeignKeys:      pbForeignKeys,
+		Fields:            fields,
+		CreateButtonText:  createButtonText,
+		View:              viewType,
+		ForeignKeys:       pbForeignKeys,
+		PrimaryKeyColumn:  tc.PrimaryKeyColumnName(),
+		DefaultSortColumn: tc.SortColumnName(colNames),
 	}), nil
 }
 

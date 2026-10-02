@@ -8,7 +8,6 @@ import (
 	"math/big"
 	"os"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -156,13 +155,15 @@ func NewRepository(db *sqlx.DB) *Repository {
 }
 
 type TableConfig struct {
-	Name             string
-	Title            string
-	Ordinal          int
-	Icon             sql.NullString
-	CreateButtonText sql.NullString `db:"create_button_text"`
-	Table            sql.NullString `db:"table"`
-	Db               sql.NullString `db:"db"`
+	Name              string
+	Title             string         `db:"title"`
+	Ordinal           int            `db:"ordinal"`
+	Icon              sql.NullString   `db:"icon"`
+	CreateButtonText  sql.NullString   `db:"create_button_text"`
+	Table             sql.NullString   `db:"table"`
+	Db                sql.NullString   `db:"db"`
+	PrimaryKeyColumn  sql.NullString   `db:"primary_key_column"`
+	DefaultSortColumn sql.NullString   `db:"default_sort_column"`
 }
 
 func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, error) {
@@ -180,7 +181,7 @@ func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, err
 }
 
 func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]TableConfig, error) {
-	rows, err := r.db.QueryxContext(ctx, "SELECT name, COALESCE(title, name) as title, COALESCE(ordinal,0) as ordinal, create_button_text, icon, `db` FROM table_configurations ORDER BY name, ordinal ASC")
+	rows, err := r.db.QueryxContext(ctx, "SELECT "+tableConfigurationSelectColumns+" FROM table_configurations ORDER BY name, ordinal ASC")
 	if err != nil {
 		return nil, err
 	}
@@ -188,7 +189,7 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 	var configs []TableConfig
 	for rows.Next() {
 		var config TableConfig
-		if err := rows.Scan(&config.Name, &config.Title, &config.Ordinal, &config.CreateButtonText, &config.Icon, &config.Db); err != nil {
+		if err := rows.StructScan(&config); err != nil {
 			return nil, err
 		}
 		configs = append(configs, config)
@@ -782,11 +783,8 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 
 	log.Infof("ListItems columnNames: %v", columnNames)
 
-	sortColumn := "sr_created"
-
-	if !slices.Contains(columnNames, sortColumn) {
-		sortColumn = "id"
-	}
+	sortColumn := tc.SortColumnName(columnNames)
+	pkColumn := tc.PrimaryKeyColumnName()
 
 	// Build WHERE clause from provided filters.
 	// If a value contains '%' we treat it as a LIKE pattern for server-assisted contains search.
@@ -829,61 +827,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 			return nil, err
 		}
 
-		// Create Item with dynamic fields
-		item := Item{
-			Fields: make(map[string]interface{}),
-		}
-
-		// Map known fields
-		if id, ok := rowMap["id"]; ok {
-			if idStr, ok := id.(string); ok {
-				item.ID = idStr
-			} else if idInt, ok := id.(int64); ok {
-				item.ID = strconv.FormatInt(idInt, 10)
-			}
-		}
-		// name field is now handled as a dynamic field
-		if createdAt, ok := rowMap["sr_created"]; ok {
-			if createdAtTime, ok := createdAt.(time.Time); ok {
-				item.SrCreated = createdAtTime
-			} else if createdAtStr, ok := createdAt.(string); ok {
-				// Handle string datetime from MySQL
-				if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-					item.SrCreated = parsedTime
-				} else {
-					log.Warnf("failed to parse sr_created datetime string: %v", err)
-				}
-			} else {
-				log.Warnf("sr_created field is not time.Time or string, got type: %T, value: %v", createdAt, createdAt)
-			}
-		}
-		if updatedAt, ok := rowMap["sr_updated"]; ok {
-			if updatedAtTime, ok := updatedAt.(time.Time); ok {
-				item.SrUpdated = updatedAtTime
-			} else if updatedAtStr, ok := updatedAt.(string); ok {
-				// Handle string datetime from MySQL
-				if parsedTime, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
-					item.SrUpdated = parsedTime
-				} else {
-					log.Warnf("failed to parse sr_updated datetime string: %v", err)
-				}
-			} else {
-				log.Warnf("sr_updated field is not time.Time or string, got type: %T, value: %v", updatedAt, updatedAt)
-			}
-		}
-
-		// Add all other fields to the dynamic Fields map (including name now)
-		for colName, value := range rowMap {
-			if colName != "id" && colName != "sr_created" && colName != "sr_updated" {
-				// Handle MySQL byte slice conversion for all fields
-				if valueBytes, ok := value.([]uint8); ok {
-					item.Fields[colName] = string(valueBytes)
-				} else {
-					item.Fields[colName] = value
-				}
-			}
-		}
-
+		item := scanRowToItem(rowMap, pkColumn)
 		items = append(items, item)
 	}
 
@@ -985,7 +929,8 @@ func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
 		columnNames = append(columnNames, col.Name)
 	}
 
-	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `id` DESC LIMIT 1", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String)
+	sortColumn := tc.SortColumnName(columnNames)
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `%s` DESC LIMIT 1", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, sortColumn)
 	log.Infof("GetLastItem SQL Query: %s db:%v tbl:%v", query, tc.Db.String, tc.Table.String)
 	rows, err := r.db.QueryxContext(ctx, query)
 	if err != nil {
@@ -1030,7 +975,8 @@ func (r *Repository) GetItemInTable(ctx context.Context, tc *TableConfig, id str
 		columnNames = append(columnNames, col.Name)
 	}
 
-	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` WHERE `id` = ?", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String)
+	pkColumn := tc.PrimaryKeyColumnName()
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` WHERE `%s` = ?", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, pkColumn)
 
 	// Use QueryxContext to get raw row and manually map it
 	rows, err := r.db.QueryxContext(ctx, query, id)
@@ -1049,54 +995,7 @@ func (r *Repository) GetItemInTable(ctx context.Context, tc *TableConfig, id str
 		return Item{}, err
 	}
 
-	// Create Item with dynamic fields
-	item := Item{
-		Fields: make(map[string]interface{}),
-	}
-
-	// Map known fields
-	if idVal, ok := rowMap["id"]; ok {
-		if idStr, ok := idVal.(string); ok {
-			item.ID = idStr
-		} else if idInt, ok := idVal.(int64); ok {
-			item.ID = strconv.FormatInt(idInt, 10)
-		}
-	}
-	// name field is now handled as a dynamic field
-	if createdAt, ok := rowMap["sr_created"]; ok {
-		if createdAtTime, ok := createdAt.(time.Time); ok {
-			item.SrCreated = createdAtTime
-		} else if createdAtStr, ok := createdAt.(string); ok {
-			// Handle string datetime from MySQL
-			if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-				item.SrCreated = parsedTime
-			}
-		}
-	}
-	if updatedAt, ok := rowMap["sr_updated"]; ok {
-		if updatedAtTime, ok := updatedAt.(time.Time); ok {
-			item.SrUpdated = updatedAtTime
-		} else if updatedAtStr, ok := updatedAt.(string); ok {
-			// Handle string datetime from MySQL
-			if parsedTime, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
-				item.SrUpdated = parsedTime
-			}
-		}
-	}
-
-	// Add all other fields to the dynamic Fields map (including name now)
-	for colName, value := range rowMap {
-		if colName != "id" && colName != "sr_created" && colName != "sr_updated" {
-			// Handle MySQL byte slice conversion for all fields
-			if valueBytes, ok := value.([]uint8); ok {
-				item.Fields[colName] = string(valueBytes)
-			} else {
-				item.Fields[colName] = value
-			}
-		}
-	}
-
-	return item, nil
+	return scanRowToItem(rowMap, pkColumn), nil
 }
 
 func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string, id string, name string, additionalFields map[string]string) (Item, error) {
@@ -1184,9 +1083,10 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 		return Item{}, fmt.Errorf("no fields to update")
 	}
 
-	args = append(args, id) // Add id for WHERE clause
+	pkColumn := tc.PrimaryKeyColumnName()
+	args = append(args, id)
 
-	query := fmt.Sprintf("UPDATE `%s`.`%s` SET %s WHERE `id` = ?", tc.Db.String, tc.Table.String, strings.Join(setParts, ", "))
+	query := fmt.Sprintf("UPDATE `%s`.`%s` SET %s WHERE `%s` = ?", tc.Db.String, tc.Table.String, strings.Join(setParts, ", "), pkColumn)
 	log.Infof("Executing update query: %s with args: %v", query, args)
 
 	if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
@@ -1203,7 +1103,8 @@ func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id str
 		return false, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
 	}
 
-	query := fmt.Sprintf("DELETE FROM %s.%s WHERE id = ?", tc.Db.String, tc.Table.String)
+	pkColumn := tc.PrimaryKeyColumnName()
+	query := fmt.Sprintf("DELETE FROM `%s`.`%s` WHERE `%s` = ?", tc.Db.String, tc.Table.String, pkColumn)
 	res, err := r.db.ExecContext(ctx, query, id)
 	if err != nil {
 		return false, err
@@ -1281,7 +1182,7 @@ func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldS
 }
 
 func (r *Repository) GetTableConfigurationByID(ctx context.Context, tcID int) (*TableConfig, error) {
-	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon FROM table_configurations WHERE id = ?"
+	query := "SELECT " + tableConfigurationSelectColumns + " FROM table_configurations WHERE id = ?"
 	var config TableConfig
 	err := r.db.GetContext(ctx, &config, query, tcID)
 
@@ -1464,6 +1365,7 @@ func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error 
 		{"table_workflows", "Workflows", "table_workflows", 2},
 		{"table_navigation", "Navigation", "table_navigation", 3},
 		{"table_dashboards", "Dashboards", "table_dashboards", 4},
+		{"table_dashboard_components", "Dashboard components", "table_dashboard_components", 8},
 		{"table_read_only_exports", "Read-only calendar exports", "read_only_calendar_exports", 5},
 		{"table_logs", "Audit logs", "audit_logs", 6},
 	}
@@ -1502,7 +1404,7 @@ func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (
 
 	// Query table_configurations for this table's metadata
 	var config TableConfig
-	query := "SELECT name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, icon FROM table_configurations WHERE name = ?"
+	query := "SELECT " + tableConfigurationSelectColumns + " FROM table_configurations WHERE name = ?"
 	err := r.db.GetContext(ctx, &config, query, tcName)
 
 	if err != nil {
@@ -2089,17 +1991,22 @@ func (r *Repository) GetMostRecentlyViewed(ctx context.Context, userID, limit in
 }
 
 // getItemName fetches the name field from a specific item in a table
-func (r *Repository) getItemName(ctx context.Context, tableName, itemID string) (string, error) {
-	t := sanitizeDatabaseIdentifier(tableName)
-
-	// Try to get the 'name' field first, fallback to 'title' if it doesn't exist
-	var name string
-	err := r.db.GetContext(ctx, &name, fmt.Sprintf("SELECT name FROM %s WHERE id = ?", t), itemID)
+func (r *Repository) getItemName(ctx context.Context, tcName, itemID string) (string, error) {
+	tc, err := r.GetTableConfiguration(ctx, tcName)
 	if err != nil {
-		// If 'name' doesn't exist, try 'title'
-		err = r.db.GetContext(ctx, &name, fmt.Sprintf("SELECT title FROM %s WHERE id = ?", t), itemID)
+		return itemID, err
+	}
+	pkColumn := tc.PrimaryKeyColumnName()
+
+	var name string
+	err = r.db.GetContext(ctx, &name,
+		fmt.Sprintf("SELECT `name` FROM `%s`.`%s` WHERE `%s` = ?", tc.Db.String, tc.Table.String, pkColumn),
+		itemID)
+	if err != nil {
+		err = r.db.GetContext(ctx, &name,
+			fmt.Sprintf("SELECT `title` FROM `%s`.`%s` WHERE `%s` = ?", tc.Db.String, tc.Table.String, pkColumn),
+			itemID)
 		if err != nil {
-			// If neither exists, return the ID as fallback
 			return itemID, fmt.Errorf("no name or title field found")
 		}
 	}

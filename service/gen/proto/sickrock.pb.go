@@ -2233,8 +2233,12 @@ type GetTableStructureResponse struct {
 	CreateButtonText string                 `protobuf:"bytes,2,opt,name=CreateButtonText,proto3" json:"CreateButtonText,omitempty"`
 	View             string                 `protobuf:"bytes,3,opt,name=view,proto3" json:"view,omitempty"`
 	ForeignKeys      []*ForeignKey          `protobuf:"bytes,4,rep,name=foreign_keys,json=foreignKeys,proto3" json:"foreign_keys,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Column on the physical table used as row primary key (table_configurations.primary_key_column, default "id").
+	PrimaryKeyColumn string `protobuf:"bytes,5,opt,name=primary_key_column,json=primaryKeyColumn,proto3" json:"primary_key_column,omitempty"`
+	// Default ORDER BY column for list queries (table_configurations.default_sort_column, default "id").
+	DefaultSortColumn string `protobuf:"bytes,6,opt,name=default_sort_column,json=defaultSortColumn,proto3" json:"default_sort_column,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetTableStructureResponse) Reset() {
@@ -2293,6 +2297,20 @@ func (x *GetTableStructureResponse) GetForeignKeys() []*ForeignKey {
 		return x.ForeignKeys
 	}
 	return nil
+}
+
+func (x *GetTableStructureResponse) GetPrimaryKeyColumn() string {
+	if x != nil {
+		return x.PrimaryKeyColumn
+	}
+	return ""
+}
+
+func (x *GetTableStructureResponse) GetDefaultSortColumn() string {
+	if x != nil {
+		return x.DefaultSortColumn
+	}
+	return ""
 }
 
 type AddTableColumnRequest struct {
@@ -11550,12 +11568,14 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
 	"\brequired\x18\x03 \x01(\bR\brequired\x12?\n" +
-	"\x1cdefault_to_current_timestamp\x18\x04 \x01(\bR\x19defaultToCurrentTimestamp\"\xbd\x01\n" +
+	"\x1cdefault_to_current_timestamp\x18\x04 \x01(\bR\x19defaultToCurrentTimestamp\"\x9b\x02\n" +
 	"\x19GetTableStructureResponse\x12'\n" +
 	"\x06fields\x18\x01 \x03(\v2\x0f.sickrock.FieldR\x06fields\x12*\n" +
 	"\x10CreateButtonText\x18\x02 \x01(\tR\x10CreateButtonText\x12\x12\n" +
 	"\x04view\x18\x03 \x01(\tR\x04view\x127\n" +
-	"\fforeign_keys\x18\x04 \x03(\v2\x14.sickrock.ForeignKeyR\vforeignKeys\"W\n" +
+	"\fforeign_keys\x18\x04 \x03(\v2\x14.sickrock.ForeignKeyR\vforeignKeys\x12,\n" +
+	"\x12primary_key_column\x18\x05 \x01(\tR\x10primaryKeyColumn\x12.\n" +
+	"\x13default_sort_column\x18\x06 \x01(\tR\x11defaultSortColumn\"W\n" +
 	"\x15AddTableColumnRequest\x12\x17\n" +
 	"\apage_id\x18\x01 \x01(\tR\x06pageId\x12%\n" +
 	"\x05field\x18\x02 \x01(\v2\x0f.sickrock.FieldR\x05field\"\x93\x01\n" +

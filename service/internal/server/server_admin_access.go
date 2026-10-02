@@ -14,8 +14,9 @@ var systemSettingsTableConfigurations = map[string]bool{
 	"table_navigation":      true,
 	"table_configurations":  true,
 	"table_workflows":       true,
-	"table_dashboards":      true,
-	"device_codes":          true,
+	"table_dashboards":           true,
+	"table_dashboard_components": true,
+	"device_codes":               true,
 }
 
 func isSystemSettingsTableConfiguration(tcName string) bool {
