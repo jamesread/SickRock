@@ -14,6 +14,20 @@ interface TableData {
   where?: Record<string, string>
 }
 
+export function tableCacheFiltersMatch(
+  cachedWhere: Record<string, string> | undefined,
+  requestedWhere: Record<string, string> | undefined,
+): boolean {
+  const cached = cachedWhere ?? {}
+  const requested = requestedWhere ?? {}
+  const cachedKeys = Object.keys(cached).sort()
+  const requestedKeys = Object.keys(requested).sort()
+  return cachedKeys.length === requestedKeys.length
+    && cachedKeys.every((key, index) => (
+      key === requestedKeys[index] && cached[key] === requested[key]
+    ))
+}
+
 let db: IDBDatabase | null = null
 
 /**
@@ -109,16 +123,14 @@ export async function loadTableData(
           return
         }
 
-        // If where filters are provided, check if they match
-        // For simplicity, we'll return cached data if it exists
-        // More sophisticated filtering could be added later
-        if (where && Object.keys(where).length > 0) {
-          // For now, return cached data if available
-          // In a production app, you might want to filter the cached items
-          resolve(data.items)
-        } else {
-          resolve(data.items)
+        // A filtered cache is not a complete table snapshot. Only return it
+        // for the same filter request; callers asking for all rows must not
+        // silently receive a subset saved by an older client.
+        if (!tableCacheFiltersMatch(data.where, where)) {
+          resolve(null)
+          return
         }
+        resolve(data.items)
       }
 
       request.onerror = () => {

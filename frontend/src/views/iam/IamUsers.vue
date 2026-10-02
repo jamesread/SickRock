@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, RefreshIcon, UserMultiple02Icon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
-import TableWithRowClick from '../../components/TableWithRowClick.vue'
+import Table from 'picocrank/vue/components/Table.vue'
 import IamCreateUserDialog from '../../components/IamCreateUserDialog.vue'
 import { createApiClient } from '../../stores/api'
 import { useAuthStore } from '../../stores/auth'
@@ -61,7 +61,7 @@ async function loadAll() {
   }
 }
 
-function openUserDetails(row: Record<string, unknown>) {
+function openUserDetails({ row }: { row: Record<string, unknown> }) {
   router.push({ name: 'iam-user-details', params: { id: String(row.id) } })
 }
 
@@ -128,12 +128,14 @@ onMounted(loadAll)
     <template v-else>
       <p v-if="!users.length" class="list-banner-pad inline-notification note">No users available.</p>
 
-      <TableWithRowClick
+      <Table
         v-else
         class="user-table-wrap"
-        row-clickable
         :data="tableRows"
         :headers="tableHeaders"
+        row-key="id"
+        :filterable="false"
+        :column-options="false"
         @row-click="openUserDetails"
       >
         <template #cell-username="{ value }">
@@ -152,7 +154,7 @@ onMounted(loadAll)
             </button>
           </div>
         </template>
-      </TableWithRowClick>
+      </Table>
     </template>
   </Section>
 </template>

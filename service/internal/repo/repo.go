@@ -1166,6 +1166,7 @@ func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldS
 			Type      string  `db:"type"`
 			NotNull   int     `db:"notnull"`
 			DfltValue *string `db:"dflt_value"`
+			PK        int     `db:"pk"`
 		}
 		var rows []srow
 		q := fmt.Sprintf("PRAGMA table_info(%s)", tc.Table.String)

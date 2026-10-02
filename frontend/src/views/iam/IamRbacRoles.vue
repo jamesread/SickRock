@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, RefreshIcon, WebSecurityIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
-import TableWithRowClick from '../../components/TableWithRowClick.vue'
+import Table from 'picocrank/vue/components/Table.vue'
 import IamCreateRoleDialog from '../../components/IamCreateRoleDialog.vue'
 import { createApiClient } from '../../stores/api'
 import { useRbac } from '../../composables/useRbac'
@@ -81,7 +81,7 @@ async function loadAll() {
   }
 }
 
-function onRoleRowClick(row: Record<string, unknown>) {
+function onRoleRowClick({ row }: { row: Record<string, unknown> }) {
   router.push({ name: 'iam-rbac-role-details', params: { id: String(row.id) } })
 }
 
@@ -147,12 +147,14 @@ onMounted(loadAll)
       </p>
       <p v-if="!roles.length" class="list-banner-pad inline-notification note">No roles yet.</p>
 
-      <TableWithRowClick
+      <Table
         v-else
         class="roles-table-wrap"
-        row-clickable
         :data="tableRows"
         :headers="tableHeaders"
+        row-key="id"
+        :filterable="false"
+        :column-options="false"
         @row-click="onRoleRowClick"
       >
         <template #cell-name="{ value }">
@@ -171,7 +173,7 @@ onMounted(loadAll)
             </button>
           </div>
         </template>
-      </TableWithRowClick>
+      </Table>
     </template>
   </Section>
 </template>

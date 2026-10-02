@@ -1,28 +1,364 @@
 <script setup lang="ts">
-import { onMounted, ref, computed, watch, inject, onUnmounted, nextTick } from 'vue'
-import { useRouter } from 'vue-router'
-import Pagination from 'picocrank/vue/components/Pagination.vue'
-import ColumnVisibilityDropdown from './ColumnVisibilityDropdown.vue'
-import RowActionsDropdown from './RowActionsDropdown.vue'
-
-import { createApiClient } from '../stores/api'
-import { SickRock } from '../gen/sickrock_pb'
-import InsertRow from './InsertRow.vue'
-import { GetTableStructureResponse } from '../gen/sickrock_pb'
+import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import Table from 'picocrank/vue/components/Table.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { DatabaseIcon, ViewIcon, Edit03Icon, CheckListIcon, RefreshIcon, Add01Icon, Download01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
-import { formatUnixTimestamp } from '../utils/dateFormatting'
+import {
+  Add01Icon,
+  AddCircleIcon,
+  DatabaseIcon,
+  Download01Icon,
+  Settings01Icon,
+} from '@hugeicons/core-free-icons'
+
+import type { Field, GetTableStructureResponse, Item } from '../gen/sickrock_pb'
+import type { TableView } from '../composables/useTableViewManager'
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../composables/useKeyboardShortcuts'
-import { useTableViewManager } from '../composables/useTableViewManager'
+import { createApiClient } from '../stores/api'
+import { formatUnixTimestamp } from '../utils/dateFormatting'
+import { hasUuidColumn, isOnline, loadTableData, saveTableData } from '../utils/indexedDB'
+import {
+  buildTableHeaders,
+  flattenItems,
+  getSourceItem,
+  getStableRowId,
+  mapTableView,
+  type SortDirection,
+  type TableRow,
+} from '../utils/tableAdapter'
+import InsertRow from './InsertRow.vue'
+import RowActionsDropdown from './RowActionsDropdown.vue'
 import ViewsButton from './ViewsButton.vue'
-import { hasUuidColumn, saveTableData, loadTableData, isOnline } from '../utils/indexedDB'
 
-const router = useRouter()
-const tableStructure = ref<GetTableStructureResponse | null>(null)
-const tableTitle = ref<string>('')
+const ACTIONS_COLUMN = '__sickrock_actions'
 
-// Foreign key lookup state
+type ActiveCell = {
+  rowKey: string | number
+  columnKey: string | number
+} | null
+
+type CellContext = {
+  row: TableRow
+  value: unknown
+  header: { key: string }
+  rowIndex: number
+  sourceIndex: number
+  rowKey?: string | number
+  columnKey?: string | number
+  columnIndex?: number
+}
+
+type TableApi = {
+  clearFilters: () => void
+  activateCellAt: (
+    rowIndex: number,
+    columnIndex: number,
+    options?: { focus?: boolean; wrapColumns?: boolean },
+  ) => CellContext | null
+  moveActiveCell: (
+    rowDelta: number,
+    columnDelta: number,
+    options?: { focus?: boolean; wrapColumns?: boolean },
+  ) => CellContext | null
+  getActiveCellContext: () => CellContext | null
+}
+
+const props = defineProps<{
+  tableId: string
+  tableStructure?: GetTableStructureResponse | null
+  fields?: Array<{ name: string; type: string }>
+  createButtonText?: string
+  items?: any[]
+  showToolbar?: boolean
+  showViewSwitcher?: boolean
+  showViewEdit?: boolean
+  showViewCreate?: boolean
+  showExport?: boolean
+  showStructure?: boolean
+  showInsert?: boolean
+  showPagination?: boolean
+  title?: string
+}>()
+
+const emit = defineEmits<{
+  'view-created': []
+  'rows-updated': []
+  'row-deleted': [id: string]
+  'view-changed': [viewType: string]
+}>()
+
+const client = createApiClient()
+const tableRef = ref<TableApi | null>(null)
+const tableStructure = ref<GetTableStructureResponse | null>(props.tableStructure ?? null)
+const tableTitle = ref('')
+const items = ref<Item[]>([])
+const loading = ref(true)
+const error = ref<string | null>(null)
+
+const fieldDefs = computed<Field[]>(() => {
+  if (props.fields?.length) {
+    return props.fields.map(field => ({
+      name: field.name,
+      type: field.type,
+      required: false,
+      defaultToCurrentTimestamp: false,
+    })) as Field[]
+  }
+  return tableStructure.value?.fields ?? []
+})
+
+const sourceItems = computed<Item[]>(() => (props.items ?? items.value) as Item[])
+const flattenedRows = computed<TableRow[]>(() => {
+  const rows = flattenItems(sourceItems.value)
+  const primaryKeyColumn = tableStructure.value?.primaryKeyColumn
+  const booleanFields = fieldDefs.value
+    .filter(field => field.type.toLowerCase().startsWith('tinyint') || ['bool', 'boolean'].includes(field.type.toLowerCase()))
+    .map(field => field.name)
+
+  for (const row of rows) {
+    if (primaryKeyColumn && row[primaryKeyColumn] === undefined) {
+      row[primaryKeyColumn] = row.id
+    }
+    for (const fieldName of booleanFields) {
+      const value = row[fieldName]
+      if (value !== null && value !== undefined) {
+        row[fieldName] = value === true || value === 1 || value === '1'
+      }
+    }
+  }
+  return rows
+})
+
+const sectionTitle = computed(() => props.title || tableTitle.value || props.tableId)
+const insertButtonText = computed(() => (
+  props.createButtonText || tableStructure.value?.CreateButtonText || 'Insert row'
+))
+
+const showViewSwitcher = computed(() => props.showViewSwitcher !== false)
+const showViewEdit = computed(() => props.showViewEdit !== false)
+const showViewCreate = computed(() => props.showViewCreate !== false)
+const showExport = computed(() => props.showExport !== false)
+const showStructure = computed(() => props.showStructure !== false)
+const showInsert = computed(() => props.showInsert !== false)
+const showPagination = computed(() => props.showPagination !== false)
+const showToolbar = computed(() => {
+  if (props.showToolbar === false) return false
+  return showViewSwitcher.value
+    || showViewEdit.value
+    || showViewCreate.value
+    || showExport.value
+    || showStructure.value
+    || showInsert.value
+})
+
+// Server table views remain the source of truth. PicoCrank changes the
+// controlled state below for this component session only.
+const tableViews = ref<TableView[]>([])
+const selectedViewId = ref<number | null>(null)
+const currentView = computed(() => (
+  tableViews.value.find(view => view.id === selectedViewId.value) ?? null
+))
+const viewOptions = computed<TableView[]>(() => {
+  const options = [...tableViews.value]
+  if (options.length === 0 || !options.some(view => view.isDefault)) {
+    options.unshift({
+      id: -1,
+      tableName: props.tableId,
+      viewName: 'All Columns',
+      isDefault: true,
+      viewType: 'table',
+      columns: [],
+    })
+  }
+  return options
+})
+
+const tableFilters = ref<Record<string, unknown>>({})
+const columnVisibility = ref<Record<string, boolean>>({})
+const columnOrder = ref<string[]>([])
+const sortBy = ref<string | null>(null)
+const sortDir = ref<SortDirection>('asc')
+const page = ref(1)
+const pageSize = ref(10)
+const selectedKeys = ref<string[]>([])
+const activeCell = ref<ActiveCell>(null)
+
+const tableHeaders = computed(() => [
+  ...buildTableHeaders(fieldDefs.value, currentView.value),
+  {
+    key: ACTIONS_COLUMN,
+    label: '',
+    sortable: false,
+    filterable: false,
+    hideable: false,
+    width: '5rem',
+    class: 'actions',
+  },
+])
+
+function applyServerView() {
+  const mapped = mapTableView(fieldDefs.value, currentView.value)
+  columnOrder.value = [...mapped.orderedColumns, ACTIONS_COLUMN]
+  columnVisibility.value = {
+    ...mapped.columnVisibility,
+    [ACTIONS_COLUMN]: true,
+  }
+  sortBy.value = mapped.sortBy
+  sortDir.value = mapped.sortDir
+  activeCell.value = null
+}
+
+watch(
+  [
+    () => fieldDefs.value.map(field => `${field.name}:${field.type}`).join('|'),
+    () => selectedViewId.value,
+    () => JSON.stringify(currentView.value?.columns ?? []),
+  ],
+  applyServerView,
+  { immediate: true },
+)
+
+function onColumnVisibilityUpdate(value: Record<string, boolean>) {
+  columnVisibility.value = { ...value, [ACTIONS_COLUMN]: true }
+}
+
+function onColumnOrderUpdate(value: string[]) {
+  const dataColumns = value.filter(key => key !== ACTIONS_COLUMN)
+  columnOrder.value = [...dataColumns, ACTIONS_COLUMN]
+}
+
+function onFiltersUpdate(value: Record<string, unknown>) {
+  tableFilters.value = value
+}
+
+function onSelectedKeysUpdate(value: unknown[]) {
+  selectedKeys.value = value.map(String)
+}
+
+function onActiveCellUpdate(value: ActiveCell) {
+  activeCell.value = value
+}
+
+async function loadTableViews() {
+  try {
+    const response = await client.getTableViews({ tableName: props.tableId })
+    tableViews.value = response.views.map(view => ({
+      id: view.id,
+      tableName: view.tableName,
+      viewName: view.viewName,
+      isDefault: view.isDefault,
+      viewType: view.viewType || 'table',
+      columns: view.columns.map(column => ({
+        columnName: column.columnName,
+        isVisible: column.isVisible,
+        columnOrder: column.columnOrder,
+        sortOrder: column.sortOrder,
+      })),
+    }))
+
+    const fallback = tableViews.value.find(view => view.isDefault)
+      ?? tableViews.value[0]
+      ?? null
+    const hasValidSelection = selectedViewId.value === -1
+      || (
+        selectedViewId.value !== null
+        && tableViews.value.some(view => view.id === selectedViewId.value)
+      )
+
+    if (!hasValidSelection) {
+      selectedViewId.value = fallback?.id ?? -1
+    }
+  } catch (viewError) {
+    console.error('Failed to load table views:', viewError)
+    selectedViewId.value = -1
+  }
+}
+
+function selectView(viewId: number) {
+  selectedViewId.value = viewId
+  nextTick(() => {
+    const view = tableViews.value.find(candidate => candidate.id === viewId)
+    emit('view-changed', view?.viewType || 'table')
+  })
+}
+
+async function loadStructure() {
+  if (props.tableStructure) {
+    tableStructure.value = props.tableStructure
+  } else {
+    tableStructure.value = await client.getTableStructure({ pageId: props.tableId })
+  }
+
+  try {
+    const configurations = await client.getTableConfigurations({})
+    tableTitle.value = configurations.pages?.find(page => page.id === props.tableId)?.title ?? ''
+  } catch (titleError) {
+    console.warn('Failed to load table configuration for title:', titleError)
+  }
+}
+
+watch(
+  () => props.tableStructure,
+  value => {
+    if (value) tableStructure.value = value
+  },
+)
+
+async function load() {
+  if (props.items !== undefined) {
+    loading.value = false
+    return
+  }
+
+  loading.value = true
+  error.value = null
+  const fields = tableStructure.value?.fields ?? fieldDefs.value
+  const canCacheOffline = hasUuidColumn(fields)
+  const emptyWhere: Record<string, string> = {}
+
+  try {
+    if (!isOnline() && canCacheOffline) {
+      const cachedItems = await loadTableData(props.tableId, emptyWhere)
+      if (cachedItems !== null) {
+        items.value = cachedItems as Item[]
+        return
+      }
+      items.value = []
+      error.value = 'No offline data available. Please connect to the internet to load table data.'
+      return
+    }
+
+    // Keep the initial request unfiltered. PicoCrank owns filtering over the
+    // complete local row set, including rows loaded from the offline cache.
+    const response = await client.listItems({ tcName: props.tableId, where: emptyWhere })
+    items.value = Array.isArray(response.items) ? response.items : []
+
+    if (canCacheOffline && isOnline()) {
+      await saveTableData(props.tableId, items.value, emptyWhere)
+    }
+  } catch (loadError) {
+    if (canCacheOffline) {
+      const cachedItems = await loadTableData(props.tableId, emptyWhere)
+      if (cachedItems !== null) {
+        items.value = cachedItems as Item[]
+        error.value = null
+        return
+      }
+    }
+    error.value = String(loadError)
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(
+  () => props.items,
+  (value, previous) => {
+    if (value === undefined && previous !== undefined) void load()
+  },
+)
+
+// Foreign-key lookup state
 const foreignKeys = ref<Array<{
   constraintName: string
   tableName: string
@@ -34,638 +370,66 @@ const foreignKeys = ref<Array<{
   tableTcName?: string
   referencedTableTcName?: string
 }>>([])
+const referencedTableData = ref<Record<string, Item[]>>({})
 
-const referencedTableData = ref<Record<string, any[]>>({})
-const loadingForeignKeys = ref(false)
+async function loadForeignKeys() {
+  try {
+    const structure = tableStructure.value
+      ?? await client.getTableStructure({ pageId: props.tableId })
+    foreignKeys.value = (structure.foreignKeys ?? []).map(foreignKey => ({
+      constraintName: foreignKey.constraintName,
+      tableName: foreignKey.tableName,
+      columnName: foreignKey.columnName,
+      referencedTable: foreignKey.referencedTable,
+      referencedColumn: foreignKey.referencedColumn,
+      onDeleteAction: foreignKey.onDeleteAction,
+      onUpdateAction: foreignKey.onUpdateAction,
+      tableTcName: foreignKey.tableTcName,
+      referencedTableTcName: foreignKey.referencedTableTcName,
+    }))
+
+    const data: Record<string, Item[]> = {}
+    for (const foreignKey of foreignKeys.value) {
+      try {
+        const tcName = foreignKey.referencedTableTcName || foreignKey.referencedTable
+        const response = await client.listItems({ tcName })
+        data[foreignKey.columnName] = response.items ?? []
+      } catch (foreignKeyError) {
+        console.error(`Error loading data for table ${foreignKey.referencedTable}:`, foreignKeyError)
+        data[foreignKey.columnName] = []
+      }
+    }
+    referencedTableData.value = data
+  } catch (foreignKeyError) {
+    console.error('Error loading foreign keys:', foreignKeyError)
+  }
+}
+
+function isForeignKey(columnName: string): boolean {
+  return foreignKeys.value.some(foreignKey => foreignKey.columnName === columnName)
+}
+
+function getForeignKeyInfo(columnName: string) {
+  return foreignKeys.value.find(foreignKey => foreignKey.columnName === columnName)
+}
+
+function getReferencedItem(columnName: string, foreignKeyValue: unknown): Item | undefined {
+  return (referencedTableData.value[columnName] ?? [])
+    .find(item => String(item.id) === String(foreignKeyValue))
+}
+
+function getReferencedItemName(item: Item | undefined): string {
+  if (!item) return 'Unknown'
+  return (item as Item & { name?: string }).name
+    || item.additionalFields?.name
+    || `ID: ${item.id}`
+}
 
 // Conditional formatting state
 const conditionalFormattingRules = ref<any[]>([])
-const loadingFormattingRules = ref(false)
 
-const props = defineProps<{
-  tableId: string;
-  tableStructure?: GetTableStructureResponse | null;
-  fields?: Array<{ name: string; type: string }>;
-  createButtonText?: string;
-  items?: any[];
-  showToolbar?: boolean;
-  showViewSwitcher?: boolean;
-  showViewEdit?: boolean;
-  showViewCreate?: boolean;
-  showExport?: boolean;
-  showStructure?: boolean;
-  showInsert?: boolean;
-  showPagination?: boolean;
-  title?: string;
-}>()
-
-const emit = defineEmits<{
-  'view-created': []
-  'rows-updated': []
-  'row-deleted': [id: string]
-  'view-changed': [viewType: string]
-}>()
-
-// View management state
-const tableViews = ref<Array<{ id: number; tableName: string; viewName: string; isDefault: boolean; viewType: string; columns: Array<{ columnName: string; isVisible: boolean; columnOrder: number; sortOrder: string }> }>>([])
-const selectedViewId = ref<number | null>(null)
-
-// Computed property for the current view
-const currentView = computed(() => {
-  return tableViews.value.find(view => view.id === selectedViewId.value) || null
-})
-// Find default view for this table, if any
-const defaultView = computed(() => tableViews.value.find(v => v.isDefault) || null)
-
-// Computed property for the section title
-const sectionTitle = computed(() => {
-  return props.title || tableTitle.value || props.tableId
-})
-
-// Computed property for view options (including default) for other parts of the UI
-const viewOptions = computed(() => {
-  const options = [...tableViews.value]
-  // Preserve previous behavior: only inject synthetic "All Columns" when no view is marked default
-  if (options.length === 0 || !options.some(v => v.isDefault)) {
-      options.unshift({
-        id: -1,
-        tableName: props.tableId,
-        viewName: 'All Columns',
-        isDefault: true,
-        viewType: 'table',
-        columns: []
-      })
-  }
-  return options
-})
-
-// Dedicated list for the Views dialog: always show "All Columns" plus every saved view
-const viewsForDialog = computed(() => {
-  return [
-    {
-      id: -1,
-      tableName: props.tableId,
-      viewName: 'All Columns',
-      isDefault: !tableViews.value.length || !!defaultView.value,
-      viewType: 'table',
-      columns: []
-    },
-    ...tableViews.value
-  ]
-})
-
-type Item = Record<string, unknown>
-
-const items = ref<Item[]>([])
-const loading = ref(false)
-const error = ref<string | null>(null)
-
-const localFields = ref<string[]>([])
-const localFieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
-
-// Watch for changes in currentView to update column configuration
-watch(
-  () => currentView.value,
-  (view) => {
-    if (view && view.columns.length > 0) {
-      // Use view configuration - include all visible columns as specified in the view
-      console.log('[Table] Applying view columns:', view.viewName, view.columns
-        .slice()
-        .sort((a, b) => a.columnOrder - b.columnOrder)
-        .map(c => ({ column: c.columnName, order: c.columnOrder, isVisible: c.isVisible, sort: c.sortOrder }))
-      )
-      const visibleColumns = view.columns
-        .filter(col => col.isVisible)
-        .sort((a, b) => a.columnOrder - b.columnOrder)
-        .map(col => col.columnName)
-
-      localFields.value = visibleColumns
-
-      // Apply initial sort from view if provided
-      const sortColumn = view.columns.find(c => c.sortOrder === 'asc' || c.sortOrder === 'desc')
-      if (sortColumn) {
-        sortBy.value = sortColumn.columnName
-        sortDir.value = (sortColumn.sortOrder === 'desc' ? 'desc' : 'asc')
-        console.log('[Table] Applied initial sort from view:', sortBy.value, sortDir.value)
-      } else {
-        // No sort specified by the view; leave any existing sort as-is
-        console.log('[Table] View provides no initial sort order')
-      }
-    } else if (props.fields && props.fields.length) {
-      // Fallback to all fields (default view) - include sr_created in default view
-      localFields.value = props.fields.map(x => x.name)
-    }
-  },
-  { immediate: true }
-)
-
-watch(
-  () => props.fields,
-  (f) => {
-    if (f && f.length) {
-      localFieldDefs.value = f.map(field => ({
-        name: field.name,
-        type: field.type,
-        required: false
-      }))
-
-      // Only update localFields if no view is active
-      if (!currentView.value || currentView.value.columns.length === 0) {
-        localFields.value = f.map(x => x.name)
-      }
-    }
-  },
-  { immediate: true }
-)
-async function loadStructure() {
-  // Prefer provided structure to avoid extra API call
-  if (props.tableStructure) {
-    tableStructure.value = props.tableStructure
-  } else {
-    tableStructure.value = await client.getTableStructure({ pageId: props.tableId })
-  }
-  const defs = (tableStructure.value?.fields ?? []).map(f => ({ name: f.name, type: f.type, required: !!f.required }))
-  const names = defs.map(d => d.name)
-  if (names.length) {
-    localFieldDefs.value = defs
-
-    // Only set localFields if no view is active
-    if (!currentView.value || currentView.value.columns.length === 0) {
-      localFields.value = names
-      selectedColumns.value = [...names]
-    }
-  }
-
-  // Load table configuration to get the title
-  try {
-    const configs = await client.getTableConfigurations({})
-    const config = configs.pages?.find(p => p.id === props.tableId)
-    if (config && config.title) {
-      tableTitle.value = config.title
-    }
-  } catch (e) {
-    console.warn('Failed to load table configuration for title:', e)
-  }
-}
-
-async function loadTableViews() {
-  try {
-    const response = await client.getTableViews({ tableName: props.tableId })
-    tableViews.value = response.views.map(view => ({
-      id: view.id,
-      tableName: view.tableName,
-      viewName: view.viewName,
-      isDefault: view.isDefault,
-      viewType: view.viewType || 'table', // Default to "table" if not set
-      columns: view.columns.map(col => ({
-        columnName: col.columnName,
-        isVisible: col.isVisible,
-        columnOrder: col.columnOrder,
-        sortOrder: col.sortOrder
-      }))
-    }))
-
-    // Find default view or first view
-    const defaultView = tableViews.value.find(v => v.isDefault) || (tableViews.value.length > 0 ? tableViews.value[0] : null)
-
-    // Only set default view if no view is currently selected (null), or if the currently selected view no longer exists
-    // Note: viewId === -1 means "All Columns" view, which is always valid
-    const hasValidSelection = selectedViewId.value === -1 || (selectedViewId.value !== null && tableViews.value.some(v => v.id === selectedViewId.value))
-
-    if (!hasValidSelection) {
-      // Select the default view or first view
-      if (defaultView) {
-        selectedViewId.value = defaultView.id
-      } else {
-        // No views exist, use the default "All Columns" view
-        selectedViewId.value = -1
-      }
-    }
-  } catch (error) {
-    console.error('Failed to load table views:', error)
-    // Fallback to default view
-    selectedViewId.value = -1
-  }
-}
-
-function onViewChange() {
-  // This will trigger reactivity in the column configuration
-  const view = currentView.value
-  console.log('[Table] View changed to:', selectedViewId.value, view?.viewName)
-
-  // If no view (e.g. "All Columns" option), reset to all fields
-  if (!view) {
-    const allNames = localFieldDefs.value.map(f => f.name)
-    localFields.value = allNames
-    selectedColumns.value = [...allNames]
-    sortBy.value = null
-    sortDir.value = 'asc'
-    console.log('[Table] Reset to All Columns view')
-    return
-  }
-
-  const ordered = view.columns
-    .slice()
-    .sort((a, b) => a.columnOrder - b.columnOrder)
-    .map(c => ({ column: c.columnName, order: c.columnOrder, isVisible: c.isVisible, sort: c.sortOrder }))
-  console.log('[Table] View column order:', ordered)
-
-  // Apply sort from the selected view on change
-  const sortColumn = view.columns.find(c => c.sortOrder === 'asc' || c.sortOrder === 'desc')
-  if (sortColumn) {
-    sortBy.value = sortColumn.columnName
-    sortDir.value = (sortColumn.sortOrder === 'desc' ? 'desc' : 'asc')
-    console.log('[Table] Applied sort from changed view:', sortBy.value, sortDir.value)
-  }
-}
-
-function selectView(viewId: number) {
-  selectedViewId.value = viewId
-  nextTick(() => {
-    onViewChange()
-    // Get view directly from tableViews array to ensure we have the latest data
-    const view = tableViews.value.find(v => v.id === viewId) || null
-    console.log('[TableComponent] View selected, viewId:', viewId, 'view:', view)
-    if (view && view.viewType) {
-      console.log('[TableComponent] Emitting view-changed with viewType:', view.viewType)
-      emit('view-changed', view.viewType)
-    } else if (viewId === -1) {
-      // "All Columns" view
-      console.log('[TableComponent] "All Columns" view selected, emitting "table"')
-      emit('view-changed', 'table')
-    } else {
-      console.log('[TableComponent] No viewType found, emitting default "table"')
-      emit('view-changed', 'table')
-    }
-  })
-}
-
-function createTableView() {
-  router.push({ name: 'create-table-view', params: { tableName: props.tableId } })
-}
-
-function editTableView() {
-  if (currentView.value && currentView.value.id !== -1) {
-    router.push({
-      name: 'edit-table-view',
-      params: {
-        tableName: props.tableId,
-        viewId: currentView.value.id.toString()
-      }
-    })
-  }
-}
-const columns = computed(() => localFields.value.length ? localFields.value : ['id'])
-const selectedColumns = ref<string[]>([])
-watch(columns, (cols) => { selectedColumns.value = [...cols] }, { immediate: true })
-const visibleColumns = computed(() =>
-  columns.value
-    .filter(c => selectedColumns.value.includes(c))
-    .filter(c => getColumnType(c) !== 'unknown')
-    .filter(c => !c.endsWith('Markdown')) // Hide markdown fields from being displayed as separate columns
-)
-
-const sortBy = ref<string | null>(null)
-const sortDir = ref<'asc' | 'desc'>('asc')
-const columnMenu = ref<{ visible: boolean; x: number; y: number; column: string | null }>({
-  visible: false,
-  x: 0,
-  y: 0,
-  column: null,
-})
-const columnFilters = ref<Record<string, string>>({})
-const columnFilterInput = ref('')
-const hasFilters = computed(() => Object.keys(columnFilters.value).length > 0)
-function isColumnFiltered(col: string) {
-  return !!columnFilters.value[col]
-}
-
-// Natural sort function for alphanumeric strings
-function naturalSort(a: string, b: string): number {
-  const aStr = String(a)
-  const bStr = String(b)
-
-  // Split strings into parts (numbers and text)
-  const aParts = aStr.match(/(\d+|\D+)/g) || []
-  const bParts = bStr.match(/(\d+|\D+)/g) || []
-
-  const maxLength = Math.max(aParts.length, bParts.length)
-
-  for (let i = 0; i < maxLength; i++) {
-    const aPart = aParts[i] || ''
-    const bPart = bParts[i] || ''
-
-    // Check if both parts are numbers
-    const aIsNum = /^\d+$/.test(aPart)
-    const bIsNum = /^\d+$/.test(bPart)
-
-    if (aIsNum && bIsNum) {
-      // Compare as numbers
-      const aNum = parseInt(aPart, 10)
-      const bNum = parseInt(bPart, 10)
-      if (aNum !== bNum) {
-        return aNum - bNum
-      }
-    } else {
-      // Compare as strings (case-insensitive)
-      const comparison = aPart.toLowerCase().localeCompare(bPart.toLowerCase())
-      if (comparison !== 0) {
-        return comparison
-      }
-    }
-  }
-
-  return 0
-}
-
-function toggleSort(col: string) {
-  if (sortBy.value === col) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortBy.value = col
-    sortDir.value = 'asc'
-  }
-}
-
-function sortAscending(col: string) {
-  sortBy.value = col
-  sortDir.value = 'asc'
-  hideColumnMenu()
-}
-
-function sortDescending(col: string) {
-  sortBy.value = col
-  sortDir.value = 'desc'
-  hideColumnMenu()
-}
-
-function showColumnMenu(event: MouseEvent, col: string) {
-  event.preventDefault()
-  columnMenu.value = {
-    visible: true,
-    x: event.clientX,
-    y: event.clientY,
-    column: col,
-  }
-  const current = columnFilters.value[col] ?? ''
-  // Strip surrounding wildcards for a cleaner input display
-  columnFilterInput.value = current.replace(/^%/, '').replace(/%$/, '')
-}
-
-function hideColumnMenu() {
-  columnMenu.value = { visible: false, x: 0, y: 0, column: null }
-}
-
-async function applyColumnFilter() {
-  if (!columnMenu.value.column) return
-  const col = columnMenu.value.column
-  const value = columnFilterInput.value.trim()
-  if (value) {
-    // Wrap with wildcards so the server performs a contains match
-    columnFilters.value = { ...columnFilters.value, [col]: `%${value}%` }
-  } else {
-    const { [col]: _, ...rest } = columnFilters.value
-    columnFilters.value = rest
-  }
-  hideColumnMenu()
-  await load()
-}
-
-async function clearAllFilters() {
-  columnFilters.value = {}
-  await load()
-}
-
-async function clearColumnFilter(col: string | null) {
-  if (!col || !columnFilters.value[col]) {
-    hideColumnMenu()
-    return
-  }
-  const { [col]: _, ...rest } = columnFilters.value
-  columnFilters.value = rest
-  hideColumnMenu()
-  await load()
-}
-
-const sortedItems = computed(() => {
-  const col = sortBy.value
-  const source = (props.items || items.value)
-  if (!col) return source
-  const dir = sortDir.value === 'asc' ? 1 : -1
-  return [...source].sort((a, b) => {
-    const avRaw = getItemValue(a, col)
-    const bvRaw = getItemValue(b, col)
-    if (avRaw == null && bvRaw == null) return 0
-    if (avRaw == null) return 1
-    if (bvRaw == null) return -1
-    // Normalize values for comparison
-    const av = typeof avRaw === 'bigint' ? Number(avRaw) : avRaw
-    const bv = typeof bvRaw === 'bigint' ? Number(bvRaw) : bvRaw
-    // Datetime: attempt numeric comparison if both numbers or parseable dates
-    if (isDatetimeColumn(col)) {
-      const an = typeof av === 'number' ? av : Date.parse(String(av))
-      const bn = typeof bv === 'number' ? bv : Date.parse(String(bv))
-      if (!isNaN(an) && !isNaN(bn)) return (an - bn) * dir
-    }
-    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
-    const as = String(av)
-    const bs = String(bv)
-    return naturalSort(as, bs) * dir
-  })
-})
-
-const page = ref(1)
-const pageSize = ref(10)
-const total = computed(() => sortedItems.value.length)
-const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
-
-// Only reset page when pageSize changes, not when sortedItems changes
-watch([pageSize], () => { page.value = 1 })
-
-// Reset page when data is actually reloaded (not just sorted)
-const previousItemsLength = ref(0)
-watch(sortedItems, (newItems) => {
-  if (newItems.length !== previousItemsLength.value) {
-    page.value = 1
-    previousItemsLength.value = newItems.length
-  }
-}, { immediate: true })
-
-const pagedItems = computed(() => {
-  const start = (page.value - 1) * pageSize.value
-  return sortedItems.value.slice(start, start + pageSize.value)
-})
-
-// Use passed items or load from API
-const displayItems = computed(() => {
-  return props.items || items.value
-})
-
-// Fine-grained toolbar controls with backward compatibility
-const showViewSwitcher = computed(() => props.showViewSwitcher !== false)
-const showViewEdit = computed(() => props.showViewEdit !== false)
-const showViewCreate = computed(() => props.showViewCreate !== false)
-const showExport = computed(() => props.showExport !== false)
-const showStructure = computed(() => props.showStructure !== false)
-const showInsert = computed(() => props.showInsert !== false)
-
-// Show toolbar if not explicitly disabled and any control is enabled
-const showToolbar = computed(() => {
-  if (props.showToolbar === false) return false
-  return showViewSwitcher.value || showViewEdit.value || showViewCreate.value || showExport.value || showStructure.value || showInsert.value
-})
-
-const showPagination = computed(() => {
-  return props.showPagination !== false // Default to true unless explicitly false
-})
-
-const selectedKeys = ref<Set<string>>(new Set())
-
-// Inline editing state
-const editingCell = ref<{ rowId: string; column: string } | null>(null)
-const editingValue = ref<string>('')
-const saving = ref(false)
-const editInput = ref<HTMLInputElement | null>(null)
-
-// Bulk delete state
-const showDeleteConfirm = ref(false)
-const deleting = ref(false)
-
-// Quick add dialog state
-const showQuickAddDialog = ref(false)
-const quickAddLoading = ref(false)
-const quickAddSelectedViewId = ref<number | null>(null)
-
-// Table navigation state
-const currentRowIndex = ref<number | null>(null)
-const currentColumnIndex = ref<number | null>(null)
-const lastSelectedRowIndex = ref<number | null>(null)
-
-// Provide table filter focus function
-const tableFilterFocusRequest = inject<{ value: (() => void) | null } | null>('tableFilterFocusRequest', null)
-if (tableFilterFocusRequest) {
-  tableFilterFocusRequest.value = () => {
-    // Try to focus any filter input in the table
-    const filterInput = document.querySelector('input[type="search"], input[placeholder*="filter" i]') as HTMLInputElement
-    if (filterInput) {
-      filterInput.focus()
-    }
-  }
-}
-
-// Computed property for quick add field definitions based on selected view
-const quickAddFieldDefs = computed(() => {
-  if (quickAddSelectedViewId.value === null || quickAddSelectedViewId.value === -1) {
-    // Use all fields (default view)
-    return localFieldDefs.value
-  }
-
-  // Find the selected view
-  const selectedView = tableViews.value.find(view => view.id === quickAddSelectedViewId.value)
-  if (!selectedView) {
-    return localFieldDefs.value
-  }
-
-  // Get field definitions for visible columns in the selected view
-  const visibleColumns = selectedView.columns
-    .filter(col => col.isVisible)
-    .sort((a, b) => a.columnOrder - b.columnOrder)
-    .map(col => col.columnName)
-
-  return localFieldDefs.value.filter(field => visibleColumns.includes(field.name))
-})
-
-// Computed property for quick add view options
-const quickAddViewOptions = computed(() => {
-  return viewOptions.value
-})
-
-// Helper function to get item value for a column, handling both standard and dynamic fields
-function getItemValue(item: any, column: string): any {
-  // Check standard fields first (only id and sr_created are static now)
-  if (column === 'id') {
-    return item[column]
-  }
-  if (column === 'sr_created') {
-    // The protobuf field sr_created becomes srCreated in TypeScript
-    return item.srCreated
-  }
-  // Check additional fields from protobuf (all other fields including name are dynamic)
-  if (item.additionalFields && item.additionalFields[column] !== undefined) {
-    return item.additionalFields[column]
-  }
-  // Fallback to direct property access
-  return item[column]
-}
-
-function keyOf(it: any): string {
-  const k = getItemValue(it, 'id')
-  return k == null ? '' : String(k)
-}
-function isSelected(it: any): boolean {
-  const k = keyOf(it)
-  return k !== '' && selectedKeys.value.has(k)
-}
-function toggleSelected(it: any, ev: Event) {
-  const k = keyOf(it)
-  if (k === '') return
-  const checked = (ev.target as HTMLInputElement).checked
-  if (checked) selectedKeys.value.add(k)
-  else selectedKeys.value.delete(k)
-}
-
-// Transport handled by authenticated client
-const client = createApiClient()
-
-// Load foreign key information for the current table
-async function loadForeignKeys() {
-  try {
-    loadingForeignKeys.value = true
-    const response = await client.getTableStructure({ pageId: props.tableId })
-    foreignKeys.value = (response.foreignKeys || []).map(fk => ({
-      constraintName: fk.constraintName,
-      tableName: fk.tableName,
-      columnName: fk.columnName,
-      referencedTable: fk.referencedTable,
-      referencedColumn: fk.referencedColumn,
-      onDeleteAction: fk.onDeleteAction,
-      onUpdateAction: fk.onUpdateAction,
-      tableTcName: fk.tableTcName,
-      referencedTableTcName: fk.referencedTableTcName
-    }))
-
-    // Load referenced table data for each foreign key
-    await loadReferencedTableData()
-  } catch (err) {
-    console.error('Error loading foreign keys:', err)
-  } finally {
-    loadingForeignKeys.value = false
-  }
-}
-
-// Load data from referenced tables
-async function loadReferencedTableData() {
-  const data: Record<string, any[]> = {}
-
-  for (const fk of foreignKeys.value) {
-    try {
-      // Use referencedTableTcName if available, otherwise fall back to referencedTable
-      const tcName = fk.referencedTableTcName || fk.referencedTable
-      const response = await client.listItems({ tcName })
-      data[fk.columnName] = response.items || []
-    } catch (err) {
-      console.error(`Error loading data for table ${fk.referencedTable}:`, err)
-      data[fk.columnName] = []
-    }
-  }
-
-  referencedTableData.value = data
-}
-
-// Load conditional formatting rules
 async function loadConditionalFormattingRules() {
   try {
-    loadingFormattingRules.value = true
     const response = await client.getConditionalFormattingRules({ tableName: props.tableId })
     conditionalFormattingRules.value = response.rules.map(rule => ({
       id: rule.id,
@@ -676,179 +440,167 @@ async function loadConditionalFormattingRules() {
       formatType: rule.formatType,
       formatValue: rule.formatValue,
       priority: rule.priority,
-      isActive: rule.isActive
+      isActive: rule.isActive,
     }))
-  } catch (err) {
-    console.error('Error loading conditional formatting rules:', err)
+  } catch (formattingError) {
+    console.error('Error loading conditional formatting rules:', formattingError)
     conditionalFormattingRules.value = []
-  } finally {
-    loadingFormattingRules.value = false
   }
 }
 
-// Check if a column is a foreign key
-function isForeignKey(columnName: string): boolean {
-  return foreignKeys.value.some(fk => fk.columnName === columnName)
-}
+function applyConditionalFormatting(
+  columnName: string,
+  cellValue: unknown,
+): { content: string; styles: Record<string, string> } {
+  const styles: Record<string, string> = {}
+  const content = cellValue == null ? '' : String(cellValue)
+  const rules = conditionalFormattingRules.value
+    .filter(rule => rule.columnName === columnName && rule.isActive && rule.formatType !== 'markdown')
+    .sort((left, right) => right.priority - left.priority)
 
-// Get the foreign key info for a column
-function getForeignKeyInfo(columnName: string) {
-  return foreignKeys.value.find(fk => fk.columnName === columnName)
-}
-
-// Get the name field from a referenced item
-function getReferencedItemName(item: any): string {
-  if (!item) {
-    return 'Unknown'
-  }
-  if (item.name) {
-    return item.name
-  }
-  if (item.additionalFields && item.additionalFields.name) {
-    return item.additionalFields.name
-  }
-  return `ID: ${item.id}`
-}
-
-// Get the referenced item for a foreign key value
-function getReferencedItem(columnName: string, foreignKeyValue: any) {
-  const fkInfo = getForeignKeyInfo(columnName)
-  if (!fkInfo) {
-    console.log(`No foreign key info found for column: ${columnName}`)
-    return null
-  }
-
-  const referencedItems = referencedTableData.value[columnName] || []
-  const foundItem = referencedItems.find(item => String(item.id) === String(foreignKeyValue))
-
-  if (!foundItem) {
-    console.log(`Referenced item not found for column: ${columnName}, value: ${foreignKeyValue}, available items:`, referencedItems.map(item => ({ id: item.id, name: item.name || item.additionalFields?.name })))
-  }
-
-  return foundItem
-}
-
-async function load() {
-  loading.value = true
-  error.value = null
-  try {
-    const where: Record<string, string> = {}
-    Object.entries(columnFilters.value).forEach(([k, v]) => {
-      if (v && v.trim() !== '') {
-        // If the value already includes % assume caller set it; otherwise wrap.
-        const hasWildcard = v.includes('%')
-        where[k] = hasWildcard ? v : `%${v}%`
-      }
-    })
-
-    const online = isOnline()
-
-    // If offline, wait a bit for structure to load (in case load() was called before loadStructure())
-    if (!online && !tableStructure.value) {
-      // Wait up to 2 seconds for structure to load
-      for (let i = 0; i < 20 && !tableStructure.value; i++) {
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
+  for (const rule of rules) {
+    let applies = false
+    switch (rule.conditionType) {
+      case 'always':
+        applies = true
+        break
+      case 'equals':
+        applies = content === rule.conditionValue
+        break
+      case 'contains':
+        applies = content.toLowerCase().includes(rule.conditionValue.toLowerCase())
+        break
+      case 'greater_than':
+        applies = Number(content) > Number(rule.conditionValue)
+        break
+      case 'less_than':
+        applies = Number(content) < Number(rule.conditionValue)
+        break
     }
 
-    // Check if table has uuid column for offline caching
-    const fields = tableStructure.value?.fields ?? []
-    const canCacheOffline = hasUuidColumn(fields)
-
-    // If offline and table has uuid, try to load from IndexedDB
-    if (!online && canCacheOffline) {
-      const cachedItems = await loadTableData(props.tableId, where)
-      if (cachedItems && cachedItems.length > 0) {
-        items.value = cachedItems as Item[]
-        console.log(`[TableComponent] Loaded ${cachedItems.length} items from IndexedDB (offline)`)
-        return
-      } else {
-        // No cached data available offline
-        error.value = 'No offline data available. Please connect to the internet to load table data.'
-        items.value = []
-        return
-      }
+    if (!applies) continue
+    switch (rule.formatType) {
+      case 'color':
+        styles['background-color'] = rule.formatValue
+        break
+      case 'text_color':
+        styles.color = rule.formatValue
+        break
+      case 'bold':
+        if (rule.formatValue === 'true') styles['font-weight'] = 'bold'
+        break
+      case 'italic':
+        if (rule.formatValue === 'true') styles['font-style'] = 'italic'
+        break
     }
-
-    // Fetch from API (online or table doesn't have uuid)
-    const res = await client.listItems({ tcName: props.tableId, where })
-    items.value = Array.isArray(res.items) ? (res.items as Item[]) : []
-
-    // If table has uuid and we're online, save to IndexedDB for offline use
-    if (canCacheOffline && online) {
-      try {
-        await saveTableData(props.tableId, items.value, where)
-        console.log(`[TableComponent] Saved ${items.value.length} items to IndexedDB for offline use`)
-      } catch (cacheError) {
-        console.warn('[TableComponent] Failed to cache table data:', cacheError)
-        // Don't fail the load if caching fails
-      }
-    }
-  } catch (e) {
-    error.value = String(e)
-
-    // If online fetch failed and we have cached data, try to use it
-    if (isOnline() === false) {
-      const fields = tableStructure.value?.fields ?? []
-      if (hasUuidColumn(fields)) {
-        try {
-          const where: Record<string, string> = {}
-          Object.entries(columnFilters.value).forEach(([k, v]) => {
-            if (v && v.trim() !== '') {
-              const hasWildcard = v.includes('%')
-              where[k] = hasWildcard ? v : `%${v}%`
-            }
-          })
-          const cachedItems = await loadTableData(props.tableId, where)
-          if (cachedItems && cachedItems.length > 0) {
-            items.value = cachedItems as Item[]
-            error.value = null // Clear error since we have cached data
-            console.log(`[TableComponent] Using cached data after fetch failure: ${cachedItems.length} items`)
-          }
-        } catch (cacheError) {
-          console.warn('[TableComponent] Failed to load cached data:', cacheError)
-        }
-      }
-    }
-  } finally {
-    loading.value = false
   }
+  return { content, styles }
 }
 
-// Inline editing functions
-function startEdit(item: any, column: string) {
-  // Don't allow editing of id, name, sr_created, sr_updated, or foreign key columns
-  if (column === 'id' || column === 'name' || column === 'sr_created' || column === 'sr_updated' || isForeignKey(column)) {
-    return
-  }
+function cellStyle(context: CellContext) {
+  if (context.header.key === ACTIONS_COLUMN) return {}
+  const value = getItemValue(sourceItemForRow(context.row), context.header.key)
+  return applyConditionalFormatting(context.header.key, value).styles
+}
 
-  const currentValue = getItemValue(item, column)
+function sourceItemForRow(row: TableRow): Item {
+  return getSourceItem(row) ?? row as unknown as Item
+}
+
+function getItemValue(item: Item | Record<string, any>, column: string): any {
+  const source = item as Record<string, any>
+  if (column === 'id') return source.id
+  if (column === tableStructure.value?.primaryKeyColumn) return source.id
+  if (column === 'sr_created') return source.srCreated ?? source.sr_created
+  if (column === 'sr_updated') return source.srUpdated ?? source.sr_updated
+  if (column === 'sr_created_relative') {
+    return source.srCreatedRelative ?? source.sr_created_relative
+  }
+  if (column === 'sr_updated_relative') {
+    return source.srUpdatedRelative ?? source.sr_updated_relative
+  }
+  if (source.additionalFields?.[column] !== undefined) {
+    return source.additionalFields[column]
+  }
+  return source[column]
+}
+
+function cellValue(row: TableRow, column: string): any {
+  return getItemValue(sourceItemForRow(row), column)
+}
+
+function fieldType(column: string): string {
+  return fieldDefs.value.find(field => field.name === column)?.type ?? 'unknown'
+}
+
+function isTinyintColumn(column: string): boolean {
+  const type = fieldType(column).toLowerCase()
+  return type.startsWith('tinyint') || type === 'bool' || type === 'boolean'
+}
+
+function isDatetimeColumn(column: string): boolean {
+  const type = fieldType(column).toLowerCase()
+  return type === 'datetime' || type.startsWith('datetime(')
+}
+
+function getBooleanValue(item: Item, column: string): boolean {
+  const value = getItemValue(item, column)
+  return value === true || Number(value) === 1
+}
+
+function hasMarkdownField(column: string, item: Item): boolean {
+  return Boolean(item.additionalFields?.[`${column}Markdown`])
+}
+
+function getMarkdownContent(column: string, item: Item): string {
+  return item.additionalFields?.[`${column}Markdown`] ?? ''
+}
+
+function formatRelativeTime(seconds: number): string {
+  if (seconds < 60) return `${seconds}s ago`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  return `${Math.floor(seconds / 86400)}d ago`
+}
+
+function relativeTime(item: Item, column: 'sr_created' | 'sr_updated'): number | null {
+  const value = column === 'sr_created' ? item.srCreatedRelative : item.srUpdatedRelative
+  return value === null || value === undefined ? null : Number(value)
+}
+
+// Inline editing
+const editingCell = ref<{ rowId: string; column: string } | null>(null)
+const editingValue = ref('')
+const saving = ref(false)
+const editInput = ref<HTMLInputElement | null>(null)
+
+function setEditInput(element: unknown) {
+  editInput.value = element instanceof HTMLInputElement ? element : null
+}
+
+function canEditColumn(column: string): boolean {
+  return !['id', 'name', 'sr_created', 'sr_updated', ACTIONS_COLUMN].includes(column)
+    && column !== tableStructure.value?.primaryKeyColumn
+    && !isForeignKey(column)
+}
+
+function startEditRow(row: TableRow, column: string) {
+  if (!canEditColumn(column)) return
+  const item = sourceItemForRow(row)
+  const value = getItemValue(item, column)
   editingCell.value = { rowId: String(item.id), column }
 
-  // Handle datetime fields - convert ISO8601 to datetime-local format
-  if (isDatetimeColumn(column) && currentValue != null) {
-    try {
-      const date = new Date(currentValue)
-      if (!isNaN(date.getTime())) {
-        // Convert to YYYY-MM-DDTHH:MM format for datetime-local input
-        editingValue.value = date.toISOString().slice(0, 16)
-      } else {
-        editingValue.value = ''
-      }
-    } catch {
-      editingValue.value = ''
-    }
+  if (isDatetimeColumn(column) && value != null) {
+    const date = new Date(value)
+    editingValue.value = Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 16)
   } else {
-    editingValue.value = currentValue == null ? '' : String(currentValue)
+    editingValue.value = value == null ? '' : String(value)
   }
 
-  // Focus the input after the DOM updates
-  setTimeout(() => {
-    if (editInput.value) {
-      editInput.value.focus()
-      editInput.value.select()
-    }
-  }, 0)
+  void nextTick(() => {
+    editInput.value?.focus()
+    editInput.value?.select()
+  })
 }
 
 function cancelEdit() {
@@ -856,270 +608,121 @@ function cancelEdit() {
   editingValue.value = ''
 }
 
-async function saveEdit(item: any) {
-  if (!editingCell.value) return
+function isEditingRow(row: TableRow, column: string): boolean {
+  const item = sourceItemForRow(row)
+  return editingCell.value?.rowId === String(item.id)
+    && editingCell.value.column === column
+}
 
+function mysqlDatetime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+async function saveEditRow(row: TableRow) {
+  if (!editingCell.value || saving.value) return
   saving.value = true
   try {
+    const item = sourceItemForRow(row)
     const { rowId, column } = editingCell.value
-
-    // Prepare the update data - all fields go into additionalFields
+    const currentItem = sourceItems.value.find(candidate => String(candidate.id) === rowId) ?? item
     const additionalFields: Record<string, string> = {}
-
-    // Get all current values and update just the one being edited
-    const currentItem = items.value.find(it => String(it.id) === rowId)
-    if (currentItem) {
-      // Get all additional fields from the current item
-      if (currentItem.additionalFields) {
-        Object.entries(currentItem.additionalFields).forEach(([key, value]) => {
-          additionalFields[key] = String(value)
-        })
-      }
-      // Update the specific field being edited
-      if (isDatetimeColumn(column)) {
-        // Convert datetime-local input to MySQL datetime format
-        try {
-          const date = new Date(editingValue.value)
-          if (!isNaN(date.getTime())) {
-            // Convert to MySQL datetime format: YYYY-MM-DD HH:MM:SS
-            const year = date.getFullYear()
-            const month = String(date.getMonth() + 1).padStart(2, '0')
-            const day = String(date.getDate()).padStart(2, '0')
-            const hours = String(date.getHours()).padStart(2, '0')
-            const minutes = String(date.getMinutes()).padStart(2, '0')
-            const seconds = String(date.getSeconds()).padStart(2, '0')
-            additionalFields[column] = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-          } else {
-            additionalFields[column] = editingValue.value
-          }
-        } catch {
-          additionalFields[column] = editingValue.value
-        }
-      } else {
-        additionalFields[column] = editingValue.value
-      }
-
-      await client.editItem({
-        id: rowId,
-        additionalFields: additionalFields,
-        pageId: props.tableId
-      })
+    for (const [key, value] of Object.entries(currentItem.additionalFields ?? {})) {
+      additionalFields[key] = String(value)
     }
+    additionalFields[column] = isDatetimeColumn(column)
+      ? mysqlDatetime(editingValue.value)
+      : editingValue.value
 
-    // Reload the data to reflect changes
-    await load()
+    await client.editItem({
+      id: rowId,
+      additionalFields,
+      pageId: props.tableId,
+    })
     cancelEdit()
-  } catch (e) {
-    console.error('Failed to save edit:', e)
-    // You might want to show an error message to the user here
+    if (props.items === undefined) await load()
+    emit('rows-updated')
+  } catch (saveError) {
+    console.error('Failed to save edit:', saveError)
   } finally {
     saving.value = false
   }
 }
 
-function isEditing(item: any, column: string): boolean {
-  return editingCell.value?.rowId === String(item.id) && editingCell.value?.column === column
-}
-
-// Helper function to check if a column is a tinyint (boolean) column
-function isTinyintColumn(column: string): boolean {
-  const field = localFieldDefs.value.find(f => f.name === column)
-  return field?.type.startsWith('tinyint')
-}
-
-// Helper function to check if a column is a datetime column
-function isDatetimeColumn(column: string): boolean {
-  const field = localFieldDefs.value.find(f => f.name === column)
-  return field?.type === 'datetime'
-}
-
-// Helper function to get the SQL datatype for a column
-function getColumnType(column: string): string {
-  const field = localFieldDefs.value.find(f => f.name === column)
-  if (field) {
-    return field.type
-  }
-
-  // Fallback for standard columns
-  if (column === 'id') return 'string'
-  if (column === 'sr_created') return 'datetime'
-
-  return 'unknown'
-}
-
-// Helper function to get display label for a column
-function getColumnLabel(column: string): string {
-  if (column === 'id') return 'ID'
-  if (column === 'sr_created') return 'Created'
-  if (column === 'sr_updated') return 'Updated'
-  return column
-}
-
-// Helper function to get boolean value from tinyint column
-function getBooleanValue(item: any, column: string): boolean {
-  const value = getItemValue(item, column)
-  if (value === null || value === undefined) return false
-  // Convert to number first, then to boolean
-  const numValue = Number(value)
-  return numValue === 1
-}
-
-// Helper function to check if a markdown field exists for a column
-function hasMarkdownField(columnName: string, item: any): boolean {
-  const markdownFieldName = columnName + 'Markdown'
-  return item.additionalFields && item.additionalFields[markdownFieldName]
-}
-
-// Helper function to get markdown content for a column
-function getMarkdownContent(columnName: string, item: any): string {
-  const markdownFieldName = columnName + 'Markdown'
-  return item.additionalFields?.[markdownFieldName] || ''
-}
-
-// Helper function to format relative time values
-function formatRelativeTime(seconds: number): string {
-  if (seconds < 60) {
-    return `${seconds}s ago`
-  } else if (seconds < 3600) {
-    const minutes = Math.floor(seconds / 60)
-    return `${minutes}m ago`
-  } else if (seconds < 86400) {
-    const hours = Math.floor(seconds / 3600)
-    return `${hours}h ago`
-  } else {
-    const days = Math.floor(seconds / 86400)
-    return `${days}d ago`
-  }
-}
-
-// Apply conditional formatting to cell content (non-markdown rules only)
-function applyConditionalFormatting(columnName: string, cellValue: any, item: any): { content: string; styles: Record<string, string> } {
-  const styles: Record<string, string> = {}
-  let content = cellValue == null ? '' : String(cellValue)
-
-  // Apply client-side conditional formatting (excluding markdown rules)
-  const applicableRules = conditionalFormattingRules.value
-    .filter(rule => rule.columnName === columnName && rule.isActive && rule.formatType !== 'markdown')
-    .sort((a, b) => b.priority - a.priority) // Sort by priority (highest first)
-
-  for (const rule of applicableRules) {
-    let shouldApply = false
-
-    // Check condition
-    switch (rule.conditionType) {
-      case 'always':
-        shouldApply = true
-        break
-      case 'equals':
-        shouldApply = content === rule.conditionValue
-        break
-      case 'contains':
-        shouldApply = content.toLowerCase().includes(rule.conditionValue.toLowerCase())
-        break
-      case 'greater_than':
-        shouldApply = Number(content) > Number(rule.conditionValue)
-        break
-      case 'less_than':
-        shouldApply = Number(content) < Number(rule.conditionValue)
-        break
-    }
-
-    if (shouldApply) {
-      // Apply formatting
-      switch (rule.formatType) {
-        case 'color':
-          styles['background-color'] = rule.formatValue
-          break
-        case 'text_color':
-          styles['color'] = rule.formatValue
-          break
-        case 'bold':
-          if (rule.formatValue === 'true') {
-            styles['font-weight'] = 'bold'
-          }
-          break
-        case 'italic':
-          if (rule.formatValue === 'true') {
-            styles['font-style'] = 'italic'
-          }
-          break
-      }
-    }
-  }
-
-  return { content, styles }
-}
-
-// Bulk delete functionality
+// Bulk selection and deletion
 const selectedItems = computed(() => {
-  return items.value.filter(item => {
-    const key = keyOf(item)
-    return key !== '' && selectedKeys.value.has(key)
-  })
+  const keys = new Set(selectedKeys.value)
+  return sourceItems.value.filter(item => keys.has(String(item.id)))
 })
-
-const hasSelectedItems = computed(() => selectedKeys.value.size > 0)
-const isAllSelected = computed(() => pagedItems.value.length > 0 && selectedKeys.value.size === pagedItems.value.length)
-const isIndeterminate = computed(() => selectedKeys.value.size > 0 && selectedKeys.value.size < pagedItems.value.length)
-
-async function deleteSelectedItems() {
-  if (selectedItems.value.length === 0) return
-
-  deleting.value = true
-  error.value = null
-
-  try {
-    // Delete items one by one
-    for (const item of selectedItems.value) {
-      const key = keyOf(item)
-      if (key !== '') {
-        await client.deleteItem({ pageId: props.tableId, id: key })
-        // Emit row-deleted event for each deleted item
-        emit('row-deleted', key)
-      }
-    }
-
-    // Clear selection
-    selectedKeys.value.clear()
-
-    // If using props.items, don't reload - let parent handle it
-    if (props.items) {
-      showDeleteConfirm.value = false
-      emit('rows-updated')
-    } else {
-      // If using local items.value, reload data
-      await load()
-      showDeleteConfirm.value = false
-    }
-  } catch (e) {
-    error.value = String(e)
-  } finally {
-    deleting.value = false
-  }
-}
+const hasSelectedItems = computed(() => selectedKeys.value.length > 0)
+const showDeleteConfirm = ref(false)
+const deleting = ref(false)
 
 function confirmDeleteSelected() {
-  if (selectedItems.value.length > 0) {
-    showDeleteConfirm.value = true
-  }
+  if (selectedItems.value.length > 0) showDeleteConfirm.value = true
 }
 
 function cancelDeleteSelected() {
   showDeleteConfirm.value = false
 }
 
-// Quick add functions
+async function deleteSelectedItems() {
+  if (selectedItems.value.length === 0) return
+  deleting.value = true
+  error.value = null
+  try {
+    for (const item of selectedItems.value) {
+      const id = String(item.id)
+      await client.deleteItem({ pageId: props.tableId, id })
+      emit('row-deleted', id)
+    }
+    selectedKeys.value = []
+    showDeleteConfirm.value = false
+    if (props.items === undefined) await load()
+    emit('rows-updated')
+  } catch (deleteError) {
+    error.value = String(deleteError)
+  } finally {
+    deleting.value = false
+  }
+}
+
+async function onRowActionDeleted(row: TableRow) {
+  const id = String(cellValue(row, 'id'))
+  emit('row-deleted', id)
+  if (props.items === undefined) await load()
+  emit('rows-updated')
+}
+
+// Quick add
+const showQuickAddDialog = ref(false)
+const quickAddSelectedViewId = ref<number | null>(null)
+const quickAddFieldDefs = computed(() => {
+  if (quickAddSelectedViewId.value === null || quickAddSelectedViewId.value === -1) {
+    return fieldDefs.value
+  }
+  const selectedView = tableViews.value.find(view => view.id === quickAddSelectedViewId.value)
+  if (!selectedView) return fieldDefs.value
+  const visibleColumns = selectedView.columns
+    .filter(column => column.isVisible)
+    .sort((left, right) => left.columnOrder - right.columnOrder)
+    .map(column => column.columnName)
+  return fieldDefs.value.filter(field => visibleColumns.includes(field.name))
+})
+
 function openQuickAddDialog() {
-  // Set the default view to the currently selected view
   quickAddSelectedViewId.value = selectedViewId.value
   showQuickAddDialog.value = true
-
-  // Focus the dialog for keyboard events
   setTimeout(() => {
     const dialog = document.querySelector('.modal-overlay')
-    if (dialog) {
-      (dialog as HTMLElement).focus()
-    }
+    if (dialog instanceof HTMLElement) dialog.focus()
   }, 100)
 }
 
@@ -1128,733 +731,504 @@ function closeQuickAddDialog() {
 }
 
 async function onQuickAddCreated() {
-  // Reload data to show the new item
-  await load()
+  if (props.items === undefined) await load()
   closeQuickAddDialog()
   emit('rows-updated')
 }
 
-function onQuickAddCancelled() {
-  closeQuickAddDialog()
-}
-
-function selectAll() {
-  pagedItems.value.forEach(item => {
-    const key = keyOf(item)
-    if (key !== '') {
-      selectedKeys.value.add(key)
-    }
+// Keyboard navigation is delegated to PicoCrank's active-cell model.
+function moveCell(rowDelta: number, columnDelta: number, wrapColumns = false) {
+  tableRef.value?.moveActiveCell(rowDelta, columnDelta, {
+    focus: true,
+    wrapColumns,
   })
 }
 
-function selectNone() {
-  selectedKeys.value.clear()
-}
-
-function toggleSelectAll() {
-  if (isAllSelected.value) {
-    selectNone()
-  } else {
-    selectAll()
-  }
-}
-
-// Table navigation functions
-function navigateToCell(rowIndex: number, columnIndex: number) {
-  if (rowIndex >= 0 && rowIndex < pagedItems.value.length) {
-    currentRowIndex.value = rowIndex
-    if (columnIndex >= 0 && columnIndex < visibleColumns.value.length) {
-      currentColumnIndex.value = columnIndex
-    }
-    // Scroll the cell into view
-    nextTick(() => {
-      const cell = document.querySelector(`tbody tr:nth-child(${rowIndex + 1}) td:nth-child(${columnIndex + 2})`) as HTMLElement
-      if (cell) {
-        cell.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      }
-    })
-  }
-}
-
-function navigateUp() {
-  if (currentRowIndex.value === null) {
-    currentRowIndex.value = 0
-    currentColumnIndex.value = 0
-  } else if (currentRowIndex.value > 0) {
-    navigateToCell(currentRowIndex.value - 1, currentColumnIndex.value ?? 0)
-  }
-}
-
-function navigateDown() {
-  if (currentRowIndex.value === null) {
-    currentRowIndex.value = 0
-    currentColumnIndex.value = 0
-  } else if (currentRowIndex.value < pagedItems.value.length - 1) {
-    navigateToCell(currentRowIndex.value + 1, currentColumnIndex.value ?? 0)
-  }
-}
-
-function navigateLeft() {
-  if (currentColumnIndex.value === null || currentColumnIndex.value === 0) {
-    return
-  }
-  navigateToCell(currentRowIndex.value ?? 0, currentColumnIndex.value - 1)
-}
-
-function navigateRight() {
-  if (currentColumnIndex.value === null) {
-    currentColumnIndex.value = 0
-  } else if (currentColumnIndex.value < visibleColumns.value.length - 1) {
-    navigateToCell(currentRowIndex.value ?? 0, currentColumnIndex.value + 1)
-  }
-}
-
-function navigateNext() {
-  if (currentColumnIndex.value === null) {
-    currentColumnIndex.value = 0
-    currentRowIndex.value = 0
-  } else if (currentColumnIndex.value < visibleColumns.value.length - 1) {
-    navigateRight()
-  } else if (currentRowIndex.value !== null && currentRowIndex.value < pagedItems.value.length - 1) {
-    navigateToCell(currentRowIndex.value + 1, 0)
-  }
-}
-
-function navigatePrevious() {
-  if (currentColumnIndex.value === null || currentColumnIndex.value === 0) {
-    if (currentRowIndex.value !== null && currentRowIndex.value > 0) {
-      navigateToCell(currentRowIndex.value - 1, visibleColumns.value.length - 1)
-    }
-  } else {
-    navigateLeft()
-  }
-}
-
 function editCurrentCell() {
-  if (currentRowIndex.value !== null && currentColumnIndex.value !== null) {
-    const item = pagedItems.value[currentRowIndex.value]
-    const column = visibleColumns.value[currentColumnIndex.value]
-    if (item && column) {
-      startEdit(item, column)
-    }
+  const context = tableRef.value?.getActiveCellContext()
+  if (context && context.header.key !== ACTIONS_COLUMN) {
+    startEditRow(context.row, context.header.key)
   }
 }
 
-function handleDeleteKey() {
-  if (selectedKeys.value.size > 0) {
-    confirmDeleteSelected()
-  }
-}
-
-// Handle Ctrl+Click and Shift+Click for multi-select
-function handleRowClick(item: any, event: MouseEvent) {
-  const key = keyOf(item)
-  if (key === '') return
-
-  if (event.ctrlKey || event.metaKey) {
-    // Multi-select: toggle this row
-    if (selectedKeys.value.has(key)) {
-      selectedKeys.value.delete(key)
-    } else {
-      selectedKeys.value.add(key)
-    }
-    lastSelectedRowIndex.value = pagedItems.value.findIndex(it => keyOf(it) === key)
-  } else if (event.shiftKey && lastSelectedRowIndex.value !== null) {
-    // Range select: select from last selected to current
-    const currentIndex = pagedItems.value.findIndex(it => keyOf(it) === key)
-    if (currentIndex !== -1) {
-      const start = Math.min(lastSelectedRowIndex.value, currentIndex)
-      const end = Math.max(lastSelectedRowIndex.value, currentIndex)
-      for (let i = start; i <= end; i++) {
-        const itemKey = keyOf(pagedItems.value[i])
-        if (itemKey !== '') {
-          selectedKeys.value.add(itemKey)
-        }
-      }
-    }
-  } else {
-    // Single select: clear and select this row
-    selectedKeys.value.clear()
-    selectedKeys.value.add(key)
-    lastSelectedRowIndex.value = pagedItems.value.findIndex(it => keyOf(it) === key)
-  }
-}
-
-// Table keyboard shortcuts
 const tableShortcuts = ref<KeyboardShortcut[]>([
   {
     key: 'ArrowUp',
-    handler: (e) => {
+    handler: event => {
       if (!editingCell.value) {
-        e.preventDefault()
-        navigateUp()
+        event.preventDefault()
+        moveCell(-1, 0)
       }
     },
-    description: 'Navigate to previous row'
+    description: 'Navigate to previous row',
   },
   {
     key: 'ArrowDown',
-    handler: (e) => {
+    handler: event => {
       if (!editingCell.value) {
-        e.preventDefault()
-        navigateDown()
+        event.preventDefault()
+        moveCell(1, 0)
       }
     },
-    description: 'Navigate to next row'
+    description: 'Navigate to next row',
   },
   {
     key: 'ArrowLeft',
-    handler: (e) => {
+    handler: event => {
       if (!editingCell.value) {
-        e.preventDefault()
-        navigateLeft()
+        event.preventDefault()
+        moveCell(0, -1)
       }
     },
-    description: 'Navigate to previous column'
+    description: 'Navigate to previous column',
   },
   {
     key: 'ArrowRight',
-    handler: (e) => {
+    handler: event => {
       if (!editingCell.value) {
-        e.preventDefault()
-        navigateRight()
+        event.preventDefault()
+        moveCell(0, 1)
       }
     },
-    description: 'Navigate to next column'
+    description: 'Navigate to next column',
   },
   {
     key: 'Tab',
-    handler: (e) => {
+    shift: true,
+    handler: event => {
       if (!editingCell.value) {
-        e.preventDefault()
-        if (e.shiftKey) {
-          navigatePrevious()
-        } else {
-          navigateNext()
-        }
+        event.preventDefault()
+        moveCell(0, -1, true)
       }
     },
-    description: 'Navigate to next/previous cell'
+    description: 'Navigate to previous cell',
+  },
+  {
+    key: 'Tab',
+    handler: event => {
+      if (!editingCell.value) {
+        event.preventDefault()
+        moveCell(0, 1, true)
+      }
+    },
+    description: 'Navigate to next cell',
   },
   {
     key: 'Enter',
-    handler: (e) => {
-      if (!editingCell.value && currentRowIndex.value !== null && currentColumnIndex.value !== null) {
-        e.preventDefault()
+    handler: event => {
+      if (!editingCell.value && tableRef.value?.getActiveCellContext()) {
+        event.preventDefault()
         editCurrentCell()
       }
     },
-    description: 'Edit current cell'
+    description: 'Edit current cell',
   },
   {
     key: 'Delete',
-    handler: (e) => {
-      if (!editingCell.value) {
-        e.preventDefault()
-        handleDeleteKey()
+    handler: event => {
+      if (!editingCell.value && hasSelectedItems.value) {
+        event.preventDefault()
+        confirmDeleteSelected()
       }
     },
-    description: 'Delete selected rows'
+    description: 'Delete selected rows',
   },
   {
     key: 'Backspace',
-    handler: (e) => {
-      if (!editingCell.value) {
-        e.preventDefault()
-        handleDeleteKey()
+    handler: event => {
+      if (!editingCell.value && hasSelectedItems.value) {
+        event.preventDefault()
+        confirmDeleteSelected()
       }
     },
-    description: 'Delete selected rows'
+    description: 'Delete selected rows',
   },
 ])
 
 useKeyboardShortcuts(tableShortcuts)
 
-// Listen for global events
+const tableFilterFocusRequest = inject<{ value: (() => void) | null } | null>(
+  'tableFilterFocusRequest',
+  null,
+)
+if (tableFilterFocusRequest) {
+  tableFilterFocusRequest.value = () => {
+    const filterInput = document.querySelector(
+      'input[type="search"], input[placeholder*="filter" i], input[placeholder*="value" i]',
+    )
+    if (filterInput instanceof HTMLInputElement) filterInput.focus()
+  }
+}
+
 function handleOpenQuickAdd() {
   openQuickAddDialog()
 }
 
 function handleSaveCurrentEdit() {
-  if (editingCell.value) {
-    const item = items.value.find(it => String(it.id) === editingCell.value!.rowId)
-    if (item) {
-      saveEdit(item)
-    }
-  }
+  if (!editingCell.value) return
+  const row = flattenedRows.value.find(candidate => (
+    getStableRowId(candidate) === editingCell.value?.rowId
+  ))
+  if (row) void saveEditRow(row)
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener('open-quick-add', handleOpenQuickAdd)
   window.addEventListener('save-current-edit', handleSaveCurrentEdit)
-  load()
-  loadStructure()
-  loadTableViews()
-  loadForeignKeys()
-  loadConditionalFormattingRules()
+  try {
+    await Promise.all([
+      loadStructure(),
+      loadTableViews(),
+      loadConditionalFormattingRules(),
+    ])
+    await Promise.all([
+      loadForeignKeys(),
+      props.items === undefined ? load() : Promise.resolve(),
+    ])
+  } catch (initializationError) {
+    error.value = String(initializationError)
+  } finally {
+    loading.value = false
+  }
 })
 
 onUnmounted(() => {
   window.removeEventListener('open-quick-add', handleOpenQuickAdd)
   window.removeEventListener('save-current-edit', handleSaveCurrentEdit)
+  if (tableFilterFocusRequest) tableFilterFocusRequest.value = null
 })
 </script>
 
 <template>
-  <Section :title="sectionTitle" :icon="DatabaseIcon" :padding="false" class="table-component-wrapper">
+  <Section
+    :title="sectionTitle"
+    :icon="DatabaseIcon"
+    :padding="false"
+    class="table-component-wrapper"
+  >
     <template v-if="showToolbar" #toolbar>
-        <ViewsButton
-          v-if="showViewSwitcher || showViewEdit || showViewCreate"
-          :table-id="props.tableId"
-          :show-view-create="showViewCreate"
-          :show-view-edit="showViewEdit"
-          :external-views="tableViews"
-          :external-selected-view-id="selectedViewId"
-          :external-current-view="currentView"
-          @view-selected="selectView"
-        />
-        <router-link v-if="showExport" :to="`/table/${props.tableId}/export`" class="button inline-icon neutral ss-large">
-          <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Export</span>
-        </router-link>
-        <router-link v-if="showStructure" :to="`/table/${props.tableId}/column-types`" class="button inline-icon neutral ss-large">
-          <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Structure</span>
-        </router-link>
-
-        <!-- Blended Insert/Quick Add Button Group -->
-        <div v-if="showInsert" class="insert-button-group">
-          <router-link :to="`/table/${props.tableId}/insert-row`" class="button inline-icon neutral insert-button" accesskey="n" title="Insert row">
-            <HugeiconsIcon :icon="AddCircleIcon" width="1em" height="1em" aria-hidden="true" />
-            <span>{{ tableStructure?.CreateButtonText ?? 'Insert row' }}</span>
-          </router-link>
-          <button @click="openQuickAddDialog" class="button inline-icon good quick-add-button" title="Quick Add" aria-label="Quick Add">
-            <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
-            <span class="quick-add-text"></span>
-          </button>
-        </div>
-    </template>
-    <div v-if="error" class="error">{{ error }}</div>
-    <div v-else-if="loading">Loading…</div>
-    <div v-else>
-      <div v-if="items.length === 0 && hasFilters" class="filtered-empty-wrapper">
-        <table class="table row-hover">
-          <colgroup>
-            <col class="checkbox-col">
-            <col v-for="col in visibleColumns" :key="col" :class="{ 'id-col': col === 'id' }">
-            <col class="actions-col">
-          </colgroup>
-          <thead>
-            <tr>
-              <th class="small">
-                <input
-                  type="checkbox"
-                  :checked="isAllSelected"
-                  :indeterminate="isIndeterminate"
-                  @change="toggleSelectAll"
-                />
-              </th>
-              <th
-                v-for="col in visibleColumns"
-                :key="col"
-                @click="toggleSort(col)"
-                @contextmenu="(e) => showColumnMenu(e, col)"
-                :title="getColumnType(col)"
-                :class="{ small: col === 'id' }"
-              >
-                {{ getColumnLabel(col) }}<span v-if="sortBy === col"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-                <span v-if="isColumnFiltered(col)" class="filter-indicator" title="Filter applied">●</span>
-              </th>
-              <th>
-                <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td :colspan="visibleColumns.length + 2" class="filtered-empty">
-                <div class="filtered-empty-message">
-                  <div>No items match this filter.</div>
-                  <button class="button" @click="clearAllFilters">Clear filters</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-else-if="items.length === 0" class="empty-state">
-        <div class="empty-state-content">
-          <div class="empty-state-icon">📋</div>
-          <h3>No items in this table</h3>
-          <p>This table is empty. Get started by adding your first item.</p>
-          <router-link class="button" :to="`/table/${props.tableId}/insert-row`">
-            ➕ Insert First Item
-          </router-link>
-          <div class="empty-state-actions">
-            <router-link class="button" :to="`/table/${props.tableId}/add-column`">
-              Add Column
-            </router-link>
-          </div>
-        </div>
-      </div>
-      <div v-else class="section-content">
-      <div class="table-scroll-container">
-      <table class="table row-hover">
-        <colgroup>
-          <col class="checkbox-col">
-          <col v-for="col in visibleColumns" :key="col" :class="{ 'id-col': col === 'id' }">
-          <col class="actions-col">
-        </colgroup>
-        <thead>
-          <tr>
-            <th class="small">
-              <input
-                type="checkbox"
-                :checked="isAllSelected"
-                :indeterminate="isIndeterminate"
-                @change="toggleSelectAll"
-              />
-            </th>
-            <th
-              v-for="col in visibleColumns"
-              :key="col"
-              @click="toggleSort(col)"
-              @contextmenu="(e) => showColumnMenu(e, col)"
-              :title="getColumnType(col)"
-              :class="{ small: col === 'id' }"
-            >
-              {{ getColumnLabel(col) }}<span v-if="sortBy === col"> {{ sortDir === 'asc' ? '▲' : '▼' }}</span>
-              <span v-if="isColumnFiltered(col)" class="filter-indicator" title="Filter applied">●</span>
-            </th>
-            <th>
-              <ColumnVisibilityDropdown :columns="columns" v-model="selectedColumns" />
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(it, rowIdx) in pagedItems" :key="String((it as any).id ?? Math.random())"
-            :class="{ selected: isSelected(it), 'current-row': currentRowIndex === rowIdx }"
-            @click="(e) => handleRowClick(it, e)"
-            @mousedown="currentRowIndex = rowIdx; currentColumnIndex = 0">
-            <td class = "small">
-              <input type="checkbox" :checked="isSelected(it)" @change="(e) => toggleSelected(it, e)" @click.stop />
-            </td>
-            <td v-for="col in visibleColumns" :key="col" :style="applyConditionalFormatting(col, getItemValue(it, col), it).styles">
-              <!-- Inline editing input -->
-              <div v-if="isEditing(it, col)" class="inline-edit">
-                <!-- Checkbox for tinyint columns -->
-                <input
-                  v-if="isTinyintColumn(col)"
-                  type="checkbox"
-                  :checked="getBooleanValue(it, col)"
-                  @change="(e) => { editingValue = (e.target as HTMLInputElement).checked ? '1' : '0'; saveEdit(it); }"
-                  :disabled="saving"
-                  class="edit-checkbox"
-                />
-                <!-- Datetime input for datetime columns -->
-                <input
-                  v-else-if="isDatetimeColumn(col)"
-                  type="datetime-local"
-                  v-model="editingValue"
-                  @keyup.enter="saveEdit(it)"
-                  @keyup.escape="cancelEdit"
-                  @blur="saveEdit(it)"
-                  :disabled="saving"
-                  class="edit-input"
-                  ref="editInput"
-                />
-                <!-- Text input for other columns -->
-                <input
-                  v-else
-                  v-model="editingValue"
-                  @keyup.enter="saveEdit(it)"
-                  @keyup.escape="cancelEdit"
-                  @blur="saveEdit(it)"
-                  :disabled="saving"
-                  class="edit-input"
-                  ref="editInput"
-                />
-              </div>
-              <!-- Display values -->
-              <div v-else @click="startEdit(it, col)" class="cell-content" :class="{ 'editable': col !== 'id' && col !== 'name' && col !== 'sr_created' && col !== 'sr_updated' && !isForeignKey(col) }">
-                <span v-if="col === 'sr_created' && getItemValue(it, col) != null" class="date">
-                  {{ formatUnixTimestamp(getItemValue(it, col)) }}
-                  <span v-if="it.srCreatedRelative != null" class="relative-time">({{ formatRelativeTime(Number(it.srCreatedRelative)) }})</span>
-                </span>
-                <span v-else-if="col === 'sr_updated' && getItemValue(it, col) != null" class="date">
-                  {{ formatUnixTimestamp(getItemValue(it, col)) }}
-                  <span v-if="it.srUpdatedRelative != null" class="relative-time">({{ formatRelativeTime(Number(it.srUpdatedRelative)) }})</span>
-                </span>
-                <span v-else-if="col === 'id'">
-                  <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
-                </span>
-                <span v-else-if="col === 'name'">
-                  <router-link :to="`/table/${props.tableId}/${getItemValue(it, 'id')}`">{{ getItemValue(it, col) }}</router-link>
-                </span>
-                <span v-else-if="isForeignKey(col) && getItemValue(it, col) != null">
-                  <template v-if="getReferencedItem(col, getItemValue(it, col))">
-                    <router-link :to="`/table/${getForeignKeyInfo(col)?.referencedTable}/${getItemValue(it, col)}`">
-                      {{ getReferencedItemName(getReferencedItem(col, getItemValue(it, col))) }}
-                    </router-link>
-                  </template>
-                  <template v-else>
-                    {{ getItemValue(it, col) }}
-                  </template>
-                </span>
-                <span v-else-if="getItemValue(it, col) == null" class="subtle">NULL</span>
-                <span v-else-if="isTinyintColumn(col)" class="boolean-display">
-                  <span v-if="getBooleanValue(it, col)" class="boolean-true">✓</span>
-                  <span v-else class="boolean-false">✗</span>
-                </span>
-                <span v-else-if="isDatetimeColumn(col) && getItemValue(it, col) != null">
-                  {{ new Date(getItemValue(it, col)).toLocaleString() }}
-                </span>
-                <span v-else>
-                  <!-- Check if server-rendered markdown field exists -->
-                  <template v-if="hasMarkdownField(col, it)">
-                    <div v-html="getMarkdownContent(col, it)"
-                         class="markdown-content"></div>
-                  </template>
-                  <!-- Apply client-side conditional formatting (non-markdown) -->
-                  <template v-else>
-                    {{ applyConditionalFormatting(col, getItemValue(it, col), it).content }}
-                  </template>
-                </span>
-              </div>
-            </td>
-            <td style = "width: 5%">
-              <RowActionsDropdown :table-id="props.tableId" :row-id="getItemValue(it, 'id')" @deleted="() => { const id = String(getItemValue(it, 'id')); emit('row-deleted', id); load(); emit('rows-updated') }" />
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      </div>
-      <!-- Selection controls - moved to bottom above pagination -->
-      <div v-if="pagedItems.length > 0 && hasSelectedItems" class="selection-controls padding">
-        <button
-          @click="confirmDeleteSelected"
-          class="button bad"
-          :disabled="deleting"
+      <ViewsButton
+        v-if="showViewSwitcher || showViewEdit || showViewCreate"
+        :table-id="props.tableId"
+        :show-view-create="showViewCreate"
+        :show-view-edit="showViewEdit"
+        :external-views="tableViews"
+        :external-selected-view-id="selectedViewId"
+        :external-current-view="currentView"
+        @view-selected="selectView"
+      />
+      <router-link
+        v-if="showExport"
+        :to="`/table/${props.tableId}/export`"
+        class="button inline-icon neutral ss-large"
+      >
+        <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Export</span>
+      </router-link>
+      <router-link
+        v-if="showStructure"
+        :to="`/table/${props.tableId}/column-types`"
+        class="button inline-icon neutral ss-large"
+      >
+        <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Structure</span>
+      </router-link>
+      <div v-if="showInsert" class="insert-button-group">
+        <router-link
+          :to="`/table/${props.tableId}/insert-row`"
+          class="button inline-icon neutral insert-button"
+          accesskey="n"
+          title="Insert row"
         >
-          🗑️ Delete Selected ({{ selectedKeys.size }})
+          <HugeiconsIcon :icon="AddCircleIcon" width="1em" height="1em" aria-hidden="true" />
+          <span>{{ insertButtonText }}</span>
+        </router-link>
+        <button
+          class="button inline-icon good quick-add-button"
+          title="Quick Add"
+          aria-label="Quick Add"
+          @click="openQuickAddDialog"
+        >
+          <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span class="quick-add-text" />
         </button>
       </div>
-	  <div v-if="showPagination" class = "padding">
-		  <Pagination
-		    :total="total"
-		    :page="page"
-		    :page-size="pageSize"
-		    @update:page="(newPage) => page = newPage"
-		    @update:page-size="(newPageSize) => pageSize = newPageSize"
-		  />
-	  </div>
+    </template>
+
+    <div v-if="error" class="error">{{ error }}</div>
+    <div v-else-if="loading" class="loading-state">Loading…</div>
+    <div v-else class="section-content">
+      <div class="table-host">
+        <Table
+          ref="tableRef"
+          :data="flattenedRows"
+          :headers="tableHeaders"
+          :row-key="getStableRowId"
+          :filters="tableFilters"
+          :column-visibility="columnVisibility"
+          :column-order="columnOrder"
+          :sort-by="sortBy"
+          :sort-dir="sortDir"
+          :page="page"
+          :page-size="pageSize"
+          :selected-keys="selectedKeys"
+          :active-cell="activeCell"
+          :show-pagination="showPagination"
+          :reset-page-on-sort="false"
+          :load-saved-layout="false"
+          :column-options="true"
+          :cell-style="cellStyle"
+          selectable
+          selection-click-mode="extended"
+          @update:filters="onFiltersUpdate"
+          @update:column-visibility="onColumnVisibilityUpdate"
+          @update:column-order="onColumnOrderUpdate"
+          @update:sort-by="sortBy = $event"
+          @update:sort-dir="sortDir = $event"
+          @update:page="page = $event"
+          @update:page-size="pageSize = $event"
+          @update:selected-keys="onSelectedKeysUpdate"
+          @update:active-cell="onActiveCellUpdate"
+        >
+          <template #cell="{ row, header }">
+            <template v-if="header.key === ACTIONS_COLUMN">
+              <RowActionsDropdown
+                :table-id="props.tableId"
+                :row-id="String(cellValue(row, 'id'))"
+                @deleted="onRowActionDeleted(row)"
+              />
+            </template>
+
+            <template v-else-if="isEditingRow(row, header.key)">
+              <div class="inline-edit" data-row-click-ignore>
+                <input
+                  v-if="isTinyintColumn(header.key)"
+                  type="checkbox"
+                  :checked="getBooleanValue(sourceItemForRow(row), header.key)"
+                  :disabled="saving"
+                  class="edit-checkbox"
+                  @change="event => {
+                    editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+                    saveEditRow(row)
+                  }"
+                />
+                <input
+                  v-else-if="isDatetimeColumn(header.key)"
+                  :ref="setEditInput"
+                  v-model="editingValue"
+                  type="datetime-local"
+                  :disabled="saving"
+                  class="edit-input"
+                  @keyup.enter="saveEditRow(row)"
+                  @keyup.escape="cancelEdit"
+                  @blur="saveEditRow(row)"
+                />
+                <input
+                  v-else
+                  :ref="setEditInput"
+                  v-model="editingValue"
+                  type="text"
+                  :disabled="saving"
+                  class="edit-input"
+                  @keyup.enter="saveEditRow(row)"
+                  @keyup.escape="cancelEdit"
+                  @blur="saveEditRow(row)"
+                />
+              </div>
+            </template>
+
+            <div
+              v-else
+              class="cell-content"
+              :class="{ editable: canEditColumn(header.key) }"
+              @click="startEditRow(row, header.key)"
+            >
+              <span
+                v-if="header.key === 'sr_created' && cellValue(row, header.key) != null"
+                class="date"
+              >
+                {{ formatUnixTimestamp(cellValue(row, header.key)) }}
+                <span
+                  v-if="relativeTime(sourceItemForRow(row), 'sr_created') != null"
+                  class="relative-time"
+                >
+                  ({{ formatRelativeTime(relativeTime(sourceItemForRow(row), 'sr_created')!) }})
+                </span>
+              </span>
+              <span
+                v-else-if="header.key === 'sr_updated' && cellValue(row, header.key) != null"
+                class="date"
+              >
+                {{ formatUnixTimestamp(cellValue(row, header.key)) }}
+                <span
+                  v-if="relativeTime(sourceItemForRow(row), 'sr_updated') != null"
+                  class="relative-time"
+                >
+                  ({{ formatRelativeTime(relativeTime(sourceItemForRow(row), 'sr_updated')!) }})
+                </span>
+              </span>
+              <router-link
+                v-else-if="
+                  header.key === 'id'
+                  || header.key === 'name'
+                  || header.key === tableStructure?.primaryKeyColumn
+                "
+                :to="`/table/${props.tableId}/${cellValue(row, 'id')}`"
+              >
+                {{ cellValue(row, header.key) }}
+              </router-link>
+              <span
+                v-else-if="isForeignKey(header.key) && cellValue(row, header.key) != null"
+              >
+                <router-link
+                  v-if="getReferencedItem(header.key, cellValue(row, header.key))"
+                  :to="`/table/${
+                    getForeignKeyInfo(header.key)?.referencedTableTcName
+                    || getForeignKeyInfo(header.key)?.referencedTable
+                  }/${cellValue(row, header.key)}`"
+                >
+                  {{
+                    getReferencedItemName(
+                      getReferencedItem(header.key, cellValue(row, header.key)),
+                    )
+                  }}
+                </router-link>
+                <template v-else>{{ cellValue(row, header.key) }}</template>
+              </span>
+              <span v-else-if="cellValue(row, header.key) == null" class="subtle">NULL</span>
+              <span v-else-if="isTinyintColumn(header.key)" class="boolean-display">
+                <span
+                  v-if="getBooleanValue(sourceItemForRow(row), header.key)"
+                  class="boolean-true"
+                >✓</span>
+                <span v-else class="boolean-false">✗</span>
+              </span>
+              <span v-else-if="isDatetimeColumn(header.key)">
+                {{ new Date(cellValue(row, header.key)).toLocaleString() }}
+              </span>
+              <div
+                v-else-if="hasMarkdownField(header.key, sourceItemForRow(row))"
+                class="markdown-content"
+                v-html="getMarkdownContent(header.key, sourceItemForRow(row))"
+              />
+              <span v-else>
+                {{ applyConditionalFormatting(header.key, cellValue(row, header.key)).content }}
+              </span>
+            </div>
+          </template>
+
+          <template #filtered-empty="{ clearFilters }">
+            <div class="filtered-empty-message">
+              <div>No items match this filter.</div>
+              <button class="button" @click="clearFilters">Clear filters</button>
+            </div>
+          </template>
+
+          <template #empty>
+            <div class="empty-state">
+              <div class="empty-state-content">
+                <div class="empty-state-icon">📋</div>
+                <h3>No items in this table</h3>
+                <p>This table is empty. Get started by adding your first item.</p>
+                <router-link class="button" :to="`/table/${props.tableId}/insert-row`">
+                  ➕ Insert First Item
+                </router-link>
+                <div class="empty-state-actions">
+                  <router-link class="button" :to="`/table/${props.tableId}/add-column`">
+                    Add Column
+                  </router-link>
+                </div>
+              </div>
+            </div>
+          </template>
+        </Table>
+      </div>
+
+      <div v-if="hasSelectedItems" class="selection-controls padding">
+        <button
+          class="button bad"
+          :disabled="deleting"
+          @click="confirmDeleteSelected"
+        >
+          🗑️ Delete Selected ({{ selectedKeys.length }})
+        </button>
       </div>
     </div>
 
-
-    <!-- Bulk Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDeleteSelected">
       <div class="modal-content" @click.stop>
         <h3>Confirm Delete</h3>
-        <p>Are you sure you want to delete {{ selectedKeys.size }} selected row(s)? This action cannot be undone.</p>
+        <p>
+          Are you sure you want to delete {{ selectedKeys.length }} selected row(s)?
+          This action cannot be undone.
+        </p>
         <div class="modal-actions">
-          <button @click="cancelDeleteSelected" class="button neutral" :disabled="deleting">
+          <button
+            class="button neutral"
+            :disabled="deleting"
+            @click="cancelDeleteSelected"
+          >
             Cancel
           </button>
-          <button @click="deleteSelectedItems" class="button bad" :disabled="deleting">
-            {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.size} Row(s)` }}
+          <button
+            class="button bad"
+            :disabled="deleting"
+            @click="deleteSelectedItems"
+          >
+            {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.length} Row(s)` }}
           </button>
         </div>
       </div>
     </div>
 
-    <!-- Quick Add Dialog -->
     <div
       v-if="showQuickAddDialog"
       class="modal-overlay"
+      tabindex="0"
       @click="closeQuickAddDialog"
       @keydown.escape="closeQuickAddDialog"
-      tabindex="0"
     >
       <div class="modal-content quick-add-modal" @click.stop>
         <div class="modal-header">
           <div class="modal-header-left">
-            <h3>{{ tableStructure?.CreateButtonText ?? 'Insert row' }}</h3>
-            <!-- View Selector -->
-            <div v-if="quickAddViewOptions.length > 1" class="quick-add-view-selector">
+            <h3>{{ insertButtonText }}</h3>
+            <div v-if="viewOptions.length > 1" class="quick-add-view-selector">
               <label for="quick-add-view">View:</label>
               <select
                 id="quick-add-view"
                 v-model="quickAddSelectedViewId"
                 class="view-dropdown"
               >
-                <option
-                  v-for="view in quickAddViewOptions"
-                  :key="view.id"
-                  :value="view.id"
-                >
+                <option v-for="view in viewOptions" :key="view.id" :value="view.id">
                   {{ view.viewName }}
                 </option>
               </select>
             </div>
           </div>
-          <button @click="closeQuickAddDialog" class="button neutral" title="Close">
-            ✕
-          </button>
+          <button class="button neutral" title="Close" @click="closeQuickAddDialog">✕</button>
         </div>
         <div class="modal-body">
           <InsertRow
             :table-id="props.tableId"
             :field-defs="quickAddFieldDefs"
             @created="onQuickAddCreated"
-            @cancelled="onQuickAddCancelled"
+            @cancelled="closeQuickAddDialog"
           />
         </div>
       </div>
     </div>
   </Section>
-
-  <!-- Column context menu -->
-  <div
-    v-if="columnMenu.visible && columnMenu.column"
-    class="column-context-menu"
-    :style="{ left: columnMenu.x + 'px', top: columnMenu.y + 'px' }"
-    @click="hideColumnMenu"
-  >
-    <button class="menu-item" @click.stop="sortAscending(columnMenu.column)">Sort Ascending</button>
-    <button class="menu-item" @click.stop="sortDescending(columnMenu.column)">Sort Descending</button>
-    <button
-      v-if="columnMenu.column && columnFilters[columnMenu.column]"
-      class="menu-item"
-      @click.stop="clearColumnFilter(columnMenu.column)"
-    >
-      Clear Filter
-    </button>
-    <div class="menu-separator"></div>
-    <div class="menu-filter">
-      <label>Filter</label>
-      <input
-        type="text"
-        v-model="columnFilterInput"
-        placeholder="Contains…"
-        @keyup.enter="applyColumnFilter"
-        @click.stop
-      />
-      <div class="filter-actions">
-        <button type="button" class="button good small" @click.stop="applyColumnFilter">Apply</button>
-      </div>
-    </div>
-  </div>
 </template>
 
 <style scoped>
-.toolbar-group {
-  display: flex;
-  align-items: center;
-}
-
-.view-selector {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.view-selector label {
-  font-weight: 600;
-  color: #333;
-}
-
-.view-dropdown {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  font-size: 1rem;
-  cursor: pointer;
-  min-width: 150px;
-}
-
-.view-dropdown:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.cell-content {
-  min-height: 1.5em;
-  padding: 0.25rem;
-  border-radius: 3px;
-  transition: background-color 0.2s;
-}
-
-.cell-content.editable {
-  cursor: pointer;
-}
-
-.cell-content.editable:hover {
-  background-color: #f8f9fa;
-}
-
-.inline-edit {
-  padding: 0;
-}
-
-.edit-input {
-  width: 100%;
-  border: 2px solid #007bff;
-  border-radius: 3px;
-  padding: 0.25rem;
-  font-size: inherit;
-  background: white;
-  outline: none;
-}
-
-.edit-input:focus {
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.edit-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.boolean-display {
-  display: flex;
-  align-items: center;
-  min-height: 1.5em;
-}
-
-.boolean-true {
-  color: #28a745;
-  font-weight: bold;
-  font-size: 1.2em;
-}
-
-.boolean-false {
-  color: #dc3545;
-  font-weight: bold;
-  font-size: 1.2em;
-}
-
-.edit-checkbox {
-  transform: scale(1.2);
-  cursor: pointer;
-}
-
-.edit-checkbox:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.table-title {
-  margin: 0;
-}
-
 .error {
   color: #b00020;
 }
 
-/* Constrain the table component wrapper (now applied directly to Section) */
+.loading-state {
+  padding: 1rem;
+}
+
 .table-component-wrapper {
   display: flex !important;
   flex-direction: column !important;
@@ -1863,171 +1237,109 @@ onUnmounted(() => {
 
 .table-component-wrapper :deep([class*="section-body"]),
 .table-component-wrapper :deep([class*="section-content"]) {
-  flex: 1 !important;
-  min-height: 0 !important;
   display: flex !important;
+  flex: 1 !important;
   flex-direction: column !important;
+  min-height: 0 !important;
   overflow: hidden !important;
 }
 
-.section-content {
+.section-content,
+.table-host {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-height: 0;
   max-width: calc(100dvw - 3rem);
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-  max-height: 100%;
-}
-
-.table-scroll-container {
   overflow: auto;
-  flex: 1;
-  min-height: 0;
-  max-height: 100%;
-  position: relative;
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: max-content;
+.cell-content {
+  min-height: 1.5em;
+  padding: 0.25rem;
+  border-radius: 3px;
 }
 
-.table thead {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background-color: #fff;
-}
-
-/* Column group styles for consistent column widths */
-.checkbox-col {
-  width: 1rem;
-  min-width: 1rem;
-  max-width: 1rem;
-}
-
-.id-col {
-  width: 5rem;
-  min-width: 5rem;
-  max-width: 5rem;
-}
-
-.actions-col {
-  width: 5rem;
-  min-width: 5rem;
-  max-width: 5rem;
-}
-
-/* Hide columns 3 and above on small screens */
-@media (max-width: 768px) {
-  colgroup col:nth-child(n+5) {
-    display: none;
-  }
-
-  .table thead th:nth-child(n+5),
-  .table tbody td:nth-child(n+5) {
-    display: none;
-  }
-
-  .section-content {
-    max-width: 100%;
-  }
-}
-
-.table thead th {
-  text-align: left;
-  border-bottom: 1px solid #ddd;
-  padding: .5rem;
+.cell-content.editable {
   cursor: pointer;
-  transition: color .15s ease-in-out;
-  background-color: #fff;
 }
 
-.table thead th:hover {
-  color: #0366d6;
+.cell-content.editable:hover {
+  background-color: var(--hover-background-color, #f8f9fa);
 }
 
-.table tbody td {
-  border-bottom: 1px solid #eee;
-  padding: .5rem;
+.inline-edit {
+  padding: 0;
 }
 
-.no-items {
-  padding: .75rem;
-  color: #666;
+.edit-input {
+  width: 100%;
+  padding: 0.25rem;
+  border: 2px solid #007bff;
+  border-radius: 3px;
+  background: white;
+  font-size: inherit;
+  outline: none;
 }
 
-.current-row {
-  background-color: #e3f2fd !important;
+.edit-input:focus {
+  box-shadow: 0 0 0 2px rgb(0 123 255 / 25%);
 }
 
-.current-row td {
-  background-color: #e3f2fd !important;
+.edit-input:disabled,
+.edit-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
-.selected {
-  background: #f0f7ff;
+.edit-checkbox {
+  cursor: pointer;
+  transform: scale(1.2);
 }
 
-.dropdown-menu {
-  position: absolute;
-  z-index: 10;
-  background: #fff;
-  border: 1px solid #ddd;
-  padding: .5rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, .08);
-  min-width: 200px;
+.boolean-display {
+  display: flex;
+  align-items: center;
+  min-height: 1.5em;
 }
 
-/* Selection controls */
+.boolean-true,
+.boolean-false {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+
+.boolean-true {
+  color: #28a745;
+}
+
+.boolean-false {
+  color: #dc3545;
+}
+
+.relative-time {
+  margin-left: 0.5em;
+  color: #888;
+  font-size: 0.8em;
+  font-weight: normal;
+}
+
 .selection-controls {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
+  gap: 0.5rem;
   margin-left: auto;
   flex-wrap: wrap;
 }
 
-/* Modal Dialog Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  box-sizing: border-box;
+.filtered-empty-message {
+  text-align: center;
 }
 
-.modal-content {
-  background: white;
-  border-radius: 8px;
-  padding: 1rem;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+.filtered-empty-message .button {
+  margin-top: 0.5rem;
 }
 
-.modal-content p {
-  margin: 0 0 1.5rem 0;
-  color: #666;
-  line-height: 1.5;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-
-/* Empty State Styles */
 .empty-state {
   display: flex;
   align-items: center;
@@ -2037,292 +1349,91 @@ onUnmounted(() => {
 }
 
 .empty-state-content {
-  text-align: center;
   max-width: 500px;
+  text-align: center;
 }
 
 .empty-state-icon {
-  font-size: 4rem;
   margin-bottom: 1rem;
+  font-size: 4rem;
   opacity: 0.6;
 }
 
 .empty-state-content h3 {
-  margin: 0 0 0.5rem 0;
-  color: #333;
+  margin: 0 0 0.5rem;
   font-size: 1.5rem;
   font-weight: 600;
 }
 
 .empty-state-content p {
-  margin: 0 0 2rem 0;
+  margin: 0 0 2rem;
   color: #666;
-  font-size: 1rem;
   line-height: 1.5;
 }
 
 .empty-state-actions {
   display: flex;
-  gap: 1rem;
   justify-content: center;
-  flex-wrap: wrap;
+  gap: 1rem;
   margin-top: 1.5rem;
+  flex-wrap: wrap;
 }
 
-.button:active {
-  transform: translateY(0);
-}
-
-.small {
-  width: 0rem;
-}
-
-.small input {
-  width: 1rem;
-}
-
-/* Responsive design for selection controls */
-@media (max-width: 768px) {
-  .selection-controls {
-    margin-left: 0;
-    margin-top: 0.5rem;
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .modal-actions {
-    flex-direction: column;
-  }
-
-  .modal-actions .button {
-    width: 100%;
-  }
-
-  .empty-state {
-    min-height: 300px;
-    padding: 1rem;
-  }
-
-  .empty-state-icon {
-    font-size: 3rem;
-  }
-
-  .empty-state-content h3 {
-    font-size: 1.25rem;
-  }
-
-  .empty-state-actions {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .empty-state-actions .button {
-    width: 100%;
-    max-width: 250px;
-  }
-
-  section {
-    margin-top: 0;
-  }
-}
-
-.insert-toolbar {
-  display: flex;
-  align-items: center;
-}
-
-.fg1 { flex-grow: 1 }
-
-/* Blended Insert/Quick Add Button Group — do not flex-grow (picocrank grows non-button toolbar children) */
 .insert-button-group {
   display: flex;
   align-items: center;
-  flex: 0 0 auto;
   min-width: auto;
+  flex: 0 0 auto;
 }
 
-/* Ensure proper spacing between buttons */
 .insert-button-group .button {
   margin: 0;
 }
 
-@media (max-width: 768px) {
-  .ss-large {
-    display: none;
-  }
-
-  .view-selector {
-    display: none;
-  }
-
-  .quick-add-view-selector {
-    display: none;
-  }
-
-  /* Mobile Insert Button Group Styles */
-  .insert-button-group {
-	display: flex;
-    flex-direction: row;
-  }
-
-  .insert-button:first-child {
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-	border-right: 0;
-	padding-right: 0.5rem;
-  }
-
-  .quick-add-button {
-	border-top-left-radius: 0;
-	border-bottom-left-radius: 0;
-	border-left: 0;
-	padding-left: 0.5rem;
-  }
-
-  /* Hide Quick Add text on mobile */
-  .quick-add-text {
-    display: none;
-  }
-
-  /* Mobile Quick Add Dialog Styles */
-  .quick-add-modal {
-    max-width: 95%;
-    width: 95%;
-    max-height: 90vh;
-    margin: 0.5rem;
-  }
-
-  .modal-overlay {
-    padding: 0.5rem;
-    align-items: flex-start;
-    padding-top: 2rem;
-  }
-
-  .modal-content {
-    padding: 0.5rem;
-    max-width: none;
-    width: 100%;
-    border-radius: 4px;
-  }
-
-  .modal-header {
-    padding: 0.5rem;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .modal-header-left {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .modal-header h3 {
-    font-size: 1.1rem;
-    margin: 0;
-  }
-
-  .modal-header button {
-    align-self: flex-end;
-    padding: 0.25rem 0.5rem;
-    font-size: 1rem;
-  }
-
-  .modal-body {
-    padding: 0.5rem;
-  }
-
-  .quick-add-view-selector {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    padding: 0.5rem;
-    background: #f8f9fa;
-    border-radius: 4px;
-    border: 1px solid #e9ecef;
-  }
-
-  .quick-add-view-selector label {
-    font-size: 0.85rem;
-    margin: 0;
-  }
-
-  .quick-add-view-selector .view-dropdown {
-    padding: 0.5rem;
-    font-size: 0.9rem;
-    min-width: auto;
-    width: 100%;
-  }
+.modal-overlay {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  padding: 1rem;
+  background-color: rgb(0 0 0 / 50%);
 }
 
-/* Extra small mobile screens */
-@media (max-width: 480px) {
-  .quick-add-modal {
-    max-width: 98%;
-    width: 98%;
-    margin: 0.25rem;
-    max-height: 95vh;
-  }
-
-  .modal-overlay {
-    padding: 0.25rem;
-    padding-top: 1rem;
-  }
-
-  .modal-content {
-    padding: 0.25rem;
-    border-radius: 2px;
-  }
-
-  .modal-header {
-    padding: 0.25rem;
-  }
-
-  .modal-header h3 {
-    font-size: 1rem;
-  }
-
-  .modal-body {
-    padding: 0.25rem;
-  }
-
-  .quick-add-view-selector {
-    padding: 0.25rem;
-  }
-
-  .quick-add-view-selector label {
-    font-size: 0.8rem;
-  }
-
-  .quick-add-view-selector .view-dropdown {
-    padding: 0.4rem;
-    font-size: 0.85rem;
-  }
-
-  /* Extra small mobile button group styles */
-  .insert-button-group {
-    margin: 0.25rem 0;
-  }
-
-   /* Ensure Quick Add text stays hidden on extra small screens */
-  .quick-add-text {
-    display: none;
-  }
-}
-
-/* Quick Add Dialog Styles */
-.quick-add-modal {
-  max-width: 600px;
+.modal-content {
   width: 90%;
+  max-width: 400px;
+  padding: 1rem;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 30%);
+}
+
+.modal-content p {
+  margin: 0 0 1.5rem;
+  color: #666;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.quick-add-modal {
+  width: 90%;
+  max-width: 600px;
   max-height: 80vh;
   overflow-y: auto;
 }
 
 .modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
+  justify-content: space-between;
   padding: 0.75rem;
   border-bottom: 1px solid #ddd;
 }
@@ -2340,8 +1451,8 @@ onUnmounted(() => {
 }
 
 .modal-header button {
-  padding: 0.5rem;
   min-width: auto;
+  padding: 0.5rem;
   font-size: 1.2rem;
   line-height: 1;
 }
@@ -2355,216 +1466,156 @@ onUnmounted(() => {
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
-  background: #f8f9fa;
-  border-radius: 4px;
   border: 1px solid #e9ecef;
+  border-radius: 4px;
+  background: #f8f9fa;
 }
 
 .quick-add-view-selector label {
-  font-weight: 600;
-  color: #333;
   margin: 0;
+  color: #333;
   font-size: 0.9rem;
+  font-weight: 600;
 }
 
-.quick-add-view-selector .view-dropdown {
+.view-dropdown {
+  min-width: 120px;
   padding: 0.4rem 0.6rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: white;
-  font-size: 0.9rem;
   cursor: pointer;
-  min-width: 120px;
+  font-size: 0.9rem;
 }
 
-.quick-add-view-selector .view-dropdown:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-/* Relative time styling */
-.relative-time {
-  font-size: 0.8em;
-  color: #888;
-  font-weight: normal;
-  margin-left: 0.5em;
-}
-
-/* Markdown content styling */
 .markdown-content {
   line-height: 1.4;
 }
 
-.markdown-content h1,
-.markdown-content h2,
-.markdown-content h3,
-.markdown-content h4,
-.markdown-content h5,
-.markdown-content h6 {
-  margin: 0.5em 0 0.25em 0;
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  margin: 0.5em 0 0.25em;
   font-weight: bold;
 }
 
-.markdown-content h1 { font-size: 1.2em; }
-.markdown-content h2 { font-size: 1.1em; }
-.markdown-content h3 { font-size: 1.05em; }
-.markdown-content h4,
-.markdown-content h5,
-.markdown-content h6 { font-size: 1em; }
-
-.markdown-content p {
+.markdown-content :deep(p) {
   margin: 0.25em 0;
 }
 
-.markdown-content ul,
-.markdown-content ol {
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
   margin: 0.25em 0;
   padding-left: 1.5em;
 }
 
-.markdown-content li {
-  margin: 0.1em 0;
-}
-
-.markdown-content code {
-  background: #f5f5f5;
+.markdown-content :deep(code) {
   padding: 0.1em 0.3em;
   border-radius: 3px;
+  background: #f5f5f5;
   font-family: monospace;
   font-size: 0.9em;
 }
 
-.markdown-content pre {
-  background: #f5f5f5;
-  padding: 0.5em;
-  border-radius: 4px;
-  overflow-x: auto;
-  margin: 0.25em 0;
-}
-
-.markdown-content pre code {
-  background: none;
-  padding: 0;
-}
-
-.markdown-content blockquote {
-  border-left: 3px solid #ddd;
-  padding-left: 0.5em;
-  margin: 0.25em 0;
-  color: #666;
-}
-
-.markdown-content a {
+.markdown-content :deep(a) {
   color: #007bff;
   text-decoration: none;
 }
 
-.markdown-content a:hover {
+.markdown-content :deep(a:hover) {
   text-decoration: underline;
 }
 
-.markdown-content strong {
-  font-weight: bold;
+@media (max-width: 768px) {
+  .section-content,
+  .table-host {
+    max-width: 100%;
+  }
+
+  .ss-large,
+  .quick-add-text {
+    display: none;
+  }
+
+  .insert-button-group {
+    flex-direction: row;
+  }
+
+  .insert-button {
+    padding-right: 0.5rem;
+    border-right: 0;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .quick-add-button {
+    padding-left: 0.5rem;
+    border-left: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  .selection-controls {
+    justify-content: flex-start;
+    width: 100%;
+    margin-top: 0.5rem;
+    margin-left: 0;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions .button {
+    width: 100%;
+  }
+
+  .empty-state {
+    min-height: 300px;
+    padding: 1rem;
+  }
+
+  .empty-state-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .modal-overlay {
+    align-items: flex-start;
+    padding: 2rem 0.5rem 0.5rem;
+  }
+
+  .modal-content {
+    width: 100%;
+    max-width: none;
+    padding: 0.5rem;
+    border-radius: 4px;
+  }
+
+  .quick-add-modal {
+    width: 95%;
+    max-width: 95%;
+    max-height: 90vh;
+    margin: 0.5rem;
+  }
+
+  .modal-header,
+  .modal-header-left {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .quick-add-view-selector {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quick-add-view-selector .view-dropdown {
+    width: 100%;
+  }
 }
-
-.markdown-content em {
-  font-style: italic;
-}
-
-/* Column context menu */
-.column-context-menu {
-  position: fixed;
-  background: white;
-  border: 1px solid #e9ecef;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
-  z-index: 2000;
-  display: flex;
-  flex-direction: column;
-  min-width: 160px;
-  padding: 4px 0;
-}
-
-.column-context-menu .menu-item {
-  padding: 8px 12px;
-  background: transparent;
-  border: none;
-  text-align: left;
-  width: 100%;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.column-context-menu .menu-item:hover {
-  background: #f6f7fb;
-}
-
-.filter-indicator {
-  color: #007bff;
-  margin-left: 6px;
-  font-size: 10px;
-  vertical-align: middle;
-}
-
-.column-context-menu .menu-separator {
-  height: 1px;
-  background: #e9ecef;
-  margin: 4px 0;
-}
-
-.column-context-menu .menu-filter {
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.column-context-menu .menu-filter label {
-  font-size: 12px;
-  color: #6c757d;
-}
-
-.column-context-menu .menu-filter input {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #dcdfe6;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.column-context-menu .menu-filter input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.15);
-}
-
-.column-context-menu .filter-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.filter-indicator {
-  color: #007bff;
-  margin-left: 6px;
-  font-size: 10px;
-  vertical-align: middle;
-}
-
-.filtered-empty-wrapper {
-  padding: 1rem;
-}
-
-.filtered-empty {
-  text-align: center;
-  padding: 20px;
-  color: #6c757d;
-}
-
-.filtered-empty .button {
-  margin-top: 8px;
-}
-
-/* Views dialog styles moved to ViewsButton.vue to avoid duplication */
-
 </style>

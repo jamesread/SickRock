@@ -6,7 +6,7 @@ import { Add01Icon, ArrowLeft01Icon, RefreshIcon, UserGroupIcon } from '@hugeico
 import Section from 'picocrank/vue/components/Section.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
-import TableWithRowClick from '../../components/TableWithRowClick.vue'
+import Table from 'picocrank/vue/components/Table.vue'
 import { createApiClient } from '../../stores/api'
 import { useRbac } from '../../composables/useRbac'
 import { isSystemGroup } from '../../utils/rbacAccess'
@@ -71,7 +71,7 @@ async function loadAll() {
   }
 }
 
-function openGroupDetails(row: Record<string, unknown>) {
+function openGroupDetails({ row }: { row: Record<string, unknown> }) {
   router.push({ name: 'iam-group-details', params: { id: String(row.id) } })
 }
 
@@ -177,12 +177,14 @@ onMounted(loadAll)
     <template v-else>
       <p v-if="!groups.length" class="list-banner-pad inline-notification note">No user groups yet.</p>
 
-      <TableWithRowClick
+      <Table
         v-else
         class="user-table-wrap"
-        row-clickable
         :data="groups"
         :headers="tableHeaders"
+        row-key="id"
+        :filterable="false"
+        :column-options="false"
         @row-click="openGroupDetails"
       >
         <template #cell-name="{ row, value }">
@@ -198,7 +200,7 @@ onMounted(loadAll)
             </button>
           </div>
         </template>
-      </TableWithRowClick>
+      </Table>
     </template>
   </Section>
 </template>
