@@ -7,6 +7,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import { AddIcon } from '@hugeicons/core-free-icons'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -15,6 +16,7 @@ const database = ref('main')
 const table = ref('')
 const createTableInDatabase = ref(true)
 const createConfiguration = ref(true)
+const createNavigationEntry = ref(true)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
@@ -130,6 +132,7 @@ async function submit() {
         name: name.value,
         database: database.value,
         table: table.value,
+        createNavigationEntry: createNavigationEntry.value,
       })
 
       if (!response.success) {
@@ -229,6 +232,21 @@ async function submit() {
       </FormField>
 
       <FormField
+        v-if="createConfiguration"
+        label="Create navigation entry"
+        for="create-navigation-entry"
+        description="Adds a link in the main navigation menu for this table configuration"
+        :disabled="loading"
+      >
+        <input
+          id="create-navigation-entry"
+          v-model="createNavigationEntry"
+          type="checkbox"
+          :disabled="loading"
+        />
+      </FormField>
+
+      <FormField
         label="Configuration name"
         for="name"
         :label-required="createConfiguration"
@@ -248,7 +266,7 @@ async function submit() {
       </FormField>
 
       <p v-if="success" class="inline-notification note">{{ success }}</p>
-      <p v-if="error" class="inline-notification error">{{ error }}</p>
+      <NotificationBlock v-if="error" type="error" :message="error" />
 
       <template #actions>
         <button

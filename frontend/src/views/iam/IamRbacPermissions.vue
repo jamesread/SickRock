@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { RefreshIcon, ShieldKeyIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import { createApiClient } from '../../stores/api'
 import type { RbacPermission, RbacRole } from '../../gen/sickrock_pb'
@@ -75,7 +76,9 @@ onMounted(loadAll)
       </button>
     </template>
 
-    <div v-if="errorMessage" class="list-banner-pad inline-notification error">{{ errorMessage }}</div>
+    <div v-if="errorMessage" class="list-banner-pad">
+      <NotificationBlock type="error" :message="errorMessage" />
+    </div>
     <div v-if="loading && !permissions.length" class="list-banner-pad muted">Loading…</div>
 
     <template v-else>

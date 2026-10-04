@@ -10,6 +10,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
 import StatusCard from 'picocrank/vue/components/StatusCard.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 
 const iconStrokeWidth = 2.5
 
@@ -469,7 +470,7 @@ onMounted(async () => {
         </template>
         <template v-else>
           <p class="status-lead">Service worker is not registered.</p>
-          <p v-if="swStatus.error" class="inline-notification error">{{ swStatus.error }}</p>
+          <NotificationBlock v-if="swStatus.error" type="error" :message="swStatus.error" />
         </template>
       </StatusCard>
 

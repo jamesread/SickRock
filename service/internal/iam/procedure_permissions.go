@@ -21,6 +21,7 @@ var writeProcedures = map[string]bool{
 	sickrockpbconnect.SickRockSetUserGroupMembersProcedure:                    true,
 	sickrockpbconnect.SickRockCreateTableProcedure:                            true,
 	sickrockpbconnect.SickRockCreateTableConfigurationProcedure:               true,
+	sickrockpbconnect.SickRockCreateDashboardProcedure:                        true,
 	sickrockpbconnect.SickRockCreateItemProcedure:                             true,
 	sickrockpbconnect.SickRockEditItemProcedure:                               true,
 	sickrockpbconnect.SickRockDeleteItemProcedure:                             true,
@@ -91,6 +92,7 @@ func RequiredPermission(procedureName string) string {
 		return rbac.PermissionUserGroupsManage
 	case sickrockpbconnect.SickRockCreateTableProcedure,
 		sickrockpbconnect.SickRockCreateTableConfigurationProcedure,
+		sickrockpbconnect.SickRockCreateDashboardProcedure,
 		sickrockpbconnect.SickRockAddTableColumnProcedure,
 		sickrockpbconnect.SickRockChangeColumnTypeProcedure,
 		sickrockpbconnect.SickRockChangeColumnNameProcedure,

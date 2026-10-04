@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { Edit03Icon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
@@ -177,7 +178,7 @@ function datetimeLocalToMysql(datetimeLocal: string): string {
     </template>
 
     <div class="section-content padding">
-    <div v-if="error" class="error">{{ error }}</div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
     <div v-else-if="loading">Loading…</div>
     <form v-else @submit.prevent="saveChanges">
       <template v-for="field in editableFields" :key="field.name">

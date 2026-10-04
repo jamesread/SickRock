@@ -188,7 +188,7 @@ func main() {
 	loadEnvFile(cfg)
 	configureLogging(cfg)
 
-	db, err := repo.ConnectDatabase("file:../tmp/sickrock.db?_pragma=foreign_keys(1)")
+	db, err := repo.ConnectDatabase("file:../tmp/sickrock.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)")
 	if err != nil {
 		log.Fatalf("open db: %v", err)
 	}
@@ -211,6 +211,10 @@ func main() {
 		log.Fatalf("update system table configurations: %v", err)
 	}
 
+	if err := repository.BackfillTableRelationsFromPhysicalFKs(context.Background()); err != nil {
+		log.Fatalf("backfill table_relations: %v", err)
+	}
+
 	logDatabaseEngineVersion(db)
 
 	iamStore := iam.NewStore(db)
@@ -226,6 +230,7 @@ func main() {
 	srv := srvpkg.NewSickRockServer(repository, authLayer)
 
 	go startDeviceCodeCleanupJob(repository)
+	go startRssCalendarFeedRefreshJob(srv)
 
 	jsonOpt := connectproto.WithJSON(
 		protojson.MarshalOptions{
@@ -421,4 +426,22 @@ func cleanupDeviceCodes(repository *repo.Repository) {
 	if err := repository.CleanupExpiredDeviceCodes(ctx); err != nil {
 		log.Errorf("Device code cleanup failed: %v", err)
 	}
+}
+
+func startRssCalendarFeedRefreshJob(srv *srvpkg.SickRockServer) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	log.Info("RSS calendar feed refresh job started (checks every 5 minutes, default feed interval 60 minutes)")
+	refreshDueRssFeeds(srv)
+
+	for range ticker.C {
+		refreshDueRssFeeds(srv)
+	}
+}
+
+func refreshDueRssFeeds(srv *srvpkg.SickRockServer) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	srv.RefreshDueRssCalendarFeeds(ctx)
 }

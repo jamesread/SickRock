@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { Share08Icon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import { createApiClient } from '../stores/api'
 import { useRbac } from '../composables/useRbac'
@@ -94,7 +95,7 @@ onMounted(load)
     subtitle="Choose which user groups can access this table and with which role."
     :icon="Share08Icon"
   >
-    <div v-if="errorMessage" class="inline-notification error">{{ errorMessage }}</div>
+    <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
     <div v-if="saveMessage" class="inline-notification note">{{ saveMessage }}</div>
     <div v-if="loading" class="muted">Loading…</div>
     <FormLayout v-else @submit.prevent="save">

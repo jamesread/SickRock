@@ -1,39 +1,61 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
 import { CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
+import { createApiClient } from '../stores/api'
 
 const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableName as string
 const fromTable = route.query.fromTable as string | undefined
 const fromRowId = route.query.fromRowId as string | undefined
-const dashboard = route.query.dashboard as string | undefined
 const dashboardName = route.query.dashboardName as string | undefined
 
-// Check if this is from column addition or row insertion based on the referrer
+const client = createApiClient()
+const rowLabel = ref('Row')
+
 const isFromColumnAddition = ref(false)
 
-onMounted(() => {
-  // Check if we came from add-column route
+const addedTitle = computed(() =>
+  isFromColumnAddition.value ? 'Column Added Successfully' : `${rowLabel.value} Added Successfully`,
+)
+const addedMessage = computed(() =>
+  isFromColumnAddition.value
+    ? '✅ Column added successfully!'
+    : `✅ ${rowLabel.value} created successfully!`,
+)
+const insertAnotherLabel = computed(() =>
+  isFromColumnAddition.value ? '➕ Add Another Column' : `➕ Add Another ${rowLabel.value}`,
+)
+
+onMounted(async () => {
   if (document.referrer.includes('/add-column')) {
     isFromColumnAddition.value = true
+  }
+  if (isFromColumnAddition.value) {
+    return
+  }
+  try {
+    const structure = await client.getTableStructure({ pageId: tableId })
+    const name = structure.rowName?.trim()
+    if (name) {
+      rowLabel.value = name
+    }
+  } catch (error) {
+    console.warn('Failed to load row label for table:', error)
   }
 })
 
 function insertAnother() {
   if (isFromColumnAddition.value) {
-    // Navigate to add column view
     router.push({ name: 'add-column', params: { tableName: tableId } })
   } else {
-    // Navigate to insert row view with the same table
     router.push({ name: 'insert-row', params: { tableName: tableId } })
   }
 }
 
 function returnToTable() {
-  // Navigate back to the table view
   router.push({ name: 'table', params: { tableName: tableId } })
 }
 
@@ -45,32 +67,29 @@ function returnToOriginRow() {
 
 function returnToDashboard() {
   if (dashboardName) {
-    router.push({ name: 'dashboard', params: { dashboardName: dashboardName } })
+    router.push({ name: 'dashboard', params: { dashboardName } })
   }
 }
 </script>
 
 <template>
-  <Section
-    :title="isFromColumnAddition ? 'Column Added Successfully' : 'Row Added Successfully'"
-    :icon="CheckmarkSquare03Icon"
-  >
+  <Section :title="addedTitle" :icon="CheckmarkSquare03Icon">
     <div class="success-message">
-      <h3>{{ isFromColumnAddition ? '✅ Column added successfully!' : '✅ Row added successfully!' }}</h3>
+      <h3>{{ addedMessage }}</h3>
       <p>What would you like to do next?</p>
     </div>
 
     <div class="action-buttons">
-      <button @click="returnToTable" class="button neutral">
+      <button type="button" class="button neutral" @click="returnToTable">
         📋 Return to Table
       </button>
-      <button @click="insertAnother" class="button neutral">
-        {{ isFromColumnAddition ? '➕ Add Another Column' : '➕ Insert Another Row' }}
+      <button type="button" class="button neutral" @click="insertAnother">
+        {{ insertAnotherLabel }}
       </button>
-      <button v-if="dashboardName" @click="returnToDashboard" class="button neutral">
+      <button v-if="dashboardName" type="button" class="button neutral" @click="returnToDashboard">
         📊 Return to Dashboard
       </button>
-      <button v-if="fromTable && fromRowId" @click="returnToOriginRow" class="button neutral">
+      <button v-if="fromTable && fromRowId" type="button" class="button neutral" @click="returnToOriginRow">
         🔙 Back to Row
       </button>
     </div>

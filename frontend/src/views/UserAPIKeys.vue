@@ -11,6 +11,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import Table from 'picocrank/vue/components/Table.vue'
@@ -232,7 +233,7 @@ onMounted(loadAPIKeys)
         />
       </FormField>
 
-      <p v-if="createError" class="inline-notification error">{{ createError }}</p>
+      <NotificationBlock v-if="createError" type="error" :message="createError" />
 
       <template #actions>
         <button type="button" class="neutral" :disabled="saving" @click="closeCreateDialog">Cancel</button>
@@ -282,7 +283,9 @@ onMounted(loadAPIKeys)
       </button>
     </template>
 
-    <div v-if="errorMessage" class="list-banner-pad inline-notification error">{{ errorMessage }}</div>
+    <div v-if="errorMessage" class="list-banner-pad">
+      <NotificationBlock type="error" :message="errorMessage" />
+    </div>
     <div v-if="loading && !apiKeys.length" class="list-banner-pad muted">Loading…</div>
 
     <template v-else>

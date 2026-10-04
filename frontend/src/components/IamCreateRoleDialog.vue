@@ -2,6 +2,7 @@
 import { computed, reactive, ref, nextTick } from 'vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import type { RbacPermission } from '../gen/sickrock_pb'
 import { createApiClient } from '../stores/api'
 
@@ -118,7 +119,7 @@ defineExpose({ open, close })
         </table>
       </FormField>
 
-      <p v-if="errorMessage" class="inline-notification error">{{ errorMessage }}</p>
+      <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
 
       <template #actions>
         <button type="button" class="neutral" :disabled="saving" @click="close">Cancel</button>

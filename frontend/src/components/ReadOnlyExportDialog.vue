@@ -3,6 +3,7 @@ import { ref, watch, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import CheckGroup from 'picocrank/vue/components/CheckGroup.vue'
 import { createApiClient } from '../stores/api'
 
@@ -146,7 +147,7 @@ function close() {
           Share this calendar at <code>/exports/{{ slug || 'your_slug' }}</code>. Users must sign in and belong to an allowed group (or hold exports.manage).
         </p>
 
-        <p v-if="error" class="inline-notification error">{{ error }}</p>
+        <NotificationBlock v-if="error" type="error" :message="error" />
 
         <div v-if="createdSlug" class="inline-notification good">
           <p>Export created.</p>

@@ -7,7 +7,7 @@ const tableId = route.params.tableName as string
 
 // Get query parameters for pre-filling the form
 const initialName = route.query.name as string | undefined
-const initialType = route.query.type as 'string' | 'int64' | 'tinyint' | 'datetime' | undefined
+const initialType = route.query.type as 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | undefined
 </script>
 
 <template>

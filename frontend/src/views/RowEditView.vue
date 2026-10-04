@@ -6,6 +6,7 @@ import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from '../components/InsertRow.vue'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Edit03Icon } from '@hugeicons/core-free-icons'
 
@@ -74,7 +75,7 @@ function goBack() {
       </button>
     </template>
 
-    <div v-if="error" class="error">{{ error }}</div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
     <div v-else-if="loading">Loading…</div>
     <InsertRow
       v-else
@@ -89,13 +90,3 @@ function goBack() {
   </Section>
 </template>
 
-<style scoped>
-.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  margin: 1rem 0;
-}
-</style>

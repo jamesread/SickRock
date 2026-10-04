@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, inject } from 'vue'
 import type { createApiClient } from '../stores/api'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
 
@@ -31,7 +32,7 @@ onMounted(load)
     <h2>Dashboards</h2>
     <div v-if="loading">Loading…</div>
     <div v-else>
-      <div v-if="error" class="error">{{ error }}</div>
+      <NotificationBlock v-if="error" type="error" :message="error" />
       <div v-else>
         <div v-if="dashboards.length === 0" class="subtle">No dashboards yet.</div>
         <ul v-else class="dashboard-list">
@@ -67,11 +68,4 @@ onMounted(load)
 .dash-name { font-weight: 500; }
 .dash-id { color: #6c757d; font-size: 0.85rem; }
 .subtle { color: #888; }
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-}
 </style>

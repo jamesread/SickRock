@@ -6,6 +6,7 @@ import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { Calendar03Icon, HomeIcon, Link04Icon, ViewIcon, WorkflowIcon } from '@hugeicons/core-free-icons'
 import { resolveNavigationIcon } from '../utils/navigationIcon'
 
@@ -249,7 +250,7 @@ onMounted(load)
       <div v-if="loading">Loading…</div>
       <div v-else>
         <div v-if="!isAuthenticated" class="subtle">Please log in to view your recently viewed items.</div>
-        <div v-else-if="error" class="error">{{ error }}</div>
+        <NotificationBlock v-else-if="error" type="error" :message="error" />
         <div v-else class="meta">
           <p class="version">
             Version: {{ version }}
@@ -319,11 +320,4 @@ onMounted(load)
   color: var(--muted-text-color, #777);
 }
 
-.error {
-  background: var(--karma-bad-tint, #f8d7da);
-  color: var(--text-color, #721c24);
-  padding: 0.75rem;
-  border: 1px solid var(--border-color, #f5c6cb);
-  border-radius: 4px;
-}
 </style>

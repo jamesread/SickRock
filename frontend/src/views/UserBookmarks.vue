@@ -6,6 +6,7 @@ import * as Hugeicons from '@hugeicons/core-free-icons'
 import { BookmarkIcon, DatabaseIcon, Delete01Icon } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 
 // Use global API client
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
@@ -95,7 +96,7 @@ onMounted(async () => {
 
 <template>
   <Section title="Bookmarks" :icon="BookmarkIcon">
-    <div v-if="error" class="error">{{ error }}</div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
 
     <div v-if="bookmarksLoading" class="loading">Loading bookmarks...</div>
     <div v-else-if="bookmarks.length === 0" class="no-bookmarks">
@@ -132,15 +133,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
 .loading {
   color: #666;
   font-style: italic;

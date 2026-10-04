@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { inject } from 'vue'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
@@ -314,7 +315,7 @@ onMounted(load)
     </template>
 
     <div v-if="loading" class="muted">Loading…</div>
-    <div v-else-if="error" class="inline-notification error">{{ error }}</div>
+    <NotificationBlock v-else-if="error" type="error" :message="error" />
     <template v-else>
       <p v-if="items.length === 0" class="inline-notification note">
         No navigation links yet. Use <strong>Change Navigation Links</strong> in the toolbar to add steps to this workflow.

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, DatabaseIcon, RefreshIcon, UserGroupIcon, UserMultiple02Icon, WebSecurityIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import CheckGroup from 'picocrank/vue/components/CheckGroup.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
@@ -196,7 +197,7 @@ onMounted(load)
       </button>
     </template>
 
-    <div v-if="errorMessage" class="inline-notification error">{{ errorMessage }}</div>
+    <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
     <div v-if="saveMessage" class="inline-notification note">{{ saveMessage }}</div>
     <div v-if="loading" class="muted">Loading…</div>
     <div v-else-if="!group" class="inline-notification note">User group not found.</div>

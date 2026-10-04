@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, RefreshIcon, ShieldKeyIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { createApiClient } from '../../stores/api'
 
 const iconStrokeWidth = 2.5
@@ -61,7 +62,7 @@ onMounted(load)
       </button>
     </template>
 
-    <div v-if="errorMessage" class="inline-notification error">{{ errorMessage }}</div>
+    <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
     <div v-else-if="loading" class="muted">Loading…</div>
     <template v-else>
       <h3 class="subsection-title">Group membership</h3>

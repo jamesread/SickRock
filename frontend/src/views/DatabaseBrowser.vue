@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { DatabaseIcon } from '@hugeicons/core-free-icons'
 import { RouterLink } from 'vue-router'
 
@@ -60,9 +61,7 @@ onMounted(() => {
         </button>
       </div>
 
-      <div v-if="error" class="error-message">
-        ✗ {{ error }}
-      </div>
+      <NotificationBlock v-if="error" type="error" :message="error" />
 
       <div v-if="!loading && tables.length === 0" class="no-tables">
         No tables found in database "{{ database }}"
@@ -216,14 +215,6 @@ onMounted(() => {
 
 .actions {
   text-align: center;
-}
-
-.error-message {
-  padding: 1rem;
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  color: #721c24;
 }
 
 .no-tables {

@@ -527,6 +527,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/CreateDashboard": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "CreateDashboard",
+        "operationId": "sickrock.SickRock.CreateDashboard",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.CreateDashboardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.CreateDashboardResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/CreateDashboardComponentRule": {
       "post": {
         "tags": [
@@ -1566,6 +1624,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.DeleteRbacRoleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/DeleteRssCalendarFeed": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "DeleteRssCalendarFeed",
+        "operationId": "sickrock.SickRock.DeleteRssCalendarFeed",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.DeleteRssCalendarFeedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.DeleteRssCalendarFeedResponse"
                 }
               }
             }
@@ -3031,6 +3147,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/GetRssCalendarFeed": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "GetRssCalendarFeed",
+        "operationId": "sickrock.SickRock.GetRssCalendarFeed",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetRssCalendarFeedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetRssCalendarFeedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/GetSystemInfo": {
       "post": {
         "tags": [
@@ -4197,6 +4371,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/ListRssCalendarFeeds": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "ListRssCalendarFeeds",
+        "operationId": "sickrock.SickRock.ListRssCalendarFeeds",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ListRssCalendarFeedsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ListRssCalendarFeedsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/ListTableShareGrants": {
       "post": {
         "tags": [
@@ -4547,6 +4779,122 @@
         }
       }
     },
+    "/api/sickrock.SickRock/PreviewRssCalendarFeed": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "PreviewRssCalendarFeed",
+        "operationId": "sickrock.SickRock.PreviewRssCalendarFeed",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.PreviewRssCalendarFeedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.PreviewRssCalendarFeedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/RefreshRssCalendarFeed": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "RefreshRssCalendarFeed",
+        "operationId": "sickrock.SickRock.RefreshRssCalendarFeed",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.RefreshRssCalendarFeedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.RefreshRssCalendarFeedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/ResetUserPassword": {
       "post": {
         "tags": [
@@ -4598,6 +4946,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.ResetUserPasswordResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SaveRssCalendarFeed": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SaveRssCalendarFeed",
+        "operationId": "sickrock.SickRock.SaveRssCalendarFeed",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SaveRssCalendarFeedRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SaveRssCalendarFeedResponse"
                 }
               }
             }
@@ -5868,6 +6274,45 @@
         "title": "CreateDashboardComponentRuleResponse",
         "additionalProperties": false
       },
+      "sickrock.CreateDashboardRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "createNavigationEntry": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "title": "create_navigation_entry",
+            "description": "When unset, navigation entry is created. Set false to skip."
+          }
+        },
+        "title": "CreateDashboardRequest",
+        "additionalProperties": false
+      },
+      "sickrock.CreateDashboardResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          },
+          "dashboardId": {
+            "type": "integer",
+            "title": "dashboard_id",
+            "format": "int32"
+          }
+        },
+        "title": "CreateDashboardResponse",
+        "additionalProperties": false
+      },
       "sickrock.CreateForeignKeyRequest": {
         "type": "object",
         "properties": {
@@ -6018,6 +6463,14 @@
           "table": {
             "type": "string",
             "title": "table"
+          },
+          "createNavigationEntry": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "title": "create_navigation_entry",
+            "description": "When unset, navigation entry is created. Set false to skip."
           }
         },
         "title": "CreateTableConfigurationRequest",
@@ -6522,6 +6975,29 @@
           }
         },
         "title": "DeleteRbacRoleResponse",
+        "additionalProperties": false
+      },
+      "sickrock.DeleteRssCalendarFeedRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          }
+        },
+        "title": "DeleteRssCalendarFeedRequest",
+        "additionalProperties": false
+      },
+      "sickrock.DeleteRssCalendarFeedResponse": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "title": "deleted"
+          }
+        },
+        "title": "DeleteRssCalendarFeedResponse",
         "additionalProperties": false
       },
       "sickrock.DeleteTableViewRequest": {
@@ -7295,6 +7771,29 @@
         "title": "GetReadOnlyCalendarExportResponse",
         "additionalProperties": false
       },
+      "sickrock.GetRssCalendarFeedRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          }
+        },
+        "title": "GetRssCalendarFeedRequest",
+        "additionalProperties": false
+      },
+      "sickrock.GetRssCalendarFeedResponse": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "title": "feed",
+            "$ref": "#/components/schemas/sickrock.RssCalendarFeed"
+          }
+        },
+        "title": "GetRssCalendarFeedResponse",
+        "additionalProperties": false
+      },
       "sickrock.GetSystemInfoRequest": {
         "type": "object",
         "title": "GetSystemInfoRequest",
@@ -7416,6 +7915,21 @@
             "type": "string",
             "title": "default_sort_column",
             "description": "Default ORDER BY column for list queries (table_configurations.default_sort_column, default \"id\")."
+          },
+          "createDelegate": {
+            "type": "string",
+            "title": "create_delegate",
+            "description": "When set, the insert/create action navigates here instead of the default insert-row route."
+          },
+          "title": {
+            "type": "string",
+            "title": "title",
+            "description": "Display title from table_configurations (falls back to name on the server when title is unset)."
+          },
+          "rowName": {
+            "type": "string",
+            "title": "row_name",
+            "description": "Singular label for a data row (e.g. \"Customer\") used in success messages."
           }
         },
         "title": "GetTableStructureResponse",
@@ -7966,6 +8480,25 @@
         "title": "ListRbacRolesResponse",
         "additionalProperties": false
       },
+      "sickrock.ListRssCalendarFeedsRequest": {
+        "type": "object",
+        "title": "ListRssCalendarFeedsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ListRssCalendarFeedsResponse": {
+        "type": "object",
+        "properties": {
+          "feeds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.RssCalendarFeed"
+            },
+            "title": "feeds"
+          }
+        },
+        "title": "ListRssCalendarFeedsResponse",
+        "additionalProperties": false
+      },
       "sickrock.ListTableShareGrantsRequest": {
         "type": "object",
         "properties": {
@@ -8307,6 +8840,38 @@
         "title": "PingResponse",
         "additionalProperties": false
       },
+      "sickrock.PreviewRssCalendarFeedRequest": {
+        "type": "object",
+        "properties": {
+          "feedUrl": {
+            "type": "string",
+            "title": "feed_url"
+          }
+        },
+        "title": "PreviewRssCalendarFeedRequest",
+        "additionalProperties": false
+      },
+      "sickrock.PreviewRssCalendarFeedResponse": {
+        "type": "object",
+        "properties": {
+          "rssFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "rss_fields"
+          },
+          "sampleValues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.RssFieldMapping"
+            },
+            "title": "sample_values"
+          }
+        },
+        "title": "PreviewRssCalendarFeedResponse",
+        "additionalProperties": false
+      },
       "sickrock.RbacPermission": {
         "type": "object",
         "properties": {
@@ -8419,6 +8984,43 @@
         "title": "RecentlyViewedItem",
         "additionalProperties": false
       },
+      "sickrock.RefreshRssCalendarFeedRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          }
+        },
+        "title": "RefreshRssCalendarFeedRequest",
+        "additionalProperties": false
+      },
+      "sickrock.RefreshRssCalendarFeedResponse": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "title": "feed",
+            "$ref": "#/components/schemas/sickrock.RssCalendarFeed"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          },
+          "itemsCreated": {
+            "type": "integer",
+            "title": "items_created",
+            "format": "int32"
+          },
+          "itemsUpdated": {
+            "type": "integer",
+            "title": "items_updated",
+            "format": "int32"
+          }
+        },
+        "title": "RefreshRssCalendarFeedResponse",
+        "additionalProperties": false
+      },
       "sickrock.ResetUserPasswordRequest": {
         "type": "object",
         "properties": {
@@ -8447,6 +9049,114 @@
           }
         },
         "title": "ResetUserPasswordResponse",
+        "additionalProperties": false
+      },
+      "sickrock.RssCalendarFeed": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          },
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "feedUrl": {
+            "type": "string",
+            "title": "feed_url"
+          },
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "fieldMappings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.RssFieldMapping"
+            },
+            "title": "field_mappings"
+          },
+          "uniqueColumn": {
+            "type": "string",
+            "title": "unique_column"
+          },
+          "refreshIntervalMinutes": {
+            "type": "integer",
+            "title": "refresh_interval_minutes",
+            "format": "int32"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "enabled"
+          },
+          "lastRefreshAt": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "last_refresh_at",
+            "format": "int64"
+          },
+          "lastRefreshStatus": {
+            "type": "string",
+            "title": "last_refresh_status"
+          },
+          "lastRefreshMessage": {
+            "type": "string",
+            "title": "last_refresh_message"
+          },
+          "lastItemsCreated": {
+            "type": "integer",
+            "title": "last_items_created",
+            "format": "int32"
+          },
+          "lastItemsUpdated": {
+            "type": "integer",
+            "title": "last_items_updated",
+            "format": "int32"
+          }
+        },
+        "title": "RssCalendarFeed",
+        "additionalProperties": false
+      },
+      "sickrock.RssFieldMapping": {
+        "type": "object",
+        "properties": {
+          "rssField": {
+            "type": "string",
+            "title": "rss_field"
+          },
+          "column": {
+            "type": "string",
+            "title": "column"
+          }
+        },
+        "title": "RssFieldMapping",
+        "additionalProperties": false,
+        "description": "RSS calendar feed import (Control Panel → RSS calendar feeds)"
+      },
+      "sickrock.SaveRssCalendarFeedRequest": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "title": "feed",
+            "$ref": "#/components/schemas/sickrock.RssCalendarFeed"
+          }
+        },
+        "title": "SaveRssCalendarFeedRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SaveRssCalendarFeedResponse": {
+        "type": "object",
+        "properties": {
+          "feed": {
+            "title": "feed",
+            "$ref": "#/components/schemas/sickrock.RssCalendarFeed"
+          }
+        },
+        "title": "SaveRssCalendarFeedResponse",
         "additionalProperties": false
       },
       "sickrock.SetGroupTableRoleGrantsRequest": {

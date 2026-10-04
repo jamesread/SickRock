@@ -5,6 +5,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import InsertRow from '../components/InsertRow.vue'
+import {
+  applyViewToInsertFieldDefs,
+  fieldDefsForInsertForm,
+} from '../utils/insertRowViewFields'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
@@ -39,39 +43,21 @@ const viewOptions = computed(() => {
 })
 
 function applyViewToFields() {
-  const defs = [...fieldDefs.value]
-  const currentView = tableViews.value.find(v => v.id === selectedViewId.value) || null
-  if (!currentView || currentView.id === -1 || !currentView.columns || currentView.columns.length === 0) {
-    displayFieldDefs.value = defs
-    return
-  }
-
-  const orderMap: Record<string, number> = {}
-  const visibilityMap: Record<string, boolean> = {}
-  currentView.columns.forEach(col => {
-    orderMap[col.columnName] = col.columnOrder
-    visibilityMap[col.columnName] = col.isVisible
-  })
-
-  const inView: typeof defs = []
-  const notInView: typeof defs = []
-  for (const d of defs) {
-    if (orderMap[d.name] != null) inView.push(d)
-    else notInView.push(d)
-  }
-  inView.sort((a, b) => (orderMap[a.name] ?? 0) - (orderMap[b.name] ?? 0))
-  const visibleInView = inView.filter(d => visibilityMap[d.name] !== false)
-  displayFieldDefs.value = [...visibleInView, ...notInView]
+  displayFieldDefs.value = applyViewToInsertFieldDefs(
+    fieldDefsForInsertForm(fieldDefs.value),
+    tableViews.value,
+    selectedViewId.value,
+  )
 }
 
 onMounted(async () => {
   try {
     const res = await client.getTableStructure({ pageId: tableId })
-    const defs = (res.fields ?? [])
-      .filter(f => f.name !== 'sr_created' && f.name !== 'sr_updated') // Hide sr_created and sr_updated fields
-      .map(f => ({ name: f.name, type: f.type, required: !!f.required }))
-
-    fieldDefs.value = defs
+    fieldDefs.value = (res.fields ?? []).map(f => ({
+      name: f.name,
+      type: f.type,
+      required: !!f.required,
+    }))
 
     // Load views for selector and initialize selection
     try {

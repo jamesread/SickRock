@@ -15,10 +15,11 @@ import (
 const (
 	exportsManagePermission     = "exports.manage"
 	tableReadOnlyExportsTCName  = "table_read_only_exports"
+	tableRssCalendarFeedsTCName = "table_rss_calendar_feeds"
 )
 
 func (s *SickRockServer) requireExportsManageForTable(ctx context.Context, tcName string) error {
-	if tcName != tableReadOnlyExportsTCName {
+	if tcName != tableReadOnlyExportsTCName && tcName != tableRssCalendarFeedsTCName {
 		return nil
 	}
 	au := s.authUser(ctx)

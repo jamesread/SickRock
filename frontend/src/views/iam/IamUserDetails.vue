@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, RefreshIcon, UserIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { createApiClient } from '../../stores/api'
 import { useRbac } from '../../composables/useRbac'
 import type { IamUser, UserEffectiveRoleGrant } from '../../gen/sickrock_pb'
@@ -98,7 +99,7 @@ onMounted(load)
     </template>
 
     <div v-if="loading" class="muted">Loading…</div>
-    <div v-else-if="error" class="inline-notification error">{{ error }}</div>
+    <NotificationBlock v-else-if="error" type="error" :message="error" />
     <div v-else-if="!user" class="inline-notification note">User not found.</div>
     <template v-else>
       <dl class="user-meta">
@@ -141,7 +142,7 @@ onMounted(load)
 
       <div v-if="canResetPassword" class="reset-section">
         <h3 class="subsection-title">Reset password</h3>
-        <p v-if="resetError" class="inline-notification error">{{ resetError }}</p>
+        <NotificationBlock v-if="resetError" type="error" :message="resetError" />
         <p v-if="resetStatus" class="inline-notification note">{{ resetStatus }}</p>
         <div class="reset-form">
           <input v-model="resetPassword" type="password" placeholder="New password (min 8 characters)" :disabled="saving" />

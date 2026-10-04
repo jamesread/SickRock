@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { createApiClient } from '../stores/api'
 import ViewsButton from './ViewsButton.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
@@ -211,7 +212,7 @@ onMounted(() => {
     </template>
 
     <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
+    <NotificationBlock v-else-if="error" type="error" :message="error" />
     <div v-else>
       <div class="ticklist-container">
         <div
@@ -242,15 +243,10 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.loading, .error, .warning {
+.loading, .warning {
   padding: 20px;
   text-align: center;
 }
-
-.error {
-  color: #dc3545;
-}
-
 
 .ticklist-container {
   display: grid;

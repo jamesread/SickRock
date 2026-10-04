@@ -1,14 +1,38 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, inject } from 'vue'
+import { ref, onMounted, computed, inject, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import { SickRock } from '../gen/sickrock_pb'
+import type { Field, GetTableStructureResponse } from '../gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, DatabaseIcon, Edit01Icon, Delete01Icon, ViewIcon } from '@hugeicons/core-free-icons'
 import Table from '../components/TableComponent.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import type { createApiClient } from '../stores/api'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
+import { useTableAccess } from '../composables/useTableAccess'
+import { useIamUsers } from '../composables/useIamUsers'
+import {
+  findFieldDef,
+  hasStoredUserRefValue,
+  isUserRefColumn as columnIsUserRef,
+  isUserRefFieldType,
+} from '../utils/fieldTypes'
+
+type FieldEntry = {
+  key: string
+  displayValue: unknown
+  valueClass: string
+}
+
+const NON_EDITABLE_FIELDS = new Set([
+  'id',
+  'srCreated',
+  'srUpdated',
+  'sr_created',
+  'sr_updated',
+  'srCreatedRelative',
+  'srUpdatedRelative',
+])
 
 // Helper function to format relative time values
 function formatRelativeTime(seconds: number): string {
@@ -33,6 +57,24 @@ const rowId = route.params.rowId as string
 
 // Use global API client
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
+const { access: tableAccess } = useTableAccess(tableName)
+const { users, loadUsers, displayUserLabel } = useIamUsers()
+
+const tableStructure = ref<GetTableStructureResponse | null>(null)
+const fieldDefs = computed<Field[]>(() => tableStructure.value?.fields ?? [])
+const primaryKeyColumn = computed(() => tableStructure.value?.primaryKeyColumn ?? 'id')
+
+const editingField = ref<string | null>(null)
+const editingValue = ref('')
+const savingField = ref(false)
+const fieldError = ref<string | null>(null)
+const editInput = ref<HTMLInputElement | HTMLSelectElement | null>(null)
+
+function setEditInput(element: unknown) {
+  editInput.value = element instanceof HTMLInputElement || element instanceof HTMLSelectElement
+    ? element
+    : null
+}
 
 const item = ref<Record<string, unknown> | null>(null)
 const loading = ref(false)
@@ -95,6 +137,7 @@ function resolveRawFieldValue(key: string): any {
 }
 
 function getFkDisplay(key: string): { to?: string; label?: string } {
+  if (isUserRefColumn(key)) return {}
   const fk = foreignKeyByColumn.value[key]
   if (!fk) return {}
   const raw = resolveRawFieldValue(key)
@@ -105,10 +148,152 @@ function getFkDisplay(key: string): { to?: string; label?: string } {
   return { to: `/table/${table}/${id}`, label }
 }
 
-// Load foreign keys for the current table from GetTableStructure
-async function loadForeignKeys() {
+function isForeignKey(columnName: string): boolean {
+  return foreignKeys.value.some(fk => fk.columnName === columnName)
+}
+
+function fieldType(column: string): string {
+  return findFieldDef(fieldDefs.value, column)?.type ?? 'unknown'
+}
+
+function isUserRefColumn(column: string): boolean {
+  return columnIsUserRef(column, fieldDefs.value, foreignKeys.value)
+}
+
+function isTinyintColumn(column: string): boolean {
+  const type = fieldType(column).toLowerCase()
+  return type.startsWith('tinyint') || type === 'bool' || type === 'boolean'
+}
+
+function isDatetimeColumn(column: string): boolean {
+  const type = fieldType(column).toLowerCase()
+  return type === 'datetime' || type.startsWith('datetime(')
+}
+
+function isIntegerLikeFieldType(fieldTypeName: string): boolean {
+  const t = fieldTypeName.toLowerCase()
+  return t.includes('int') || t === 'integer' || t === 'bigint'
+}
+
+function getFieldDef(fieldName: string): Field | undefined {
+  return findFieldDef(fieldDefs.value, fieldName)
+}
+
+function getBooleanValue(column: string): boolean {
+  const value = resolveRawFieldValue(column)
+  return value === true || Number(value) === 1
+}
+
+function canEditField(key: string, valueClass: string): boolean {
+  if (!tableAccess.value.canEdit) return false
+  if (valueClass === 'markdown-content') return false
+  if (NON_EDITABLE_FIELDS.has(key)) return false
+  if (key === primaryKeyColumn.value) return false
+  if (isForeignKey(key)) return false
+  return true
+}
+
+function mysqlDatetime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  const seconds = String(date.getSeconds()).padStart(2, '0')
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+}
+
+function buildAdditionalFieldsPayload(): Record<string, string> {
+  const additionalFields: Record<string, string> = {}
+  for (const [key, value] of Object.entries(item.value?.additionalFields ?? {})) {
+    additionalFields[key] = String(value)
+  }
+  return additionalFields
+}
+
+function startEdit(key: string, valueClass: string) {
+  if (!canEditField(key, valueClass)) return
+  const value = resolveRawFieldValue(key)
+  editingField.value = key
+  fieldError.value = null
+
+  if (isTinyintColumn(key)) {
+    editingValue.value = getBooleanValue(key) ? '1' : '0'
+    return
+  }
+  if (isDatetimeColumn(key) && value != null && value !== '') {
+    const date = new Date(value as string | number)
+    editingValue.value = Number.isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 16)
+  } else {
+    editingValue.value = value == null || value === '' ? '' : String(value)
+  }
+
+  void nextTick(() => {
+    editInput.value?.focus()
+    if (editInput.value instanceof HTMLInputElement) {
+      editInput.value.select()
+    }
+  })
+}
+
+function cancelEdit() {
+  editingField.value = null
+  editingValue.value = ''
+}
+
+async function saveField() {
+  if (!editingField.value || savingField.value || !item.value) return
+  const column = editingField.value
+  savingField.value = true
+  fieldError.value = null
+  try {
+    const additionalFields = buildAdditionalFieldsPayload()
+    let newValue = editingValue.value
+    if (isDatetimeColumn(column)) {
+      newValue = mysqlDatetime(editingValue.value)
+    } else if (
+      editingValue.value === ''
+      && (isUserRefColumn(column) || isIntegerLikeFieldType(fieldType(column)))
+      && !getFieldDef(column)?.required
+    ) {
+      newValue = '0'
+    }
+    additionalFields[column] = newValue
+
+    const res = await client.editItem({
+      id: rowId,
+      additionalFields,
+      pageId: tableName,
+    })
+    item.value = res.item as Record<string, unknown> ?? null
+    cancelEdit()
+    if (item.value) {
+      await loadRelatedRows()
+    }
+  } catch (e) {
+    fieldError.value = String(e)
+  } finally {
+    savingField.value = false
+  }
+}
+
+watch(
+  fieldDefs,
+  defs => {
+    if (defs.some(field => isUserRefFieldType(field.type))) {
+      void loadUsers()
+    }
+  },
+  { immediate: true },
+)
+
+// Load table structure and foreign keys
+async function loadTableStructure() {
   try {
     const response = await client.getTableStructure({ pageId: tableName })
+    tableStructure.value = response
     foreignKeys.value = (response.foreignKeys || []).map(fk => ({
       constraintName: fk.constraintName,
       tableName: fk.tableName,
@@ -116,11 +301,13 @@ async function loadForeignKeys() {
       referencedTable: fk.referencedTable,
       referencedColumn: fk.referencedColumn,
       onDeleteAction: fk.onDeleteAction,
-      onUpdateAction: fk.onUpdateAction
+      onUpdateAction: fk.onUpdateAction,
     }))
-    console.log('Loaded foreign keys for table:', tableName, foreignKeys.value)
+    if (response.fields?.some(field => isUserRefColumn(field.name))) {
+      void loadUsers()
+    }
   } catch (err) {
-    console.error('Error loading foreign keys:', err)
+    console.error('Error loading table structure:', err)
   }
 }
 
@@ -183,7 +370,7 @@ onMounted(async () => {
 
     // Load foreign keys and related rows after getting the main item
     if (item.value) {
-      await loadForeignKeys()
+      await loadTableStructure()
       await loadRelatedRows()
     }
   } catch (e) {
@@ -196,7 +383,7 @@ onMounted(async () => {
 const entries = computed(() => {
   if (!item.value) return []
 
-  const entries: Array<[string, any, string]> = []
+  const entries: FieldEntry[] = []
 
   // Handle regular fields (id, srCreated, etc.)
   for (const [key, value] of Object.entries(item.value)) {
@@ -244,7 +431,7 @@ const entries = computed(() => {
       valueClass = value ? 'boolean-true' : 'boolean-false'
     }
 
-    entries.push([key, displayValue, valueClass])
+    entries.push({ key, displayValue, valueClass })
   }
 
   // Handle additionalFields by flattening them
@@ -310,7 +497,7 @@ const entries = computed(() => {
         }
       }
 
-      entries.push([key, displayValue, valueClass])
+      entries.push({ key, displayValue, valueClass })
     }
   }
 
@@ -428,6 +615,7 @@ function cancelDelete() {
           <span>Back to Table</span>
         </router-link>
         <router-link
+          v-if="tableAccess.canEdit"
           :to="`/table/${tableName}/${rowId}/edit`"
           class="button inline-icon neutral"
         >
@@ -446,19 +634,101 @@ function cancelDelete() {
 
       <div v-if="error">{{ error }}</div>
       <div v-else-if="loading">Loading…</div>
-      <dl v-else-if="entries.length > 0">
-        <template v-for="[k, v, valueClass] in entries" :key="k">
-          <dt>{{ displayFieldLabel(k) }}</dt>
-          <dd :class="valueClass">
-            <template v-if="getFkDisplay(k).to">
-              <router-link :to="getFkDisplay(k).to">{{ getFkDisplay(k).label }}</router-link>
-            </template>
-            <template v-else-if="valueClass === 'markdown-content'">
-              <div v-html="v"></div>
-            </template>
-            <template v-else>
-              {{ v }}
-            </template>
+      <div v-else-if="fieldError" class="field-save-error">{{ fieldError }}</div>
+      <dl v-if="!loading && !error && entries.length > 0">
+        <template v-for="entry in entries" :key="entry.key">
+          <dt>{{ displayFieldLabel(entry.key) }}</dt>
+          <dd :class="entry.valueClass">
+            <div
+              v-if="editingField === entry.key"
+              class="inline-edit"
+              @click.stop
+            >
+              <input
+                v-if="isTinyintColumn(entry.key)"
+                type="checkbox"
+                :checked="editingValue === '1'"
+                :disabled="savingField"
+                class="edit-checkbox"
+                @change="event => {
+                  editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+                  saveField()
+                }"
+              />
+              <select
+                v-else-if="isUserRefColumn(entry.key)"
+                :ref="setEditInput"
+                v-model="editingValue"
+                :disabled="savingField"
+                class="edit-input"
+                @change="saveField"
+                @keyup.escape="cancelEdit"
+              >
+                <option v-if="!getFieldDef(entry.key)?.required" value="">— None —</option>
+                <option
+                  v-for="user in users"
+                  :key="user.id"
+                  :value="String(user.id)"
+                >
+                  {{ user.username || `User #${user.id}` }}
+                </option>
+              </select>
+              <input
+                v-else-if="isDatetimeColumn(entry.key)"
+                :ref="setEditInput"
+                v-model="editingValue"
+                type="datetime-local"
+                :disabled="savingField"
+                class="edit-input"
+                @keyup.enter="saveField"
+                @keyup.escape="cancelEdit"
+                @blur="saveField"
+              />
+              <input
+                v-else
+                :ref="setEditInput"
+                v-model="editingValue"
+                type="text"
+                :disabled="savingField"
+                class="edit-input"
+                @keyup.enter="saveField"
+                @keyup.escape="cancelEdit"
+                @blur="saveField"
+              />
+            </div>
+            <div
+              v-else
+              class="field-display"
+              :class="{ editable: canEditField(entry.key, entry.valueClass) }"
+              @click="startEdit(entry.key, entry.valueClass)"
+            >
+              <template v-if="isUserRefColumn(entry.key) && hasStoredUserRefValue(resolveRawFieldValue(entry.key))">
+                <router-link
+                  v-if="!canEditField(entry.key, entry.valueClass)"
+                  :to="`/admin/iam/users/${resolveRawFieldValue(entry.key)}`"
+                  class="tag note user-ref-chip"
+                >
+                  {{ displayUserLabel(resolveRawFieldValue(entry.key)) }}
+                </router-link>
+                <span v-else class="tag note user-ref-chip">
+                  {{ displayUserLabel(resolveRawFieldValue(entry.key)) }}
+                </span>
+              </template>
+              <template v-else-if="getFkDisplay(entry.key).to">
+                <router-link :to="getFkDisplay(entry.key).to">{{ getFkDisplay(entry.key).label }}</router-link>
+              </template>
+              <template v-else-if="entry.valueClass === 'markdown-content'">
+                <div v-html="entry.displayValue"></div>
+              </template>
+              <template v-else-if="isTinyintColumn(entry.key)">
+                <span :class="getBooleanValue(entry.key) ? 'boolean-true' : 'boolean-false'">
+                  {{ getBooleanValue(entry.key) ? 'Yes' : 'No' }}
+                </span>
+              </template>
+              <template v-else>
+                {{ entry.displayValue }}
+              </template>
+            </div>
           </dd>
         </template>
       </dl>
@@ -590,6 +860,45 @@ function cancelDelete() {
   text-align: center;
   color: #666;
   font-style: italic;
+}
+
+.field-save-error {
+  color: #dc3545;
+  margin-bottom: 1rem;
+}
+
+.field-display {
+  min-height: 1.5em;
+  padding: 0.25rem;
+  border-radius: 3px;
+}
+
+.field-display.editable {
+  cursor: pointer;
+}
+
+.field-display.editable:hover {
+  background-color: var(--hover-background-color, #f8f9fa);
+}
+
+.inline-edit {
+  padding: 0;
+}
+
+.edit-input {
+  width: 100%;
+  max-width: 28rem;
+  padding: 0.25rem;
+  border: 2px solid #007bff;
+  border-radius: 3px;
+  background: white;
+  font-size: inherit;
+  outline: none;
+}
+
+.edit-checkbox {
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 </style>

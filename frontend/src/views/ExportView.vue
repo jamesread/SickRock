@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import type { GetTableStructureResponse } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Download01Icon } from '@hugeicons/core-free-icons'
 
@@ -264,7 +265,7 @@ async function copyToClipboard() {
     </template>
     <div class="section-content">
       <div v-if="loading">Loading…</div>
-      <div v-else-if="error" class="error">{{ error }}</div>
+      <NotificationBlock v-else-if="error" type="error" :message="error" />
       <div v-else>
         <pre class="csv" aria-label="CSV export" role="textbox" @click="copyToClipboard" title="Click to copy">{{ csvText }}</pre>
         <div class="copy-actions">
@@ -298,9 +299,6 @@ async function copyToClipboard() {
   cursor: pointer;
   min-width: 150px;
   margin-right: 0.5rem;
-}
-.error {
-  color: #b00020;
 }
 .csv {
   white-space: pre;

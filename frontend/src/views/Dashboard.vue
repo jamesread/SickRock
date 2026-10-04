@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { inject } from 'vue'
 import type { createApiClient } from '../stores/api'
 import { Edit02Icon, LayoutIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import StatusCard from 'picocrank/vue/components/StatusCard.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')
@@ -22,6 +24,11 @@ const components = ref<Array<{
   error?: string;
   suffix?: string;
 }>>([])
+
+const addWidgetTo = computed(() => {
+  if (!dashboardId.value) return ''
+  return `/table/table_dashboard_components/insert-row/?dashboard=${dashboardId.value}&dashboardName=${encodeURIComponent(dashboardName.value)}`
+})
 
 async function load() {
   loading.value = true
@@ -65,8 +72,8 @@ onMounted(load)
           View Dashboard
         </router-link>
         <router-link
-          v-if="dashboardId"
-          :to="`/table/table_dashboard_components/insert-row/?dashboard=${dashboardId}&dashboardName=${encodeURIComponent(dashboardName)}`"
+          v-if="dashboardId && addWidgetTo"
+          :to="addWidgetTo"
           class="button good add-widget-btn"
         >
           Add Widget
@@ -75,21 +82,34 @@ onMounted(load)
     </template>
     <div v-if="loading">Loading…</div>
     <div v-else>
-      <div v-if="error" class="error">{{ error }}</div>
+      <NotificationBlock v-if="error" type="error" :message="error" />
       <div v-else>
-        <div class="stats-grid">
+        <StatusCard
+          v-if="components.length === 0"
+          karma="note"
+          align="center"
+          class="dashboard-empty"
+        >
+          <p>This dashboard has no widgets yet.</p>
+          <p class="dashboard-empty-hint">Add a component to show stats, titles, and summaries here.</p>
+          <router-link
+            v-if="dashboardId && addWidgetTo"
+            :to="addWidgetTo"
+            class="button good"
+          >
+            Add Widget
+          </router-link>
+        </StatusCard>
+        <div v-else class="stats-grid">
           <template v-for="c in components" :key="c.id">
-            <div v-if="c.error" class="error-card stat-card">{{ c.name }}
-              <div class="component-error">
-                <div class="error-message">{{ c.error }}</div>
-              </div>
+            <div v-if="c.error" class="stat-card dashboard-widget-error">
               <router-link
                 :to="`/table/table_dashboard_components/${c.id}`"
                 class="edit-icon-btn"
               >
                 <HugeiconsIcon :icon="Edit02Icon" />
               </router-link>
-
+              <NotificationBlock type="error" :label="c.name" :message="c.error" />
             </div>
             <div v-else-if="!c.dataString" class = "title-card">{{ c.name }}</div>
             <div v-else class = "stat-card">
@@ -138,6 +158,16 @@ onMounted(load)
   font-weight: bold;
   margin-bottom: 10px;
 }
+.dashboard-empty {
+  margin-top: 0.5rem;
+}
+.dashboard-empty p {
+  margin: 0 0 0.75rem 0;
+}
+.dashboard-empty-hint {
+  color: var(--femto-muted-fg, #6c757d);
+  font-size: 0.95rem;
+}
 .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(275px, 1fr)); gap: 20px; }
 .stat-card {
   text-align: center;
@@ -147,18 +177,14 @@ onMounted(load)
   border: 1px solid #e9ecef;
   position: relative;
 }
-.stat-card.error-card { background: #f8d7da; border-color: #f5c6cb; }
+.dashboard-widget-error {
+  grid-column: span 1;
+  text-align: left;
+}
 .stat-number { font-size: 2.0em; font-weight: bold; color: #007bff; margin-bottom: 5px; }
 .stat-label { color: #666; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
 .stat-suffix { color: #007bff; font-size: 1.0em; font-weight: normal; }
 .component-success { position: relative; }
-.component-error { text-align: center; }
-.error-message {
-  color: #721c24;
-  font-size: 12px;
-  margin-bottom: 10px;
-  word-break: break-word;
-}
 .edit-icon-btn {
   position: absolute;
   top: 8px;
@@ -185,12 +211,5 @@ onMounted(load)
 }
 .stat-card:hover .edit-icon-btn {
   opacity: 1;
-}
-.error {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
 }
 </style>

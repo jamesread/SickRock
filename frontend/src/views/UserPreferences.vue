@@ -4,6 +4,7 @@ import { useAuthStore } from '../stores/auth'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import * as Hugeicons from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 
@@ -51,7 +52,7 @@ onMounted(async () => {
   <Section title="User Preferences" :icon="Hugeicons.SettingsIcon">
     <div v-if="loading" class="muted">Loading preferences…</div>
     <template v-else>
-      <p v-if="error" class="inline-notification error">{{ error }}</p>
+      <NotificationBlock v-if="error" type="error" :message="error" />
 
       <FormLayout @submit.prevent="savePreferences">
         <FormField label="Theme" for="theme">

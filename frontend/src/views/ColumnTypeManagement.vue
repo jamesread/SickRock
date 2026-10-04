@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import ConditionalFormattingRules from '../components/ConditionalFormattingRules.vue'
 import TableShareSection from '../components/TableShareSection.vue'
+import AddColumn from '../components/AddColumn.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Edit03Icon, CheckmarkSquare03Icon, Delete01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
 
 const route = useRoute()
-const router = useRouter()
 const tableId = route.params.tableName as string
 
 // Transport handled by authenticated client
@@ -27,6 +28,9 @@ const customType = ref('')
 const useCustomType = ref(false)
 const showDropConfirm = ref<string | null>(null)
 const dropping = ref(false)
+const showCreateColumn = ref(false)
+const createColumnName = ref<string | undefined>()
+const createColumnType = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | undefined>()
 
 // Rename column state
 const renamingColumn = ref<string | null>(null)
@@ -126,6 +130,12 @@ const standardFields = [
     name: 'uuid',
     type: 'string' as const,
     description: 'Universally unique identifier. Useful for distributed systems and external integrations.',
+    recommended: false
+  },
+  {
+    name: 'owner_id',
+    type: 'user_ref' as const,
+    description: 'References a SickRock user account id. Shown as a username chip in tables and insert forms.',
     recommended: false
   }
 ]
@@ -307,6 +317,21 @@ async function dropForeignKey(constraintName: string) {
 }
 
 
+function openCreateColumn(name?: string, type?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref') {
+  createColumnName.value = name
+  createColumnType.value = type
+  showCreateColumn.value = true
+}
+
+function closeCreateColumn() {
+  showCreateColumn.value = false
+}
+
+async function onColumnAdded() {
+  closeCreateColumn()
+  await loadColumns()
+}
+
 // Lifecycle
 onMounted(async () => {
   await Promise.all([
@@ -330,15 +355,13 @@ onMounted(async () => {
         <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Foreign Keys</span>
       </router-link>
-      <router-link :to="`/table/${tableId}/add-column`" class="button inline-icon neutral">
+      <button type="button" class="button inline-icon neutral" @click="openCreateColumn()">
         <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Create Column</span>
-      </router-link>
+      </button>
     </template>
 
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
 
     <div v-if="loading && columns.length === 0" class="loading">
       Loading columns...
@@ -467,6 +490,28 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div
+      v-if="showCreateColumn"
+      class="modal-overlay"
+      @click="closeCreateColumn"
+      @keydown.escape="closeCreateColumn"
+    >
+      <div class="modal create-column-modal" @click.stop>
+        <div class="modal-heading">
+          <h3>Create Column</h3>
+          <button type="button" class="button neutral" @click="closeCreateColumn">Close</button>
+        </div>
+        <AddColumn
+          :key="`${createColumnName ?? ''}:${createColumnType ?? ''}`"
+          :table-id="tableId"
+          :initial-name="createColumnName"
+          :initial-type="createColumnType"
+          :navigate-on-success="false"
+          @added="onColumnAdded"
+        />
+      </div>
+    </div>
+
     <!-- Drop Column Confirmation Modal -->
     <div v-if="showDropConfirm" class="modal-overlay" @click="showDropConfirm = null">
       <div class="modal" @click.stop>
@@ -503,17 +548,10 @@ onMounted(async () => {
           <strong class="field-name">{{ field.name }}</strong>
           <p class="field-description">{{ field.description }}</p>
         </div>
-        <router-link
-          :to="{
-            name: 'add-column',
-            params: { tableName: tableId },
-            query: { name: field.name, type: field.type }
-          }"
-          class="button good"
-        >
+        <button type="button" class="button good" @click="openCreateColumn(field.name, field.type)">
           <HugeiconsIcon :icon="Edit03Icon" />
           Create "{{ field.name }}" Column
-        </router-link>
+        </button>
       </div>
     </div>
   </Section>
@@ -538,14 +576,6 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.error-message {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
 .loading {
   text-align: center;
   padding: 2rem;
@@ -795,6 +825,22 @@ onMounted(async () => {
 .modal h3 {
   margin: 0 0 1rem 0;
   color: #333;
+}
+
+.create-column-modal {
+  max-width: 40rem;
+}
+
+.modal-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.modal-heading h3 {
+  margin: 0;
 }
 
 .modal p {

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { createApiClient } from '../stores/api'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Calendar03Icon } from '@hugeicons/core-free-icons'
@@ -260,8 +261,8 @@ onMounted(loadData)
     </template>
 
     <div v-if="loading" class="loading">Loading...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-    <div v-else-if="!selectedDate" class="error">Invalid date</div>
+    <NotificationBlock v-else-if="error" type="error" :message="error" />
+    <NotificationBlock v-else-if="!selectedDate" type="error" message="Invalid date" />
     <div v-else>
       <h2 class="day-title">{{ formattedDate }}</h2>
 
@@ -354,14 +355,9 @@ onMounted(loadData)
   color: #333;
 }
 
-.loading,
-.error {
+.loading {
   padding: 2rem;
   text-align: center;
-}
-
-.error {
-  color: #d32f2f;
 }
 
 .no-events {

@@ -10,6 +10,7 @@ import {
 } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import Table from 'picocrank/vue/components/Table.vue'
@@ -373,7 +374,7 @@ onMounted(async () => {
         />
       </FormField>
 
-      <p v-if="channelCreateError" class="inline-notification error">{{ channelCreateError }}</p>
+      <NotificationBlock v-if="channelCreateError" type="error" :message="channelCreateError" />
 
       <template #actions>
         <button type="button" class="neutral" :disabled="creatingChannel" @click="closeCreateChannelDialog">
@@ -420,7 +421,7 @@ onMounted(async () => {
         </select>
       </FormField>
 
-      <p v-if="subscriptionCreateError" class="inline-notification error">{{ subscriptionCreateError }}</p>
+      <NotificationBlock v-if="subscriptionCreateError" type="error" :message="subscriptionCreateError" />
 
       <template #actions>
         <button
@@ -471,7 +472,9 @@ onMounted(async () => {
       </button>
     </template>
 
-    <div v-if="channelsError" class="list-banner-pad inline-notification error">{{ channelsError }}</div>
+    <div v-if="channelsError" class="list-banner-pad">
+      <NotificationBlock type="error" :message="channelsError" />
+    </div>
     <div v-if="channelsLoading && !notificationChannels.length" class="list-banner-pad muted">Loading…</div>
 
     <template v-else>
@@ -540,8 +543,8 @@ onMounted(async () => {
       </button>
     </template>
 
-    <div v-if="subscriptionsError" class="list-banner-pad inline-notification error">
-      {{ subscriptionsError }}
+    <div v-if="subscriptionsError" class="list-banner-pad">
+      <NotificationBlock type="error" :message="subscriptionsError" />
     </div>
     <div
       v-if="subscriptionsLoading && !notificationSubscriptions.length"

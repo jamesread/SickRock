@@ -151,6 +151,24 @@ const (
 	// SickRockListAccessibleReadOnlyExportsProcedure is the fully-qualified name of the SickRock's
 	// ListAccessibleReadOnlyExports RPC.
 	SickRockListAccessibleReadOnlyExportsProcedure = "/sickrock.SickRock/ListAccessibleReadOnlyExports"
+	// SickRockListRssCalendarFeedsProcedure is the fully-qualified name of the SickRock's
+	// ListRssCalendarFeeds RPC.
+	SickRockListRssCalendarFeedsProcedure = "/sickrock.SickRock/ListRssCalendarFeeds"
+	// SickRockGetRssCalendarFeedProcedure is the fully-qualified name of the SickRock's
+	// GetRssCalendarFeed RPC.
+	SickRockGetRssCalendarFeedProcedure = "/sickrock.SickRock/GetRssCalendarFeed"
+	// SickRockSaveRssCalendarFeedProcedure is the fully-qualified name of the SickRock's
+	// SaveRssCalendarFeed RPC.
+	SickRockSaveRssCalendarFeedProcedure = "/sickrock.SickRock/SaveRssCalendarFeed"
+	// SickRockDeleteRssCalendarFeedProcedure is the fully-qualified name of the SickRock's
+	// DeleteRssCalendarFeed RPC.
+	SickRockDeleteRssCalendarFeedProcedure = "/sickrock.SickRock/DeleteRssCalendarFeed"
+	// SickRockRefreshRssCalendarFeedProcedure is the fully-qualified name of the SickRock's
+	// RefreshRssCalendarFeed RPC.
+	SickRockRefreshRssCalendarFeedProcedure = "/sickrock.SickRock/RefreshRssCalendarFeed"
+	// SickRockPreviewRssCalendarFeedProcedure is the fully-qualified name of the SickRock's
+	// PreviewRssCalendarFeed RPC.
+	SickRockPreviewRssCalendarFeedProcedure = "/sickrock.SickRock/PreviewRssCalendarFeed"
 	// SickRockListItemsProcedure is the fully-qualified name of the SickRock's ListItems RPC.
 	SickRockListItemsProcedure = "/sickrock.SickRock/ListItems"
 	// SickRockCreateItemProcedure is the fully-qualified name of the SickRock's CreateItem RPC.
@@ -200,6 +218,9 @@ const (
 	SickRockGetMostRecentlyViewedProcedure = "/sickrock.SickRock/GetMostRecentlyViewed"
 	// SickRockGetDashboardsProcedure is the fully-qualified name of the SickRock's GetDashboards RPC.
 	SickRockGetDashboardsProcedure = "/sickrock.SickRock/GetDashboards"
+	// SickRockCreateDashboardProcedure is the fully-qualified name of the SickRock's CreateDashboard
+	// RPC.
+	SickRockCreateDashboardProcedure = "/sickrock.SickRock/CreateDashboard"
 	// SickRockGetDashboardComponentRulesProcedure is the fully-qualified name of the SickRock's
 	// GetDashboardComponentRules RPC.
 	SickRockGetDashboardComponentRulesProcedure = "/sickrock.SickRock/GetDashboardComponentRules"
@@ -329,6 +350,12 @@ type SickRockClient interface {
 	SetWorkflowNavigationMembers(context.Context, *connect.Request[proto.SetWorkflowNavigationMembersRequest]) (*connect.Response[proto.SetWorkflowNavigationMembersResponse], error)
 	GetReadOnlyCalendarExport(context.Context, *connect.Request[proto.GetReadOnlyCalendarExportRequest]) (*connect.Response[proto.GetReadOnlyCalendarExportResponse], error)
 	ListAccessibleReadOnlyExports(context.Context, *connect.Request[proto.ListAccessibleReadOnlyExportsRequest]) (*connect.Response[proto.ListAccessibleReadOnlyExportsResponse], error)
+	ListRssCalendarFeeds(context.Context, *connect.Request[proto.ListRssCalendarFeedsRequest]) (*connect.Response[proto.ListRssCalendarFeedsResponse], error)
+	GetRssCalendarFeed(context.Context, *connect.Request[proto.GetRssCalendarFeedRequest]) (*connect.Response[proto.GetRssCalendarFeedResponse], error)
+	SaveRssCalendarFeed(context.Context, *connect.Request[proto.SaveRssCalendarFeedRequest]) (*connect.Response[proto.SaveRssCalendarFeedResponse], error)
+	DeleteRssCalendarFeed(context.Context, *connect.Request[proto.DeleteRssCalendarFeedRequest]) (*connect.Response[proto.DeleteRssCalendarFeedResponse], error)
+	RefreshRssCalendarFeed(context.Context, *connect.Request[proto.RefreshRssCalendarFeedRequest]) (*connect.Response[proto.RefreshRssCalendarFeedResponse], error)
+	PreviewRssCalendarFeed(context.Context, *connect.Request[proto.PreviewRssCalendarFeedRequest]) (*connect.Response[proto.PreviewRssCalendarFeedResponse], error)
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
@@ -357,6 +384,7 @@ type SickRockClient interface {
 	GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error)
 	// Dashboards
 	GetDashboards(context.Context, *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error)
+	CreateDashboard(context.Context, *connect.Request[proto.CreateDashboardRequest]) (*connect.Response[proto.CreateDashboardResponse], error)
 	// Dashboard Component Rules
 	GetDashboardComponentRules(context.Context, *connect.Request[proto.GetDashboardComponentRulesRequest]) (*connect.Response[proto.GetDashboardComponentRulesResponse], error)
 	CreateDashboardComponentRule(context.Context, *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error)
@@ -673,6 +701,42 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("ListAccessibleReadOnlyExports")),
 			connect.WithClientOptions(opts...),
 		),
+		listRssCalendarFeeds: connect.NewClient[proto.ListRssCalendarFeedsRequest, proto.ListRssCalendarFeedsResponse](
+			httpClient,
+			baseURL+SickRockListRssCalendarFeedsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListRssCalendarFeeds")),
+			connect.WithClientOptions(opts...),
+		),
+		getRssCalendarFeed: connect.NewClient[proto.GetRssCalendarFeedRequest, proto.GetRssCalendarFeedResponse](
+			httpClient,
+			baseURL+SickRockGetRssCalendarFeedProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetRssCalendarFeed")),
+			connect.WithClientOptions(opts...),
+		),
+		saveRssCalendarFeed: connect.NewClient[proto.SaveRssCalendarFeedRequest, proto.SaveRssCalendarFeedResponse](
+			httpClient,
+			baseURL+SickRockSaveRssCalendarFeedProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SaveRssCalendarFeed")),
+			connect.WithClientOptions(opts...),
+		),
+		deleteRssCalendarFeed: connect.NewClient[proto.DeleteRssCalendarFeedRequest, proto.DeleteRssCalendarFeedResponse](
+			httpClient,
+			baseURL+SickRockDeleteRssCalendarFeedProcedure,
+			connect.WithSchema(sickRockMethods.ByName("DeleteRssCalendarFeed")),
+			connect.WithClientOptions(opts...),
+		),
+		refreshRssCalendarFeed: connect.NewClient[proto.RefreshRssCalendarFeedRequest, proto.RefreshRssCalendarFeedResponse](
+			httpClient,
+			baseURL+SickRockRefreshRssCalendarFeedProcedure,
+			connect.WithSchema(sickRockMethods.ByName("RefreshRssCalendarFeed")),
+			connect.WithClientOptions(opts...),
+		),
+		previewRssCalendarFeed: connect.NewClient[proto.PreviewRssCalendarFeedRequest, proto.PreviewRssCalendarFeedResponse](
+			httpClient,
+			baseURL+SickRockPreviewRssCalendarFeedProcedure,
+			connect.WithSchema(sickRockMethods.ByName("PreviewRssCalendarFeed")),
+			connect.WithClientOptions(opts...),
+		),
 		listItems: connect.NewClient[proto.ListItemsRequest, proto.ListItemsResponse](
 			httpClient,
 			baseURL+SickRockListItemsProcedure,
@@ -791,6 +855,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockGetDashboardsProcedure,
 			connect.WithSchema(sickRockMethods.ByName("GetDashboards")),
+			connect.WithClientOptions(opts...),
+		),
+		createDashboard: connect.NewClient[proto.CreateDashboardRequest, proto.CreateDashboardResponse](
+			httpClient,
+			baseURL+SickRockCreateDashboardProcedure,
+			connect.WithSchema(sickRockMethods.ByName("CreateDashboard")),
 			connect.WithClientOptions(opts...),
 		),
 		getDashboardComponentRules: connect.NewClient[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse](
@@ -999,6 +1069,12 @@ type sickRockClient struct {
 	setWorkflowNavigationMembers       *connect.Client[proto.SetWorkflowNavigationMembersRequest, proto.SetWorkflowNavigationMembersResponse]
 	getReadOnlyCalendarExport          *connect.Client[proto.GetReadOnlyCalendarExportRequest, proto.GetReadOnlyCalendarExportResponse]
 	listAccessibleReadOnlyExports      *connect.Client[proto.ListAccessibleReadOnlyExportsRequest, proto.ListAccessibleReadOnlyExportsResponse]
+	listRssCalendarFeeds               *connect.Client[proto.ListRssCalendarFeedsRequest, proto.ListRssCalendarFeedsResponse]
+	getRssCalendarFeed                 *connect.Client[proto.GetRssCalendarFeedRequest, proto.GetRssCalendarFeedResponse]
+	saveRssCalendarFeed                *connect.Client[proto.SaveRssCalendarFeedRequest, proto.SaveRssCalendarFeedResponse]
+	deleteRssCalendarFeed              *connect.Client[proto.DeleteRssCalendarFeedRequest, proto.DeleteRssCalendarFeedResponse]
+	refreshRssCalendarFeed             *connect.Client[proto.RefreshRssCalendarFeedRequest, proto.RefreshRssCalendarFeedResponse]
+	previewRssCalendarFeed             *connect.Client[proto.PreviewRssCalendarFeedRequest, proto.PreviewRssCalendarFeedResponse]
 	listItems                          *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
 	createItem                         *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
 	getItem                            *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
@@ -1019,6 +1095,7 @@ type sickRockClient struct {
 	changeColumnName                   *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
 	getMostRecentlyViewed              *connect.Client[proto.GetMostRecentlyViewedRequest, proto.GetMostRecentlyViewedResponse]
 	getDashboards                      *connect.Client[proto.GetDashboardsRequest, proto.GetDashboardsResponse]
+	createDashboard                    *connect.Client[proto.CreateDashboardRequest, proto.CreateDashboardResponse]
 	getDashboardComponentRules         *connect.Client[proto.GetDashboardComponentRulesRequest, proto.GetDashboardComponentRulesResponse]
 	createDashboardComponentRule       *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
 	getSystemInfo                      *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
@@ -1272,6 +1349,36 @@ func (c *sickRockClient) ListAccessibleReadOnlyExports(ctx context.Context, req 
 	return c.listAccessibleReadOnlyExports.CallUnary(ctx, req)
 }
 
+// ListRssCalendarFeeds calls sickrock.SickRock.ListRssCalendarFeeds.
+func (c *sickRockClient) ListRssCalendarFeeds(ctx context.Context, req *connect.Request[proto.ListRssCalendarFeedsRequest]) (*connect.Response[proto.ListRssCalendarFeedsResponse], error) {
+	return c.listRssCalendarFeeds.CallUnary(ctx, req)
+}
+
+// GetRssCalendarFeed calls sickrock.SickRock.GetRssCalendarFeed.
+func (c *sickRockClient) GetRssCalendarFeed(ctx context.Context, req *connect.Request[proto.GetRssCalendarFeedRequest]) (*connect.Response[proto.GetRssCalendarFeedResponse], error) {
+	return c.getRssCalendarFeed.CallUnary(ctx, req)
+}
+
+// SaveRssCalendarFeed calls sickrock.SickRock.SaveRssCalendarFeed.
+func (c *sickRockClient) SaveRssCalendarFeed(ctx context.Context, req *connect.Request[proto.SaveRssCalendarFeedRequest]) (*connect.Response[proto.SaveRssCalendarFeedResponse], error) {
+	return c.saveRssCalendarFeed.CallUnary(ctx, req)
+}
+
+// DeleteRssCalendarFeed calls sickrock.SickRock.DeleteRssCalendarFeed.
+func (c *sickRockClient) DeleteRssCalendarFeed(ctx context.Context, req *connect.Request[proto.DeleteRssCalendarFeedRequest]) (*connect.Response[proto.DeleteRssCalendarFeedResponse], error) {
+	return c.deleteRssCalendarFeed.CallUnary(ctx, req)
+}
+
+// RefreshRssCalendarFeed calls sickrock.SickRock.RefreshRssCalendarFeed.
+func (c *sickRockClient) RefreshRssCalendarFeed(ctx context.Context, req *connect.Request[proto.RefreshRssCalendarFeedRequest]) (*connect.Response[proto.RefreshRssCalendarFeedResponse], error) {
+	return c.refreshRssCalendarFeed.CallUnary(ctx, req)
+}
+
+// PreviewRssCalendarFeed calls sickrock.SickRock.PreviewRssCalendarFeed.
+func (c *sickRockClient) PreviewRssCalendarFeed(ctx context.Context, req *connect.Request[proto.PreviewRssCalendarFeedRequest]) (*connect.Response[proto.PreviewRssCalendarFeedResponse], error) {
+	return c.previewRssCalendarFeed.CallUnary(ctx, req)
+}
+
 // ListItems calls sickrock.SickRock.ListItems.
 func (c *sickRockClient) ListItems(ctx context.Context, req *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error) {
 	return c.listItems.CallUnary(ctx, req)
@@ -1370,6 +1477,11 @@ func (c *sickRockClient) GetMostRecentlyViewed(ctx context.Context, req *connect
 // GetDashboards calls sickrock.SickRock.GetDashboards.
 func (c *sickRockClient) GetDashboards(ctx context.Context, req *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error) {
 	return c.getDashboards.CallUnary(ctx, req)
+}
+
+// CreateDashboard calls sickrock.SickRock.CreateDashboard.
+func (c *sickRockClient) CreateDashboard(ctx context.Context, req *connect.Request[proto.CreateDashboardRequest]) (*connect.Response[proto.CreateDashboardResponse], error) {
+	return c.createDashboard.CallUnary(ctx, req)
 }
 
 // GetDashboardComponentRules calls sickrock.SickRock.GetDashboardComponentRules.
@@ -1556,6 +1668,12 @@ type SickRockHandler interface {
 	SetWorkflowNavigationMembers(context.Context, *connect.Request[proto.SetWorkflowNavigationMembersRequest]) (*connect.Response[proto.SetWorkflowNavigationMembersResponse], error)
 	GetReadOnlyCalendarExport(context.Context, *connect.Request[proto.GetReadOnlyCalendarExportRequest]) (*connect.Response[proto.GetReadOnlyCalendarExportResponse], error)
 	ListAccessibleReadOnlyExports(context.Context, *connect.Request[proto.ListAccessibleReadOnlyExportsRequest]) (*connect.Response[proto.ListAccessibleReadOnlyExportsResponse], error)
+	ListRssCalendarFeeds(context.Context, *connect.Request[proto.ListRssCalendarFeedsRequest]) (*connect.Response[proto.ListRssCalendarFeedsResponse], error)
+	GetRssCalendarFeed(context.Context, *connect.Request[proto.GetRssCalendarFeedRequest]) (*connect.Response[proto.GetRssCalendarFeedResponse], error)
+	SaveRssCalendarFeed(context.Context, *connect.Request[proto.SaveRssCalendarFeedRequest]) (*connect.Response[proto.SaveRssCalendarFeedResponse], error)
+	DeleteRssCalendarFeed(context.Context, *connect.Request[proto.DeleteRssCalendarFeedRequest]) (*connect.Response[proto.DeleteRssCalendarFeedResponse], error)
+	RefreshRssCalendarFeed(context.Context, *connect.Request[proto.RefreshRssCalendarFeedRequest]) (*connect.Response[proto.RefreshRssCalendarFeedResponse], error)
+	PreviewRssCalendarFeed(context.Context, *connect.Request[proto.PreviewRssCalendarFeedRequest]) (*connect.Response[proto.PreviewRssCalendarFeedResponse], error)
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
@@ -1584,6 +1702,7 @@ type SickRockHandler interface {
 	GetMostRecentlyViewed(context.Context, *connect.Request[proto.GetMostRecentlyViewedRequest]) (*connect.Response[proto.GetMostRecentlyViewedResponse], error)
 	// Dashboards
 	GetDashboards(context.Context, *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error)
+	CreateDashboard(context.Context, *connect.Request[proto.CreateDashboardRequest]) (*connect.Response[proto.CreateDashboardResponse], error)
 	// Dashboard Component Rules
 	GetDashboardComponentRules(context.Context, *connect.Request[proto.GetDashboardComponentRulesRequest]) (*connect.Response[proto.GetDashboardComponentRulesResponse], error)
 	CreateDashboardComponentRule(context.Context, *connect.Request[proto.CreateDashboardComponentRuleRequest]) (*connect.Response[proto.CreateDashboardComponentRuleResponse], error)
@@ -1896,6 +2015,42 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("ListAccessibleReadOnlyExports")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockListRssCalendarFeedsHandler := connect.NewUnaryHandler(
+		SickRockListRssCalendarFeedsProcedure,
+		svc.ListRssCalendarFeeds,
+		connect.WithSchema(sickRockMethods.ByName("ListRssCalendarFeeds")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetRssCalendarFeedHandler := connect.NewUnaryHandler(
+		SickRockGetRssCalendarFeedProcedure,
+		svc.GetRssCalendarFeed,
+		connect.WithSchema(sickRockMethods.ByName("GetRssCalendarFeed")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSaveRssCalendarFeedHandler := connect.NewUnaryHandler(
+		SickRockSaveRssCalendarFeedProcedure,
+		svc.SaveRssCalendarFeed,
+		connect.WithSchema(sickRockMethods.ByName("SaveRssCalendarFeed")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockDeleteRssCalendarFeedHandler := connect.NewUnaryHandler(
+		SickRockDeleteRssCalendarFeedProcedure,
+		svc.DeleteRssCalendarFeed,
+		connect.WithSchema(sickRockMethods.ByName("DeleteRssCalendarFeed")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockRefreshRssCalendarFeedHandler := connect.NewUnaryHandler(
+		SickRockRefreshRssCalendarFeedProcedure,
+		svc.RefreshRssCalendarFeed,
+		connect.WithSchema(sickRockMethods.ByName("RefreshRssCalendarFeed")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockPreviewRssCalendarFeedHandler := connect.NewUnaryHandler(
+		SickRockPreviewRssCalendarFeedProcedure,
+		svc.PreviewRssCalendarFeed,
+		connect.WithSchema(sickRockMethods.ByName("PreviewRssCalendarFeed")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockListItemsHandler := connect.NewUnaryHandler(
 		SickRockListItemsProcedure,
 		svc.ListItems,
@@ -2014,6 +2169,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockGetDashboardsProcedure,
 		svc.GetDashboards,
 		connect.WithSchema(sickRockMethods.ByName("GetDashboards")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockCreateDashboardHandler := connect.NewUnaryHandler(
+		SickRockCreateDashboardProcedure,
+		svc.CreateDashboard,
+		connect.WithSchema(sickRockMethods.ByName("CreateDashboard")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockGetDashboardComponentRulesHandler := connect.NewUnaryHandler(
@@ -2264,6 +2425,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetReadOnlyCalendarExportHandler.ServeHTTP(w, r)
 		case SickRockListAccessibleReadOnlyExportsProcedure:
 			sickRockListAccessibleReadOnlyExportsHandler.ServeHTTP(w, r)
+		case SickRockListRssCalendarFeedsProcedure:
+			sickRockListRssCalendarFeedsHandler.ServeHTTP(w, r)
+		case SickRockGetRssCalendarFeedProcedure:
+			sickRockGetRssCalendarFeedHandler.ServeHTTP(w, r)
+		case SickRockSaveRssCalendarFeedProcedure:
+			sickRockSaveRssCalendarFeedHandler.ServeHTTP(w, r)
+		case SickRockDeleteRssCalendarFeedProcedure:
+			sickRockDeleteRssCalendarFeedHandler.ServeHTTP(w, r)
+		case SickRockRefreshRssCalendarFeedProcedure:
+			sickRockRefreshRssCalendarFeedHandler.ServeHTTP(w, r)
+		case SickRockPreviewRssCalendarFeedProcedure:
+			sickRockPreviewRssCalendarFeedHandler.ServeHTTP(w, r)
 		case SickRockListItemsProcedure:
 			sickRockListItemsHandler.ServeHTTP(w, r)
 		case SickRockCreateItemProcedure:
@@ -2304,6 +2477,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetMostRecentlyViewedHandler.ServeHTTP(w, r)
 		case SickRockGetDashboardsProcedure:
 			sickRockGetDashboardsHandler.ServeHTTP(w, r)
+		case SickRockCreateDashboardProcedure:
+			sickRockCreateDashboardHandler.ServeHTTP(w, r)
 		case SickRockGetDashboardComponentRulesProcedure:
 			sickRockGetDashboardComponentRulesHandler.ServeHTTP(w, r)
 		case SickRockCreateDashboardComponentRuleProcedure:
@@ -2545,6 +2720,30 @@ func (UnimplementedSickRockHandler) ListAccessibleReadOnlyExports(context.Contex
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListAccessibleReadOnlyExports is not implemented"))
 }
 
+func (UnimplementedSickRockHandler) ListRssCalendarFeeds(context.Context, *connect.Request[proto.ListRssCalendarFeedsRequest]) (*connect.Response[proto.ListRssCalendarFeedsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListRssCalendarFeeds is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetRssCalendarFeed(context.Context, *connect.Request[proto.GetRssCalendarFeedRequest]) (*connect.Response[proto.GetRssCalendarFeedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetRssCalendarFeed is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SaveRssCalendarFeed(context.Context, *connect.Request[proto.SaveRssCalendarFeedRequest]) (*connect.Response[proto.SaveRssCalendarFeedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SaveRssCalendarFeed is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) DeleteRssCalendarFeed(context.Context, *connect.Request[proto.DeleteRssCalendarFeedRequest]) (*connect.Response[proto.DeleteRssCalendarFeedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteRssCalendarFeed is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) RefreshRssCalendarFeed(context.Context, *connect.Request[proto.RefreshRssCalendarFeedRequest]) (*connect.Response[proto.RefreshRssCalendarFeedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.RefreshRssCalendarFeed is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) PreviewRssCalendarFeed(context.Context, *connect.Request[proto.PreviewRssCalendarFeedRequest]) (*connect.Response[proto.PreviewRssCalendarFeedResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.PreviewRssCalendarFeed is not implemented"))
+}
+
 func (UnimplementedSickRockHandler) ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListItems is not implemented"))
 }
@@ -2623,6 +2822,10 @@ func (UnimplementedSickRockHandler) GetMostRecentlyViewed(context.Context, *conn
 
 func (UnimplementedSickRockHandler) GetDashboards(context.Context, *connect.Request[proto.GetDashboardsRequest]) (*connect.Response[proto.GetDashboardsResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetDashboards is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) CreateDashboard(context.Context, *connect.Request[proto.CreateDashboardRequest]) (*connect.Response[proto.CreateDashboardResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateDashboard is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetDashboardComponentRules(context.Context, *connect.Request[proto.GetDashboardComponentRulesRequest]) (*connect.Response[proto.GetDashboardComponentRulesResponse], error) {

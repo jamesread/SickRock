@@ -28,6 +28,7 @@ export const SYSTEM_SETTINGS_TABLE_CONFIGURATIONS = new Set([
 ])
 
 export const READ_ONLY_EXPORTS_TABLE_CONFIGURATION = 'table_read_only_exports'
+export const RSS_CALENDAR_FEEDS_TABLE_CONFIGURATION = 'table_rss_calendar_feeds'
 export const AUDIT_LOGS_TABLE_CONFIGURATION = 'table_logs'
 
 export function permissionsFromStatus(st: InitResponse | null | undefined): string[] {
@@ -79,7 +80,8 @@ export function canAccessAdminTableConfiguration(
   if (tableName === AUDIT_LOGS_TABLE_CONFIGURATION) {
     return canViewAuditLogs(perms, superuser)
   }
-  if (tableName === READ_ONLY_EXPORTS_TABLE_CONFIGURATION) {
+  if (tableName === READ_ONLY_EXPORTS_TABLE_CONFIGURATION
+    || tableName === RSS_CALENDAR_FEEDS_TABLE_CONFIGURATION) {
     return canManageExports(perms, superuser)
   }
   if (SYSTEM_SETTINGS_TABLE_CONFIGURATIONS.has(tableName)) {

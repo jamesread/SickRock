@@ -2,6 +2,7 @@
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import {
   Add01Icon,
@@ -26,6 +27,12 @@ import {
   type SortDirection,
   type TableRow,
 } from '../utils/tableAdapter'
+import {
+  applyViewToInsertFieldDefs,
+  fieldDefsForInsertForm,
+} from '../utils/insertRowViewFields'
+import { useIamUsers } from '../composables/useIamUsers'
+import { isUserRefColumn as columnIsUserRef, isUserRefFieldType } from '../utils/fieldTypes'
 import InsertRow from './InsertRow.vue'
 import RowActionsDropdown from './RowActionsDropdown.vue'
 import ViewsButton from './ViewsButton.vue'
@@ -88,6 +95,7 @@ const emit = defineEmits<{
 }>()
 
 const client = createApiClient()
+const { loadUsers, displayUserLabel } = useIamUsers()
 const tableRef = ref<TableApi | null>(null)
 const tableStructure = ref<GetTableStructureResponse | null>(props.tableStructure ?? null)
 const tableTitle = ref('')
@@ -133,6 +141,16 @@ const sectionTitle = computed(() => props.title || tableTitle.value || props.tab
 const insertButtonText = computed(() => (
   props.createButtonText || tableStructure.value?.CreateButtonText || 'Insert row'
 ))
+
+const insertRoute = computed(() => {
+  const delegate = tableStructure.value?.createDelegate?.trim()
+  if (delegate) {
+    return delegate
+  }
+  return `/table/${props.tableId}/insert-row`
+})
+
+const showQuickAdd = computed(() => showInsert.value && !tableStructure.value?.createDelegate?.trim())
 
 const showViewSwitcher = computed(() => props.showViewSwitcher !== false)
 const showViewEdit = computed(() => props.showViewEdit !== false)
@@ -285,22 +303,24 @@ function selectView(viewId: number) {
 async function loadStructure() {
   if (props.tableStructure) {
     tableStructure.value = props.tableStructure
+    if (props.tableStructure.title) {
+      tableTitle.value = props.tableStructure.title
+    }
   } else {
-    tableStructure.value = await client.getTableStructure({ pageId: props.tableId })
-  }
-
-  try {
-    const configurations = await client.getTableConfigurations({})
-    tableTitle.value = configurations.pages?.find(page => page.id === props.tableId)?.title ?? ''
-  } catch (titleError) {
-    console.warn('Failed to load table configuration for title:', titleError)
+    const structure = await client.getTableStructure({ pageId: props.tableId })
+    tableStructure.value = structure
+    if (structure.title) {
+      tableTitle.value = structure.title
+    }
   }
 }
 
 watch(
   () => props.tableStructure,
   value => {
-    if (value) tableStructure.value = value
+    if (!value) return
+    tableStructure.value = value
+    if (value.title) tableTitle.value = value.title
   },
 )
 
@@ -543,6 +563,10 @@ function isDatetimeColumn(column: string): boolean {
   return type === 'datetime' || type.startsWith('datetime(')
 }
 
+function isUserRefColumn(column: string): boolean {
+  return columnIsUserRef(column, fieldDefs.value, foreignKeys.value)
+}
+
 function getBooleanValue(item: Item, column: string): boolean {
   const value = getItemValue(item, column)
   return value === true || Number(value) === 1
@@ -704,21 +728,22 @@ async function onRowActionDeleted(row: TableRow) {
 // Quick add
 const showQuickAddDialog = ref(false)
 const quickAddSelectedViewId = ref<number | null>(null)
-const quickAddFieldDefs = computed(() => {
-  if (quickAddSelectedViewId.value === null || quickAddSelectedViewId.value === -1) {
-    return fieldDefs.value
-  }
-  const selectedView = tableViews.value.find(view => view.id === quickAddSelectedViewId.value)
-  if (!selectedView) return fieldDefs.value
-  const visibleColumns = selectedView.columns
-    .filter(column => column.isVisible)
-    .sort((left, right) => left.columnOrder - right.columnOrder)
-    .map(column => column.columnName)
-  return fieldDefs.value.filter(field => visibleColumns.includes(field.name))
-})
+const quickAddFieldDefs = computed(() => applyViewToInsertFieldDefs(
+  fieldDefsForInsertForm(fieldDefs.value.map(field => ({
+    name: field.name,
+    type: field.type,
+    required: field.required,
+  }))),
+  tableViews.value,
+  quickAddSelectedViewId.value,
+))
 
 function openQuickAddDialog() {
+  const defaultView = tableViews.value.find(view => view.isDefault)
   quickAddSelectedViewId.value = selectedViewId.value
+    ?? defaultView?.id
+    ?? tableViews.value[0]?.id
+    ?? -1
   showQuickAddDialog.value = true
   setTimeout(() => {
     const dialog = document.querySelector('.modal-overlay')
@@ -872,6 +897,16 @@ function handleSaveCurrentEdit() {
   if (row) void saveEditRow(row)
 }
 
+watch(
+  fieldDefs,
+  defs => {
+    if (defs.some(field => isUserRefFieldType(field.type))) {
+      void loadUsers()
+    }
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
   window.addEventListener('open-quick-add', handleOpenQuickAdd)
   window.addEventListener('save-current-edit', handleSaveCurrentEdit)
@@ -935,7 +970,7 @@ onUnmounted(() => {
       </router-link>
       <div v-if="showInsert" class="insert-button-group">
         <router-link
-          :to="`/table/${props.tableId}/insert-row`"
+          :to="insertRoute"
           class="button inline-icon neutral insert-button"
           accesskey="n"
           title="Insert row"
@@ -944,6 +979,7 @@ onUnmounted(() => {
           <span>{{ insertButtonText }}</span>
         </router-link>
         <button
+          v-if="showQuickAdd"
           class="button inline-icon good quick-add-button"
           title="Quick Add"
           aria-label="Quick Add"
@@ -955,12 +991,13 @@ onUnmounted(() => {
       </div>
     </template>
 
-    <div v-if="error" class="error">{{ error }}</div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
     <div v-else-if="loading" class="loading-state">Loading…</div>
     <div v-else class="section-content">
       <div class="table-host">
         <Table
           ref="tableRef"
+          :table-id="props.tableId"
           :data="flattenedRows"
           :headers="tableHeaders"
           :row-key="getStableRowId"
@@ -975,7 +1012,7 @@ onUnmounted(() => {
           :active-cell="activeCell"
           :show-pagination="showPagination"
           :reset-page-on-sort="false"
-          :load-saved-layout="false"
+          :load-saved-layout="true"
           :column-options="true"
           :cell-style="cellStyle"
           selectable
@@ -1077,6 +1114,13 @@ onUnmounted(() => {
               >
                 {{ cellValue(row, header.key) }}
               </router-link>
+              <router-link
+                v-else-if="isUserRefColumn(header.key) && cellValue(row, header.key) != null"
+                :to="`/admin/iam/users/${cellValue(row, header.key)}`"
+                class="tag note user-ref-chip"
+              >
+                {{ displayUserLabel(cellValue(row, header.key)) }}
+              </router-link>
               <span
                 v-else-if="isForeignKey(header.key) && cellValue(row, header.key) != null"
               >
@@ -1130,7 +1174,7 @@ onUnmounted(() => {
                 <div class="empty-state-icon">📋</div>
                 <h3>No items in this table</h3>
                 <p>This table is empty. Get started by adding your first item.</p>
-                <router-link class="button" :to="`/table/${props.tableId}/insert-row`">
+                <router-link class="button" :to="insertRoute">
                   ➕ Insert First Item
                 </router-link>
                 <div class="empty-state-actions">
@@ -1189,42 +1233,44 @@ onUnmounted(() => {
       @keydown.escape="closeQuickAddDialog"
     >
       <div class="modal-content quick-add-modal" @click.stop>
-        <div class="modal-header">
-          <div class="modal-header-left">
-            <h3>{{ insertButtonText }}</h3>
-            <div v-if="viewOptions.length > 1" class="quick-add-view-selector">
-              <label for="quick-add-view">View:</label>
-              <select
-                id="quick-add-view"
-                v-model="quickAddSelectedViewId"
-                class="view-dropdown"
+        <Section :title="insertButtonText" :icon="Add01Icon" class="quick-add-section">
+          <template #toolbar>
+            <div class="insert-toolbar">
+              <div class="view-selector">
+                <label for="quick-add-view-select">View:</label>
+                <select
+                  id="quick-add-view-select"
+                  v-model="quickAddSelectedViewId"
+                  class="view-dropdown"
+                >
+                  <option v-for="view in viewOptions" :key="view.id" :value="view.id">
+                    {{ view.viewName }}
+                  </option>
+                </select>
+              </div>
+              <button
+                type="button"
+                class="button neutral"
+                title="Close"
+                @click="closeQuickAddDialog"
               >
-                <option v-for="view in viewOptions" :key="view.id" :value="view.id">
-                  {{ view.viewName }}
-                </option>
-              </select>
+                Close
+              </button>
             </div>
-          </div>
-          <button class="button neutral" title="Close" @click="closeQuickAddDialog">✕</button>
-        </div>
-        <div class="modal-body">
+          </template>
           <InsertRow
             :table-id="props.tableId"
             :field-defs="quickAddFieldDefs"
             @created="onQuickAddCreated"
             @cancelled="closeQuickAddDialog"
           />
-        </div>
+        </Section>
       </div>
     </div>
   </Section>
 </template>
 
 <style scoped>
-.error {
-  color: #b00020;
-}
-
 .loading-state {
   padding: 1rem;
 }
@@ -1425,67 +1471,47 @@ onUnmounted(() => {
 
 .quick-add-modal {
   width: 90%;
-  max-width: 600px;
-  max-height: 80vh;
+  max-width: 640px;
+  max-height: 85vh;
   overflow-y: auto;
 }
 
-.modal-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 0.75rem;
-  border-bottom: 1px solid #ddd;
+.quick-add-section {
+  margin: 0;
 }
 
-.modal-header-left {
+.insert-toolbar {
   display: flex;
   align-items: center;
   gap: 1rem;
-  flex: 1;
+  flex-wrap: wrap;
 }
 
-.modal-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.modal-header button {
-  min-width: auto;
-  padding: 0.5rem;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.modal-body {
-  padding: 0.75rem;
-}
-
-.quick-add-view-selector {
+.view-selector {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #e9ecef;
-  border-radius: 4px;
-  background: #f8f9fa;
 }
 
-.quick-add-view-selector label {
-  margin: 0;
-  color: #333;
-  font-size: 0.9rem;
+.view-selector label {
   font-weight: 600;
+  color: #333;
 }
 
 .view-dropdown {
-  min-width: 120px;
-  padding: 0.4rem 0.6rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid #ddd;
   border-radius: 4px;
   background: white;
+  font-size: 1rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  min-width: 150px;
+}
+
+.view-dropdown:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 .markdown-content {
@@ -1602,19 +1628,12 @@ onUnmounted(() => {
     margin: 0.5rem;
   }
 
-  .modal-header,
-  .modal-header-left {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.5rem;
-  }
-
-  .quick-add-view-selector {
+  .insert-toolbar {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .quick-add-view-selector .view-dropdown {
+  .view-selector .view-dropdown {
     width: 100%;
   }
 }

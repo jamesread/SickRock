@@ -16,7 +16,10 @@ import ConditionalFormattingRules from './components/ConditionalFormattingRules.
 import ExportView from './views/ExportView.vue'
 import ReadOnlyCalendarExportView from './views/ReadOnlyCalendarExportView.vue'
 import TableCreate from './views/TableCreate.vue'
+import DashboardCreate from './views/DashboardCreate.vue'
 import ControlPanel from './views/ControlPanel.vue'
+import RssCalendarFeedsView from './views/RssCalendarFeedsView.vue'
+import RssCalendarFeedEditView from './views/RssCalendarFeedEditView.vue'
 import PWAInstallation from './views/PWAInstallation.vue'
 import LoginView from './views/LoginView.vue'
 import NotFoundView from './views/NotFoundView.vue'
@@ -358,6 +361,17 @@ const router = createRouter({
       },
     },
     {
+      path: '/admin/dashboard/create',
+      name: 'dashboard-create',
+      component: DashboardCreate,
+      meta: {
+        requiresAuth: true,
+        requiresPermission: 'system.settings',
+        title: 'Create Dashboard',
+        icon: DatabaseAddIcon
+      },
+    },
+    {
       path: '/admin/database-browser',
       name: 'database-browser',
       component: DatabaseBrowser,
@@ -377,6 +391,28 @@ const router = createRouter({
         requiresControlPanel: true,
         title: 'Control Panel',
         icon: DatabaseAddIcon
+      },
+    },
+    {
+      path: '/admin/rss-calendar-feeds',
+      name: 'rss-calendar-feeds',
+      component: RssCalendarFeedsView,
+      meta: {
+        requiresAuth: true,
+        requiresPermission: 'exports.manage',
+        title: 'Calendar feeds',
+        icon: DatabaseAddIcon,
+      },
+    },
+    {
+      path: '/admin/rss-calendar-feeds/:feedId',
+      name: 'rss-calendar-feed-edit',
+      component: RssCalendarFeedEditView,
+      meta: {
+        requiresAuth: true,
+        requiresPermission: 'exports.manage',
+        title: 'Calendar feed',
+        icon: DatabaseAddIcon,
       },
     },
     {

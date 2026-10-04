@@ -55,6 +55,42 @@ type Dashboard struct {
 	Name string `db:"name"`
 }
 
+// CreateDashboard inserts a dashboard and optionally a navigation entry. Returns the new dashboard id.
+func (r *Repository) CreateDashboard(ctx context.Context, name string, createNavigation bool) (int, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, fmt.Errorf("dashboard name is required")
+	}
+
+	var exists int
+	if err := r.db.GetContext(ctx, &exists, "SELECT COUNT(*) FROM table_dashboards WHERE name = ?", name); err != nil {
+		return 0, fmt.Errorf("failed to check existing dashboard: %w", err)
+	}
+	if exists > 0 {
+		return 0, fmt.Errorf("dashboard '%s' already exists", name)
+	}
+
+	result, err := r.db.ExecContext(ctx, "INSERT INTO table_dashboards (name) VALUES (?)", name)
+	if err != nil {
+		return 0, fmt.Errorf("failed to insert dashboard: %w", err)
+	}
+	dashboardID, err := result.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get dashboard id: %w", err)
+	}
+
+	if createNavigation {
+		navQuery := "INSERT INTO table_navigation (ordinal, dashboard_id, name) VALUES (99, ?, ?)"
+		if _, err := r.db.ExecContext(ctx, navQuery, dashboardID, name); err != nil {
+			log.Warnf("Failed to create navigation entry for dashboard %s: %v", name, err)
+		} else {
+			log.Infof("Created navigation entry for dashboard: %s", name)
+		}
+	}
+
+	return int(dashboardID), nil
+}
+
 // ListDashboards returns all dashboards
 func (r *Repository) ListDashboards(ctx context.Context) ([]Dashboard, error) {
 	rows, err := r.db.QueryxContext(ctx, "SELECT id, name FROM table_dashboards ORDER BY id ASC")
@@ -160,6 +196,8 @@ type TableConfig struct {
 	Ordinal           int            `db:"ordinal"`
 	Icon              sql.NullString   `db:"icon"`
 	CreateButtonText  sql.NullString   `db:"create_button_text"`
+	CreateDelegate    sql.NullString   `db:"create_delegate"`
+	RowName           sql.NullString   `db:"row_name"`
 	Table             sql.NullString   `db:"table"`
 	Db                sql.NullString   `db:"db"`
 	PrimaryKeyColumn  sql.NullString   `db:"primary_key_column"`
@@ -721,10 +759,16 @@ func (r *Repository) AddColumn(ctx context.Context, db, table string, field Fiel
 	defaultClause := ""
 
 	switch field.Type {
-	case "int64":
+	case "int64", "user_ref":
 		typ = "BIGINT"
 	case "string":
 		typ = "TEXT"
+	case "tinyint":
+		if r.db.DriverName() == "mysql" {
+			typ = "TINYINT(1)"
+		} else {
+			typ = "INTEGER"
+		}
 	case "datetime":
 		// Use native SQL datetime format
 		if r.db.DriverName() == "mysql" {
@@ -733,8 +777,9 @@ func (r *Repository) AddColumn(ctx context.Context, db, table string, field Fiel
 				defaultClause = " DEFAULT CURRENT_TIMESTAMP"
 			}
 		} else {
-			// SQLite uses TEXT for datetime with ISO8601 format
-			typ = "TEXT"
+			// Declare DATETIME so the column is reported as a datetime.
+			// ISO-8601 values are not integer literals, so SQLite still stores them as text.
+			typ = "DATETIME"
 			if field.DefaultToCurrentTimestamp {
 				defaultClause = " DEFAULT (datetime('now'))"
 			}
@@ -748,7 +793,12 @@ func (r *Repository) AddColumn(ctx context.Context, db, table string, field Fiel
 		notNull = " NOT NULL"
 	}
 
-	query := fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN %s %s%s%s", db, t, col, typ, notNull, defaultClause)
+	var query string
+	if r.db.DriverName() == "mysql" {
+		query = fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN %s %s%s%s", db, t, col, typ, notNull, defaultClause)
+	} else {
+		query = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s%s%s", t, col, typ, notNull, defaultClause)
+	}
 	_, err := r.db.ExecContext(ctx, query)
 	return err
 }
@@ -868,16 +918,18 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 	placeholders := []string{}
 	values := []interface{}{}
 
+	nowExpr := r.sqlCurrentTimestampExpr()
+
 	// Add sr_created if the column exists
 	if hasSrCreated {
 		insertColumns = append(insertColumns, "`sr_created`")
-		placeholders = append(placeholders, "NOW()")
+		placeholders = append(placeholders, nowExpr)
 	}
 
 	// Add sr_updated if the column exists (set to same value as sr_created)
 	if hasSrUpdated {
 		insertColumns = append(insertColumns, "`sr_updated`")
-		placeholders = append(placeholders, "NOW()")
+		placeholders = append(placeholders, nowExpr)
 	}
 
 	// Add additional fields
@@ -1034,7 +1086,7 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 
 	// Add sr_updated if the column exists
 	if hasSrUpdated {
-		setParts = append(setParts, "`sr_updated` = NOW()")
+		setParts = append(setParts, fmt.Sprintf("`sr_updated` = %s", r.sqlCurrentTimestampExpr()))
 	}
 
 	for fieldName, fieldValue := range additionalFields {
@@ -1136,7 +1188,40 @@ func ConnectDatabase(defaultSQLiteDSN string) (*sqlx.DB, error) {
 		return sqlx.Open("mysql", dsn)
 	}
 
-	return sqlx.Open("sqlite", defaultSQLiteDSN)
+	db, err := sqlx.Open("sqlite", defaultSQLiteDSN)
+	if err != nil {
+		return nil, err
+	}
+	if err := configureSQLiteDB(db); err != nil {
+		db.Close()
+		return nil, err
+	}
+	return db, nil
+}
+
+// sqliteMaxOpenConns allows concurrent readers under WAL. A pool of one serializes every
+// HTTP handler and IAM auth lookup on the same DSN, so parallel RPCs queue until auth hits
+// its 30s provider timeout.
+const sqliteMaxOpenConns = 8
+
+// configureSQLiteDB sets pool and pragmas suited to concurrent HTTP handlers and dev reload (air).
+func configureSQLiteDB(db *sqlx.DB) error {
+	db.SetMaxOpenConns(sqliteMaxOpenConns)
+	db.SetMaxIdleConns(sqliteMaxOpenConns)
+	db.SetConnMaxLifetime(0)
+
+	pragmas := []string{
+		"PRAGMA foreign_keys = ON",
+		"PRAGMA journal_mode = WAL",
+		"PRAGMA busy_timeout = 10000",
+		"PRAGMA synchronous = NORMAL",
+	}
+	for _, pragma := range pragmas {
+		if _, err := db.Exec(pragma); err != nil {
+			return fmt.Errorf("%s: %w", pragma, err)
+		}
+	}
+	return nil
 }
 
 func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldSpec, error) {
@@ -1211,21 +1296,36 @@ func (r *Repository) GetDatabaseTables(ctx context.Context, database string) ([]
 		database = "main"
 	}
 
-	// Query to get all tables from information_schema and join with table_configurations
-	query := `
-		SELECT
-			t.TABLE_NAME as table_name,
-			CASE WHEN tc.name IS NOT NULL THEN 1 ELSE 0 END as has_configuration,
-			tc.name as configuration_name
-		FROM information_schema.TABLES t
-		LEFT JOIN table_configurations tc ON t.TABLE_NAME = tc.table AND tc.db = ?
-		WHERE t.TABLE_SCHEMA = ?
-		AND t.TABLE_TYPE = 'BASE TABLE'
-		ORDER BY t.TABLE_NAME
-	`
-
 	var tables []DatabaseTableInfo
-	err := r.db.SelectContext(ctx, &tables, query, database, database)
+	var err error
+	switch r.db.DriverName() {
+	case "mysql":
+		query := `
+			SELECT
+				t.TABLE_NAME as table_name,
+				CASE WHEN tc.name IS NOT NULL THEN 1 ELSE 0 END as has_configuration,
+				tc.name as configuration_name
+			FROM information_schema.TABLES t
+			LEFT JOIN table_configurations tc ON t.TABLE_NAME = tc.` + "`table`" + ` AND tc.` + "`db`" + ` = ?
+			WHERE t.TABLE_SCHEMA = ?
+			AND t.TABLE_TYPE = 'BASE TABLE'
+			ORDER BY t.TABLE_NAME
+		`
+		err = r.db.SelectContext(ctx, &tables, query, database, database)
+	default: // sqlite
+		query := `
+			SELECT
+				m.name as table_name,
+				CASE WHEN tc.name IS NOT NULL THEN 1 ELSE 0 END as has_configuration,
+				tc.name as configuration_name
+			FROM sqlite_master m
+			LEFT JOIN table_configurations tc ON m.name = tc."table" AND tc.db = ?
+			WHERE m.type = 'table'
+			AND m.name NOT LIKE 'sqlite_%'
+			ORDER BY m.name
+		`
+		err = r.db.SelectContext(ctx, &tables, query, database)
+	}
 	if err != nil {
 		log.Errorf("Failed to get database tables: %v", err)
 		return nil, fmt.Errorf("failed to get database tables: %w", err)
@@ -1293,8 +1393,9 @@ func (r *Repository) CreateTable(ctx context.Context, database, table string) er
 	return nil
 }
 
-// CreateTableConfiguration creates a new table configuration entry
-func (r *Repository) CreateTableConfiguration(ctx context.Context, name, database, table string) error {
+// CreateTableConfiguration creates a new table configuration entry.
+// When createNavigation is true, a row is added to table_navigation for the new configuration.
+func (r *Repository) CreateTableConfiguration(ctx context.Context, name, database, table string, createNavigation bool) error {
 	log.WithFields(log.Fields{
 		"name":     name,
 		"database": database,
@@ -1332,15 +1433,14 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 		return fmt.Errorf("failed to get configuration ID: %w", err)
 	}
 
-	// Create a navigation entry for the new table configuration
-	navQuery := "INSERT INTO table_navigation (ordinal, table_configuration, name) VALUES (99, ?, ?)"
-	_, err = r.db.ExecContext(ctx, navQuery, configID, name)
-	if err != nil {
-		log.Warnf("Failed to create navigation entry for table configuration %s: %v", name, err)
-		// Don't fail the whole operation if navigation entry creation fails
-		// The table configuration was created successfully
-	} else {
-		log.Infof("Created navigation entry for table configuration: %s", name)
+	if createNavigation {
+		navQuery := "INSERT INTO table_navigation (ordinal, table_configuration, name) VALUES (99, ?, ?)"
+		_, err = r.db.ExecContext(ctx, navQuery, configID, name)
+		if err != nil {
+			log.Warnf("Failed to create navigation entry for table configuration %s: %v", name, err)
+		} else {
+			log.Infof("Created navigation entry for table configuration: %s", name)
+		}
 	}
 
 	log.Infof("Created table configuration: %s (db: %s, table: %s, view: table)", name, database, table)
@@ -1356,27 +1456,43 @@ func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error 
 		dbName = "main"
 	}
 	systemConfigs := []struct {
-		name    string
-		title   string
-		table   string
-		ordinal int
+		name             string
+		title            string
+		table            string
+		ordinal          int
+		createDelegate   string
+		createButtonText string
+		rowName          string
 	}{
-		{"table_settings", "Settings", "table_settings", 0},
-		{"table_configurations", "Table Configurations", "table_configurations", 1},
-		{"table_workflows", "Workflows", "table_workflows", 2},
-		{"table_navigation", "Navigation", "table_navigation", 3},
-		{"table_dashboards", "Dashboards", "table_dashboards", 4},
-		{"table_dashboard_components", "Dashboard components", "table_dashboard_components", 8},
-		{"table_read_only_exports", "Read-only calendar exports", "read_only_calendar_exports", 5},
-		{"table_logs", "Audit logs", "audit_logs", 6},
+		{"table_settings", "Settings", "table_settings", 0, "", "Add Setting", "Setting"},
+		{"table_configurations", "Table Configurations", "table_configurations", 1, "/admin/table/create", "Create Table", "Table configuration"},
+		{"table_workflows", "Workflows", "table_workflows", 2, "", "Add Workflow", "Workflow"},
+		{"table_navigation", "Navigation", "table_navigation", 3, "", "Add Navigation Item", "Navigation item"},
+		{"table_dashboards", "Dashboards", "table_dashboards", 4, "/admin/dashboard/create", "Create Dashboard", "Dashboard"},
+		{"table_dashboard_components", "Dashboard components", "table_dashboard_components", 8, "", "Add Component", "Dashboard component"},
+		{"table_read_only_exports", "Read-only calendar exports", "read_only_calendar_exports", 5, "", "Add Export", "Calendar export"},
+		{"table_rss_calendar_feeds", "Calendar feeds", "rss_calendar_feeds", 7, "/admin/rss-calendar-feeds/new", "Add feed", "Calendar feed"},
+		{"table_logs", "Audit logs", "audit_logs", 6, "", "Insert Row", "Audit log entry"},
 	}
 	switch r.db.DriverName() {
 	case "mysql":
 		for _, c := range systemConfigs {
-			query := `INSERT INTO table_configurations (name, title, ` + "`db`" + `, ` + "`table`" + `, ordinal)
-VALUES (?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE title = VALUES(title), ` + "`db`" + ` = VALUES(` + "`db`" + `), ` + "`table`" + ` = VALUES(` + "`table`" + `), ordinal = VALUES(ordinal)`
-			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal)
+			query := `INSERT INTO table_configurations (name, title, ` + "`db`" + `, ` + "`table`" + `, ordinal, create_delegate, create_button_text, row_name)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE title = VALUES(title), ` + "`db`" + ` = VALUES(` + "`db`" + `), ` + "`table`" + ` = VALUES(` + "`table`" + `), ordinal = VALUES(ordinal), create_delegate = COALESCE(NULLIF(VALUES(create_delegate), ''), create_delegate), create_button_text = COALESCE(NULLIF(VALUES(create_button_text), ''), create_button_text), row_name = COALESCE(NULLIF(VALUES(row_name), ''), row_name)`
+			var createDelegate interface{}
+			if c.createDelegate != "" {
+				createDelegate = c.createDelegate
+			}
+			var createButtonText interface{}
+			if c.createButtonText != "" {
+				createButtonText = c.createButtonText
+			}
+			var rowName interface{}
+			if c.rowName != "" {
+				rowName = c.rowName
+			}
+			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal, createDelegate, createButtonText, rowName)
 			if err != nil {
 				return fmt.Errorf("upsert system table config %s: %w", c.name, err)
 			}
@@ -1384,10 +1500,22 @@ ON DUPLICATE KEY UPDATE title = VALUES(title), ` + "`db`" + ` = VALUES(` + "`db`
 		}
 	default: // sqlite
 		for _, c := range systemConfigs {
-			query := `INSERT INTO table_configurations (name, title, db, "table", ordinal)
-VALUES (?, ?, ?, ?, ?)
-ON CONFLICT(name) DO UPDATE SET title = excluded.title, db = excluded.db, "table" = excluded."table", ordinal = excluded.ordinal`
-			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal)
+			query := `INSERT INTO table_configurations (name, title, db, "table", ordinal, create_delegate, create_button_text, row_name)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(name) DO UPDATE SET title = excluded.title, db = excluded.db, "table" = excluded."table", ordinal = excluded.ordinal, create_delegate = COALESCE(NULLIF(excluded.create_delegate, ''), table_configurations.create_delegate), create_button_text = COALESCE(NULLIF(excluded.create_button_text, ''), table_configurations.create_button_text), row_name = COALESCE(NULLIF(excluded.row_name, ''), table_configurations.row_name)`
+			var createDelegate interface{}
+			if c.createDelegate != "" {
+				createDelegate = c.createDelegate
+			}
+			var createButtonText interface{}
+			if c.createButtonText != "" {
+				createButtonText = c.createButtonText
+			}
+			var rowName interface{}
+			if c.rowName != "" {
+				rowName = c.rowName
+			}
+			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal, createDelegate, createButtonText, rowName)
 			if err != nil {
 				return fmt.Errorf("upsert system table config %s: %w", c.name, err)
 			}
@@ -1650,10 +1778,8 @@ type ForeignKey struct {
 	OnUpdateAction   string `db:"on_update_action"`
 }
 
-// CreateForeignKey creates a foreign key constraint
+// CreateForeignKey records a relation in table_relations and applies a database FK when supported.
 func (r *Repository) CreateForeignKey(ctx context.Context, tableName, columnName, referencedTable, referencedColumn, onDeleteAction, onUpdateAction string) error {
-	t := sanitizeDatabaseIdentifier(tableName)
-	refTable := sanitizeDatabaseIdentifier(referencedTable)
 	col := sanitizeDatabaseIdentifier(columnName)
 	refCol := sanitizeDatabaseIdentifier(referencedColumn)
 
@@ -1667,145 +1793,70 @@ func (r *Repository) CreateForeignKey(ctx context.Context, tableName, columnName
 		return err
 	}
 
-	// Generate constraint name
-	constraintName := fmt.Sprintf("fk_%s_%s_%s_%s", t, col, refTable, refCol)
-
-	// Build the ALTER TABLE statement
-	var alterQuery string
-	switch r.db.DriverName() {
-	case "mysql":
-		alterQuery = fmt.Sprintf(
-			"ALTER TABLE %s.%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s(%s) ON DELETE %s ON UPDATE %s",
-			tc.Db.String, tc.Table.String, constraintName, col, tcRef.Db.String, tcRef.Table.String, refCol, onDeleteAction, onUpdateAction,
-		)
-
-	default: // SQLite
-		// SQLite has limited foreign key support, but we can still create the constraint
-		alterQuery = fmt.Sprintf(
-			"ALTER TABLE %s.%s ADD CONSTRAINT %s FOREIGN KEY (%s) REFERENCES %s.%s(%s) ON DELETE %s ON UPDATE %s",
-			tc.Db.String, tc.Table.String, constraintName, col, tcRef.Db.String, tcRef.Table.String, refCol, onDeleteAction, onUpdateAction,
-		)
+	constraintName := makeForeignKeyConstraintName(tableName, col, referencedTable, refCol)
+	rel := TableRelation{
+		ConstraintName:     constraintName,
+		SourceTableKey:     tableName,
+		SourceColumn:       col,
+		ReferencedTableKey: referencedTable,
+		ReferencedColumn:   refCol,
+		OnDeleteAction:     onDeleteAction,
+		OnUpdateAction:     onUpdateAction,
+	}
+	if err := r.insertTableRelation(ctx, rel); err != nil {
+		return fmt.Errorf("save table relation: %w", err)
 	}
 
-	log.Infof("Creating foreign key: %s", alterQuery)
-
-	_, err = r.db.ExecContext(ctx, alterQuery)
-	return err
+	if err := r.applyPhysicalForeignKey(ctx, tc, tcRef, col, refCol, onDeleteAction, onUpdateAction, constraintName); err != nil {
+		log.WithError(err).Warn("database foreign key not applied; relation saved in table_relations")
+	}
+	return nil
 }
 
-// GetForeignKeys retrieves all foreign keys for a given table (bidirectional)
+// GetForeignKeys lists relations involving a table configuration (source or referenced).
 func (r *Repository) GetForeignKeys(ctx context.Context, tableName string) ([]ForeignKey, error) {
-	tc, err := r.GetTableConfiguration(ctx, tableName)
+	if _, err := r.GetTableConfiguration(ctx, tableName); err != nil {
+		return nil, err
+	}
+	relations, err := r.listTableRelationsForConfiguration(ctx, tableName)
 	if err != nil {
 		return nil, err
 	}
-
-	var foreignKeys []ForeignKey
-
-	switch r.db.DriverName() {
-	case "mysql":
-		// Query MySQL information schema for foreign keys in both directions
-		// We need to find foreign keys where the current table is either the source or target
-		// Foreign keys can span across different databases, so we search globally
-		query := `
-			SELECT
-				kcu.CONSTRAINT_NAME as constraint_name,
-				kcu.TABLE_SCHEMA as table_schema,
-				kcu.TABLE_NAME as table_name,
-				kcu.COLUMN_NAME as column_name,
-				kcu.REFERENCED_TABLE_SCHEMA as referenced_schema,
-				kcu.REFERENCED_TABLE_NAME as referenced_table,
-				kcu.REFERENCED_COLUMN_NAME as referenced_column,
-				COALESCE(rc.DELETE_RULE, 'NO ACTION') as on_delete_action,
-				COALESCE(rc.UPDATE_RULE, 'NO ACTION') as on_update_action
-			FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
-			LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
-				ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
-				AND kcu.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
-			WHERE ((kcu.TABLE_SCHEMA = ? AND kcu.TABLE_NAME = ?)
-			OR (kcu.REFERENCED_TABLE_SCHEMA = ? AND kcu.REFERENCED_TABLE_NAME = ?))
-			AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
-			ORDER BY kcu.CONSTRAINT_NAME`
-
-		log.Tracef("GetForeignKeys Query: %v", query)
-
-		rows, err := r.db.QueryxContext(ctx, query, tc.Db.String, tc.Table.String, tc.Db.String, tc.Table.String)
-		if err != nil {
-			return nil, err
-		}
-		defer rows.Close()
-
-		for rows.Next() {
-			var fk ForeignKey
-			err := rows.StructScan(&fk)
-			if err != nil {
-				return nil, err
-			}
-			foreignKeys = append(foreignKeys, fk)
-		}
-	default: // SQLite
-		type sqliteFkRow struct {
-			ID       int    `db:"id"`
-			Seq      int    `db:"seq"`
-			Table    string `db:"table"`
-			From     string `db:"from"`
-			To       string `db:"to"`
-			OnUpdate string `db:"on_update"`
-			OnDelete string `db:"on_delete"`
-			Match    string `db:"match"`
-		}
-		var rows []sqliteFkRow
-		pragma := fmt.Sprintf("PRAGMA foreign_key_list(%s)", tc.Table.String)
-		if err := r.db.SelectContext(ctx, &rows, pragma); err != nil {
-			return nil, err
-		}
-		for _, row := range rows {
-			foreignKeys = append(foreignKeys, ForeignKey{
-				ConstraintName:   fmt.Sprintf("sqlite_fk_%s_%s", tc.Table.String, row.From),
-				TableSchema:      tc.Db.String,
-				TableName:        tc.Table.String,
-				ColumnName:       row.From,
-				ReferencedSchema: tc.Db.String,
-				ReferencedTable:  row.Table,
-				ReferencedColumn: row.To,
-				OnDeleteAction:   row.OnDelete,
-				OnUpdateAction:   row.OnUpdate,
-			})
-		}
-	}
-
-	log.Infof("Foreign keys for table: %v = %v", tableName, foreignKeys)
-
-	return foreignKeys, nil
+	return r.tableRelationsToForeignKeys(ctx, relations)
 }
 
-// DeleteForeignKey removes a foreign key constraint
-func (r *Repository) DeleteForeignKey(ctx context.Context, constraintName string) error {
-	// For MySQL, we need to know the table name to drop the constraint
-	// For SQLite, we can drop by constraint name
-	var alterQuery string
-	switch r.db.DriverName() {
-	case "mysql":
-		// We need to find the table name first
-		var tableName string
-		query := `
-			SELECT TABLE_NAME
-			FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-			WHERE CONSTRAINT_NAME = ?
-			LIMIT 1`
-
-		err := r.db.GetContext(ctx, &tableName, query, constraintName)
-		if err != nil {
-			return err
-		}
-
-		alterQuery = fmt.Sprintf("ALTER TABLE %s DROP FOREIGN KEY %s", tableName, constraintName)
-	default: // SQLite
-		return fmt.Errorf("dropping foreign keys is not supported on SQLite in this implementation")
+func (r *Repository) getForeignKeysForTableConfig(ctx context.Context, tableName string, tc *TableConfig) ([]ForeignKey, error) {
+	if tc == nil {
+		return nil, fmt.Errorf("table configuration is required")
 	}
+	relations, err := r.listTableRelationsForConfiguration(ctx, tableName)
+	if err != nil {
+		return nil, err
+	}
+	return r.tableRelationsToForeignKeys(ctx, relations)
+}
 
-	_, err := r.db.ExecContext(ctx, alterQuery)
-	return err
+// GetForeignKeysForTableConfig is like GetForeignKeys but skips reloading table_configurations.
+func (r *Repository) GetForeignKeysForTableConfig(ctx context.Context, tc *TableConfig) ([]ForeignKey, error) {
+	if tc == nil {
+		return nil, fmt.Errorf("table configuration is required")
+	}
+	return r.getForeignKeysForTableConfig(ctx, tc.Name, tc)
+}
+
+// DeleteForeignKey removes a relation from table_relations and drops the database FK when possible.
+func (r *Repository) DeleteForeignKey(ctx context.Context, constraintName string) error {
+	rel, err := r.getTableRelationByConstraintName(ctx, constraintName)
+	if err != nil {
+		return fmt.Errorf("table relation not found: %w", err)
+	}
+	if err := r.deleteTableRelationByConstraintName(ctx, constraintName); err != nil {
+		return err
+	}
+	if err := r.dropPhysicalForeignKey(ctx, rel); err != nil {
+		log.WithError(err).Warn("database foreign key not removed; relation deleted from table_relations")
+	}
+	return nil
 }
 
 // ChangeColumnType changes the data type of a column
@@ -1823,12 +1874,12 @@ func (r *Repository) ChangeColumnType(ctx context.Context, tableName, columnName
 	// Build the ALTER TABLE statement
 	alterQuery := fmt.Sprintf("ALTER TABLE %s.%s MODIFY COLUMN %s %s", tc.Db.String, tc.Table.String, col, dbType)
 
-	// For SQLite, we need to use a different approach since it doesn't support MODIFY COLUMN
+	// SQLite cannot rewrite a column's declared type. Datetime is stored as text;
+	// record the logical type so structure APIs report datetime instead of TEXT.
 	if r.db.DriverName() == "sqlite" {
-		// SQLite doesn't support MODIFY COLUMN directly
-		// We would need to create a new table, copy data, drop old table, and rename
-		// This is a complex operation that requires careful handling
-		// For now, we'll return an error indicating this feature isn't fully supported in SQLite
+		if IsDatetimeTypeName(newType) {
+			return r.SetColumnSemantic(ctx, tc.Name, columnName, SemanticTypeDatetime)
+		}
 		return fmt.Errorf("column type changes are not fully supported in SQLite. Please recreate the table with the desired column types")
 	}
 
@@ -2639,11 +2690,11 @@ func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID i
 
 // CreateConditionalFormattingRule creates a new conditional formatting rule
 func (r *Repository) CreateConditionalFormattingRule(ctx context.Context, userID int, rule *ConditionalFormattingRule) (int, error) {
-	query := `
+	query := fmt.Sprintf(`
 		INSERT INTO table_conditional_formatting_rules
 		(table_name, column_name, condition_type, condition_value, format_type, format_value, priority, is_active, sr_created, updated_at_unix)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), UNIX_TIMESTAMP())
-	`
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, %s, %s)`,
+		r.sqlCurrentTimestampExpr(), r.sqlUnixTimestampExpr())
 
 	result, err := r.db.ExecContext(ctx, query,
 		rule.TableName,

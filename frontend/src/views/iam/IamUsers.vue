@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, RefreshIcon, UserMultiple02Icon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import IamCreateUserDialog from '../../components/IamCreateUserDialog.vue'
 import { createApiClient } from '../../stores/api'
@@ -122,7 +123,9 @@ onMounted(loadAll)
       </button>
     </template>
 
-    <div v-if="errorMessage" class="list-banner-pad inline-notification error">{{ errorMessage }}</div>
+    <div v-if="errorMessage" class="list-banner-pad">
+      <NotificationBlock type="error" :message="errorMessage" />
+    </div>
     <div v-if="loading && !users.length" class="list-banner-pad muted">Loading…</div>
 
     <template v-else>

@@ -56,6 +56,8 @@ message CreateTableConfigurationRequest {
   string name = 1;
   string database = 2;
   string table = 3;
+  // When unset, navigation entry is created. Set false to skip.
+  optional bool create_navigation_entry = 4;
 }
 
 message CreateTableConfigurationResponse {
@@ -151,6 +153,78 @@ message ListAccessibleReadOnlyExportsResponse {
   repeated ReadOnlyExportSummary exports = 1;
 }
 
+// RSS calendar feed import (Control Panel → RSS calendar feeds)
+message RssFieldMapping {
+  string rss_field = 1;
+  string column = 2;
+}
+
+message RssCalendarFeed {
+  int32 id = 1;
+  string name = 2;
+  string feed_url = 3;
+  string table_configuration = 4;
+  repeated RssFieldMapping field_mappings = 5;
+  string unique_column = 6;
+  int32 refresh_interval_minutes = 7;
+  bool enabled = 8;
+  int64 last_refresh_at = 9;
+  string last_refresh_status = 10;
+  string last_refresh_message = 11;
+  int32 last_items_created = 12;
+  int32 last_items_updated = 13;
+}
+
+message ListRssCalendarFeedsRequest {}
+
+message ListRssCalendarFeedsResponse {
+  repeated RssCalendarFeed feeds = 1;
+}
+
+message GetRssCalendarFeedRequest {
+  int32 id = 1;
+}
+
+message GetRssCalendarFeedResponse {
+  RssCalendarFeed feed = 1;
+}
+
+message SaveRssCalendarFeedRequest {
+  RssCalendarFeed feed = 1;
+}
+
+message SaveRssCalendarFeedResponse {
+  RssCalendarFeed feed = 1;
+}
+
+message DeleteRssCalendarFeedRequest {
+  int32 id = 1;
+}
+
+message DeleteRssCalendarFeedResponse {
+  bool deleted = 1;
+}
+
+message RefreshRssCalendarFeedRequest {
+  int32 id = 1;
+}
+
+message RefreshRssCalendarFeedResponse {
+  RssCalendarFeed feed = 1;
+  string message = 2;
+  int32 items_created = 3;
+  int32 items_updated = 4;
+}
+
+message PreviewRssCalendarFeedRequest {
+  string feed_url = 1;
+}
+
+message PreviewRssCalendarFeedResponse {
+  repeated string rss_fields = 1;
+  repeated RssFieldMapping sample_values = 2;
+}
+
 // Items
 message Item {
   string id = 1;
@@ -230,6 +304,12 @@ message GetTableStructureResponse {
   string primary_key_column = 5;
   // Default ORDER BY column for list queries (table_configurations.default_sort_column, default "id").
   string default_sort_column = 6;
+  // When set, the insert/create action navigates here instead of the default insert-row route.
+  string create_delegate = 7;
+  // Display title from table_configurations (falls back to name on the server when title is unset).
+  string title = 8;
+  // Singular label for a data row (e.g. "Customer") used in success messages.
+  string row_name = 9;
 }
 
 message AddTableColumnRequest {
@@ -404,6 +484,18 @@ message GetDashboardsRequest {}
 
 message GetDashboardsResponse {
   repeated Dashboard dashboards = 1;
+}
+
+message CreateDashboardRequest {
+  string name = 1;
+  // When unset, navigation entry is created. Set false to skip.
+  optional bool create_navigation_entry = 2;
+}
+
+message CreateDashboardResponse {
+  bool success = 1;
+  string message = 2;
+  int32 dashboard_id = 3;
 }
 
 message DashboardComponent {
@@ -1139,6 +1231,12 @@ service SickRock {
   rpc SetWorkflowNavigationMembers(SetWorkflowNavigationMembersRequest) returns (SetWorkflowNavigationMembersResponse);
   rpc GetReadOnlyCalendarExport(GetReadOnlyCalendarExportRequest) returns (GetReadOnlyCalendarExportResponse);
   rpc ListAccessibleReadOnlyExports(ListAccessibleReadOnlyExportsRequest) returns (ListAccessibleReadOnlyExportsResponse);
+  rpc ListRssCalendarFeeds(ListRssCalendarFeedsRequest) returns (ListRssCalendarFeedsResponse);
+  rpc GetRssCalendarFeed(GetRssCalendarFeedRequest) returns (GetRssCalendarFeedResponse);
+  rpc SaveRssCalendarFeed(SaveRssCalendarFeedRequest) returns (SaveRssCalendarFeedResponse);
+  rpc DeleteRssCalendarFeed(DeleteRssCalendarFeedRequest) returns (DeleteRssCalendarFeedResponse);
+  rpc RefreshRssCalendarFeed(RefreshRssCalendarFeedRequest) returns (RefreshRssCalendarFeedResponse);
+  rpc PreviewRssCalendarFeed(PreviewRssCalendarFeedRequest) returns (PreviewRssCalendarFeedResponse);
 
   // Generic CRUD over items on a page
   rpc ListItems(ListItemsRequest) returns (ListItemsResponse);
@@ -1175,6 +1273,7 @@ service SickRock {
 
   // Dashboards
   rpc GetDashboards(GetDashboardsRequest) returns (GetDashboardsResponse);
+  rpc CreateDashboard(CreateDashboardRequest) returns (CreateDashboardResponse);
 
   // Dashboard Component Rules
   rpc GetDashboardComponentRules(GetDashboardComponentRulesRequest) returns (GetDashboardComponentRulesResponse);

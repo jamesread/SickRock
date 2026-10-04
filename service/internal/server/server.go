@@ -76,27 +76,6 @@ func safeInt64ToInt32(value int64) int32 {
 	return int32(value)
 }
 
-// lookupTableConfigName looks up the table configuration name for a given database and table
-func (s *SickRockServer) lookupTableConfigName(ctx context.Context, database, table string) string {
-	// Query table_configurations for a match
-	var tcName string
-	query := "SELECT name FROM table_configurations WHERE `db` = ? AND `table` = ? LIMIT 1"
-	err := s.repo.DB().GetContext(ctx, &tcName, query, database, table)
-	if err != nil {
-		log.WithError(err).WithFields(log.Fields{
-			"database": database,
-			"table":    table,
-		}).Debug("No table configuration found")
-		return ""
-	}
-	log.WithFields(log.Fields{
-		"database": database,
-		"table":    table,
-		"tcName":   tcName,
-	}).Debug("Found table configuration")
-	return tcName
-}
-
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
@@ -220,8 +199,12 @@ func (s *SickRockServer) CreateTableConfiguration(ctx context.Context, req *conn
 		database = "main" // Default database
 	}
 
-	// Create the table configuration
-	err := s.repo.CreateTableConfiguration(ctx, name, database, table)
+	createNavigation := true
+	if req.Msg.CreateNavigationEntry != nil {
+		createNavigation = req.Msg.GetCreateNavigationEntry()
+	}
+
+	err := s.repo.CreateTableConfiguration(ctx, name, database, table, createNavigation)
 	if err != nil {
 		log.Errorf("Failed to create table configuration: %v", err)
 		return connect.NewResponse(&sickrockpb.CreateTableConfigurationResponse{
@@ -954,8 +937,9 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 	if err != nil {
 		log.Errorf("list columns: %v, table: %s", err, tcName)
 	} else {
-		log.Infof("list columns: %v, table: %s", cols, tcName)
+		log.WithField("columnCount", len(cols)).Debugf("list columns for table %s", tcName)
 	}
+	cols = s.repo.ApplyColumnSemantics(ctx, tcName, cols)
 	fields := make([]*sickrockpb.Field, 0, len(cols))
 	for _, c := range cols {
 		fields = append(fields, &sickrockpb.Field{
@@ -966,15 +950,17 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		})
 	}
 
-	log.Infof("GetTableStructureResponse: %+v", tc)
-
 	createButtonText := "Insert Row"
 	if tc.CreateButtonText.Valid {
 		createButtonText = tc.CreateButtonText.String
 	}
+	createDelegate := ""
+	if tc.CreateDelegate.Valid {
+		createDelegate = strings.TrimSpace(tc.CreateDelegate.String)
+	}
 
 	// Get foreign keys for this table
-	foreignKeys, err := s.repo.GetForeignKeys(ctx, tcName)
+	foreignKeys, err := s.repo.GetForeignKeysForTableConfig(ctx, tc)
 	var pbForeignKeys []*sickrockpb.ForeignKey
 	if err != nil {
 		log.Errorf("Failed to get foreign keys: %v", err)
@@ -983,14 +969,32 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		log.WithFields(log.Fields{
 			"tcName": tcName,
 			"numFks": len(foreignKeys),
-			"fks":    foreignKeys,
 		}).Debug("Retrieved foreign keys")
+
+		lookupPairs := make([]repo.DbTablePair, 0, len(foreignKeys)*2)
+		for _, fk := range foreignKeys {
+			tableDb := fk.TableSchema
+			if tableDb == "" {
+				tableDb = tc.Db.String
+			}
+			referencedDb := fk.ReferencedSchema
+			if referencedDb == "" {
+				referencedDb = tc.Db.String
+			}
+			lookupPairs = append(lookupPairs,
+				repo.DbTablePair{Db: tableDb, Table: fk.TableName},
+				repo.DbTablePair{Db: referencedDb, Table: fk.ReferencedTable},
+			)
+		}
+		tcNameByDbTable, lookupErr := s.repo.LookupTableConfigNames(ctx, lookupPairs)
+		if lookupErr != nil {
+			log.WithError(lookupErr).Warn("Failed to batch lookup table configuration names for foreign keys")
+			tcNameByDbTable = map[string]string{}
+		}
 
 		// Convert repository foreign keys to protobuf foreign keys
 		pbForeignKeys = make([]*sickrockpb.ForeignKey, 0, len(foreignKeys))
 		for _, fk := range foreignKeys {
-			// Look up table configuration names for both tables
-			// Use TableSchema for the table, ReferencedSchema for the referenced table
 			tableDb := fk.TableSchema
 			if tableDb == "" {
 				tableDb = tc.Db.String
@@ -1000,27 +1004,8 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 				referencedDb = tc.Db.String
 			}
 
-			log.WithFields(log.Fields{
-				"tableSchema":      fk.TableSchema,
-				"tableName":        fk.TableName,
-				"referencedSchema": fk.ReferencedSchema,
-				"referencedTable":  fk.ReferencedTable,
-				"tableDb":          tableDb,
-				"referencedDb":     referencedDb,
-				"currentTcDb":      tc.Db.String,
-			}).Debug("Looking up table config names for foreign key")
-
-			tableTcName := s.lookupTableConfigName(ctx, tableDb, fk.TableName)
-			referencedTcName := s.lookupTableConfigName(ctx, referencedDb, fk.ReferencedTable)
-
-			log.WithFields(log.Fields{
-				"tableTcName":        tableTcName,
-				"referencedTcName":   referencedTcName,
-				"fk_TableName":       fk.TableName,
-				"fk_ReferencedTable": fk.ReferencedTable,
-				"tableDb":            tableDb,
-				"referencedDb":       referencedDb,
-			}).Info("Completed table config lookup")
+			tableTcName := tcNameByDbTable[repo.DbTableLookupKey(tableDb, fk.TableName)]
+			referencedTcName := tcNameByDbTable[repo.DbTableLookupKey(referencedDb, fk.ReferencedTable)]
 
 			pbForeignKeys = append(pbForeignKeys, &sickrockpb.ForeignKey{
 				ConstraintName:        fk.ConstraintName,
@@ -1056,6 +1041,10 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 	for i, c := range cols {
 		colNames[i] = c.Name
 	}
+	displayTitle := tc.Name
+	if tc.Title != "" {
+		displayTitle = tc.Title
+	}
 	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
 		Fields:            fields,
 		CreateButtonText:  createButtonText,
@@ -1063,6 +1052,9 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		ForeignKeys:       pbForeignKeys,
 		PrimaryKeyColumn:  tc.PrimaryKeyColumnName(),
 		DefaultSortColumn: tc.SortColumnName(colNames),
+		CreateDelegate:    createDelegate,
+		Title:             displayTitle,
+		RowName:           tc.DisplayRowName(),
 	}), nil
 }
 
@@ -1076,14 +1068,27 @@ func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Reques
 	if f == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("field required"))
 	}
+	fieldType := f.GetType()
 	err = s.repo.AddColumn(ctx, tc.Db.String, tc.Table.String, repo.FieldSpec{
 		Name:                      f.GetName(),
-		Type:                      f.GetType(),
+		Type:                      fieldType,
 		Required:                  f.GetRequired(),
 		DefaultToCurrentTimestamp: f.GetDefaultToCurrentTimestamp(),
 	})
 	if err != nil {
 		return nil, err
+	}
+	semantic := ""
+	switch {
+	case fieldType == repo.SemanticTypeUserRef:
+		semantic = repo.SemanticTypeUserRef
+	case repo.IsDatetimeTypeName(fieldType):
+		semantic = repo.SemanticTypeDatetime
+	}
+	if semantic != "" {
+		if err := s.repo.SetColumnSemantic(ctx, req.Msg.GetPageId(), f.GetName(), semantic); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("save column semantic: %w", err))
+		}
 	}
 	return s.GetTableStructure(ctx, &connect.Request[sickrockpb.GetTableStructureRequest]{Msg: &sickrockpb.GetTableStructureRequest{PageId: req.Msg.GetPageId()}})
 }
@@ -1520,6 +1525,39 @@ func (s *SickRockServer) GetSystemInfo(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.GetSystemInfoResponse{ApproxTotalRows: total}), nil
+}
+
+func (s *SickRockServer) CreateDashboard(ctx context.Context, req *connect.Request[sickrockpb.CreateDashboardRequest]) (*connect.Response[sickrockpb.CreateDashboardResponse], error) {
+	name := strings.TrimSpace(req.Msg.GetName())
+	if name == "" {
+		return connect.NewResponse(&sickrockpb.CreateDashboardResponse{
+			Success: false,
+			Message: "Dashboard name is required",
+		}), nil
+	}
+
+	createNavigation := true
+	if req.Msg.CreateNavigationEntry != nil {
+		createNavigation = req.Msg.GetCreateNavigationEntry()
+	}
+
+	dashboardID, err := s.repo.CreateDashboard(ctx, name, createNavigation)
+	if err != nil {
+		log.Errorf("Failed to create dashboard: %v", err)
+		return connect.NewResponse(&sickrockpb.CreateDashboardResponse{
+			Success: false,
+			Message: fmt.Sprintf("Failed to create dashboard: %v", err),
+		}), nil
+	}
+	if grantErr := s.repo.EnsureEveryoneDashboardGrant(ctx, name); grantErr != nil {
+		log.Warnf("Failed to seed Everyone grant for dashboard %s: %v", name, grantErr)
+	}
+
+	return connect.NewResponse(&sickrockpb.CreateDashboardResponse{
+		Success:     true,
+		Message:     "Dashboard created successfully",
+		DashboardId: int32(dashboardID),
+	}), nil
 }
 
 func (s *SickRockServer) GetDashboards(ctx context.Context, req *connect.Request[sickrockpb.GetDashboardsRequest]) (*connect.Response[sickrockpb.GetDashboardsResponse], error) {

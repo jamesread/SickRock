@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Delete01Icon, ArrowLeft01Icon, Edit03Icon, PaintBrushIcon } from '@hugeicons/core-free-icons'
 
@@ -267,9 +268,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
       </button>
     </template>
 
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
 
     <!-- Add Rule Form -->
     <div v-if="showAddRuleForm" class="add-rule-form">
@@ -457,14 +456,6 @@ watch(() => newRule.value.formatType, (newFormatType) => {
 </template>
 
 <style scoped>
-.error-message {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
 .empty-state {
   text-align: center;
   padding: 2rem;

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowLeft01Icon, RefreshIcon, UserGroupIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import Table from 'picocrank/vue/components/Table.vue'
@@ -137,7 +138,7 @@ onMounted(loadAll)
           required
         />
       </FormField>
-      <p v-if="createGroupError" class="inline-notification error">{{ createGroupError }}</p>
+      <NotificationBlock v-if="createGroupError" type="error" :message="createGroupError" />
       <template #actions>
         <button type="button" class="neutral" :disabled="saving" @click="closeCreateGroupDialog">Cancel</button>
         <button type="submit" class="good" :disabled="saving || !newGroupName.trim()">Create group</button>
@@ -171,7 +172,9 @@ onMounted(loadAll)
       </button>
     </template>
 
-    <div v-if="errorMessage" class="list-banner-pad inline-notification error">{{ errorMessage }}</div>
+    <div v-if="errorMessage" class="list-banner-pad">
+      <NotificationBlock type="error" :message="errorMessage" />
+    </div>
     <div v-if="loading && !groups.length" class="list-banner-pad muted">Loading…</div>
 
     <template v-else>

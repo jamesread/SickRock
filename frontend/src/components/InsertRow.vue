@@ -2,7 +2,11 @@
 import { ref, computed, watch, onMounted } from 'vue'
 
 import { createApiClient } from '../stores/api'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { SickRock } from '../gen/sickrock_pb'
+import { useIamUsers } from '../composables/useIamUsers'
+import { isUserRefFieldType } from '../utils/fieldTypes'
+import type { IamUser } from '../gen/sickrock_pb'
 
 const props = defineProps<{
   tableId: string,
@@ -28,6 +32,9 @@ const error = ref<string | null>(null)
 // Edit mode state
 const isEditMode = computed(() => props.editMode || false)
 const saving = ref(false)
+
+const { users, loading: loadingUsers, loadUsers, displayUserLabel } = useIamUsers()
+const filteredUsers = ref<Record<string, IamUser[]>>({})
 
 // Foreign key lookup state
 const foreignKeys = ref<Array<{
@@ -212,6 +219,36 @@ function isForeignKey(fieldName: string): boolean {
     || KNOWN_NULLABLE_FK_COLUMNS.has(fieldName)
 }
 
+function isUserRefField(fieldName: string): boolean {
+  const fieldDef = getFieldDef(fieldName)
+  return fieldDef ? isUserRefFieldType(fieldDef.type) : false
+}
+
+function filterUsers(fieldName: string, query: string) {
+  const searchTerm = query.trim().toLowerCase()
+  filteredUsers.value[fieldName] = !searchTerm
+    ? [...users.value]
+    : users.value.filter(user => (user.username ?? '').toLowerCase().includes(searchTerm))
+}
+
+function selectUser(fieldName: string, user: IamUser) {
+  if (user.id == null) return
+  form.value[fieldName] = user.id
+  searchQueries.value[fieldName] = user.username ?? ''
+  showDropdowns.value[fieldName] = false
+}
+
+function clearUserSelection(fieldName: string) {
+  form.value[fieldName] = ''
+  searchQueries.value[fieldName] = ''
+  showDropdowns.value[fieldName] = false
+}
+
+function openUserDropdown(fieldName: string) {
+  showDropdowns.value[fieldName] = true
+  filterUsers(fieldName, searchQueries.value[fieldName] || '')
+}
+
 function getFieldDef(fieldName: string) {
   return props.fieldDefs.find(f => f.name === fieldName)
 }
@@ -229,7 +266,7 @@ function isIntegerLikeFieldType(fieldType: string): boolean {
 
 /** Value sent to API to clear a nullable column (server maps "" and "0" to NULL for FK ints). */
 function clearedFieldPayloadValue(field: { name: string; type: string }): string {
-  if (isForeignKey(field.name) || isIntegerLikeFieldType(field.type)) {
+  if (isForeignKey(field.name) || isUserRefField(field.name) || isIntegerLikeFieldType(field.type)) {
     return '0'
   }
   return ''
@@ -377,6 +414,10 @@ function initializeFormWithExistingData() {
         initialData[key] = String(value)
       }
 
+      if (isUserRefField(key)) {
+        searchQueries.value[key] = displayUserLabel(value)
+      }
+
       // Handle foreign key display text
       if (isForeignKey(key)) {
         const list = referencedTableData.value[key] || []
@@ -435,6 +476,9 @@ function setDefaultDatetimeValues() {
 // Load foreign keys when component is mounted
 onMounted(() => {
   loadForeignKeys()
+  if (props.fieldDefs.some(field => isUserRefFieldType(field.type))) {
+    void loadUsers()
+  }
   initializeFormWithExistingData()
   setDefaultDatetimeValues()
   // Apply initialValues for create mode
@@ -580,7 +624,13 @@ async function submit() {
         // Skip invalid dates
         continue
       }
-    } else if (f.type === 'int64' || f.type === 'int' || f.type === 'bigint' || f.type === 'integer') {
+    } else if (
+      f.type === 'int64'
+      || f.type === 'int'
+      || f.type === 'bigint'
+      || f.type === 'integer'
+      || isUserRefFieldType(f.type)
+    ) {
       payload[f.name] = String(Number(v))
     } else if (f.type === 'float') {
       payload[f.name] = String(Number(v))
@@ -633,8 +683,69 @@ function cancel() {
         <template v-if="f.name !== 'id'">
             <label :for="'field-' + f.name">{{ f.name }}<span v-if="f.required" aria-label="required" title="required">*</span></label>
 
+            <!-- User reference picker -->
+            <div v-if="isUserRefField(f.name)" class="foreign-key-dropdown user-ref-dropdown">
+              <div v-if="form[f.name]" class="user-ref-selected">
+                <span class="tag note">{{ displayUserLabel(form[f.name]) }}</span>
+                <button
+                  v-if="!f.required"
+                  type="button"
+                  class="clear-button inline"
+                  title="Clear user"
+                  @click="clearUserSelection(f.name)"
+                >
+                  ×
+                </button>
+              </div>
+              <div class="search-input-container">
+                <input
+                  :id="'field-' + f.name"
+                  v-model="searchQueries[f.name]"
+                  :placeholder="`Search users for ${f.name}...`"
+                  :disabled="loadingUsers"
+                  class="search-input"
+                  @input="filterUsers(f.name, ($event.target as HTMLInputElement).value)"
+                  @focus="openUserDropdown(f.name)"
+                  @blur="handleBlur(f.name)"
+                />
+                <button
+                  type="button"
+                  class="dropdown-toggle"
+                  :class="{ open: showDropdowns[f.name] }"
+                  @click="openUserDropdown(f.name)"
+                >
+                  ▼
+                </button>
+              </div>
+              <div v-if="showDropdowns[f.name]" class="dropdown-results">
+                <div
+                  v-if="!f.required"
+                  class="dropdown-item dropdown-item-none"
+                  :class="{ selected: !form[f.name] }"
+                  @mousedown.prevent="clearUserSelection(f.name)"
+                >
+                  — None —
+                </div>
+                <div
+                  v-if="(filteredUsers[f.name] || []).length === 0"
+                  class="no-results"
+                >
+                  {{ loadingUsers ? 'Loading users…' : 'No users found' }}
+                </div>
+                <div
+                  v-for="user in filteredUsers[f.name] || []"
+                  :key="user.id"
+                  class="dropdown-item"
+                  :class="{ selected: String(form[f.name]) === String(user.id) }"
+                  @mousedown.prevent="selectUser(f.name, user)"
+                >
+                  <span class="tag note">{{ user.username }}</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Foreign key searchable dropdown -->
-            <div v-if="isForeignKey(f.name)" class="foreign-key-dropdown">
+            <div v-else-if="isForeignKey(f.name)" class="foreign-key-dropdown">
               <div class="search-input-container">
                 <input
                   :id="'field-' + f.name"
@@ -755,7 +866,7 @@ function cancel() {
         </button>
       </div>
     </form>
-    <div v-if="error" class="error">{{ error }}</div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
   </div>
 </template>
 
@@ -790,6 +901,21 @@ function cancel() {
 form {
   grid-template-columns: max-content 1fr;
   gap: 1em;
+}
+
+.user-ref-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.user-ref-dropdown .clear-button.inline {
+  position: static;
+  transform: none;
+  width: auto;
+  height: auto;
+  padding: 0.15rem 0.45rem;
 }
 
 input[type="datetime-local"] {
@@ -1008,15 +1134,6 @@ select:disabled {
 }
 
 /* Error styling */
-.error {
-  background-color: #f8d7da;
-  color: #721c24;
-  padding: 0.75rem;
-  border: 1px solid #f5c6cb;
-  border-radius: 4px;
-  margin-top: 1rem;
-}
-
 @media (max-width: 768px) {
   form {
     grid-template-columns: 1fr;

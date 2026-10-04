@@ -6,6 +6,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import StatusCard from 'picocrank/vue/components/StatusCard.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import {
   AddIcon,
   HomeIcon,
@@ -153,6 +154,16 @@ onMounted(async () => {
         type: 'route',
         description: 'Configure read-only calendar exports at /exports/{slug}.',
       })
+
+      localNavigation.value.addNavigationLink({
+        id: 'rss-calendar-feeds',
+        name: 'rss-calendar-feeds',
+        title: 'Calendar feeds',
+        path: '/admin/rss-calendar-feeds',
+        icon: Calendar03Icon,
+        type: 'route',
+        description: 'Import calendar events from feeds into tables.',
+      })
     }
 
     if (canViewAuditLogs(perms, superuser)) {
@@ -211,9 +222,7 @@ async function loadDatabaseStats() {
 
 <template>
   <div class="control-panel">
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
 
     <div class="control-sections">
       <Section
@@ -271,15 +280,6 @@ async function loadDatabaseStats() {
 .control-panel {
   max-width: 1200px;
   margin: 0 auto;
-}
-
-.error-message {
-  background: var(--karma-bad, #f8d7da);
-  color: var(--karma-on-bg-fg, #721c24);
-  padding: 15px;
-  border-radius: 5px;
-  margin-bottom: 20px;
-  border: 1px solid var(--karma-bad-border, #f5c6cb);
 }
 
 .control-sections {

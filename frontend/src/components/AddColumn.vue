@@ -5,17 +5,20 @@ import { useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   tableId: string
   initialName?: string
-  initialType?: 'string' | 'int64' | 'tinyint' | 'datetime'
-}>()
+  initialType?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref'
+  navigateOnSuccess?: boolean
+}>(), {
+  navigateOnSuccess: true,
+})
 const emit = defineEmits<{ added: [] }>()
 
 const router = useRouter()
 
 const name = ref('')
-const type = ref<'string' | 'int64' | 'tinyint' | 'datetime'>('string')
+const type = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref'>('string')
 const required = ref(false)
 const defaultToCurrentTimestamp = ref(false)
 const loading = ref(false)
@@ -48,8 +51,10 @@ async function submit() {
                 defaultToCurrentTimestamp: defaultToCurrentTimestamp.value
             }
         })
-        // Navigate to AfterInsertView after successful column addition
-        router.push({ name: 'after-insert', params: { tableName: props.tableId } })
+        emit('added')
+        if (props.navigateOnSuccess) {
+            router.push({ name: 'after-insert', params: { tableName: props.tableId } })
+        }
     } catch (e) {
         error.value = String(e)
     } finally {
@@ -75,7 +80,11 @@ async function submit() {
                     <option value="int64">int64</option>
                     <option value="tinyint">tinyint</option>
                     <option value="datetime">datetime</option>
+                    <option value="user_ref">User reference</option>
                 </select>
+                <div v-if="type === 'user_ref'" class="desc">
+                    Stores a SickRock user account id. Values are shown as username chips in tables and forms.
+                </div>
             </div>
 
             <label for="addcol-required">Required</label>

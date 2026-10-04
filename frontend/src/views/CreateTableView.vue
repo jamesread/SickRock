@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, ViewIcon } from '@hugeicons/core-free-icons'
 
@@ -295,9 +296,7 @@ async function deleteTableView() {
       </router-link>
     </template>
 
-    <div v-if="error" class="error-message">
-      {{ error }}
-    </div>
+    <NotificationBlock v-if="error" type="error" :message="error" />
 
     <form @submit.prevent="saveTableView">
         <label for="view-name">View Name</label>
@@ -446,14 +445,6 @@ async function deleteTableView() {
 </template>
 
 <style scoped>
-.error-message {
-  background: #f8d7da;
-  color: #721c24;
-  padding: 1rem;
-  border-radius: 4px;
-  margin-bottom: 1rem;
-}
-
 .form-group {
   margin-bottom: 2rem;
 }
