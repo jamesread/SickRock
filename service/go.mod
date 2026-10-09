@@ -4,6 +4,7 @@ go 1.26.0
 
 require (
 	connectrpc.com/connect v1.21.0
+	github.com/arran4/golang-ical v0.3.2
 	github.com/expr-lang/expr v1.17.8
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.10.1
@@ -35,7 +36,6 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/alexedwards/argon2id v1.0.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/arran4/golang-ical v0.3.2 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.4 // indirect
 	github.com/bytedance/sonic/loader v0.5.2 // indirect
@@ -77,7 +77,7 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.9.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/arch v0.31.0 // indirect
-	golang.org/x/net v0.59.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
