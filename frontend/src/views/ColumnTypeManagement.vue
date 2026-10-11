@@ -1,16 +1,36 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
-import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
+import Table from 'picocrank/vue/components/Table.vue'
 import ConditionalFormattingRules from '../components/ConditionalFormattingRules.vue'
+import FieldGroupingEditor from '../components/FieldGroupingEditor.vue'
+import ColumnDisplayEditor from '../components/ColumnDisplayEditor.vue'
+import TablePullThroughSection from '../components/TablePullThroughSection.vue'
+import TableRowLabelsEditor from '../components/TableRowLabelsEditor.vue'
+import { useDesignMode } from '../composables/useDesignMode'
 import TableShareSection from '../components/TableShareSection.vue'
 import AddColumn from '../components/AddColumn.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon, Edit03Icon, CheckmarkSquare03Icon, Delete01Icon, Settings01Icon, AddCircleIcon } from '@hugeicons/core-free-icons'
+import { tableListLinkLabel } from '../utils/rowInsertLabel'
+import { syntheticColumnNamesForSourceTable } from '../utils/relationPullThrough'
+import type { ForeignKey } from '../gen/sickrock_pb'
+import {
+  ArrowLeft01Icon,
+  Edit03Icon,
+  Delete01Icon,
+  Settings01Icon,
+  AddCircleIcon,
+  Add01Icon,
+  RefreshIcon,
+  LayoutIcon,
+} from '@hugeicons/core-free-icons'
+
+const iconStrokeWidth = 2.5
+const { designModeEnabled } = useDesignMode()
 
 const route = useRoute()
 const tableId = route.params.tableName as string
@@ -20,6 +40,9 @@ const client = createApiClient()
 
 // State
 const columns = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const tableRowName = ref<string | null>(null)
+const tableRowNamePlural = ref<string | null>(null)
+const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.value, tableRowName.value))
 const loading = ref(false)
 const error = ref<string | null>(null)
 const editingColumn = ref<string | null>(null)
@@ -28,7 +51,7 @@ const customType = ref('')
 const useCustomType = ref(false)
 const showDropConfirm = ref<string | null>(null)
 const dropping = ref(false)
-const showCreateColumn = ref(false)
+const createColumnDialog = ref<HTMLDialogElement | null>(null)
 const createColumnName = ref<string | undefined>()
 const createColumnType = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | undefined>()
 
@@ -55,6 +78,29 @@ const sortedColumns = computed(() => {
   return out
 })
 
+const structureForeignKeys = ref<ForeignKey[]>([])
+
+const columnNamesForGrouping = computed(() => {
+  const physical = sortedColumns.value.map(c => c.name)
+  const synthetic = syntheticColumnNamesForSourceTable(tableId, structureForeignKeys.value)
+  return [...physical, ...synthetic]
+})
+
+const tableHeaders = computed(() => [
+  { key: 'name', label: 'Column', sortable: true },
+  { key: 'type', label: 'Type', sortable: true },
+  { key: 'tags', label: 'Tags', sortable: false, width: '10rem' },
+  { key: 'actions', label: 'Actions', sortable: false, width: '22rem' },
+])
+
+function isSystemColumn(name: string | undefined) {
+  return !!name?.startsWith('sr_')
+}
+
+function foreignKeysForColumn(columnName: string) {
+  return foreignKeys.value.filter(fk => fk.columnName === columnName)
+}
+
 // Foreign keys for this table
 const foreignKeys = ref<Array<{
   constraintName: string
@@ -73,6 +119,7 @@ const droppingFk = ref(false)
 async function loadForeignKeys() {
   try {
     const res = await client.getTableStructure({ pageId: tableId })
+    structureForeignKeys.value = (res.foreignKeys ?? []).map(fk => ({ ...fk }))
     foreignKeys.value = (res.foreignKeys || []).map(fk => ({
       constraintName: fk.constraintName,
       tableName: fk.tableName,
@@ -165,6 +212,8 @@ async function loadColumns() {
   try {
     loading.value = true
     const response = await client.getTableStructure({ pageId: tableId })
+    tableRowName.value = response.rowName?.trim() || null
+    tableRowNamePlural.value = response.rowNamePlural?.trim() || null
     columns.value = response.fields?.map(field => ({
       name: field.name,
       type: field.type,
@@ -320,11 +369,19 @@ async function dropForeignKey(constraintName: string) {
 function openCreateColumn(name?: string, type?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref') {
   createColumnName.value = name
   createColumnType.value = type
-  showCreateColumn.value = true
+  nextTick(() => createColumnDialog.value?.showModal())
 }
 
 function closeCreateColumn() {
-  showCreateColumn.value = false
+  if (createColumnDialog.value?.open) {
+    createColumnDialog.value.close()
+  }
+  createColumnName.value = undefined
+  createColumnType.value = undefined
+}
+
+async function refreshAll() {
+  await Promise.all([loadColumns(), loadForeignKeys()])
 }
 
 async function onColumnAdded() {
@@ -342,202 +399,311 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Section :title="`Column Types: ${tableId}`" :icon="Settings01Icon">
+  <dialog ref="createColumnDialog" class="dialog create-column-dialog" @close="closeCreateColumn">
+    <h2>Create column</h2>
+    <p>Add a new column to this table. Choose a name and database type.</p>
+    <AddColumn
+      :key="`${createColumnName ?? ''}:${createColumnType ?? ''}`"
+      :table-id="tableId"
+      :initial-name="createColumnName"
+      :initial-type="createColumnType"
+      :navigate-on-success="false"
+      @added="onColumnAdded"
+    />
+    <div class="dialog-actions">
+      <button type="button" class="neutral" @click="closeCreateColumn">Cancel</button>
+    </div>
+  </dialog>
+
+  <Section
+    :padding="false"
+    subtitle="View and manage column types, foreign keys, and formatting for this table."
+  >
+    <template #title>
+      <span class="section-title-with-icon">
+        <HugeiconsIcon :icon="Settings01Icon" width="22" height="22" aria-hidden="true" />
+        Column types: {{ tableId }}
+      </span>
+    </template>
+
     <template #toolbar>
-      <router-link
-        :to="`/table/${tableId}`"
-        class="button inline-icon neutral"
-      >
+      <router-link :to="`/table/${tableId}`" class="button inline-icon neutral">
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Back to Table</span>
+        <span>{{ backToTableLabel }}</span>
       </router-link>
-      <router-link :to="`/table/${tableId}/foreign-keys`" class="button inline-icon neutral">
+      <router-link
+        v-if="designModeEnabled"
+        :to="`/table/${tableId}/foreign-keys`"
+        class="button inline-icon neutral design-only"
+      >
         <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Foreign Keys</span>
+        <span>Foreign keys</span>
       </router-link>
-      <button type="button" class="button inline-icon neutral" @click="openCreateColumn()">
-        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Create Column</span>
+      <router-link
+        v-if="designModeEnabled"
+        :to="`/table/${tableId}/item-view-layout`"
+        class="button inline-icon neutral design-only"
+      >
+        <HugeiconsIcon :icon="LayoutIcon" width="1em" height="1em" aria-hidden="true" />
+        <span>Item view layout</span>
+      </router-link>
+      <button
+        type="button"
+        class="inline-icon neutral"
+        aria-label="Refresh"
+        :disabled="loading"
+        @click="refreshAll"
+      >
+        <HugeiconsIcon :icon="RefreshIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+      </button>
+      <button
+        v-if="designModeEnabled"
+        type="button"
+        class="inline-icon design-only"
+        aria-label="Create column"
+        :disabled="loading"
+        @click="openCreateColumn()"
+      >
+        <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
       </button>
     </template>
 
-    <NotificationBlock v-if="error" type="error" :message="error" />
-
-    <div v-if="loading && columns.length === 0" class="loading">
-      Loading columns...
+    <div v-if="error" class="list-banner-pad">
+      <NotificationBlock type="error" :message="error" />
     </div>
-
-    <div v-else-if="columns.length === 0" class="empty-state">
-      <div class="empty-state-icon">📊</div>
-      <h3>No Columns</h3>
-      <p>This table doesn't have any columns yet.</p>
+    <div v-if="!designModeEnabled && !loading" class="list-banner-pad inline-notification note">
+      Design mode is off. Use the <strong>Design</strong> button in the header to change columns, keys, and layout.
     </div>
+    <div v-if="loading && columns.length === 0" class="list-banner-pad muted">Loading columns…</div>
 
-    <div v-else class="columns-list">
-      <div class="column-item" v-for="column in sortedColumns" :key="column.name">
-        <div class="column-info">
-          <div class="column-name">
-            <strong v-if="renamingColumn !== column.name">{{ column.name }}</strong>
-            <span v-else class="rename-inline">
-              <input v-model="newColumnName" type="text" class="rename-input" />
-              <button class="button small good" @click="renameColumn(column.name)" :disabled="loading || !newColumnName.trim()">Save</button>
-              <button class="button small neutral" @click="cancelRename" :disabled="loading">Cancel</button>
-            </span>
-            <span v-if="column.required" class="required-badge">Required</span>
-            <span v-if="column.name && column.name.startsWith('sr_')" class="system-badge">System</span>
-          </div>
-          <div class="column-type">
-            Current Type: <code>{{ column.type }}</code>
-            <template v-if="foreignKeys.some(fk => fk.columnName === column.name)">
-              <div class="fk-info" v-for="fk in foreignKeys.filter(fk => fk.columnName === column.name)" :key="fk.constraintName">
-                FK → <router-link :to="`/table/${fk.referencedTable}`">{{ fk.referencedTable }}</router-link> ({{ fk.referencedColumn }})
-                <span class="fk-action">on delete {{ fk.onDeleteAction }}, on update {{ fk.onUpdateAction }}</span>
-                <button class="button xsmall bad" @click="showDropFkConfirm = fk.constraintName" title="Drop foreign key">Drop FK</button>
-              </div>
-            </template>
-          </div>
-        </div>
+    <template v-else>
+      <p v-if="columns.length === 0" class="list-banner-pad inline-notification note">
+        This table does not have any columns yet.
+      </p>
 
-        <div v-if="editingColumn === column.name" class="edit-form">
-          <div class="type-selector">
-            <label for="new-type">New Type:</label>
-            <div class="type-options">
-              <label class="radio-option">
-                <input type="radio" v-model="useCustomType" :value="false" />
-                <span>Select from common types</span>
-              </label>
-              <label class="radio-option">
-                <input type="radio" v-model="useCustomType" :value="true" />
-                <span>Enter custom type</span>
-              </label>
-            </div>
-
-            <div v-if="!useCustomType">
-              <select v-model="newType" id="new-type" class="type-select">
-                <option value="">Select a type</option>
-                <option v-for="type in columnTypes" :key="type.value" :value="type.value">
-                  {{ type.label }}
-                </option>
-                <!-- Add current type if it's not in our predefined list -->
-                <option v-if="!columnTypes.find(t => t.value === getCurrentColumnType(editingColumn))"
-                        :value="getCurrentColumnType(editingColumn)"
-                        disabled>
-                  {{ getCurrentColumnType(editingColumn) }} (current)
-                </option>
-              </select>
-              <div v-if="newType" class="type-description">
-                {{ columnTypes.find(t => t.value === newType)?.description }}
-              </div>
-            </div>
-
-            <div v-else>
-              <input
-                v-model="customType"
-                type="text"
-                placeholder="e.g., VARCHAR(500), DECIMAL(10,3), etc."
-                class="type-input"
-              />
-              <div class="type-description">
-                Enter the exact database type (e.g., VARCHAR(255), INT(11), DECIMAL(10,2))
-              </div>
-            </div>
-          </div>
-          <div class="edit-actions">
-            <button @click="changeColumnType" :disabled="!canChangeType || loading" class="button good">
-              <HugeiconsIcon :icon="CheckmarkSquare03Icon" />
-              {{ loading ? 'Changing...' : 'Change Type' }}
+      <Table
+        v-else
+        class="columns-table-wrap"
+        :data="sortedColumns"
+        :headers="tableHeaders"
+        row-key="name"
+        :filterable="false"
+        :column-options="false"
+      >
+        <template #cell-name="{ row }">
+          <template v-if="renamingColumn !== row.name">
+            <strong>{{ row.name }}</strong>
+          </template>
+          <span v-else class="rename-inline">
+            <input v-model="newColumnName" type="text" class="rename-input" />
+            <button
+              type="button"
+              class="small good"
+              :disabled="loading || !newColumnName.trim()"
+              @click="renameColumn(row.name)"
+            >
+              Save
             </button>
-            <button @click="cancelEdit" :disabled="loading" class="button neutral">
-              Cancel
+            <button type="button" class="small neutral" :disabled="loading" @click="cancelRename">Cancel</button>
+          </span>
+        </template>
+
+        <template #cell-tags="{ row }">
+          <span class="column-tags">
+            <span v-if="row.required" class="tag bad">Required</span>
+            <span v-if="isSystemColumn(row.name)" class="tag note">System</span>
+          </span>
+        </template>
+
+        <template #cell-type="{ row }">
+          <div v-if="editingColumn === row.name" class="edit-form">
+            <div class="type-selector">
+              <label :for="`new-type-${row.name}`">New type</label>
+              <div class="type-options">
+                <label class="radio-option">
+                  <input v-model="useCustomType" type="radio" :value="false" />
+                  <span>Common types</span>
+                </label>
+                <label class="radio-option">
+                  <input v-model="useCustomType" type="radio" :value="true" />
+                  <span>Custom type</span>
+                </label>
+              </div>
+
+              <div v-if="!useCustomType">
+                <select :id="`new-type-${row.name}`" v-model="newType" class="type-select">
+                  <option value="">Select a type</option>
+                  <option v-for="type in columnTypes" :key="type.value" :value="type.value">
+                    {{ type.label }}
+                  </option>
+                  <option
+                    v-if="!columnTypes.find(t => t.value === getCurrentColumnType(editingColumn))"
+                    :value="getCurrentColumnType(editingColumn)"
+                    disabled
+                  >
+                    {{ getCurrentColumnType(editingColumn) }} (current)
+                  </option>
+                </select>
+                <div v-if="newType" class="type-description muted">
+                  {{ columnTypes.find(t => t.value === newType)?.description }}
+                </div>
+              </div>
+
+              <div v-else>
+                <input
+                  v-model="customType"
+                  type="text"
+                  placeholder="e.g., VARCHAR(500), DECIMAL(10,3)"
+                  class="type-input"
+                />
+                <div class="type-description muted">
+                  Enter the exact database type (e.g., VARCHAR(255), INT(11)).
+                </div>
+              </div>
+            </div>
+            <div class="edit-actions">
+              <button type="button" class="good small" :disabled="!canChangeType || loading" @click="changeColumnType">
+                {{ loading ? 'Changing…' : 'Change type' }}
+              </button>
+              <button type="button" class="neutral small" :disabled="loading" @click="cancelEdit">Cancel</button>
+            </div>
+          </div>
+          <template v-else>
+            <code>{{ row.type }}</code>
+            <div
+              v-for="fk in foreignKeysForColumn(row.name)"
+              :key="fk.constraintName"
+              class="fk-info muted"
+            >
+              FK →
+              <router-link :to="`/table/${fk.referencedTable}`">{{ fk.referencedTable }}</router-link>
+              ({{ fk.referencedColumn }})
+              <span class="fk-action">on delete {{ fk.onDeleteAction }}, on update {{ fk.onUpdateAction }}</span>
+              <button
+                v-if="designModeEnabled"
+                type="button"
+                class="xsmall bad"
+                title="Drop foreign key"
+                @click="showDropFkConfirm = fk.constraintName"
+              >
+                Drop FK
+              </button>
+            </div>
+          </template>
+        </template>
+
+        <template #cell-actions="{ row }">
+          <div v-if="editingColumn !== row.name && designModeEnabled" class="actions-cell">
+            <button
+              v-if="!row.required && !isSystemColumn(row.name)"
+              type="button"
+              class="small neutral design-only"
+              @click="startRename(row.name)"
+            >
+              Rename
+            </button>
+            <router-link
+              v-if="!row.required && !isSystemColumn(row.name)"
+              :to="`/table/${tableId}/foreign-keys?column=${encodeURIComponent(row.name)}`"
+              class="button small neutral design-only"
+            >
+              Add FK
+            </router-link>
+            <router-link
+              v-if="!isSystemColumn(row.name)"
+              :to="`/table/${tableId}/conditional-formatting?column=${encodeURIComponent(row.name)}`"
+              class="button small neutral"
+            >
+              Formatting
+            </router-link>
+            <button
+              v-if="!isSystemColumn(row.name)"
+              type="button"
+              class="small neutral design-only"
+              @click="startEdit(row.name)"
+            >
+              Change type
+            </button>
+            <button
+              v-if="canDropColumn(row.name)"
+              type="button"
+              class="small bad"
+              @click="showDropConfirm = row.name"
+            >
+              Drop
             </button>
           </div>
-        </div>
-
-        <div v-else class="column-actions">
-          <button v-if="!column.required && !(column.name && column.name.startsWith('sr_'))" @click="startRename(column.name)" class="button small neutral">
-            <HugeiconsIcon :icon="Edit03Icon" />
-            Rename
-          </button>
-          <router-link
-            v-if="!column.required && !(column.name && column.name.startsWith('sr_'))"
-            :to="`/table/${tableId}/foreign-keys?column=${encodeURIComponent(column.name)}`"
-            class="button small neutral"
-          >
-            <HugeiconsIcon :icon="Edit03Icon" />
-            Add FK
-          </router-link>
-          <router-link
-            v-if="!(column.name && column.name.startsWith('sr_'))"
-            :to="`/table/${tableId}/conditional-formatting?column=${encodeURIComponent(column.name)}`"
-            class="button small neutral"
-          >
-            <HugeiconsIcon :icon="Edit03Icon" />
-            Add Conditional Formatting Rule
-          </router-link>
-          <button v-if="!(column.name && column.name.startsWith('sr_'))" @click="startEdit(column.name)" class="button small neutral">
-            <HugeiconsIcon :icon="Edit03Icon" />
-            Change Type
-          </button>
-          <button
-            v-if="canDropColumn(column.name)"
-            @click="showDropConfirm = column.name"
-            class="button small bad"
-          >
-            <HugeiconsIcon :icon="Delete01Icon" />
-            Drop
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-if="showCreateColumn"
-      class="modal-overlay"
-      @click="closeCreateColumn"
-      @keydown.escape="closeCreateColumn"
-    >
-      <div class="modal create-column-modal" @click.stop>
-        <div class="modal-heading">
-          <h3>Create Column</h3>
-          <button type="button" class="button neutral" @click="closeCreateColumn">Close</button>
-        </div>
-        <AddColumn
-          :key="`${createColumnName ?? ''}:${createColumnType ?? ''}`"
-          :table-id="tableId"
-          :initial-name="createColumnName"
-          :initial-type="createColumnType"
-          :navigate-on-success="false"
-          @added="onColumnAdded"
-        />
-      </div>
-    </div>
-
-    <!-- Drop Column Confirmation Modal -->
-    <div v-if="showDropConfirm" class="modal-overlay" @click="showDropConfirm = null">
-      <div class="modal" @click.stop>
-        <h3>Drop Column</h3>
-        <p>Are you sure you want to drop the column <strong>{{ showDropConfirm }}</strong>?</p>
-        <p class="warning">This action cannot be undone and will permanently delete all data in this column.</p>
-        <div class="modal-actions">
-          <button
-            @click="dropColumn(showDropConfirm)"
-            :disabled="dropping"
-            class="button bad"
-          >
-            <HugeiconsIcon :icon="Delete01Icon" />
-            {{ dropping ? 'Dropping...' : 'Drop Column' }}
-          </button>
-          <button @click="showDropConfirm = null" :disabled="dropping" class="button neutral">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+          <div v-else-if="editingColumn !== row.name && !designModeEnabled" class="actions-cell">
+            <router-link
+              v-if="!isSystemColumn(row.name)"
+              :to="`/table/${tableId}/conditional-formatting?column=${encodeURIComponent(row.name)}`"
+              class="button small neutral"
+            >
+              Formatting
+            </router-link>
+          </div>
+        </template>
+      </Table>
+    </template>
   </Section>
+
+  <TablePullThroughSection
+    v-if="!loading && structureForeignKeys.length > 0"
+    :table-id="tableId"
+    :foreign-keys="structureForeignKeys"
+    :client="client"
+    :design-mode-enabled="designModeEnabled"
+    @saved="loadForeignKeys"
+  />
+
+  <TableRowLabelsEditor
+    v-if="!loading"
+    :table-id="tableId"
+    :client="client"
+    :design-mode-enabled="designModeEnabled"
+    @saved="loadColumns"
+  />
+
+  <ColumnDisplayEditor
+    v-if="!loading && columns.length > 0"
+    :table-id="tableId"
+    :column-names="columnNamesForGrouping"
+    :client="client"
+  />
+
+  <FieldGroupingEditor
+    v-if="designModeEnabled && !loading && columns.length > 0"
+    :table-id="tableId"
+    :column-names="columnNamesForGrouping"
+    :client="client"
+  />
+
+  <!-- Drop Column Confirmation Modal -->
+  <div v-if="showDropConfirm" class="modal-overlay" @click="showDropConfirm = null">
+    <div class="modal" @click.stop>
+      <h3>Drop Column</h3>
+      <p>Are you sure you want to drop the column <strong>{{ showDropConfirm }}</strong>?</p>
+      <p class="warning">This action cannot be undone and will permanently delete all data in this column.</p>
+      <div class="modal-actions">
+        <button
+          type="button"
+          :disabled="dropping"
+          class="button bad"
+          @click="dropColumn(showDropConfirm!)"
+        >
+          <HugeiconsIcon :icon="Delete01Icon" />
+          {{ dropping ? 'Dropping…' : 'Drop column' }}
+        </button>
+        <button type="button" :disabled="dropping" class="button neutral" @click="showDropConfirm = null">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Standard Fields Section -->
   <Section
-    v-if="!loading && missingStandardFields.length > 0 && columns.length > 0"
+    v-if="designModeEnabled && !loading && missingStandardFields.length > 0 && columns.length > 0"
     title="Standard Fields"
     :icon="AddCircleIcon"
   >
@@ -548,7 +714,7 @@ onMounted(async () => {
           <strong class="field-name">{{ field.name }}</strong>
           <p class="field-description">{{ field.description }}</p>
         </div>
-        <button type="button" class="button good" @click="openCreateColumn(field.name, field.type)">
+        <button type="button" class="button design-only" @click="openCreateColumn(field.name, field.type)">
           <HugeiconsIcon :icon="Edit03Icon" />
           Create "{{ field.name }}" Column
         </button>
@@ -576,30 +742,49 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.loading {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
+.section-title-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  vertical-align: middle;
 }
 
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
+.list-banner-pad {
+  padding-left: 1em;
+  padding-right: 1em;
 }
 
-.empty-state-icon {
-  font-size: 3rem;
-  margin-bottom: 1rem;
+.columns-table-wrap {
+  margin-top: 0.5rem;
+  margin-bottom: 1.5rem;
 }
 
-.empty-state h3 {
-  margin: 0 0 0.5rem 0;
-  color: #333;
+.actions-cell {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.35rem;
 }
 
-.empty-state p {
-  margin: 0 0 2rem 0;
-  color: #666;
+.column-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.rename-inline {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.rename-input {
+  min-width: 10rem;
+}
+
+.create-column-dialog {
+  max-width: 40rem;
 }
 
 .section-description {
@@ -644,87 +829,13 @@ onMounted(async () => {
   line-height: 1.4;
 }
 
-.columns-list {
-  margin-bottom: 2rem;
-}
-
-.columns-list h3 {
-  margin: 0 0 1rem 0;
-  color: #333;
-}
-
-.column-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 1rem;
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-  color: var(--text-color);
-  background: var(--background-color);
-}
-
-.column-info {
-  flex: 1;
-  margin-right: 1rem;
-}
-
-.column-name {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
-}
-
-.required-badge {
-  background: #dc3545;
-  color: white;
-  padding: 0.125rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: normal;
-}
-
-.system-badge {
-  background: #6c757d;
-  color: white;
-  padding: 0.125rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: normal;
-}
-
-.system-badge {
-  background: #007bff;
-  color: white;
-  padding: 0.125rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: normal;
-}
-
-.column-type {
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.column-type code {
-  background: #e9ecef;
-  padding: 0.125rem 0.25rem;
-  border-radius: 3px;
-  font-family: monospace;
-}
-
 .fk-info {
-  margin-top: 0.25rem;
-  color: #555;
+  margin-top: 0.35rem;
   font-size: 0.9rem;
 }
 
 .fk-info .fk-action {
-  margin-left: .5rem;
-  color: #777;
+  margin-left: 0.35rem;
   font-style: italic;
 }
 
@@ -793,12 +904,6 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
-.column-actions {
-  display: flex;
-  align-items: center;
-  gap: .5em;
-}
-
 /* Modal styles */
 .modal-overlay {
   position: fixed;
@@ -825,22 +930,6 @@ onMounted(async () => {
 .modal h3 {
   margin: 0 0 1rem 0;
   color: #333;
-}
-
-.create-column-modal {
-  max-width: 40rem;
-}
-
-.modal-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.modal-heading h3 {
-  margin: 0;
 }
 
 .modal p {

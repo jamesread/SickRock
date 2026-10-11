@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
 import { CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
 import { createApiClient } from '../stores/api'
+import { rowNameLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
 
 const route = useRoute()
 const router = useRouter()
@@ -14,6 +15,7 @@ const dashboardName = route.query.dashboardName as string | undefined
 
 const client = createApiClient()
 const rowLabel = ref('Row')
+const rowNamePlural = ref<string | null>(null)
 
 const isFromColumnAddition = ref(false)
 
@@ -28,19 +30,22 @@ const addedMessage = computed(() =>
 const insertAnotherLabel = computed(() =>
   isFromColumnAddition.value ? '➕ Add Another Column' : `➕ Add Another ${rowLabel.value}`,
 )
+const returnToTableLabel = computed(() =>
+  tableListLinkLabel(rowNamePlural.value, rowLabel.value),
+)
 
 onMounted(async () => {
   if (document.referrer.includes('/add-column')) {
     isFromColumnAddition.value = true
   }
-  if (isFromColumnAddition.value) {
-    return
-  }
   try {
     const structure = await client.getTableStructure({ pageId: tableId })
-    const name = structure.rowName?.trim()
-    if (name) {
-      rowLabel.value = name
+    rowNamePlural.value = structure.rowNamePlural?.trim() || null
+    if (!isFromColumnAddition.value) {
+      const name = rowNameLabel(structure.rowName)
+      if (name) {
+        rowLabel.value = name
+      }
     }
   } catch (error) {
     console.warn('Failed to load row label for table:', error)
@@ -81,7 +86,7 @@ function returnToDashboard() {
 
     <div class="action-buttons">
       <button type="button" class="button neutral" @click="returnToTable">
-        📋 Return to Table
+        📋 {{ returnToTableLabel }}
       </button>
       <button type="button" class="button neutral" @click="insertAnother">
         {{ insertAnotherLabel }}

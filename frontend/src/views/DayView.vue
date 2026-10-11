@@ -7,6 +7,9 @@ import { createApiClient } from '../stores/api'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Calendar03Icon } from '@hugeicons/core-free-icons'
 import ViewsButton from '../components/ViewsButton.vue'
+import { useDesignMode } from '../composables/useDesignMode'
+
+const { designModeEnabled } = useDesignMode()
 
 const route = useRoute()
 const router = useRouter()
@@ -304,7 +307,12 @@ onMounted(loadData)
             :show-view-edit="true"
             @view-changed="handleViewChanged"
           />
-          <router-link :to="`/table/${tableName}/column-types`" class="button neutral" @click="hideMobileMenu">
+          <router-link
+            v-if="designModeEnabled"
+            :to="`/table/${tableName}/column-types`"
+            class="button neutral design-only"
+            @click="hideMobileMenu"
+          >
             Structure
           </router-link>
           <button @click="hideMobileMenu" class="button neutral">

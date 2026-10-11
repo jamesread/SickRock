@@ -12,6 +12,7 @@ import {
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
+import { tableListLinkLabel } from '../utils/rowInsertLabel'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,6 +22,9 @@ const initialValues = ref<Record<string, string> | null>(null)
 const displayFieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
 const selectedDate = ref<string | null>(null)
 const createButtonText = ref<string>('Insert Row')
+const tableRowName = ref<string | null>(null)
+const tableRowNamePlural = ref<string | null>(null)
+const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.value, tableRowName.value))
 
 // Transport handled by authenticated client
 const client = createApiClient()
@@ -53,6 +57,8 @@ function applyViewToFields() {
 onMounted(async () => {
   try {
     const res = await client.getTableStructure({ pageId: tableId })
+    tableRowName.value = res.rowName?.trim() || null
+    tableRowNamePlural.value = res.rowNamePlural?.trim() || null
     fieldDefs.value = (res.fields ?? []).map(f => ({
       name: f.name,
       type: f.type,
@@ -148,7 +154,7 @@ function handleCreated() {
         class="button inline-icon"
       >
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Back to Table</span>
+        <span>{{ backToTableLabel }}</span>
       </router-link>
     </template>
     <InsertRow :table-id="tableId" :field-defs="displayFieldDefs" :selected-date="selectedDate" :initial-values="initialValues" @created="handleCreated" />

@@ -3,7 +3,10 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTableViewManager, type TableView } from '../composables/useTableViewManager'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon, Edit03Icon, Settings01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Edit03Icon, Settings01Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
+import { useDesignMode } from '../composables/useDesignMode'
+
+const { designModeEnabled } = useDesignMode()
 
 const props = withDefaults(defineProps<{
   tableId: string
@@ -11,7 +14,6 @@ const props = withDefaults(defineProps<{
   showViewEdit?: boolean
   iconOnly?: boolean
   showStructureLink?: boolean
-  // Optional: use external view state (for TableComponent)
   externalViews?: TableView[]
   externalSelectedViewId?: number | null
   externalCurrentView?: TableView | null
@@ -19,7 +21,7 @@ const props = withDefaults(defineProps<{
   showViewCreate: true,
   showViewEdit: true,
   iconOnly: false,
-  showStructureLink: false
+  showStructureLink: false,
 })
 
 const emit = defineEmits<{
@@ -29,18 +31,15 @@ const emit = defineEmits<{
 
 const router = useRouter()
 
-// Use external state if provided, otherwise use internal state
 const useExternalState = computed(() => !!props.externalViews)
 
 const internalManager = useTableViewManager(props.tableId, (view: TableView | null) => {
   if (!useExternalState.value) {
-    // Only handle view changes if using internal state
     const viewType = view?.viewType || 'table'
     emit('view-changed', viewType)
   }
 })
 
-// Use external or internal state
 const viewsForDialog = computed(() => {
   if (useExternalState.value && props.externalViews) {
     const defaultView = props.externalViews.find(v => v.isDefault)
@@ -51,9 +50,9 @@ const viewsForDialog = computed(() => {
         viewName: 'All Columns',
         isDefault: !props.externalViews.length || !!defaultView,
         viewType: 'table',
-        columns: []
+        columns: [],
       },
-      ...props.externalViews
+      ...props.externalViews,
     ]
   }
   return internalManager.viewsForDialog.value
@@ -67,7 +66,7 @@ const selectedViewId = computed({
     } else {
       internalManager.selectedViewId.value = val
     }
-  }
+  },
 })
 
 const currentView = computed(() => {
@@ -77,11 +76,9 @@ const currentView = computed(() => {
   return internalManager.currentView.value
 })
 
-const showViewsDialog = ref(false)
 const dialogRef = ref<HTMLDialogElement | null>(null)
 
 function openViewsDialog() {
-  showViewsDialog.value = true
   nextTick(() => {
     dialogRef.value?.showModal()
   })
@@ -89,7 +86,12 @@ function openViewsDialog() {
 
 function closeViewsDialog() {
   dialogRef.value?.close()
-  showViewsDialog.value = false
+}
+
+function onDialogBackdropClick(event: MouseEvent) {
+  if (event.target === dialogRef.value) {
+    closeViewsDialog()
+  }
 }
 
 function selectView(viewId: number) {
@@ -108,7 +110,6 @@ function createTableView() {
 
 function editTableView() {
   if (useExternalState.value) {
-    // When using external state, we need to navigate directly since internalManager doesn't have the current view
     if (currentView.value && currentView.value.id !== -1) {
       const viewId = encodeURIComponent(currentView.value.id.toString())
       const tableName = encodeURIComponent(props.tableId)
@@ -125,158 +126,150 @@ onMounted(() => {
     internalManager.loadTableViews()
   }
 })
+
+const allowViewCreate = computed(() => props.showViewCreate && designModeEnabled.value)
+const allowViewEdit = computed(() => props.showViewEdit && designModeEnabled.value)
+const allowStructureLink = computed(() => props.showStructureLink && designModeEnabled.value)
+
+const hasFooterActions = computed(
+  () => allowViewCreate.value || allowViewEdit.value || allowStructureLink.value,
+)
+
+const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' : 'Views'))
 </script>
 
 <template>
   <button
-    @click="openViewsDialog"
+    type="button"
     class="button inline-icon neutral ss-large"
-    :title="showStructureLink ? 'Views and structure' : 'Manage views'"
+    :title="allowStructureLink ? 'Views and structure' : 'Manage views'"
+    @click="openViewsDialog"
   >
     <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
     <span v-if="!iconOnly">Views</span>
   </button>
 
-  <!-- Views Dialog - Teleported to body to render as overlay -->
-  <Teleport to="body">
-    <dialog
-      v-if="showViewsDialog"
-      ref="dialogRef"
-      class="views-dialog"
-      @click="(e) => { if (e.target === e.currentTarget) closeViewsDialog() }"
-      @close="showViewsDialog = false"
-    >
-      <div class="modal-content views-modal" @click.stop>
-        <div class="modal-header">
-          <div class="modal-header-left">
-            <h3>{{ showStructureLink ? 'Table options' : 'Views' }}</h3>
-          </div>
-          <button @click="closeViewsDialog" class="button neutral" title="Close">
-            ✕
-          </button>
-        </div>
-        <div class="modal-body views-body">
-          <div class="views-list">
-            <div
+  <dialog
+    ref="dialogRef"
+    class="dialog views-picker-dialog"
+    :aria-labelledby="`views-picker-title-${tableId}`"
+    @click="onDialogBackdropClick"
+  >
+    <div class="views-picker-panel" @click.stop>
+      <div class="flex-row views-picker-header">
+        <h2 :id="`views-picker-title-${tableId}`">{{ dialogTitle }}</h2>
+        <button
+          type="button"
+          class="button inline-icon neutral"
+          aria-label="Close"
+          @click="closeViewsDialog"
+        >
+          <HugeiconsIcon :icon="Cancel01Icon" width="1em" height="1em" aria-hidden="true" />
+        </button>
+      </div>
+
+      <p class="subtle views-picker-help">Choose which saved view to display for this table.</p>
+
+      <div class="table-scroll views-picker-scroll">
+        <table class="row-hover views-picker-table">
+          <thead>
+            <tr>
+              <th scope="col">View</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
               v-for="view in viewsForDialog"
               :key="view.id"
-              class="view-row"
-              :class="{ active: selectedViewId === view.id }"
+              tabindex="0"
+              :aria-selected="selectedViewId === view.id"
+              :class="{ 'views-picker-selected': selectedViewId === view.id }"
               @click="selectView(view.id)"
+              @keydown.enter.prevent="selectView(view.id)"
             >
-              <div class="view-name">{{ view.viewName }}</div>
-              <div class="view-meta" v-if="view.isDefault">Default</div>
-            </div>
-          </div>
-          <div class="views-actions">
-            <button
-              v-if="showViewCreate"
-              class="button inline-icon good"
-              @click="() => { closeViewsDialog(); createTableView(); }"
-            >
-              <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
-              <span>Create View</span>
-            </button>
-            <button
-              v-if="showViewEdit && currentView && currentView.id !== -1"
-              class="button inline-icon neutral"
-              @click="() => { closeViewsDialog(); editTableView(); }"
-            >
-              <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
-              <span>Edit View</span>
-            </button>
-            <router-link
-              v-if="showStructureLink"
-              :to="`/table/${tableId}/column-types`"
-              class="button inline-icon neutral"
-              @click="closeViewsDialog"
-            >
-              <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
-              <span>Structure</span>
-            </router-link>
-          </div>
-        </div>
+              <td>
+                <span class="views-picker-name">{{ view.viewName }}</span>
+                <span v-if="view.isDefault" class="tag note">Default</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </dialog>
-  </Teleport>
+
+      <div v-if="hasFooterActions" role="toolbar" class="flex-row g1 views-picker-actions">
+        <button
+          v-if="allowViewCreate"
+          type="button"
+          class="button inline-icon design-only"
+          @click="createTableView"
+        >
+          <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Create view</span>
+        </button>
+        <button
+          v-if="allowViewEdit && currentView && currentView.id !== -1"
+          type="button"
+          class="button inline-icon neutral design-only"
+          @click="editTableView"
+        >
+          <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Edit view</span>
+        </button>
+        <router-link
+          v-if="allowStructureLink"
+          :to="`/table/${tableId}/column-types`"
+          class="button inline-icon neutral design-only"
+          @click="closeViewsDialog"
+        >
+          <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>Structure</span>
+        </router-link>
+      </div>
+    </div>
+  </dialog>
 </template>
 
-<style>
-/* Views dialog styles - shared between TableComponent and CalendarComponent */
-.views-dialog {
-  border: none;
-  border-radius: 8px;
-  padding: 1em;
-  background: #fff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  z-index: 3000;
-  max-width: 520px;
-  width: 90%;
+<style scoped>
+.views-picker-dialog {
+  max-width: 32rem;
+  width: min(32rem, 92vw);
 }
 
-h3 {
+.views-picker-panel h2 {
   margin: 0;
-  padding: 0;
+  font-size: 1.25rem;
 }
 
-.views-dialog::backdrop {
-  background: rgba(0, 0, 0, 0.5);
-}
-
-.views-modal {
-  width: 100%;
-  background: white;
-}
-
-.views-body {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.views-list {
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  max-height: 320px;
-  overflow-y: auto;
-}
-
-.view-row {
-  display: flex;
-  align-items: center;
+.views-picker-header {
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 10px 12px;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.views-picker-help {
+  margin: 0 0 0.75rem;
+}
+
+.views-picker-scroll {
+  max-height: 18rem;
+  margin-bottom: 1rem;
+}
+
+.views-picker-table td {
   cursor: pointer;
-  border-bottom: 1px solid #f1f3f5;
-  transition: background 0.15s;
 }
 
-.view-row:last-child {
-  border-bottom: none;
+.views-picker-name {
+  margin-right: 0.5rem;
 }
 
-.view-row:hover {
-  background: #f8f9fb;
-}
-
-.view-row.active {
-  background: #e7f3ff;
-  border-left: 3px solid #007bff;
-}
-
-.view-name {
+.views-picker-selected td {
   font-weight: 600;
-  color: #212529;
 }
 
-.view-meta {
-  font-size: 12px;
-  color: #6c757d;
-}
-
-.views-actions {
-  display: flex;
-  gap: 8px;
+.views-picker-actions {
+  flex-wrap: wrap;
   justify-content: flex-end;
 }
 </style>

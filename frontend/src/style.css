@@ -13,3 +13,25 @@
     font-size: 0.8em;
   }
 }
+
+/* Controls that exist only while design mode is on. */
+button.neutral.design-only:not(:disabled),
+button.design-only:not(:disabled),
+a.button.neutral.design-only,
+a.button.design-only {
+  background-color: color-mix(in srgb, var(--button-good-bg, #0f7a52) 20%, var(--section-bg-color, #fff));
+  color: var(--button-good-bg, #0f7a52);
+  border-color: color-mix(in srgb, var(--button-good-bg, #0f7a52) 42%, var(--border-color, transparent));
+}
+
+button.neutral.design-only:not(:disabled):hover,
+button.design-only:not(:disabled):hover,
+button.neutral.design-only:not(:disabled):focus-visible,
+button.design-only:not(:disabled):focus-visible,
+a.button.neutral.design-only:hover,
+a.button.design-only:hover,
+a.button.neutral.design-only:focus-visible,
+a.button.design-only:focus-visible {
+  background-color: color-mix(in srgb, var(--button-good-bg, #0f7a52) 32%, var(--section-bg-color, #fff));
+  color: var(--button-good-hover-bg, #0b5c3e);
+}

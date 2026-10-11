@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
@@ -7,6 +7,10 @@ import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Delete01Icon, ArrowLeft01Icon, Edit03Icon, PaintBrushIcon } from '@hugeicons/core-free-icons'
+import { useDesignMode } from '../composables/useDesignMode'
+import { tableListLinkLabel } from '../utils/rowInsertLabel'
+
+const { designModeEnabled } = useDesignMode()
 
 const route = useRoute()
 const tableId = route.params.tableName as string
@@ -22,6 +26,9 @@ const editingRuleId = ref<number | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const columns = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const tableRowName = ref<string | null>(null)
+const tableRowNamePlural = ref<string | null>(null)
+const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.value, tableRowName.value))
 
 const newRule = ref({
   tableName: '',
@@ -37,6 +44,8 @@ const newRule = ref({
 async function loadColumns() {
   try {
     const response = await client.getTableStructure({ pageId: tableId })
+    tableRowName.value = response.rowName?.trim() || null
+    tableRowNamePlural.value = response.rowNamePlural?.trim() || null
     columns.value = response.fields?.map(field => ({
       name: field.name,
       type: field.type,
@@ -199,6 +208,8 @@ function getFormatValuePlaceholder(formatType: string): string {
       return 'true or false'
     case 'markdown':
       return 'Not needed for markdown format'
+    case 'url':
+      return 'Not needed for URL format'
     default:
       return 'e.g., #ff0000'
   }
@@ -216,6 +227,8 @@ function getFormatDisplayText(formatType: string, formatValue: string): string {
       return `Italic: ${formatValue}`
     case 'markdown':
       return `Markdown${formatValue ? `: ${formatValue}` : ''}`
+    case 'url':
+      return 'URL link (scheme hidden)'
     default:
       return `${formatType}: ${formatValue}`
   }
@@ -238,7 +251,7 @@ onMounted(async () => {
 
 // Watch for format type changes to clear format value when switching to markdown
 watch(() => newRule.value.formatType, (newFormatType) => {
-  if (newFormatType === 'markdown') {
+  if (newFormatType === 'markdown' || newFormatType === 'url') {
     newRule.value.formatValue = ''
   } else if (newFormatType === 'color' || newFormatType === 'text_color') {
     // If switching to a color type and format value is not a valid hex color, set a default
@@ -257,9 +270,13 @@ watch(() => newRule.value.formatType, (newFormatType) => {
         class="button inline-icon neutral"
       >
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Back to Table</span>
+        <span>{{ backToTableLabel }}</span>
       </router-link>
-      <router-link :to="`/table/${tableId}/column-types`" class="button inline-icon neutral">
+      <router-link
+        v-if="designModeEnabled"
+        :to="`/table/${tableId}/column-types`"
+        class="button inline-icon neutral design-only"
+      >
         <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Structure</span>
       </router-link>
@@ -314,6 +331,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
             <option value="bold">Bold</option>
             <option value="italic">Italic</option>
             <option value="markdown">Markdown</option>
+            <option value="url">URL</option>
           </select>
         </div>
         <div class="form-group">
@@ -329,7 +347,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
             v-model="newRule.formatValue"
             type="text"
             :placeholder="getFormatValuePlaceholder(newRule.formatType)"
-            :disabled="newRule.formatType === 'markdown'"
+            :disabled="newRule.formatType === 'markdown' || newRule.formatType === 'url'"
           />
         </div>
         <div class="form-group">
@@ -389,6 +407,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
             <option value="bold">Bold</option>
             <option value="italic">Italic</option>
             <option value="markdown">Markdown</option>
+            <option value="url">URL</option>
           </select>
         </div>
         <div class="form-group">
@@ -404,7 +423,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
             v-model="newRule.formatValue"
             type="text"
             :placeholder="getFormatValuePlaceholder(newRule.formatType)"
-            :disabled="newRule.formatType === 'markdown'"
+            :disabled="newRule.formatType === 'markdown' || newRule.formatType === 'url'"
           />
         </div>
         <div class="form-group">

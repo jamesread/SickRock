@@ -3,11 +3,19 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
-import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, ViewIcon } from '@hugeicons/core-free-icons'
+import { tableListLinkLabel } from '../utils/rowInsertLabel'
+import TablePullThroughSection from '../components/TablePullThroughSection.vue'
+import { useDesignMode } from '../composables/useDesignMode'
+import type { ColumnDisplaySettingInput, ForeignKey, TableViewColumn } from '../gen/sickrock_pb'
+import { columnDisplaySettingsByName } from '../utils/fieldColumnDisplay'
+import {
+  isCalculatedRelationColumn,
+  syntheticColumnNamesForSourceTable,
+} from '../utils/relationPullThrough'
 
 const route = useRoute()
 const router = useRouter()
@@ -16,15 +24,23 @@ const viewId = route.params.viewId as string
 
 // Transport handled by authenticated client
 const client = createApiClient()
+const { designModeEnabled } = useDesignMode()
 
 const viewName = ref('')
 const viewType = ref<'table' | 'calendar' | 'ticklist'>('table')
-const availableColumns = ref<Array<{ name: string; type: string }>>([])
+type CatalogColumn = { name: string; type: string; synthetic: boolean; label: string }
+
+const availableColumns = ref<CatalogColumn[]>([])
+const structureForeignKeys = ref<ForeignKey[]>([])
+const columnDisplaySettings = ref<ColumnDisplaySettingInput[]>([])
 const selectedColumns = ref<Array<{ name: string; isVisible: boolean; columnOrder: number; sortOrder: string }>>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
+const tableRowName = ref<string | null>(null)
+const tableRowNamePlural = ref<string | null>(null)
+const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.value, tableRowName.value))
 
 // Determine if we're in edit mode
 const isEditMode = computed(() => !!viewId && viewId !== 'new')
@@ -84,34 +100,103 @@ function onDragEnd() {
   overIndex.value = null
 }
 
+function buildColumnCatalog(
+  fields: Array<{ name: string; type: string }>,
+  foreignKeys: ForeignKey[],
+): CatalogColumn[] {
+  const physical: CatalogColumn[] = fields.map(field => ({
+    name: field.name,
+    type: field.type,
+    synthetic: false,
+    label: field.name,
+  }))
+  const displayByName = columnDisplaySettingsByName(columnDisplaySettings.value)
+  const syntheticNames = syntheticColumnNamesForSourceTable(tableId, foreignKeys)
+  const synthetic: CatalogColumn[] = syntheticNames.map(name => {
+    const customLabel = displayByName.get(name)?.displayLabel?.trim()
+    return {
+      name,
+      type: isCalculatedRelationColumn(name) ? 'calculated' : 'pull-through',
+      synthetic: true,
+      label: customLabel || name,
+    }
+  })
+  return [...physical, ...synthetic]
+}
+
+function selectedColumnsFromView(
+  catalog: CatalogColumn[],
+  viewColumns: readonly TableViewColumn[],
+  defaultVisible: boolean,
+) {
+  const byName = new Map(viewColumns.map(col => [col.columnName, col]))
+  const rows = catalog.map((col, index) => {
+    const existing = byName.get(col.name)
+    return {
+      name: col.name,
+      isVisible: existing ? existing.isVisible : defaultVisible,
+      columnOrder: existing ? existing.columnOrder : index + catalog.length,
+      sortOrder: existing?.sortOrder ?? '',
+    }
+  })
+  rows.sort((a, b) => a.columnOrder - b.columnOrder)
+  rows.forEach((row, index) => {
+    row.columnOrder = index
+  })
+  return rows
+}
+
+function columnCatalogEntry(name: string): CatalogColumn | undefined {
+  return availableColumns.value.find(col => col.name === name)
+}
+
+function columnListLabel(name: string): string {
+  return columnCatalogEntry(name)?.label ?? name
+}
+
+function columnTypeHint(name: string): string {
+  const entry = columnCatalogEntry(name)
+  if (!entry) return ''
+  return entry.type
+}
+
+async function loadStructureAndColumns() {
+  const res = await client.getTableStructure({ pageId: tableId })
+  tableRowName.value = res.rowName?.trim() || null
+  tableRowNamePlural.value = res.rowNamePlural?.trim() || null
+  structureForeignKeys.value = res.foreignKeys ?? []
+  columnDisplaySettings.value = res.columnDisplaySettings ?? []
+  const fields = res.fields?.map(field => ({
+    name: field.name,
+    type: field.type,
+  })) ?? []
+  availableColumns.value = buildColumnCatalog(fields, structureForeignKeys.value)
+}
+
+async function onPullThroughSaved() {
+  const priorViewColumns = selectedColumns.value.map(col => ({
+    columnName: col.name,
+    isVisible: col.isVisible,
+    columnOrder: col.columnOrder,
+    sortOrder: col.sortOrder,
+  }))
+  await loadStructureAndColumns()
+  selectedColumns.value = selectedColumnsFromView(availableColumns.value, priorViewColumns, false)
+}
+
 // Load available columns from table structure
 onMounted(async () => {
   try {
-    const res = await client.getTableStructure({ pageId: tableId })
-    availableColumns.value = res.fields?.map(field => ({
-      name: field.name,
-      type: field.type
-    })) || []
+    await loadStructureAndColumns()
 
-    // Load current view type from existing view if editing
-    if (isEditMode.value) {
-      // Will be loaded in loadExistingView()
-    } else {
-      // Default to "table" for new views
+    if (!isEditMode.value) {
       viewType.value = 'table'
     }
 
     if (isEditMode.value) {
-      // Load existing view data
       await loadExistingView()
     } else {
-      // Initialize selected columns (all visible by default)
-      selectedColumns.value = availableColumns.value.map((col, index) => ({
-        name: col.name,
-        isVisible: true,
-        columnOrder: index,
-        sortOrder: ''
-      }))
+      selectedColumns.value = selectedColumnsFromView(availableColumns.value, [], true)
     }
   } catch (err) {
     error.value = String(err)
@@ -125,20 +210,12 @@ async function loadExistingView() {
 
     if (view) {
       viewName.value = view.viewName
-
-      // Initialize selected columns based on existing view
-      selectedColumns.value = availableColumns.value.map((col, index) => {
-        const existingColumn = view.columns.find(c => c.columnName === col.name)
-        return {
-          name: col.name,
-          isVisible: existingColumn ? existingColumn.isVisible : false,
-          columnOrder: existingColumn ? existingColumn.columnOrder : index,
-          sortOrder: existingColumn ? existingColumn.sortOrder : ''
-        }
-      })
-
-      // Sort by column order
-      selectedColumns.value.sort((a, b) => a.columnOrder - b.columnOrder)
+      viewType.value = (view.viewType as 'table' | 'calendar' | 'ticklist') || 'table'
+      selectedColumns.value = selectedColumnsFromView(
+        availableColumns.value,
+        view.columns,
+        false,
+      )
     } else {
       error.value = 'View not found'
     }
@@ -292,7 +369,7 @@ async function deleteTableView() {
         class="button inline-icon"
       >
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Back to Table</span>
+        <span>{{ backToTableLabel }}</span>
       </router-link>
     </template>
 
@@ -363,8 +440,14 @@ async function deleteTableView() {
                 v-model="column.isVisible"
               />
               <label :for="`col-${index}`" class="column-name">
-                {{ column.name }}
-                <span class="column-type">({{ availableColumns.find(c => c.name === column.name)?.type }})</span>
+                <template v-if="columnCatalogEntry(column.name)?.synthetic">
+                  {{ columnListLabel(column.name) }}
+                  <code class="synthetic-key">{{ column.name }}</code>
+                </template>
+                <template v-else>
+                  {{ column.name }}
+                </template>
+                <span class="column-type">({{ columnTypeHint(column.name) }})</span>
               </label>
             </div>
 
@@ -400,6 +483,15 @@ async function deleteTableView() {
             </div>
           </div>
           </div>
+
+          <TablePullThroughSection
+            v-if="structureForeignKeys.length > 0"
+            :table-id="tableId"
+            :foreign-keys="structureForeignKeys"
+            :client="client"
+            :design-mode-enabled="designModeEnabled"
+            @saved="onPullThroughSaved"
+          />
         </div>
         <div v-else class="calendar-view-info">
           <p>Calendar views display data as events on a calendar. The calendar automatically detects date fields (calendar_date, starts, finishes, or sr_created) to display events.</p>
@@ -597,6 +689,12 @@ async function deleteTableView() {
   color: #666;
   font-weight: normal;
   font-size: 0.9rem;
+}
+
+.synthetic-key {
+  margin-left: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: normal;
 }
 
 .column-controls {

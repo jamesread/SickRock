@@ -5011,6 +5011,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/SetColumnDisplaySettings": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetColumnDisplaySettings",
+        "operationId": "sickrock.SickRock.SetColumnDisplaySettings",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetColumnDisplaySettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetColumnDisplaySettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/SetGroupTableRoleGrants": {
       "post": {
         "tags": [
@@ -5062,6 +5120,180 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.SetGroupTableRoleGrantsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetItemFieldGroups": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetItemFieldGroups",
+        "operationId": "sickrock.SickRock.SetItemFieldGroups",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetItemFieldGroupsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetItemFieldGroupsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetItemPageLayout": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetItemPageLayout",
+        "operationId": "sickrock.SickRock.SetItemPageLayout",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetItemPageLayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetItemPageLayoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetTableRowLabels": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetTableRowLabels",
+        "operationId": "sickrock.SickRock.SetTableRowLabels",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetTableRowLabelsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetTableRowLabelsResponse"
                 }
               }
             }
@@ -5527,6 +5759,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.UpdateRbacRoleResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/UpdateTableRelation": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "UpdateTableRelation",
+        "operationId": "sickrock.SickRock.UpdateTableRelation",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.UpdateTableRelationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.UpdateTableRelationResponse"
                 }
               }
             }
@@ -6069,6 +6359,29 @@
         "title": "ClearTickListStateResponse",
         "additionalProperties": false
       },
+      "sickrock.ColumnDisplaySettingInput": {
+        "type": "object",
+        "properties": {
+          "columnName": {
+            "type": "string",
+            "title": "column_name"
+          },
+          "displayLabel": {
+            "type": "string",
+            "title": "display_label"
+          },
+          "valuePrefix": {
+            "type": "string",
+            "title": "value_prefix"
+          },
+          "valueSuffix": {
+            "type": "string",
+            "title": "value_suffix"
+          }
+        },
+        "title": "ColumnDisplaySettingInput",
+        "additionalProperties": false
+      },
       "sickrock.ConditionalFormattingRule": {
         "type": "object",
         "properties": {
@@ -6471,6 +6784,12 @@
             ],
             "title": "create_navigation_entry",
             "description": "When unset, navigation entry is created. Set false to skip."
+          },
+          "navigationAppId": {
+            "type": "integer",
+            "title": "navigation_app_id",
+            "format": "int32",
+            "description": "When create_navigation_entry is true, assign the new link to this sidebar app (0 = ungrouped)."
           }
         },
         "title": "CreateTableConfigurationRequest",
@@ -7248,6 +7567,21 @@
           "defaultToCurrentTimestamp": {
             "type": "boolean",
             "title": "default_to_current_timestamp"
+          },
+          "displayLabel": {
+            "type": "string",
+            "title": "display_label",
+            "description": "Human-friendly label for this column in forms and tables."
+          },
+          "valuePrefix": {
+            "type": "string",
+            "title": "value_prefix",
+            "description": "Prepended to formatted cell values; may include {other_column} placeholders."
+          },
+          "valueSuffix": {
+            "type": "string",
+            "title": "value_suffix",
+            "description": "Appended to formatted cell values; may include {other_column} placeholders."
           }
         },
         "title": "Field",
@@ -7293,6 +7627,24 @@
             "type": "string",
             "title": "referenced_table_tc_name",
             "description": "Table configuration name for the referenced table"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "display_name",
+            "description": "Optional friendly label for UI (table_relations.display_name)"
+          },
+          "relationId": {
+            "type": "integer",
+            "title": "relation_id",
+            "format": "int32",
+            "description": "SickRock table_relations.id (stable system identifier)"
+          },
+          "pullThroughFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.RelationPullThroughField"
+            },
+            "title": "pull_through_fields"
           }
         },
         "title": "ForeignKey",
@@ -7649,6 +8001,20 @@
               "$ref": "#/components/schemas/sickrock.Workflow"
             },
             "title": "workflows"
+          },
+          "apps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.NavigationApp"
+            },
+            "title": "apps"
+          },
+          "ungroupedItems": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.NavigationItem"
+            },
+            "title": "ungrouped_items"
           }
         },
         "title": "GetNavigationResponse",
@@ -7930,6 +8296,27 @@
             "type": "string",
             "title": "row_name",
             "description": "Singular label for a data row (e.g. \"Customer\") used in success messages."
+          },
+          "itemPageLayout": {
+            "title": "item_page_layout",
+            "$ref": "#/components/schemas/sickrock.ItemPageLayout"
+          },
+          "itemFieldGroups": {
+            "title": "item_field_groups",
+            "$ref": "#/components/schemas/sickrock.ItemFieldGroups"
+          },
+          "rowNamePlural": {
+            "type": "string",
+            "title": "row_name_plural",
+            "description": "Plural row label (e.g. \"Customers\") for list empty states; falls back on the server when unset."
+          },
+          "columnDisplaySettings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.ColumnDisplaySettingInput"
+            },
+            "title": "column_display_settings",
+            "description": "All persisted column display rows for this table (physical and relation synthetic columns)."
           }
         },
         "title": "GetTableStructureResponse",
@@ -8348,6 +8735,85 @@
         "title": "AdditionalFieldsEntry",
         "additionalProperties": false
       },
+      "sickrock.ItemFieldGroup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          },
+          "ordinal": {
+            "type": "integer",
+            "title": "ordinal",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "columnNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "column_names"
+          }
+        },
+        "title": "ItemFieldGroup",
+        "additionalProperties": false
+      },
+      "sickrock.ItemFieldGroupInput": {
+        "type": "object",
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "title": "ordinal",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "columnNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "column_names"
+          }
+        },
+        "title": "ItemFieldGroupInput",
+        "additionalProperties": false
+      },
+      "sickrock.ItemFieldGroups": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.ItemFieldGroup"
+            },
+            "title": "groups"
+          }
+        },
+        "title": "ItemFieldGroups",
+        "additionalProperties": false
+      },
+      "sickrock.ItemPageLayout": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.PageLayoutBlock"
+            },
+            "title": "blocks"
+          }
+        },
+        "title": "ItemPageLayout",
+        "additionalProperties": false
+      },
       "sickrock.ListAccessibleReadOnlyExportsRequest": {
         "type": "object",
         "title": "ListAccessibleReadOnlyExportsRequest",
@@ -8408,6 +8874,11 @@
               "title": "value"
             },
             "description": "Exact-match filters: column -\u003e value"
+          },
+          "relationConstraintName": {
+            "type": "string",
+            "title": "relation_constraint_name",
+            "description": "When set, evaluates calculated relation columns from table_relations.pull_through_json"
           }
         },
         "title": "ListItemsRequest",
@@ -8648,6 +9119,34 @@
         "title": "MyPermissionAuditRow",
         "additionalProperties": false
       },
+      "sickrock.NavigationApp": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          },
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "ordinal": {
+            "type": "integer",
+            "title": "ordinal",
+            "format": "int32"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.NavigationItem"
+            },
+            "title": "items"
+          }
+        },
+        "title": "NavigationApp",
+        "additionalProperties": false
+      },
       "sickrock.NavigationItem": {
         "type": "object",
         "properties": {
@@ -8807,6 +9306,31 @@
           }
         },
         "title": "Page",
+        "additionalProperties": false
+      },
+      "sickrock.PageLayoutBlock": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          },
+          "ordinal": {
+            "type": "integer",
+            "title": "ordinal",
+            "format": "int32"
+          },
+          "blockType": {
+            "type": "string",
+            "title": "block_type"
+          },
+          "configJson": {
+            "type": "string",
+            "title": "config_json"
+          }
+        },
+        "title": "PageLayoutBlock",
         "additionalProperties": false
       },
       "sickrock.PingRequest": {
@@ -9021,6 +9545,33 @@
         "title": "RefreshRssCalendarFeedResponse",
         "additionalProperties": false
       },
+      "sickrock.RelationPullThroughField": {
+        "type": "object",
+        "properties": {
+          "fkColumn": {
+            "type": "string",
+            "title": "fk_column",
+            "description": "FK column on the related (source) table"
+          },
+          "field": {
+            "type": "string",
+            "title": "field",
+            "description": "Column on the referenced row to display"
+          },
+          "displayLabel": {
+            "type": "string",
+            "title": "display_label",
+            "description": "Header for calculated columns (required when expr is set)"
+          },
+          "expr": {
+            "type": "string",
+            "title": "expr",
+            "description": "Calculated value using {table.column} placeholders (evaluated server-side)"
+          }
+        },
+        "title": "RelationPullThroughField",
+        "additionalProperties": false
+      },
       "sickrock.ResetUserPasswordRequest": {
         "type": "object",
         "properties": {
@@ -9159,6 +9710,39 @@
         "title": "SaveRssCalendarFeedResponse",
         "additionalProperties": false
       },
+      "sickrock.SetColumnDisplaySettingsRequest": {
+        "type": "object",
+        "properties": {
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "settings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.ColumnDisplaySettingInput"
+            },
+            "title": "settings"
+          }
+        },
+        "title": "SetColumnDisplaySettingsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetColumnDisplaySettingsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SetColumnDisplaySettingsResponse",
+        "additionalProperties": false
+      },
       "sickrock.SetGroupTableRoleGrantsRequest": {
         "type": "object",
         "properties": {
@@ -9187,6 +9771,106 @@
           }
         },
         "title": "SetGroupTableRoleGrantsResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetItemFieldGroupsRequest": {
+        "type": "object",
+        "properties": {
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.ItemFieldGroupInput"
+            },
+            "title": "groups"
+          }
+        },
+        "title": "SetItemFieldGroupsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetItemFieldGroupsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SetItemFieldGroupsResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetItemPageLayoutRequest": {
+        "type": "object",
+        "properties": {
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.PageLayoutBlock"
+            },
+            "title": "blocks"
+          }
+        },
+        "title": "SetItemPageLayoutRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetItemPageLayoutResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SetItemPageLayoutResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetTableRowLabelsRequest": {
+        "type": "object",
+        "properties": {
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "rowName": {
+            "type": "string",
+            "title": "row_name"
+          },
+          "rowNamePlural": {
+            "type": "string",
+            "title": "row_name_plural"
+          }
+        },
+        "title": "SetTableRowLabelsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetTableRowLabelsResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SetTableRowLabelsResponse",
         "additionalProperties": false
       },
       "sickrock.SetTableShareGrantsRequest": {
@@ -9571,6 +10255,43 @@
           }
         },
         "title": "UpdateRbacRoleResponse",
+        "additionalProperties": false
+      },
+      "sickrock.UpdateTableRelationRequest": {
+        "type": "object",
+        "properties": {
+          "constraintName": {
+            "type": "string",
+            "title": "constraint_name"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "display_name"
+          },
+          "pullThroughFields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.RelationPullThroughField"
+            },
+            "title": "pull_through_fields"
+          }
+        },
+        "title": "UpdateTableRelationRequest",
+        "additionalProperties": false
+      },
+      "sickrock.UpdateTableRelationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "UpdateTableRelationResponse",
         "additionalProperties": false
       },
       "sickrock.UpdateTableViewRequest": {

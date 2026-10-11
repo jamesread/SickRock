@@ -7,9 +7,13 @@ import type { GetTableStructureResponse } from '../gen/sickrock_pb'
 import TableComponent from '../components/TableComponent.vue'
 import CalendarComponent from '../components/CalendarComponent.vue'
 import TickListComponent from '../components/TickListComponent.vue'
+import Section from 'picocrank/vue/components/Section.vue'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { DatabaseIcon } from '@hugeicons/core-free-icons'
 import { useTableViewManager } from '../composables/useTableViewManager'
 import { useTableAccess } from '../composables/useTableAccess'
 import { useRbac } from '../composables/useRbac'
+import { tableViewSectionTitle } from '../utils/rowInsertLabel'
 
 const route = useRoute()
 const props = defineProps<{ tableName?: string }>()
@@ -39,6 +43,15 @@ const currentViewName = computed(() => {
   const view = viewManager.currentView.value
   return view && view.id !== -1 ? view.viewName : null
 })
+
+const tableSectionTitle = computed(() =>
+  tableViewSectionTitle(
+    tableStructure.value?.rowNamePlural,
+    tableStructure.value?.rowName,
+    tableStructure.value?.title,
+    tableId.value,
+  ),
+)
 
 function handleViewChanged(viewType: string) {
   console.log('[TableView] View changed to:', viewType)
@@ -76,19 +89,42 @@ onMounted(async () => {
   <template v-else>
     <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" :view-name="currentViewName" @view-changed="handleViewChanged" />
     <TickListComponent v-else-if="currentViewType === 'ticklist'" :table-id="tableId" @view-changed="handleViewChanged" />
-    <TableComponent
+    <Section
       v-else
-      :table-id="tableId"
-      :table-structure="tableStructure"
-      :show-toolbar="true"
-      :show-view-switcher="true"
-      :show-export="tableAccess.canView"
-      :show-structure="showStructure"
-      :show-insert="tableAccess.canInsert"
-      :show-pagination="true"
-      :show-view-create="tableAccess.canEdit"
-      :show-view-edit="tableAccess.canEdit"
-      @view-changed="handleViewChanged"
-    />
+      :padding="false"
+      classes="table-list-section"
+      subtitle="Browse, filter, and manage rows in this table."
+    >
+      <template #title>
+        <span class="section-title-with-icon">
+          <HugeiconsIcon :icon="DatabaseIcon" width="22" height="22" aria-hidden="true" />
+          <span>{{ tableSectionTitle }}</span>
+        </span>
+      </template>
+      <TableComponent
+        :table-id="tableId"
+        :table-structure="tableStructure"
+        :wrap-in-section="false"
+        toolbar-teleport=".table-list-section [role='toolbar']"
+        :show-toolbar="true"
+        :show-view-switcher="true"
+        :show-export="tableAccess.canView"
+        :show-structure="showStructure"
+        :show-insert="tableAccess.canInsert"
+        :show-pagination="true"
+        :show-view-create="tableAccess.canEdit"
+        :show-view-edit="tableAccess.canEdit"
+        @view-changed="handleViewChanged"
+      />
+    </Section>
   </template>
 </template>
+
+<style scoped>
+.section-title-with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  vertical-align: middle;
+}
+</style>

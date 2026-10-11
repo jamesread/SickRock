@@ -1,0 +1,1 @@
+ALTER TABLE table_navigation ADD COLUMN title VARCHAR(255) NULL;

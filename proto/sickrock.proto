@@ -58,6 +58,8 @@ message CreateTableConfigurationRequest {
   string table = 3;
   // When unset, navigation entry is created. Set false to skip.
   optional bool create_navigation_entry = 4;
+  // When create_navigation_entry is true, assign the new link to this sidebar app (0 = ungrouped).
+  int32 navigation_app_id = 5;
 }
 
 message CreateTableConfigurationResponse {
@@ -83,6 +85,13 @@ message GetDatabaseTablesResponse {
 // Navigation
 message GetNavigationRequest {}
 
+message NavigationApp {
+  int32 id = 1;
+  string title = 2;
+  int32 ordinal = 3;
+  repeated NavigationItem items = 4;
+}
+
 message NavigationItem {
   int32 id = 1;
   int32 ordinal = 2;
@@ -93,7 +102,7 @@ message NavigationItem {
   string table_view = 7;
   int32 dashboard_id = 8; // optional, 0 if not set
   string dashboard_name = 9; // optional
-  string title = 10; // navigation field from table_navigation
+  string title = 10; // link label: table_navigation.title when set, otherwise the formatted name
   int32 workflow_id = 11; // optional: nav link opens this workflow hub (not membership)
   string workflow_name = 12; // optional
 }
@@ -110,6 +119,8 @@ message GetNavigationResponse {
   repeated NavigationItem items = 1;
   repeated UserBookmark bookmarks = 2;
   repeated Workflow workflows = 3;
+  repeated NavigationApp apps = 4;
+  repeated NavigationItem ungrouped_items = 5;
 }
 
 message WorkflowNavigationMember {
@@ -239,6 +250,8 @@ message ListItemsRequest {
   string tc_name = 1;
   // Exact-match filters: column -> value
   map<string, string> where = 2;
+  // When set, evaluates calculated relation columns from table_relations.pull_through_json
+  string relation_constraint_name = 3;
 }
 
 message ListItemsResponse {
@@ -293,6 +306,78 @@ message Field {
   string type = 2;
   bool required = 3;
   bool default_to_current_timestamp = 4;
+  // Human-friendly label for this column in forms and tables.
+  string display_label = 5;
+  // Prepended to formatted cell values; may include {other_column} placeholders.
+  string value_prefix = 6;
+  // Appended to formatted cell values; may include {other_column} placeholders.
+  string value_suffix = 7;
+}
+
+message PageLayoutBlock {
+  int32 id = 1;
+  int32 ordinal = 2;
+  string block_type = 3;
+  string config_json = 4;
+}
+
+message ItemPageLayout {
+  repeated PageLayoutBlock blocks = 1;
+}
+
+message ItemFieldGroup {
+  int32 id = 1;
+  int32 ordinal = 2;
+  string title = 3;
+  repeated string column_names = 4;
+}
+
+message ItemFieldGroups {
+  repeated ItemFieldGroup groups = 1;
+}
+
+message ItemFieldGroupInput {
+  int32 ordinal = 1;
+  string title = 2;
+  repeated string column_names = 3;
+}
+
+message SetItemFieldGroupsRequest {
+  string table_configuration = 1;
+  repeated ItemFieldGroupInput groups = 2;
+}
+
+message SetItemFieldGroupsResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ColumnDisplaySettingInput {
+  string column_name = 1;
+  string display_label = 2;
+  string value_prefix = 3;
+  string value_suffix = 4;
+}
+
+message SetColumnDisplaySettingsRequest {
+  string table_configuration = 1;
+  repeated ColumnDisplaySettingInput settings = 2;
+}
+
+message SetColumnDisplaySettingsResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message SetTableRowLabelsRequest {
+  string table_configuration = 1;
+  string row_name = 2;
+  string row_name_plural = 3;
+}
+
+message SetTableRowLabelsResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message GetTableStructureResponse {
@@ -310,6 +395,22 @@ message GetTableStructureResponse {
   string title = 8;
   // Singular label for a data row (e.g. "Customer") used in success messages.
   string row_name = 9;
+  ItemPageLayout item_page_layout = 10;
+  ItemFieldGroups item_field_groups = 11;
+  // Plural row label (e.g. "Customers") for list empty states; falls back on the server when unset.
+  string row_name_plural = 12;
+  // All persisted column display rows for this table (physical and relation synthetic columns).
+  repeated ColumnDisplaySettingInput column_display_settings = 13;
+}
+
+message SetItemPageLayoutRequest {
+  string table_configuration = 1;
+  repeated PageLayoutBlock blocks = 2;
+}
+
+message SetItemPageLayoutResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message AddTableColumnRequest {
@@ -387,6 +488,27 @@ message ForeignKey {
   string on_update_action = 7;
   string table_tc_name = 8; // Table configuration name for the table
   string referenced_table_tc_name = 9; // Table configuration name for the referenced table
+  string display_name = 10; // Optional friendly label for UI (table_relations.display_name)
+  int32 relation_id = 11; // SickRock table_relations.id (stable system identifier)
+  repeated RelationPullThroughField pull_through_fields = 12;
+}
+
+message RelationPullThroughField {
+  string fk_column = 1; // FK column on the related (source) table
+  string field = 2; // Column on the referenced row to display
+  string display_label = 3; // Header for calculated columns (required when expr is set)
+  string expr = 4; // Calculated value using {table.column} placeholders (evaluated server-side)
+}
+
+message UpdateTableRelationRequest {
+  string constraint_name = 1;
+  string display_name = 2;
+  repeated RelationPullThroughField pull_through_fields = 3;
+}
+
+message UpdateTableRelationResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message CreateForeignKeyRequest {
@@ -1262,6 +1384,11 @@ service SickRock {
   rpc CreateForeignKey(CreateForeignKeyRequest) returns (CreateForeignKeyResponse);
   rpc GetForeignKeys(GetForeignKeysRequest) returns (GetForeignKeysResponse);
   rpc DeleteForeignKey(DeleteForeignKeyRequest) returns (DeleteForeignKeyResponse);
+  rpc UpdateTableRelation(UpdateTableRelationRequest) returns (UpdateTableRelationResponse);
+  rpc SetItemPageLayout(SetItemPageLayoutRequest) returns (SetItemPageLayoutResponse);
+  rpc SetItemFieldGroups(SetItemFieldGroupsRequest) returns (SetItemFieldGroupsResponse);
+  rpc SetColumnDisplaySettings(SetColumnDisplaySettingsRequest) returns (SetColumnDisplaySettingsResponse);
+  rpc SetTableRowLabels(SetTableRowLabelsRequest) returns (SetTableRowLabelsResponse);
 
   // Column Type Management
   rpc ChangeColumnType(ChangeColumnTypeRequest) returns (ChangeColumnTypeResponse);

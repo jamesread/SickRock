@@ -205,6 +205,21 @@ const (
 	// SickRockDeleteForeignKeyProcedure is the fully-qualified name of the SickRock's DeleteForeignKey
 	// RPC.
 	SickRockDeleteForeignKeyProcedure = "/sickrock.SickRock/DeleteForeignKey"
+	// SickRockUpdateTableRelationProcedure is the fully-qualified name of the SickRock's
+	// UpdateTableRelation RPC.
+	SickRockUpdateTableRelationProcedure = "/sickrock.SickRock/UpdateTableRelation"
+	// SickRockSetItemPageLayoutProcedure is the fully-qualified name of the SickRock's
+	// SetItemPageLayout RPC.
+	SickRockSetItemPageLayoutProcedure = "/sickrock.SickRock/SetItemPageLayout"
+	// SickRockSetItemFieldGroupsProcedure is the fully-qualified name of the SickRock's
+	// SetItemFieldGroups RPC.
+	SickRockSetItemFieldGroupsProcedure = "/sickrock.SickRock/SetItemFieldGroups"
+	// SickRockSetColumnDisplaySettingsProcedure is the fully-qualified name of the SickRock's
+	// SetColumnDisplaySettings RPC.
+	SickRockSetColumnDisplaySettingsProcedure = "/sickrock.SickRock/SetColumnDisplaySettings"
+	// SickRockSetTableRowLabelsProcedure is the fully-qualified name of the SickRock's
+	// SetTableRowLabels RPC.
+	SickRockSetTableRowLabelsProcedure = "/sickrock.SickRock/SetTableRowLabels"
 	// SickRockChangeColumnTypeProcedure is the fully-qualified name of the SickRock's ChangeColumnType
 	// RPC.
 	SickRockChangeColumnTypeProcedure = "/sickrock.SickRock/ChangeColumnType"
@@ -376,6 +391,11 @@ type SickRockClient interface {
 	CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error)
 	GetForeignKeys(context.Context, *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error)
 	DeleteForeignKey(context.Context, *connect.Request[proto.DeleteForeignKeyRequest]) (*connect.Response[proto.DeleteForeignKeyResponse], error)
+	UpdateTableRelation(context.Context, *connect.Request[proto.UpdateTableRelationRequest]) (*connect.Response[proto.UpdateTableRelationResponse], error)
+	SetItemPageLayout(context.Context, *connect.Request[proto.SetItemPageLayoutRequest]) (*connect.Response[proto.SetItemPageLayoutResponse], error)
+	SetItemFieldGroups(context.Context, *connect.Request[proto.SetItemFieldGroupsRequest]) (*connect.Response[proto.SetItemFieldGroupsResponse], error)
+	SetColumnDisplaySettings(context.Context, *connect.Request[proto.SetColumnDisplaySettingsRequest]) (*connect.Response[proto.SetColumnDisplaySettingsResponse], error)
+	SetTableRowLabels(context.Context, *connect.Request[proto.SetTableRowLabelsRequest]) (*connect.Response[proto.SetTableRowLabelsResponse], error)
 	// Column Type Management
 	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
 	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
@@ -827,6 +847,36 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeleteForeignKey")),
 			connect.WithClientOptions(opts...),
 		),
+		updateTableRelation: connect.NewClient[proto.UpdateTableRelationRequest, proto.UpdateTableRelationResponse](
+			httpClient,
+			baseURL+SickRockUpdateTableRelationProcedure,
+			connect.WithSchema(sickRockMethods.ByName("UpdateTableRelation")),
+			connect.WithClientOptions(opts...),
+		),
+		setItemPageLayout: connect.NewClient[proto.SetItemPageLayoutRequest, proto.SetItemPageLayoutResponse](
+			httpClient,
+			baseURL+SickRockSetItemPageLayoutProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetItemPageLayout")),
+			connect.WithClientOptions(opts...),
+		),
+		setItemFieldGroups: connect.NewClient[proto.SetItemFieldGroupsRequest, proto.SetItemFieldGroupsResponse](
+			httpClient,
+			baseURL+SickRockSetItemFieldGroupsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetItemFieldGroups")),
+			connect.WithClientOptions(opts...),
+		),
+		setColumnDisplaySettings: connect.NewClient[proto.SetColumnDisplaySettingsRequest, proto.SetColumnDisplaySettingsResponse](
+			httpClient,
+			baseURL+SickRockSetColumnDisplaySettingsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetColumnDisplaySettings")),
+			connect.WithClientOptions(opts...),
+		),
+		setTableRowLabels: connect.NewClient[proto.SetTableRowLabelsRequest, proto.SetTableRowLabelsResponse](
+			httpClient,
+			baseURL+SickRockSetTableRowLabelsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetTableRowLabels")),
+			connect.WithClientOptions(opts...),
+		),
 		changeColumnType: connect.NewClient[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse](
 			httpClient,
 			baseURL+SickRockChangeColumnTypeProcedure,
@@ -1090,6 +1140,11 @@ type sickRockClient struct {
 	createForeignKey                   *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
 	getForeignKeys                     *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
 	deleteForeignKey                   *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
+	updateTableRelation                *connect.Client[proto.UpdateTableRelationRequest, proto.UpdateTableRelationResponse]
+	setItemPageLayout                  *connect.Client[proto.SetItemPageLayoutRequest, proto.SetItemPageLayoutResponse]
+	setItemFieldGroups                 *connect.Client[proto.SetItemFieldGroupsRequest, proto.SetItemFieldGroupsResponse]
+	setColumnDisplaySettings           *connect.Client[proto.SetColumnDisplaySettingsRequest, proto.SetColumnDisplaySettingsResponse]
+	setTableRowLabels                  *connect.Client[proto.SetTableRowLabelsRequest, proto.SetTableRowLabelsResponse]
 	changeColumnType                   *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
 	dropColumn                         *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
 	changeColumnName                   *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
@@ -1454,6 +1509,31 @@ func (c *sickRockClient) DeleteForeignKey(ctx context.Context, req *connect.Requ
 	return c.deleteForeignKey.CallUnary(ctx, req)
 }
 
+// UpdateTableRelation calls sickrock.SickRock.UpdateTableRelation.
+func (c *sickRockClient) UpdateTableRelation(ctx context.Context, req *connect.Request[proto.UpdateTableRelationRequest]) (*connect.Response[proto.UpdateTableRelationResponse], error) {
+	return c.updateTableRelation.CallUnary(ctx, req)
+}
+
+// SetItemPageLayout calls sickrock.SickRock.SetItemPageLayout.
+func (c *sickRockClient) SetItemPageLayout(ctx context.Context, req *connect.Request[proto.SetItemPageLayoutRequest]) (*connect.Response[proto.SetItemPageLayoutResponse], error) {
+	return c.setItemPageLayout.CallUnary(ctx, req)
+}
+
+// SetItemFieldGroups calls sickrock.SickRock.SetItemFieldGroups.
+func (c *sickRockClient) SetItemFieldGroups(ctx context.Context, req *connect.Request[proto.SetItemFieldGroupsRequest]) (*connect.Response[proto.SetItemFieldGroupsResponse], error) {
+	return c.setItemFieldGroups.CallUnary(ctx, req)
+}
+
+// SetColumnDisplaySettings calls sickrock.SickRock.SetColumnDisplaySettings.
+func (c *sickRockClient) SetColumnDisplaySettings(ctx context.Context, req *connect.Request[proto.SetColumnDisplaySettingsRequest]) (*connect.Response[proto.SetColumnDisplaySettingsResponse], error) {
+	return c.setColumnDisplaySettings.CallUnary(ctx, req)
+}
+
+// SetTableRowLabels calls sickrock.SickRock.SetTableRowLabels.
+func (c *sickRockClient) SetTableRowLabels(ctx context.Context, req *connect.Request[proto.SetTableRowLabelsRequest]) (*connect.Response[proto.SetTableRowLabelsResponse], error) {
+	return c.setTableRowLabels.CallUnary(ctx, req)
+}
+
 // ChangeColumnType calls sickrock.SickRock.ChangeColumnType.
 func (c *sickRockClient) ChangeColumnType(ctx context.Context, req *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error) {
 	return c.changeColumnType.CallUnary(ctx, req)
@@ -1694,6 +1774,11 @@ type SickRockHandler interface {
 	CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error)
 	GetForeignKeys(context.Context, *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error)
 	DeleteForeignKey(context.Context, *connect.Request[proto.DeleteForeignKeyRequest]) (*connect.Response[proto.DeleteForeignKeyResponse], error)
+	UpdateTableRelation(context.Context, *connect.Request[proto.UpdateTableRelationRequest]) (*connect.Response[proto.UpdateTableRelationResponse], error)
+	SetItemPageLayout(context.Context, *connect.Request[proto.SetItemPageLayoutRequest]) (*connect.Response[proto.SetItemPageLayoutResponse], error)
+	SetItemFieldGroups(context.Context, *connect.Request[proto.SetItemFieldGroupsRequest]) (*connect.Response[proto.SetItemFieldGroupsResponse], error)
+	SetColumnDisplaySettings(context.Context, *connect.Request[proto.SetColumnDisplaySettingsRequest]) (*connect.Response[proto.SetColumnDisplaySettingsResponse], error)
+	SetTableRowLabels(context.Context, *connect.Request[proto.SetTableRowLabelsRequest]) (*connect.Response[proto.SetTableRowLabelsResponse], error)
 	// Column Type Management
 	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
 	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
@@ -2141,6 +2226,36 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeleteForeignKey")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockUpdateTableRelationHandler := connect.NewUnaryHandler(
+		SickRockUpdateTableRelationProcedure,
+		svc.UpdateTableRelation,
+		connect.WithSchema(sickRockMethods.ByName("UpdateTableRelation")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetItemPageLayoutHandler := connect.NewUnaryHandler(
+		SickRockSetItemPageLayoutProcedure,
+		svc.SetItemPageLayout,
+		connect.WithSchema(sickRockMethods.ByName("SetItemPageLayout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetItemFieldGroupsHandler := connect.NewUnaryHandler(
+		SickRockSetItemFieldGroupsProcedure,
+		svc.SetItemFieldGroups,
+		connect.WithSchema(sickRockMethods.ByName("SetItemFieldGroups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetColumnDisplaySettingsHandler := connect.NewUnaryHandler(
+		SickRockSetColumnDisplaySettingsProcedure,
+		svc.SetColumnDisplaySettings,
+		connect.WithSchema(sickRockMethods.ByName("SetColumnDisplaySettings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetTableRowLabelsHandler := connect.NewUnaryHandler(
+		SickRockSetTableRowLabelsProcedure,
+		svc.SetTableRowLabels,
+		connect.WithSchema(sickRockMethods.ByName("SetTableRowLabels")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockChangeColumnTypeHandler := connect.NewUnaryHandler(
 		SickRockChangeColumnTypeProcedure,
 		svc.ChangeColumnType,
@@ -2467,6 +2582,16 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetForeignKeysHandler.ServeHTTP(w, r)
 		case SickRockDeleteForeignKeyProcedure:
 			sickRockDeleteForeignKeyHandler.ServeHTTP(w, r)
+		case SickRockUpdateTableRelationProcedure:
+			sickRockUpdateTableRelationHandler.ServeHTTP(w, r)
+		case SickRockSetItemPageLayoutProcedure:
+			sickRockSetItemPageLayoutHandler.ServeHTTP(w, r)
+		case SickRockSetItemFieldGroupsProcedure:
+			sickRockSetItemFieldGroupsHandler.ServeHTTP(w, r)
+		case SickRockSetColumnDisplaySettingsProcedure:
+			sickRockSetColumnDisplaySettingsHandler.ServeHTTP(w, r)
+		case SickRockSetTableRowLabelsProcedure:
+			sickRockSetTableRowLabelsHandler.ServeHTTP(w, r)
 		case SickRockChangeColumnTypeProcedure:
 			sickRockChangeColumnTypeHandler.ServeHTTP(w, r)
 		case SickRockDropColumnProcedure:
@@ -2802,6 +2927,26 @@ func (UnimplementedSickRockHandler) GetForeignKeys(context.Context, *connect.Req
 
 func (UnimplementedSickRockHandler) DeleteForeignKey(context.Context, *connect.Request[proto.DeleteForeignKeyRequest]) (*connect.Response[proto.DeleteForeignKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteForeignKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) UpdateTableRelation(context.Context, *connect.Request[proto.UpdateTableRelationRequest]) (*connect.Response[proto.UpdateTableRelationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateTableRelation is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetItemPageLayout(context.Context, *connect.Request[proto.SetItemPageLayoutRequest]) (*connect.Response[proto.SetItemPageLayoutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetItemPageLayout is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetItemFieldGroups(context.Context, *connect.Request[proto.SetItemFieldGroupsRequest]) (*connect.Response[proto.SetItemFieldGroupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetItemFieldGroups is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetColumnDisplaySettings(context.Context, *connect.Request[proto.SetColumnDisplaySettingsRequest]) (*connect.Response[proto.SetColumnDisplaySettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetColumnDisplaySettings is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetTableRowLabels(context.Context, *connect.Request[proto.SetTableRowLabelsRequest]) (*connect.Response[proto.SetTableRowLabelsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetTableRowLabels is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error) {

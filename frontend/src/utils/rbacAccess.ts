@@ -20,6 +20,8 @@ export const IAM_PERMISSIONS = [
 export const SYSTEM_SETTINGS_TABLE_CONFIGURATIONS = new Set([
   'table_settings',
   'table_navigation',
+  'table_apps',
+  'table_app_navigation_links',
   'table_configurations',
   'table_workflows',
   'table_dashboards',

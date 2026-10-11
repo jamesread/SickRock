@@ -534,8 +534,10 @@ type CreateTableConfigurationRequest struct {
 	Table    string                 `protobuf:"bytes,3,opt,name=table,proto3" json:"table,omitempty"`
 	// When unset, navigation entry is created. Set false to skip.
 	CreateNavigationEntry *bool `protobuf:"varint,4,opt,name=create_navigation_entry,json=createNavigationEntry,proto3,oneof" json:"create_navigation_entry,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// When create_navigation_entry is true, assign the new link to this sidebar app (0 = ungrouped).
+	NavigationAppId int32 `protobuf:"varint,5,opt,name=navigation_app_id,json=navigationAppId,proto3" json:"navigation_app_id,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *CreateTableConfigurationRequest) Reset() {
@@ -594,6 +596,13 @@ func (x *CreateTableConfigurationRequest) GetCreateNavigationEntry() bool {
 		return *x.CreateNavigationEntry
 	}
 	return false
+}
+
+func (x *CreateTableConfigurationRequest) GetNavigationAppId() int32 {
+	if x != nil {
+		return x.NavigationAppId
+	}
+	return 0
 }
 
 type CreateTableConfigurationResponse struct {
@@ -841,6 +850,74 @@ func (*GetNavigationRequest) Descriptor() ([]byte, []int) {
 	return file_sickrock_proto_rawDescGZIP(), []int{15}
 }
 
+type NavigationApp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	Ordinal       int32                  `protobuf:"varint,3,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
+	Items         []*NavigationItem      `protobuf:"bytes,4,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NavigationApp) Reset() {
+	*x = NavigationApp{}
+	mi := &file_sickrock_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NavigationApp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NavigationApp) ProtoMessage() {}
+
+func (x *NavigationApp) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NavigationApp.ProtoReflect.Descriptor instead.
+func (*NavigationApp) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *NavigationApp) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *NavigationApp) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *NavigationApp) GetOrdinal() int32 {
+	if x != nil {
+		return x.Ordinal
+	}
+	return 0
+}
+
+func (x *NavigationApp) GetItems() []*NavigationItem {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 type NavigationItem struct {
 	state              protoimpl.MessageState `protogen:"open.v1"`
 	Id                 int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -852,7 +929,7 @@ type NavigationItem struct {
 	TableView          string                 `protobuf:"bytes,7,opt,name=table_view,json=tableView,proto3" json:"table_view,omitempty"`
 	DashboardId        int32                  `protobuf:"varint,8,opt,name=dashboard_id,json=dashboardId,proto3" json:"dashboard_id,omitempty"`      // optional, 0 if not set
 	DashboardName      string                 `protobuf:"bytes,9,opt,name=dashboard_name,json=dashboardName,proto3" json:"dashboard_name,omitempty"` // optional
-	Title              string                 `protobuf:"bytes,10,opt,name=title,proto3" json:"title,omitempty"`                                     // navigation field from table_navigation
+	Title              string                 `protobuf:"bytes,10,opt,name=title,proto3" json:"title,omitempty"`                                     // link label: table_navigation.title when set, otherwise the formatted name
 	WorkflowId         int32                  `protobuf:"varint,11,opt,name=workflow_id,json=workflowId,proto3" json:"workflow_id,omitempty"`        // optional: nav link opens this workflow hub (not membership)
 	WorkflowName       string                 `protobuf:"bytes,12,opt,name=workflow_name,json=workflowName,proto3" json:"workflow_name,omitempty"`   // optional
 	unknownFields      protoimpl.UnknownFields
@@ -861,7 +938,7 @@ type NavigationItem struct {
 
 func (x *NavigationItem) Reset() {
 	*x = NavigationItem{}
-	mi := &file_sickrock_proto_msgTypes[16]
+	mi := &file_sickrock_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -873,7 +950,7 @@ func (x *NavigationItem) String() string {
 func (*NavigationItem) ProtoMessage() {}
 
 func (x *NavigationItem) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[16]
+	mi := &file_sickrock_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -886,7 +963,7 @@ func (x *NavigationItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NavigationItem.ProtoReflect.Descriptor instead.
 func (*NavigationItem) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{16}
+	return file_sickrock_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *NavigationItem) GetId() int32 {
@@ -986,7 +1063,7 @@ type Workflow struct {
 
 func (x *Workflow) Reset() {
 	*x = Workflow{}
-	mi := &file_sickrock_proto_msgTypes[17]
+	mi := &file_sickrock_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -998,7 +1075,7 @@ func (x *Workflow) String() string {
 func (*Workflow) ProtoMessage() {}
 
 func (x *Workflow) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[17]
+	mi := &file_sickrock_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1011,7 +1088,7 @@ func (x *Workflow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Workflow.ProtoReflect.Descriptor instead.
 func (*Workflow) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{17}
+	return file_sickrock_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Workflow) GetId() int32 {
@@ -1050,17 +1127,19 @@ func (x *Workflow) GetItems() []*NavigationItem {
 }
 
 type GetNavigationResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Items         []*NavigationItem      `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
-	Bookmarks     []*UserBookmark        `protobuf:"bytes,2,rep,name=bookmarks,proto3" json:"bookmarks,omitempty"`
-	Workflows     []*Workflow            `protobuf:"bytes,3,rep,name=workflows,proto3" json:"workflows,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Items          []*NavigationItem      `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Bookmarks      []*UserBookmark        `protobuf:"bytes,2,rep,name=bookmarks,proto3" json:"bookmarks,omitempty"`
+	Workflows      []*Workflow            `protobuf:"bytes,3,rep,name=workflows,proto3" json:"workflows,omitempty"`
+	Apps           []*NavigationApp       `protobuf:"bytes,4,rep,name=apps,proto3" json:"apps,omitempty"`
+	UngroupedItems []*NavigationItem      `protobuf:"bytes,5,rep,name=ungrouped_items,json=ungroupedItems,proto3" json:"ungrouped_items,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *GetNavigationResponse) Reset() {
 	*x = GetNavigationResponse{}
-	mi := &file_sickrock_proto_msgTypes[18]
+	mi := &file_sickrock_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1072,7 +1151,7 @@ func (x *GetNavigationResponse) String() string {
 func (*GetNavigationResponse) ProtoMessage() {}
 
 func (x *GetNavigationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[18]
+	mi := &file_sickrock_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1085,7 +1164,7 @@ func (x *GetNavigationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNavigationResponse.ProtoReflect.Descriptor instead.
 func (*GetNavigationResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{18}
+	return file_sickrock_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *GetNavigationResponse) GetItems() []*NavigationItem {
@@ -1109,6 +1188,20 @@ func (x *GetNavigationResponse) GetWorkflows() []*Workflow {
 	return nil
 }
 
+func (x *GetNavigationResponse) GetApps() []*NavigationApp {
+	if x != nil {
+		return x.Apps
+	}
+	return nil
+}
+
+func (x *GetNavigationResponse) GetUngroupedItems() []*NavigationItem {
+	if x != nil {
+		return x.UngroupedItems
+	}
+	return nil
+}
+
 type WorkflowNavigationMember struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	NavigationItemId int32                  `protobuf:"varint,1,opt,name=navigation_item_id,json=navigationItemId,proto3" json:"navigation_item_id,omitempty"`
@@ -1119,7 +1212,7 @@ type WorkflowNavigationMember struct {
 
 func (x *WorkflowNavigationMember) Reset() {
 	*x = WorkflowNavigationMember{}
-	mi := &file_sickrock_proto_msgTypes[19]
+	mi := &file_sickrock_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1131,7 +1224,7 @@ func (x *WorkflowNavigationMember) String() string {
 func (*WorkflowNavigationMember) ProtoMessage() {}
 
 func (x *WorkflowNavigationMember) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[19]
+	mi := &file_sickrock_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1144,7 +1237,7 @@ func (x *WorkflowNavigationMember) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkflowNavigationMember.ProtoReflect.Descriptor instead.
 func (*WorkflowNavigationMember) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{19}
+	return file_sickrock_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *WorkflowNavigationMember) GetNavigationItemId() int32 {
@@ -1171,7 +1264,7 @@ type SetWorkflowNavigationMembersRequest struct {
 
 func (x *SetWorkflowNavigationMembersRequest) Reset() {
 	*x = SetWorkflowNavigationMembersRequest{}
-	mi := &file_sickrock_proto_msgTypes[20]
+	mi := &file_sickrock_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1183,7 +1276,7 @@ func (x *SetWorkflowNavigationMembersRequest) String() string {
 func (*SetWorkflowNavigationMembersRequest) ProtoMessage() {}
 
 func (x *SetWorkflowNavigationMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[20]
+	mi := &file_sickrock_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1196,7 +1289,7 @@ func (x *SetWorkflowNavigationMembersRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use SetWorkflowNavigationMembersRequest.ProtoReflect.Descriptor instead.
 func (*SetWorkflowNavigationMembersRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{20}
+	return file_sickrock_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SetWorkflowNavigationMembersRequest) GetWorkflowId() int32 {
@@ -1223,7 +1316,7 @@ type SetWorkflowNavigationMembersResponse struct {
 
 func (x *SetWorkflowNavigationMembersResponse) Reset() {
 	*x = SetWorkflowNavigationMembersResponse{}
-	mi := &file_sickrock_proto_msgTypes[21]
+	mi := &file_sickrock_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1235,7 +1328,7 @@ func (x *SetWorkflowNavigationMembersResponse) String() string {
 func (*SetWorkflowNavigationMembersResponse) ProtoMessage() {}
 
 func (x *SetWorkflowNavigationMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[21]
+	mi := &file_sickrock_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1248,7 +1341,7 @@ func (x *SetWorkflowNavigationMembersResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use SetWorkflowNavigationMembersResponse.ProtoReflect.Descriptor instead.
 func (*SetWorkflowNavigationMembersResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{21}
+	return file_sickrock_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SetWorkflowNavigationMembersResponse) GetSuccess() bool {
@@ -1274,7 +1367,7 @@ type GetReadOnlyCalendarExportRequest struct {
 
 func (x *GetReadOnlyCalendarExportRequest) Reset() {
 	*x = GetReadOnlyCalendarExportRequest{}
-	mi := &file_sickrock_proto_msgTypes[22]
+	mi := &file_sickrock_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1286,7 +1379,7 @@ func (x *GetReadOnlyCalendarExportRequest) String() string {
 func (*GetReadOnlyCalendarExportRequest) ProtoMessage() {}
 
 func (x *GetReadOnlyCalendarExportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[22]
+	mi := &file_sickrock_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1299,7 +1392,7 @@ func (x *GetReadOnlyCalendarExportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReadOnlyCalendarExportRequest.ProtoReflect.Descriptor instead.
 func (*GetReadOnlyCalendarExportRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{22}
+	return file_sickrock_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *GetReadOnlyCalendarExportRequest) GetSlug() string {
@@ -1323,7 +1416,7 @@ type GetReadOnlyCalendarExportResponse struct {
 
 func (x *GetReadOnlyCalendarExportResponse) Reset() {
 	*x = GetReadOnlyCalendarExportResponse{}
-	mi := &file_sickrock_proto_msgTypes[23]
+	mi := &file_sickrock_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1335,7 +1428,7 @@ func (x *GetReadOnlyCalendarExportResponse) String() string {
 func (*GetReadOnlyCalendarExportResponse) ProtoMessage() {}
 
 func (x *GetReadOnlyCalendarExportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[23]
+	mi := &file_sickrock_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1348,7 +1441,7 @@ func (x *GetReadOnlyCalendarExportResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetReadOnlyCalendarExportResponse.ProtoReflect.Descriptor instead.
 func (*GetReadOnlyCalendarExportResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{23}
+	return file_sickrock_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GetReadOnlyCalendarExportResponse) GetTitle() string {
@@ -1405,7 +1498,7 @@ type ReadOnlyExportSummary struct {
 
 func (x *ReadOnlyExportSummary) Reset() {
 	*x = ReadOnlyExportSummary{}
-	mi := &file_sickrock_proto_msgTypes[24]
+	mi := &file_sickrock_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1417,7 +1510,7 @@ func (x *ReadOnlyExportSummary) String() string {
 func (*ReadOnlyExportSummary) ProtoMessage() {}
 
 func (x *ReadOnlyExportSummary) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[24]
+	mi := &file_sickrock_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1430,7 +1523,7 @@ func (x *ReadOnlyExportSummary) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadOnlyExportSummary.ProtoReflect.Descriptor instead.
 func (*ReadOnlyExportSummary) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{24}
+	return file_sickrock_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ReadOnlyExportSummary) GetSlug() string {
@@ -1469,7 +1562,7 @@ type ListAccessibleReadOnlyExportsRequest struct {
 
 func (x *ListAccessibleReadOnlyExportsRequest) Reset() {
 	*x = ListAccessibleReadOnlyExportsRequest{}
-	mi := &file_sickrock_proto_msgTypes[25]
+	mi := &file_sickrock_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1481,7 +1574,7 @@ func (x *ListAccessibleReadOnlyExportsRequest) String() string {
 func (*ListAccessibleReadOnlyExportsRequest) ProtoMessage() {}
 
 func (x *ListAccessibleReadOnlyExportsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[25]
+	mi := &file_sickrock_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1494,7 +1587,7 @@ func (x *ListAccessibleReadOnlyExportsRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ListAccessibleReadOnlyExportsRequest.ProtoReflect.Descriptor instead.
 func (*ListAccessibleReadOnlyExportsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{25}
+	return file_sickrock_proto_rawDescGZIP(), []int{26}
 }
 
 type ListAccessibleReadOnlyExportsResponse struct {
@@ -1506,7 +1599,7 @@ type ListAccessibleReadOnlyExportsResponse struct {
 
 func (x *ListAccessibleReadOnlyExportsResponse) Reset() {
 	*x = ListAccessibleReadOnlyExportsResponse{}
-	mi := &file_sickrock_proto_msgTypes[26]
+	mi := &file_sickrock_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1518,7 +1611,7 @@ func (x *ListAccessibleReadOnlyExportsResponse) String() string {
 func (*ListAccessibleReadOnlyExportsResponse) ProtoMessage() {}
 
 func (x *ListAccessibleReadOnlyExportsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[26]
+	mi := &file_sickrock_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1531,7 +1624,7 @@ func (x *ListAccessibleReadOnlyExportsResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use ListAccessibleReadOnlyExportsResponse.ProtoReflect.Descriptor instead.
 func (*ListAccessibleReadOnlyExportsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{26}
+	return file_sickrock_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListAccessibleReadOnlyExportsResponse) GetExports() []*ReadOnlyExportSummary {
@@ -1552,7 +1645,7 @@ type RssFieldMapping struct {
 
 func (x *RssFieldMapping) Reset() {
 	*x = RssFieldMapping{}
-	mi := &file_sickrock_proto_msgTypes[27]
+	mi := &file_sickrock_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1564,7 +1657,7 @@ func (x *RssFieldMapping) String() string {
 func (*RssFieldMapping) ProtoMessage() {}
 
 func (x *RssFieldMapping) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[27]
+	mi := &file_sickrock_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1577,7 +1670,7 @@ func (x *RssFieldMapping) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RssFieldMapping.ProtoReflect.Descriptor instead.
 func (*RssFieldMapping) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{27}
+	return file_sickrock_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *RssFieldMapping) GetRssField() string {
@@ -1615,7 +1708,7 @@ type RssCalendarFeed struct {
 
 func (x *RssCalendarFeed) Reset() {
 	*x = RssCalendarFeed{}
-	mi := &file_sickrock_proto_msgTypes[28]
+	mi := &file_sickrock_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1627,7 +1720,7 @@ func (x *RssCalendarFeed) String() string {
 func (*RssCalendarFeed) ProtoMessage() {}
 
 func (x *RssCalendarFeed) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[28]
+	mi := &file_sickrock_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1640,7 +1733,7 @@ func (x *RssCalendarFeed) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RssCalendarFeed.ProtoReflect.Descriptor instead.
 func (*RssCalendarFeed) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{28}
+	return file_sickrock_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *RssCalendarFeed) GetId() int32 {
@@ -1742,7 +1835,7 @@ type ListRssCalendarFeedsRequest struct {
 
 func (x *ListRssCalendarFeedsRequest) Reset() {
 	*x = ListRssCalendarFeedsRequest{}
-	mi := &file_sickrock_proto_msgTypes[29]
+	mi := &file_sickrock_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1754,7 +1847,7 @@ func (x *ListRssCalendarFeedsRequest) String() string {
 func (*ListRssCalendarFeedsRequest) ProtoMessage() {}
 
 func (x *ListRssCalendarFeedsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[29]
+	mi := &file_sickrock_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1767,7 +1860,7 @@ func (x *ListRssCalendarFeedsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRssCalendarFeedsRequest.ProtoReflect.Descriptor instead.
 func (*ListRssCalendarFeedsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{29}
+	return file_sickrock_proto_rawDescGZIP(), []int{30}
 }
 
 type ListRssCalendarFeedsResponse struct {
@@ -1779,7 +1872,7 @@ type ListRssCalendarFeedsResponse struct {
 
 func (x *ListRssCalendarFeedsResponse) Reset() {
 	*x = ListRssCalendarFeedsResponse{}
-	mi := &file_sickrock_proto_msgTypes[30]
+	mi := &file_sickrock_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1791,7 +1884,7 @@ func (x *ListRssCalendarFeedsResponse) String() string {
 func (*ListRssCalendarFeedsResponse) ProtoMessage() {}
 
 func (x *ListRssCalendarFeedsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[30]
+	mi := &file_sickrock_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1804,7 +1897,7 @@ func (x *ListRssCalendarFeedsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRssCalendarFeedsResponse.ProtoReflect.Descriptor instead.
 func (*ListRssCalendarFeedsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{30}
+	return file_sickrock_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListRssCalendarFeedsResponse) GetFeeds() []*RssCalendarFeed {
@@ -1823,7 +1916,7 @@ type GetRssCalendarFeedRequest struct {
 
 func (x *GetRssCalendarFeedRequest) Reset() {
 	*x = GetRssCalendarFeedRequest{}
-	mi := &file_sickrock_proto_msgTypes[31]
+	mi := &file_sickrock_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1835,7 +1928,7 @@ func (x *GetRssCalendarFeedRequest) String() string {
 func (*GetRssCalendarFeedRequest) ProtoMessage() {}
 
 func (x *GetRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[31]
+	mi := &file_sickrock_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1848,7 +1941,7 @@ func (x *GetRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRssCalendarFeedRequest.ProtoReflect.Descriptor instead.
 func (*GetRssCalendarFeedRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{31}
+	return file_sickrock_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *GetRssCalendarFeedRequest) GetId() int32 {
@@ -1867,7 +1960,7 @@ type GetRssCalendarFeedResponse struct {
 
 func (x *GetRssCalendarFeedResponse) Reset() {
 	*x = GetRssCalendarFeedResponse{}
-	mi := &file_sickrock_proto_msgTypes[32]
+	mi := &file_sickrock_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1879,7 +1972,7 @@ func (x *GetRssCalendarFeedResponse) String() string {
 func (*GetRssCalendarFeedResponse) ProtoMessage() {}
 
 func (x *GetRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[32]
+	mi := &file_sickrock_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1892,7 +1985,7 @@ func (x *GetRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRssCalendarFeedResponse.ProtoReflect.Descriptor instead.
 func (*GetRssCalendarFeedResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{32}
+	return file_sickrock_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetRssCalendarFeedResponse) GetFeed() *RssCalendarFeed {
@@ -1911,7 +2004,7 @@ type SaveRssCalendarFeedRequest struct {
 
 func (x *SaveRssCalendarFeedRequest) Reset() {
 	*x = SaveRssCalendarFeedRequest{}
-	mi := &file_sickrock_proto_msgTypes[33]
+	mi := &file_sickrock_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1923,7 +2016,7 @@ func (x *SaveRssCalendarFeedRequest) String() string {
 func (*SaveRssCalendarFeedRequest) ProtoMessage() {}
 
 func (x *SaveRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[33]
+	mi := &file_sickrock_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1936,7 +2029,7 @@ func (x *SaveRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveRssCalendarFeedRequest.ProtoReflect.Descriptor instead.
 func (*SaveRssCalendarFeedRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{33}
+	return file_sickrock_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *SaveRssCalendarFeedRequest) GetFeed() *RssCalendarFeed {
@@ -1955,7 +2048,7 @@ type SaveRssCalendarFeedResponse struct {
 
 func (x *SaveRssCalendarFeedResponse) Reset() {
 	*x = SaveRssCalendarFeedResponse{}
-	mi := &file_sickrock_proto_msgTypes[34]
+	mi := &file_sickrock_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1967,7 +2060,7 @@ func (x *SaveRssCalendarFeedResponse) String() string {
 func (*SaveRssCalendarFeedResponse) ProtoMessage() {}
 
 func (x *SaveRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[34]
+	mi := &file_sickrock_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1980,7 +2073,7 @@ func (x *SaveRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveRssCalendarFeedResponse.ProtoReflect.Descriptor instead.
 func (*SaveRssCalendarFeedResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{34}
+	return file_sickrock_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *SaveRssCalendarFeedResponse) GetFeed() *RssCalendarFeed {
@@ -1999,7 +2092,7 @@ type DeleteRssCalendarFeedRequest struct {
 
 func (x *DeleteRssCalendarFeedRequest) Reset() {
 	*x = DeleteRssCalendarFeedRequest{}
-	mi := &file_sickrock_proto_msgTypes[35]
+	mi := &file_sickrock_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2011,7 +2104,7 @@ func (x *DeleteRssCalendarFeedRequest) String() string {
 func (*DeleteRssCalendarFeedRequest) ProtoMessage() {}
 
 func (x *DeleteRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[35]
+	mi := &file_sickrock_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2024,7 +2117,7 @@ func (x *DeleteRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRssCalendarFeedRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRssCalendarFeedRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{35}
+	return file_sickrock_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *DeleteRssCalendarFeedRequest) GetId() int32 {
@@ -2043,7 +2136,7 @@ type DeleteRssCalendarFeedResponse struct {
 
 func (x *DeleteRssCalendarFeedResponse) Reset() {
 	*x = DeleteRssCalendarFeedResponse{}
-	mi := &file_sickrock_proto_msgTypes[36]
+	mi := &file_sickrock_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2055,7 +2148,7 @@ func (x *DeleteRssCalendarFeedResponse) String() string {
 func (*DeleteRssCalendarFeedResponse) ProtoMessage() {}
 
 func (x *DeleteRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[36]
+	mi := &file_sickrock_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2068,7 +2161,7 @@ func (x *DeleteRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRssCalendarFeedResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRssCalendarFeedResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{36}
+	return file_sickrock_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *DeleteRssCalendarFeedResponse) GetDeleted() bool {
@@ -2087,7 +2180,7 @@ type RefreshRssCalendarFeedRequest struct {
 
 func (x *RefreshRssCalendarFeedRequest) Reset() {
 	*x = RefreshRssCalendarFeedRequest{}
-	mi := &file_sickrock_proto_msgTypes[37]
+	mi := &file_sickrock_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2099,7 +2192,7 @@ func (x *RefreshRssCalendarFeedRequest) String() string {
 func (*RefreshRssCalendarFeedRequest) ProtoMessage() {}
 
 func (x *RefreshRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[37]
+	mi := &file_sickrock_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2112,7 +2205,7 @@ func (x *RefreshRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshRssCalendarFeedRequest.ProtoReflect.Descriptor instead.
 func (*RefreshRssCalendarFeedRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{37}
+	return file_sickrock_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *RefreshRssCalendarFeedRequest) GetId() int32 {
@@ -2134,7 +2227,7 @@ type RefreshRssCalendarFeedResponse struct {
 
 func (x *RefreshRssCalendarFeedResponse) Reset() {
 	*x = RefreshRssCalendarFeedResponse{}
-	mi := &file_sickrock_proto_msgTypes[38]
+	mi := &file_sickrock_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2146,7 +2239,7 @@ func (x *RefreshRssCalendarFeedResponse) String() string {
 func (*RefreshRssCalendarFeedResponse) ProtoMessage() {}
 
 func (x *RefreshRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[38]
+	mi := &file_sickrock_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2159,7 +2252,7 @@ func (x *RefreshRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RefreshRssCalendarFeedResponse.ProtoReflect.Descriptor instead.
 func (*RefreshRssCalendarFeedResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{38}
+	return file_sickrock_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *RefreshRssCalendarFeedResponse) GetFeed() *RssCalendarFeed {
@@ -2199,7 +2292,7 @@ type PreviewRssCalendarFeedRequest struct {
 
 func (x *PreviewRssCalendarFeedRequest) Reset() {
 	*x = PreviewRssCalendarFeedRequest{}
-	mi := &file_sickrock_proto_msgTypes[39]
+	mi := &file_sickrock_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2211,7 +2304,7 @@ func (x *PreviewRssCalendarFeedRequest) String() string {
 func (*PreviewRssCalendarFeedRequest) ProtoMessage() {}
 
 func (x *PreviewRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[39]
+	mi := &file_sickrock_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2224,7 +2317,7 @@ func (x *PreviewRssCalendarFeedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewRssCalendarFeedRequest.ProtoReflect.Descriptor instead.
 func (*PreviewRssCalendarFeedRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{39}
+	return file_sickrock_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *PreviewRssCalendarFeedRequest) GetFeedUrl() string {
@@ -2244,7 +2337,7 @@ type PreviewRssCalendarFeedResponse struct {
 
 func (x *PreviewRssCalendarFeedResponse) Reset() {
 	*x = PreviewRssCalendarFeedResponse{}
-	mi := &file_sickrock_proto_msgTypes[40]
+	mi := &file_sickrock_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2256,7 +2349,7 @@ func (x *PreviewRssCalendarFeedResponse) String() string {
 func (*PreviewRssCalendarFeedResponse) ProtoMessage() {}
 
 func (x *PreviewRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[40]
+	mi := &file_sickrock_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2269,7 +2362,7 @@ func (x *PreviewRssCalendarFeedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PreviewRssCalendarFeedResponse.ProtoReflect.Descriptor instead.
 func (*PreviewRssCalendarFeedResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{40}
+	return file_sickrock_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *PreviewRssCalendarFeedResponse) GetRssFields() []string {
@@ -2301,7 +2394,7 @@ type Item struct {
 
 func (x *Item) Reset() {
 	*x = Item{}
-	mi := &file_sickrock_proto_msgTypes[41]
+	mi := &file_sickrock_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2313,7 +2406,7 @@ func (x *Item) String() string {
 func (*Item) ProtoMessage() {}
 
 func (x *Item) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[41]
+	mi := &file_sickrock_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2326,7 +2419,7 @@ func (x *Item) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Item.ProtoReflect.Descriptor instead.
 func (*Item) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{41}
+	return file_sickrock_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *Item) GetId() string {
@@ -2375,14 +2468,16 @@ type ListItemsRequest struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	TcName string                 `protobuf:"bytes,1,opt,name=tc_name,json=tcName,proto3" json:"tc_name,omitempty"`
 	// Exact-match filters: column -> value
-	Where         map[string]string `protobuf:"bytes,2,rep,name=where,proto3" json:"where,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Where map[string]string `protobuf:"bytes,2,rep,name=where,proto3" json:"where,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// When set, evaluates calculated relation columns from table_relations.pull_through_json
+	RelationConstraintName string `protobuf:"bytes,3,opt,name=relation_constraint_name,json=relationConstraintName,proto3" json:"relation_constraint_name,omitempty"`
+	unknownFields          protoimpl.UnknownFields
+	sizeCache              protoimpl.SizeCache
 }
 
 func (x *ListItemsRequest) Reset() {
 	*x = ListItemsRequest{}
-	mi := &file_sickrock_proto_msgTypes[42]
+	mi := &file_sickrock_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2394,7 +2489,7 @@ func (x *ListItemsRequest) String() string {
 func (*ListItemsRequest) ProtoMessage() {}
 
 func (x *ListItemsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[42]
+	mi := &file_sickrock_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2407,7 +2502,7 @@ func (x *ListItemsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListItemsRequest.ProtoReflect.Descriptor instead.
 func (*ListItemsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{42}
+	return file_sickrock_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ListItemsRequest) GetTcName() string {
@@ -2424,6 +2519,13 @@ func (x *ListItemsRequest) GetWhere() map[string]string {
 	return nil
 }
 
+func (x *ListItemsRequest) GetRelationConstraintName() string {
+	if x != nil {
+		return x.RelationConstraintName
+	}
+	return ""
+}
+
 type ListItemsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Items         []*Item                `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
@@ -2433,7 +2535,7 @@ type ListItemsResponse struct {
 
 func (x *ListItemsResponse) Reset() {
 	*x = ListItemsResponse{}
-	mi := &file_sickrock_proto_msgTypes[43]
+	mi := &file_sickrock_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2445,7 +2547,7 @@ func (x *ListItemsResponse) String() string {
 func (*ListItemsResponse) ProtoMessage() {}
 
 func (x *ListItemsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[43]
+	mi := &file_sickrock_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2458,7 +2560,7 @@ func (x *ListItemsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListItemsResponse.ProtoReflect.Descriptor instead.
 func (*ListItemsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{43}
+	return file_sickrock_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ListItemsResponse) GetItems() []*Item {
@@ -2479,7 +2581,7 @@ type CreateItemRequest struct {
 
 func (x *CreateItemRequest) Reset() {
 	*x = CreateItemRequest{}
-	mi := &file_sickrock_proto_msgTypes[44]
+	mi := &file_sickrock_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2491,7 +2593,7 @@ func (x *CreateItemRequest) String() string {
 func (*CreateItemRequest) ProtoMessage() {}
 
 func (x *CreateItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[44]
+	mi := &file_sickrock_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2504,7 +2606,7 @@ func (x *CreateItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateItemRequest.ProtoReflect.Descriptor instead.
 func (*CreateItemRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{44}
+	return file_sickrock_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *CreateItemRequest) GetPageId() string {
@@ -2537,7 +2639,7 @@ type CreateItemResponse struct {
 
 func (x *CreateItemResponse) Reset() {
 	*x = CreateItemResponse{}
-	mi := &file_sickrock_proto_msgTypes[45]
+	mi := &file_sickrock_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2549,7 +2651,7 @@ func (x *CreateItemResponse) String() string {
 func (*CreateItemResponse) ProtoMessage() {}
 
 func (x *CreateItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[45]
+	mi := &file_sickrock_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2562,7 +2664,7 @@ func (x *CreateItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateItemResponse.ProtoReflect.Descriptor instead.
 func (*CreateItemResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{45}
+	return file_sickrock_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *CreateItemResponse) GetItem() *Item {
@@ -2582,7 +2684,7 @@ type GetItemRequest struct {
 
 func (x *GetItemRequest) Reset() {
 	*x = GetItemRequest{}
-	mi := &file_sickrock_proto_msgTypes[46]
+	mi := &file_sickrock_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2594,7 +2696,7 @@ func (x *GetItemRequest) String() string {
 func (*GetItemRequest) ProtoMessage() {}
 
 func (x *GetItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[46]
+	mi := &file_sickrock_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2607,7 +2709,7 @@ func (x *GetItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetItemRequest.ProtoReflect.Descriptor instead.
 func (*GetItemRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{46}
+	return file_sickrock_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *GetItemRequest) GetPageId() string {
@@ -2633,7 +2735,7 @@ type GetItemResponse struct {
 
 func (x *GetItemResponse) Reset() {
 	*x = GetItemResponse{}
-	mi := &file_sickrock_proto_msgTypes[47]
+	mi := &file_sickrock_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2645,7 +2747,7 @@ func (x *GetItemResponse) String() string {
 func (*GetItemResponse) ProtoMessage() {}
 
 func (x *GetItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[47]
+	mi := &file_sickrock_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2658,7 +2760,7 @@ func (x *GetItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetItemResponse.ProtoReflect.Descriptor instead.
 func (*GetItemResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{47}
+	return file_sickrock_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *GetItemResponse) GetItem() *Item {
@@ -2679,7 +2781,7 @@ type EditItemRequest struct {
 
 func (x *EditItemRequest) Reset() {
 	*x = EditItemRequest{}
-	mi := &file_sickrock_proto_msgTypes[48]
+	mi := &file_sickrock_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2691,7 +2793,7 @@ func (x *EditItemRequest) String() string {
 func (*EditItemRequest) ProtoMessage() {}
 
 func (x *EditItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[48]
+	mi := &file_sickrock_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2704,7 +2806,7 @@ func (x *EditItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditItemRequest.ProtoReflect.Descriptor instead.
 func (*EditItemRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{48}
+	return file_sickrock_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *EditItemRequest) GetId() string {
@@ -2737,7 +2839,7 @@ type EditItemResponse struct {
 
 func (x *EditItemResponse) Reset() {
 	*x = EditItemResponse{}
-	mi := &file_sickrock_proto_msgTypes[49]
+	mi := &file_sickrock_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2749,7 +2851,7 @@ func (x *EditItemResponse) String() string {
 func (*EditItemResponse) ProtoMessage() {}
 
 func (x *EditItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[49]
+	mi := &file_sickrock_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2762,7 +2864,7 @@ func (x *EditItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EditItemResponse.ProtoReflect.Descriptor instead.
 func (*EditItemResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{49}
+	return file_sickrock_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *EditItemResponse) GetItem() *Item {
@@ -2782,7 +2884,7 @@ type DeleteItemRequest struct {
 
 func (x *DeleteItemRequest) Reset() {
 	*x = DeleteItemRequest{}
-	mi := &file_sickrock_proto_msgTypes[50]
+	mi := &file_sickrock_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2794,7 +2896,7 @@ func (x *DeleteItemRequest) String() string {
 func (*DeleteItemRequest) ProtoMessage() {}
 
 func (x *DeleteItemRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[50]
+	mi := &file_sickrock_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2807,7 +2909,7 @@ func (x *DeleteItemRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteItemRequest.ProtoReflect.Descriptor instead.
 func (*DeleteItemRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{50}
+	return file_sickrock_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *DeleteItemRequest) GetPageId() string {
@@ -2833,7 +2935,7 @@ type DeleteItemResponse struct {
 
 func (x *DeleteItemResponse) Reset() {
 	*x = DeleteItemResponse{}
-	mi := &file_sickrock_proto_msgTypes[51]
+	mi := &file_sickrock_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2845,7 +2947,7 @@ func (x *DeleteItemResponse) String() string {
 func (*DeleteItemResponse) ProtoMessage() {}
 
 func (x *DeleteItemResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[51]
+	mi := &file_sickrock_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2858,7 +2960,7 @@ func (x *DeleteItemResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteItemResponse.ProtoReflect.Descriptor instead.
 func (*DeleteItemResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{51}
+	return file_sickrock_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *DeleteItemResponse) GetDeleted() bool {
@@ -2878,7 +2980,7 @@ type GetTableStructureRequest struct {
 
 func (x *GetTableStructureRequest) Reset() {
 	*x = GetTableStructureRequest{}
-	mi := &file_sickrock_proto_msgTypes[52]
+	mi := &file_sickrock_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2890,7 +2992,7 @@ func (x *GetTableStructureRequest) String() string {
 func (*GetTableStructureRequest) ProtoMessage() {}
 
 func (x *GetTableStructureRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[52]
+	mi := &file_sickrock_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2903,7 +3005,7 @@ func (x *GetTableStructureRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTableStructureRequest.ProtoReflect.Descriptor instead.
 func (*GetTableStructureRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{52}
+	return file_sickrock_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *GetTableStructureRequest) GetPageId() string {
@@ -2919,13 +3021,19 @@ type Field struct {
 	Type                      string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
 	Required                  bool                   `protobuf:"varint,3,opt,name=required,proto3" json:"required,omitempty"`
 	DefaultToCurrentTimestamp bool                   `protobuf:"varint,4,opt,name=default_to_current_timestamp,json=defaultToCurrentTimestamp,proto3" json:"default_to_current_timestamp,omitempty"`
-	unknownFields             protoimpl.UnknownFields
-	sizeCache                 protoimpl.SizeCache
+	// Human-friendly label for this column in forms and tables.
+	DisplayLabel string `protobuf:"bytes,5,opt,name=display_label,json=displayLabel,proto3" json:"display_label,omitempty"`
+	// Prepended to formatted cell values; may include {other_column} placeholders.
+	ValuePrefix string `protobuf:"bytes,6,opt,name=value_prefix,json=valuePrefix,proto3" json:"value_prefix,omitempty"`
+	// Appended to formatted cell values; may include {other_column} placeholders.
+	ValueSuffix   string `protobuf:"bytes,7,opt,name=value_suffix,json=valueSuffix,proto3" json:"value_suffix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Field) Reset() {
 	*x = Field{}
-	mi := &file_sickrock_proto_msgTypes[53]
+	mi := &file_sickrock_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2937,7 +3045,7 @@ func (x *Field) String() string {
 func (*Field) ProtoMessage() {}
 
 func (x *Field) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[53]
+	mi := &file_sickrock_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2950,7 +3058,7 @@ func (x *Field) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Field.ProtoReflect.Descriptor instead.
 func (*Field) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{53}
+	return file_sickrock_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *Field) GetName() string {
@@ -2981,6 +3089,699 @@ func (x *Field) GetDefaultToCurrentTimestamp() bool {
 	return false
 }
 
+func (x *Field) GetDisplayLabel() string {
+	if x != nil {
+		return x.DisplayLabel
+	}
+	return ""
+}
+
+func (x *Field) GetValuePrefix() string {
+	if x != nil {
+		return x.ValuePrefix
+	}
+	return ""
+}
+
+func (x *Field) GetValueSuffix() string {
+	if x != nil {
+		return x.ValueSuffix
+	}
+	return ""
+}
+
+type PageLayoutBlock struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Ordinal       int32                  `protobuf:"varint,2,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
+	BlockType     string                 `protobuf:"bytes,3,opt,name=block_type,json=blockType,proto3" json:"block_type,omitempty"`
+	ConfigJson    string                 `protobuf:"bytes,4,opt,name=config_json,json=configJson,proto3" json:"config_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PageLayoutBlock) Reset() {
+	*x = PageLayoutBlock{}
+	mi := &file_sickrock_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PageLayoutBlock) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PageLayoutBlock) ProtoMessage() {}
+
+func (x *PageLayoutBlock) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PageLayoutBlock.ProtoReflect.Descriptor instead.
+func (*PageLayoutBlock) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *PageLayoutBlock) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *PageLayoutBlock) GetOrdinal() int32 {
+	if x != nil {
+		return x.Ordinal
+	}
+	return 0
+}
+
+func (x *PageLayoutBlock) GetBlockType() string {
+	if x != nil {
+		return x.BlockType
+	}
+	return ""
+}
+
+func (x *PageLayoutBlock) GetConfigJson() string {
+	if x != nil {
+		return x.ConfigJson
+	}
+	return ""
+}
+
+type ItemPageLayout struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Blocks        []*PageLayoutBlock     `protobuf:"bytes,1,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemPageLayout) Reset() {
+	*x = ItemPageLayout{}
+	mi := &file_sickrock_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemPageLayout) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemPageLayout) ProtoMessage() {}
+
+func (x *ItemPageLayout) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemPageLayout.ProtoReflect.Descriptor instead.
+func (*ItemPageLayout) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *ItemPageLayout) GetBlocks() []*PageLayoutBlock {
+	if x != nil {
+		return x.Blocks
+	}
+	return nil
+}
+
+type ItemFieldGroup struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Ordinal       int32                  `protobuf:"varint,2,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	ColumnNames   []string               `protobuf:"bytes,4,rep,name=column_names,json=columnNames,proto3" json:"column_names,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemFieldGroup) Reset() {
+	*x = ItemFieldGroup{}
+	mi := &file_sickrock_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemFieldGroup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemFieldGroup) ProtoMessage() {}
+
+func (x *ItemFieldGroup) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemFieldGroup.ProtoReflect.Descriptor instead.
+func (*ItemFieldGroup) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *ItemFieldGroup) GetId() int32 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *ItemFieldGroup) GetOrdinal() int32 {
+	if x != nil {
+		return x.Ordinal
+	}
+	return 0
+}
+
+func (x *ItemFieldGroup) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ItemFieldGroup) GetColumnNames() []string {
+	if x != nil {
+		return x.ColumnNames
+	}
+	return nil
+}
+
+type ItemFieldGroups struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Groups        []*ItemFieldGroup      `protobuf:"bytes,1,rep,name=groups,proto3" json:"groups,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemFieldGroups) Reset() {
+	*x = ItemFieldGroups{}
+	mi := &file_sickrock_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemFieldGroups) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemFieldGroups) ProtoMessage() {}
+
+func (x *ItemFieldGroups) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemFieldGroups.ProtoReflect.Descriptor instead.
+func (*ItemFieldGroups) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *ItemFieldGroups) GetGroups() []*ItemFieldGroup {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+type ItemFieldGroupInput struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ordinal       int32                  `protobuf:"varint,1,opt,name=ordinal,proto3" json:"ordinal,omitempty"`
+	Title         string                 `protobuf:"bytes,2,opt,name=title,proto3" json:"title,omitempty"`
+	ColumnNames   []string               `protobuf:"bytes,3,rep,name=column_names,json=columnNames,proto3" json:"column_names,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ItemFieldGroupInput) Reset() {
+	*x = ItemFieldGroupInput{}
+	mi := &file_sickrock_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ItemFieldGroupInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ItemFieldGroupInput) ProtoMessage() {}
+
+func (x *ItemFieldGroupInput) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ItemFieldGroupInput.ProtoReflect.Descriptor instead.
+func (*ItemFieldGroupInput) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *ItemFieldGroupInput) GetOrdinal() int32 {
+	if x != nil {
+		return x.Ordinal
+	}
+	return 0
+}
+
+func (x *ItemFieldGroupInput) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *ItemFieldGroupInput) GetColumnNames() []string {
+	if x != nil {
+		return x.ColumnNames
+	}
+	return nil
+}
+
+type SetItemFieldGroupsRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TableConfiguration string                 `protobuf:"bytes,1,opt,name=table_configuration,json=tableConfiguration,proto3" json:"table_configuration,omitempty"`
+	Groups             []*ItemFieldGroupInput `protobuf:"bytes,2,rep,name=groups,proto3" json:"groups,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SetItemFieldGroupsRequest) Reset() {
+	*x = SetItemFieldGroupsRequest{}
+	mi := &file_sickrock_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetItemFieldGroupsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetItemFieldGroupsRequest) ProtoMessage() {}
+
+func (x *SetItemFieldGroupsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetItemFieldGroupsRequest.ProtoReflect.Descriptor instead.
+func (*SetItemFieldGroupsRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *SetItemFieldGroupsRequest) GetTableConfiguration() string {
+	if x != nil {
+		return x.TableConfiguration
+	}
+	return ""
+}
+
+func (x *SetItemFieldGroupsRequest) GetGroups() []*ItemFieldGroupInput {
+	if x != nil {
+		return x.Groups
+	}
+	return nil
+}
+
+type SetItemFieldGroupsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetItemFieldGroupsResponse) Reset() {
+	*x = SetItemFieldGroupsResponse{}
+	mi := &file_sickrock_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetItemFieldGroupsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetItemFieldGroupsResponse) ProtoMessage() {}
+
+func (x *SetItemFieldGroupsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetItemFieldGroupsResponse.ProtoReflect.Descriptor instead.
+func (*SetItemFieldGroupsResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *SetItemFieldGroupsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SetItemFieldGroupsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type ColumnDisplaySettingInput struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ColumnName    string                 `protobuf:"bytes,1,opt,name=column_name,json=columnName,proto3" json:"column_name,omitempty"`
+	DisplayLabel  string                 `protobuf:"bytes,2,opt,name=display_label,json=displayLabel,proto3" json:"display_label,omitempty"`
+	ValuePrefix   string                 `protobuf:"bytes,3,opt,name=value_prefix,json=valuePrefix,proto3" json:"value_prefix,omitempty"`
+	ValueSuffix   string                 `protobuf:"bytes,4,opt,name=value_suffix,json=valueSuffix,proto3" json:"value_suffix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ColumnDisplaySettingInput) Reset() {
+	*x = ColumnDisplaySettingInput{}
+	mi := &file_sickrock_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ColumnDisplaySettingInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ColumnDisplaySettingInput) ProtoMessage() {}
+
+func (x *ColumnDisplaySettingInput) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ColumnDisplaySettingInput.ProtoReflect.Descriptor instead.
+func (*ColumnDisplaySettingInput) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{62}
+}
+
+func (x *ColumnDisplaySettingInput) GetColumnName() string {
+	if x != nil {
+		return x.ColumnName
+	}
+	return ""
+}
+
+func (x *ColumnDisplaySettingInput) GetDisplayLabel() string {
+	if x != nil {
+		return x.DisplayLabel
+	}
+	return ""
+}
+
+func (x *ColumnDisplaySettingInput) GetValuePrefix() string {
+	if x != nil {
+		return x.ValuePrefix
+	}
+	return ""
+}
+
+func (x *ColumnDisplaySettingInput) GetValueSuffix() string {
+	if x != nil {
+		return x.ValueSuffix
+	}
+	return ""
+}
+
+type SetColumnDisplaySettingsRequest struct {
+	state              protoimpl.MessageState       `protogen:"open.v1"`
+	TableConfiguration string                       `protobuf:"bytes,1,opt,name=table_configuration,json=tableConfiguration,proto3" json:"table_configuration,omitempty"`
+	Settings           []*ColumnDisplaySettingInput `protobuf:"bytes,2,rep,name=settings,proto3" json:"settings,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SetColumnDisplaySettingsRequest) Reset() {
+	*x = SetColumnDisplaySettingsRequest{}
+	mi := &file_sickrock_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetColumnDisplaySettingsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetColumnDisplaySettingsRequest) ProtoMessage() {}
+
+func (x *SetColumnDisplaySettingsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetColumnDisplaySettingsRequest.ProtoReflect.Descriptor instead.
+func (*SetColumnDisplaySettingsRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *SetColumnDisplaySettingsRequest) GetTableConfiguration() string {
+	if x != nil {
+		return x.TableConfiguration
+	}
+	return ""
+}
+
+func (x *SetColumnDisplaySettingsRequest) GetSettings() []*ColumnDisplaySettingInput {
+	if x != nil {
+		return x.Settings
+	}
+	return nil
+}
+
+type SetColumnDisplaySettingsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetColumnDisplaySettingsResponse) Reset() {
+	*x = SetColumnDisplaySettingsResponse{}
+	mi := &file_sickrock_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetColumnDisplaySettingsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetColumnDisplaySettingsResponse) ProtoMessage() {}
+
+func (x *SetColumnDisplaySettingsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetColumnDisplaySettingsResponse.ProtoReflect.Descriptor instead.
+func (*SetColumnDisplaySettingsResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *SetColumnDisplaySettingsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SetColumnDisplaySettingsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type SetTableRowLabelsRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TableConfiguration string                 `protobuf:"bytes,1,opt,name=table_configuration,json=tableConfiguration,proto3" json:"table_configuration,omitempty"`
+	RowName            string                 `protobuf:"bytes,2,opt,name=row_name,json=rowName,proto3" json:"row_name,omitempty"`
+	RowNamePlural      string                 `protobuf:"bytes,3,opt,name=row_name_plural,json=rowNamePlural,proto3" json:"row_name_plural,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SetTableRowLabelsRequest) Reset() {
+	*x = SetTableRowLabelsRequest{}
+	mi := &file_sickrock_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetTableRowLabelsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTableRowLabelsRequest) ProtoMessage() {}
+
+func (x *SetTableRowLabelsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTableRowLabelsRequest.ProtoReflect.Descriptor instead.
+func (*SetTableRowLabelsRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *SetTableRowLabelsRequest) GetTableConfiguration() string {
+	if x != nil {
+		return x.TableConfiguration
+	}
+	return ""
+}
+
+func (x *SetTableRowLabelsRequest) GetRowName() string {
+	if x != nil {
+		return x.RowName
+	}
+	return ""
+}
+
+func (x *SetTableRowLabelsRequest) GetRowNamePlural() string {
+	if x != nil {
+		return x.RowNamePlural
+	}
+	return ""
+}
+
+type SetTableRowLabelsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetTableRowLabelsResponse) Reset() {
+	*x = SetTableRowLabelsResponse{}
+	mi := &file_sickrock_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetTableRowLabelsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetTableRowLabelsResponse) ProtoMessage() {}
+
+func (x *SetTableRowLabelsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetTableRowLabelsResponse.ProtoReflect.Descriptor instead.
+func (*SetTableRowLabelsResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *SetTableRowLabelsResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SetTableRowLabelsResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type GetTableStructureResponse struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Fields           []*Field               `protobuf:"bytes,1,rep,name=fields,proto3" json:"fields,omitempty"`
@@ -2996,14 +3797,20 @@ type GetTableStructureResponse struct {
 	// Display title from table_configurations (falls back to name on the server when title is unset).
 	Title string `protobuf:"bytes,8,opt,name=title,proto3" json:"title,omitempty"`
 	// Singular label for a data row (e.g. "Customer") used in success messages.
-	RowName       string `protobuf:"bytes,9,opt,name=row_name,json=rowName,proto3" json:"row_name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	RowName         string           `protobuf:"bytes,9,opt,name=row_name,json=rowName,proto3" json:"row_name,omitempty"`
+	ItemPageLayout  *ItemPageLayout  `protobuf:"bytes,10,opt,name=item_page_layout,json=itemPageLayout,proto3" json:"item_page_layout,omitempty"`
+	ItemFieldGroups *ItemFieldGroups `protobuf:"bytes,11,opt,name=item_field_groups,json=itemFieldGroups,proto3" json:"item_field_groups,omitempty"`
+	// Plural row label (e.g. "Customers") for list empty states; falls back on the server when unset.
+	RowNamePlural string `protobuf:"bytes,12,opt,name=row_name_plural,json=rowNamePlural,proto3" json:"row_name_plural,omitempty"`
+	// All persisted column display rows for this table (physical and relation synthetic columns).
+	ColumnDisplaySettings []*ColumnDisplaySettingInput `protobuf:"bytes,13,rep,name=column_display_settings,json=columnDisplaySettings,proto3" json:"column_display_settings,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *GetTableStructureResponse) Reset() {
 	*x = GetTableStructureResponse{}
-	mi := &file_sickrock_proto_msgTypes[54]
+	mi := &file_sickrock_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3015,7 +3822,7 @@ func (x *GetTableStructureResponse) String() string {
 func (*GetTableStructureResponse) ProtoMessage() {}
 
 func (x *GetTableStructureResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[54]
+	mi := &file_sickrock_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3028,7 +3835,7 @@ func (x *GetTableStructureResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTableStructureResponse.ProtoReflect.Descriptor instead.
 func (*GetTableStructureResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{54}
+	return file_sickrock_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *GetTableStructureResponse) GetFields() []*Field {
@@ -3094,6 +3901,138 @@ func (x *GetTableStructureResponse) GetRowName() string {
 	return ""
 }
 
+func (x *GetTableStructureResponse) GetItemPageLayout() *ItemPageLayout {
+	if x != nil {
+		return x.ItemPageLayout
+	}
+	return nil
+}
+
+func (x *GetTableStructureResponse) GetItemFieldGroups() *ItemFieldGroups {
+	if x != nil {
+		return x.ItemFieldGroups
+	}
+	return nil
+}
+
+func (x *GetTableStructureResponse) GetRowNamePlural() string {
+	if x != nil {
+		return x.RowNamePlural
+	}
+	return ""
+}
+
+func (x *GetTableStructureResponse) GetColumnDisplaySettings() []*ColumnDisplaySettingInput {
+	if x != nil {
+		return x.ColumnDisplaySettings
+	}
+	return nil
+}
+
+type SetItemPageLayoutRequest struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	TableConfiguration string                 `protobuf:"bytes,1,opt,name=table_configuration,json=tableConfiguration,proto3" json:"table_configuration,omitempty"`
+	Blocks             []*PageLayoutBlock     `protobuf:"bytes,2,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *SetItemPageLayoutRequest) Reset() {
+	*x = SetItemPageLayoutRequest{}
+	mi := &file_sickrock_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetItemPageLayoutRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetItemPageLayoutRequest) ProtoMessage() {}
+
+func (x *SetItemPageLayoutRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetItemPageLayoutRequest.ProtoReflect.Descriptor instead.
+func (*SetItemPageLayoutRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *SetItemPageLayoutRequest) GetTableConfiguration() string {
+	if x != nil {
+		return x.TableConfiguration
+	}
+	return ""
+}
+
+func (x *SetItemPageLayoutRequest) GetBlocks() []*PageLayoutBlock {
+	if x != nil {
+		return x.Blocks
+	}
+	return nil
+}
+
+type SetItemPageLayoutResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetItemPageLayoutResponse) Reset() {
+	*x = SetItemPageLayoutResponse{}
+	mi := &file_sickrock_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetItemPageLayoutResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetItemPageLayoutResponse) ProtoMessage() {}
+
+func (x *SetItemPageLayoutResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetItemPageLayoutResponse.ProtoReflect.Descriptor instead.
+func (*SetItemPageLayoutResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *SetItemPageLayoutResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *SetItemPageLayoutResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type AddTableColumnRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PageId        string                 `protobuf:"bytes,1,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
@@ -3104,7 +4043,7 @@ type AddTableColumnRequest struct {
 
 func (x *AddTableColumnRequest) Reset() {
 	*x = AddTableColumnRequest{}
-	mi := &file_sickrock_proto_msgTypes[55]
+	mi := &file_sickrock_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3116,7 +4055,7 @@ func (x *AddTableColumnRequest) String() string {
 func (*AddTableColumnRequest) ProtoMessage() {}
 
 func (x *AddTableColumnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[55]
+	mi := &file_sickrock_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3129,7 +4068,7 @@ func (x *AddTableColumnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddTableColumnRequest.ProtoReflect.Descriptor instead.
 func (*AddTableColumnRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{55}
+	return file_sickrock_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *AddTableColumnRequest) GetPageId() string {
@@ -3159,7 +4098,7 @@ type TableViewColumn struct {
 
 func (x *TableViewColumn) Reset() {
 	*x = TableViewColumn{}
-	mi := &file_sickrock_proto_msgTypes[56]
+	mi := &file_sickrock_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3171,7 +4110,7 @@ func (x *TableViewColumn) String() string {
 func (*TableViewColumn) ProtoMessage() {}
 
 func (x *TableViewColumn) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[56]
+	mi := &file_sickrock_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3184,7 +4123,7 @@ func (x *TableViewColumn) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TableViewColumn.ProtoReflect.Descriptor instead.
 func (*TableViewColumn) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{56}
+	return file_sickrock_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *TableViewColumn) GetColumnName() string {
@@ -3227,7 +4166,7 @@ type CreateTableViewRequest struct {
 
 func (x *CreateTableViewRequest) Reset() {
 	*x = CreateTableViewRequest{}
-	mi := &file_sickrock_proto_msgTypes[57]
+	mi := &file_sickrock_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3239,7 +4178,7 @@ func (x *CreateTableViewRequest) String() string {
 func (*CreateTableViewRequest) ProtoMessage() {}
 
 func (x *CreateTableViewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[57]
+	mi := &file_sickrock_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3252,7 +4191,7 @@ func (x *CreateTableViewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTableViewRequest.ProtoReflect.Descriptor instead.
 func (*CreateTableViewRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{57}
+	return file_sickrock_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *CreateTableViewRequest) GetTableName() string {
@@ -3293,7 +4232,7 @@ type CreateTableViewResponse struct {
 
 func (x *CreateTableViewResponse) Reset() {
 	*x = CreateTableViewResponse{}
-	mi := &file_sickrock_proto_msgTypes[58]
+	mi := &file_sickrock_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3305,7 +4244,7 @@ func (x *CreateTableViewResponse) String() string {
 func (*CreateTableViewResponse) ProtoMessage() {}
 
 func (x *CreateTableViewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[58]
+	mi := &file_sickrock_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3318,7 +4257,7 @@ func (x *CreateTableViewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateTableViewResponse.ProtoReflect.Descriptor instead.
 func (*CreateTableViewResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{58}
+	return file_sickrock_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *CreateTableViewResponse) GetSuccess() bool {
@@ -3348,7 +4287,7 @@ type UpdateTableViewRequest struct {
 
 func (x *UpdateTableViewRequest) Reset() {
 	*x = UpdateTableViewRequest{}
-	mi := &file_sickrock_proto_msgTypes[59]
+	mi := &file_sickrock_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3360,7 +4299,7 @@ func (x *UpdateTableViewRequest) String() string {
 func (*UpdateTableViewRequest) ProtoMessage() {}
 
 func (x *UpdateTableViewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[59]
+	mi := &file_sickrock_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3373,7 +4312,7 @@ func (x *UpdateTableViewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTableViewRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTableViewRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{59}
+	return file_sickrock_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *UpdateTableViewRequest) GetViewId() int32 {
@@ -3421,7 +4360,7 @@ type UpdateTableViewResponse struct {
 
 func (x *UpdateTableViewResponse) Reset() {
 	*x = UpdateTableViewResponse{}
-	mi := &file_sickrock_proto_msgTypes[60]
+	mi := &file_sickrock_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3433,7 +4372,7 @@ func (x *UpdateTableViewResponse) String() string {
 func (*UpdateTableViewResponse) ProtoMessage() {}
 
 func (x *UpdateTableViewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[60]
+	mi := &file_sickrock_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3446,7 +4385,7 @@ func (x *UpdateTableViewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTableViewResponse.ProtoReflect.Descriptor instead.
 func (*UpdateTableViewResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{60}
+	return file_sickrock_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *UpdateTableViewResponse) GetSuccess() bool {
@@ -3472,7 +4411,7 @@ type GetTableViewsRequest struct {
 
 func (x *GetTableViewsRequest) Reset() {
 	*x = GetTableViewsRequest{}
-	mi := &file_sickrock_proto_msgTypes[61]
+	mi := &file_sickrock_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3484,7 +4423,7 @@ func (x *GetTableViewsRequest) String() string {
 func (*GetTableViewsRequest) ProtoMessage() {}
 
 func (x *GetTableViewsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[61]
+	mi := &file_sickrock_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3497,7 +4436,7 @@ func (x *GetTableViewsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTableViewsRequest.ProtoReflect.Descriptor instead.
 func (*GetTableViewsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{61}
+	return file_sickrock_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *GetTableViewsRequest) GetTableName() string {
@@ -3521,7 +4460,7 @@ type TableView struct {
 
 func (x *TableView) Reset() {
 	*x = TableView{}
-	mi := &file_sickrock_proto_msgTypes[62]
+	mi := &file_sickrock_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3533,7 +4472,7 @@ func (x *TableView) String() string {
 func (*TableView) ProtoMessage() {}
 
 func (x *TableView) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[62]
+	mi := &file_sickrock_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3546,7 +4485,7 @@ func (x *TableView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TableView.ProtoReflect.Descriptor instead.
 func (*TableView) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{62}
+	return file_sickrock_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *TableView) GetId() int32 {
@@ -3600,7 +4539,7 @@ type GetTableViewsResponse struct {
 
 func (x *GetTableViewsResponse) Reset() {
 	*x = GetTableViewsResponse{}
-	mi := &file_sickrock_proto_msgTypes[63]
+	mi := &file_sickrock_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3612,7 +4551,7 @@ func (x *GetTableViewsResponse) String() string {
 func (*GetTableViewsResponse) ProtoMessage() {}
 
 func (x *GetTableViewsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[63]
+	mi := &file_sickrock_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3625,7 +4564,7 @@ func (x *GetTableViewsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTableViewsResponse.ProtoReflect.Descriptor instead.
 func (*GetTableViewsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{63}
+	return file_sickrock_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *GetTableViewsResponse) GetViews() []*TableView {
@@ -3644,7 +4583,7 @@ type DeleteTableViewRequest struct {
 
 func (x *DeleteTableViewRequest) Reset() {
 	*x = DeleteTableViewRequest{}
-	mi := &file_sickrock_proto_msgTypes[64]
+	mi := &file_sickrock_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3656,7 +4595,7 @@ func (x *DeleteTableViewRequest) String() string {
 func (*DeleteTableViewRequest) ProtoMessage() {}
 
 func (x *DeleteTableViewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[64]
+	mi := &file_sickrock_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3669,7 +4608,7 @@ func (x *DeleteTableViewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTableViewRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTableViewRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{64}
+	return file_sickrock_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *DeleteTableViewRequest) GetViewId() int32 {
@@ -3689,7 +4628,7 @@ type DeleteTableViewResponse struct {
 
 func (x *DeleteTableViewResponse) Reset() {
 	*x = DeleteTableViewResponse{}
-	mi := &file_sickrock_proto_msgTypes[65]
+	mi := &file_sickrock_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3701,7 +4640,7 @@ func (x *DeleteTableViewResponse) String() string {
 func (*DeleteTableViewResponse) ProtoMessage() {}
 
 func (x *DeleteTableViewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[65]
+	mi := &file_sickrock_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3714,7 +4653,7 @@ func (x *DeleteTableViewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTableViewResponse.ProtoReflect.Descriptor instead.
 func (*DeleteTableViewResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{65}
+	return file_sickrock_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *DeleteTableViewResponse) GetSuccess() bool {
@@ -3733,23 +4672,26 @@ func (x *DeleteTableViewResponse) GetMessage() string {
 
 // Foreign Key Management
 type ForeignKey struct {
-	state                 protoimpl.MessageState `protogen:"open.v1"`
-	ConstraintName        string                 `protobuf:"bytes,1,opt,name=constraint_name,json=constraintName,proto3" json:"constraint_name,omitempty"`
-	TableName             string                 `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
-	ColumnName            string                 `protobuf:"bytes,3,opt,name=column_name,json=columnName,proto3" json:"column_name,omitempty"`
-	ReferencedTable       string                 `protobuf:"bytes,4,opt,name=referenced_table,json=referencedTable,proto3" json:"referenced_table,omitempty"`
-	ReferencedColumn      string                 `protobuf:"bytes,5,opt,name=referenced_column,json=referencedColumn,proto3" json:"referenced_column,omitempty"`
-	OnDeleteAction        string                 `protobuf:"bytes,6,opt,name=on_delete_action,json=onDeleteAction,proto3" json:"on_delete_action,omitempty"`
-	OnUpdateAction        string                 `protobuf:"bytes,7,opt,name=on_update_action,json=onUpdateAction,proto3" json:"on_update_action,omitempty"`
-	TableTcName           string                 `protobuf:"bytes,8,opt,name=table_tc_name,json=tableTcName,proto3" json:"table_tc_name,omitempty"`                                 // Table configuration name for the table
-	ReferencedTableTcName string                 `protobuf:"bytes,9,opt,name=referenced_table_tc_name,json=referencedTableTcName,proto3" json:"referenced_table_tc_name,omitempty"` // Table configuration name for the referenced table
+	state                 protoimpl.MessageState      `protogen:"open.v1"`
+	ConstraintName        string                      `protobuf:"bytes,1,opt,name=constraint_name,json=constraintName,proto3" json:"constraint_name,omitempty"`
+	TableName             string                      `protobuf:"bytes,2,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
+	ColumnName            string                      `protobuf:"bytes,3,opt,name=column_name,json=columnName,proto3" json:"column_name,omitempty"`
+	ReferencedTable       string                      `protobuf:"bytes,4,opt,name=referenced_table,json=referencedTable,proto3" json:"referenced_table,omitempty"`
+	ReferencedColumn      string                      `protobuf:"bytes,5,opt,name=referenced_column,json=referencedColumn,proto3" json:"referenced_column,omitempty"`
+	OnDeleteAction        string                      `protobuf:"bytes,6,opt,name=on_delete_action,json=onDeleteAction,proto3" json:"on_delete_action,omitempty"`
+	OnUpdateAction        string                      `protobuf:"bytes,7,opt,name=on_update_action,json=onUpdateAction,proto3" json:"on_update_action,omitempty"`
+	TableTcName           string                      `protobuf:"bytes,8,opt,name=table_tc_name,json=tableTcName,proto3" json:"table_tc_name,omitempty"`                                 // Table configuration name for the table
+	ReferencedTableTcName string                      `protobuf:"bytes,9,opt,name=referenced_table_tc_name,json=referencedTableTcName,proto3" json:"referenced_table_tc_name,omitempty"` // Table configuration name for the referenced table
+	DisplayName           string                      `protobuf:"bytes,10,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`                                  // Optional friendly label for UI (table_relations.display_name)
+	RelationId            int32                       `protobuf:"varint,11,opt,name=relation_id,json=relationId,proto3" json:"relation_id,omitempty"`                                    // SickRock table_relations.id (stable system identifier)
+	PullThroughFields     []*RelationPullThroughField `protobuf:"bytes,12,rep,name=pull_through_fields,json=pullThroughFields,proto3" json:"pull_through_fields,omitempty"`
 	unknownFields         protoimpl.UnknownFields
 	sizeCache             protoimpl.SizeCache
 }
 
 func (x *ForeignKey) Reset() {
 	*x = ForeignKey{}
-	mi := &file_sickrock_proto_msgTypes[66]
+	mi := &file_sickrock_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3761,7 +4703,7 @@ func (x *ForeignKey) String() string {
 func (*ForeignKey) ProtoMessage() {}
 
 func (x *ForeignKey) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[66]
+	mi := &file_sickrock_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3774,7 +4716,7 @@ func (x *ForeignKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ForeignKey.ProtoReflect.Descriptor instead.
 func (*ForeignKey) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{66}
+	return file_sickrock_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *ForeignKey) GetConstraintName() string {
@@ -3840,6 +4782,207 @@ func (x *ForeignKey) GetReferencedTableTcName() string {
 	return ""
 }
 
+func (x *ForeignKey) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *ForeignKey) GetRelationId() int32 {
+	if x != nil {
+		return x.RelationId
+	}
+	return 0
+}
+
+func (x *ForeignKey) GetPullThroughFields() []*RelationPullThroughField {
+	if x != nil {
+		return x.PullThroughFields
+	}
+	return nil
+}
+
+type RelationPullThroughField struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FkColumn      string                 `protobuf:"bytes,1,opt,name=fk_column,json=fkColumn,proto3" json:"fk_column,omitempty"`             // FK column on the related (source) table
+	Field         string                 `protobuf:"bytes,2,opt,name=field,proto3" json:"field,omitempty"`                                   // Column on the referenced row to display
+	DisplayLabel  string                 `protobuf:"bytes,3,opt,name=display_label,json=displayLabel,proto3" json:"display_label,omitempty"` // Header for calculated columns (required when expr is set)
+	Expr          string                 `protobuf:"bytes,4,opt,name=expr,proto3" json:"expr,omitempty"`                                     // Calculated value using {table.column} placeholders (evaluated server-side)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelationPullThroughField) Reset() {
+	*x = RelationPullThroughField{}
+	mi := &file_sickrock_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelationPullThroughField) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelationPullThroughField) ProtoMessage() {}
+
+func (x *RelationPullThroughField) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelationPullThroughField.ProtoReflect.Descriptor instead.
+func (*RelationPullThroughField) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *RelationPullThroughField) GetFkColumn() string {
+	if x != nil {
+		return x.FkColumn
+	}
+	return ""
+}
+
+func (x *RelationPullThroughField) GetField() string {
+	if x != nil {
+		return x.Field
+	}
+	return ""
+}
+
+func (x *RelationPullThroughField) GetDisplayLabel() string {
+	if x != nil {
+		return x.DisplayLabel
+	}
+	return ""
+}
+
+func (x *RelationPullThroughField) GetExpr() string {
+	if x != nil {
+		return x.Expr
+	}
+	return ""
+}
+
+type UpdateTableRelationRequest struct {
+	state             protoimpl.MessageState      `protogen:"open.v1"`
+	ConstraintName    string                      `protobuf:"bytes,1,opt,name=constraint_name,json=constraintName,proto3" json:"constraint_name,omitempty"`
+	DisplayName       string                      `protobuf:"bytes,2,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"`
+	PullThroughFields []*RelationPullThroughField `protobuf:"bytes,3,rep,name=pull_through_fields,json=pullThroughFields,proto3" json:"pull_through_fields,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *UpdateTableRelationRequest) Reset() {
+	*x = UpdateTableRelationRequest{}
+	mi := &file_sickrock_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTableRelationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTableRelationRequest) ProtoMessage() {}
+
+func (x *UpdateTableRelationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTableRelationRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTableRelationRequest) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *UpdateTableRelationRequest) GetConstraintName() string {
+	if x != nil {
+		return x.ConstraintName
+	}
+	return ""
+}
+
+func (x *UpdateTableRelationRequest) GetDisplayName() string {
+	if x != nil {
+		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *UpdateTableRelationRequest) GetPullThroughFields() []*RelationPullThroughField {
+	if x != nil {
+		return x.PullThroughFields
+	}
+	return nil
+}
+
+type UpdateTableRelationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTableRelationResponse) Reset() {
+	*x = UpdateTableRelationResponse{}
+	mi := &file_sickrock_proto_msgTypes[84]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTableRelationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTableRelationResponse) ProtoMessage() {}
+
+func (x *UpdateTableRelationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_sickrock_proto_msgTypes[84]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTableRelationResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTableRelationResponse) Descriptor() ([]byte, []int) {
+	return file_sickrock_proto_rawDescGZIP(), []int{84}
+}
+
+func (x *UpdateTableRelationResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *UpdateTableRelationResponse) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
 type CreateForeignKeyRequest struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	TableName        string                 `protobuf:"bytes,1,opt,name=table_name,json=tableName,proto3" json:"table_name,omitempty"`
@@ -3854,7 +4997,7 @@ type CreateForeignKeyRequest struct {
 
 func (x *CreateForeignKeyRequest) Reset() {
 	*x = CreateForeignKeyRequest{}
-	mi := &file_sickrock_proto_msgTypes[67]
+	mi := &file_sickrock_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3866,7 +5009,7 @@ func (x *CreateForeignKeyRequest) String() string {
 func (*CreateForeignKeyRequest) ProtoMessage() {}
 
 func (x *CreateForeignKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[67]
+	mi := &file_sickrock_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3879,7 +5022,7 @@ func (x *CreateForeignKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateForeignKeyRequest.ProtoReflect.Descriptor instead.
 func (*CreateForeignKeyRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{67}
+	return file_sickrock_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *CreateForeignKeyRequest) GetTableName() string {
@@ -3934,7 +5077,7 @@ type CreateForeignKeyResponse struct {
 
 func (x *CreateForeignKeyResponse) Reset() {
 	*x = CreateForeignKeyResponse{}
-	mi := &file_sickrock_proto_msgTypes[68]
+	mi := &file_sickrock_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3946,7 +5089,7 @@ func (x *CreateForeignKeyResponse) String() string {
 func (*CreateForeignKeyResponse) ProtoMessage() {}
 
 func (x *CreateForeignKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[68]
+	mi := &file_sickrock_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3959,7 +5102,7 @@ func (x *CreateForeignKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateForeignKeyResponse.ProtoReflect.Descriptor instead.
 func (*CreateForeignKeyResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{68}
+	return file_sickrock_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *CreateForeignKeyResponse) GetSuccess() bool {
@@ -3985,7 +5128,7 @@ type GetForeignKeysRequest struct {
 
 func (x *GetForeignKeysRequest) Reset() {
 	*x = GetForeignKeysRequest{}
-	mi := &file_sickrock_proto_msgTypes[69]
+	mi := &file_sickrock_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3997,7 +5140,7 @@ func (x *GetForeignKeysRequest) String() string {
 func (*GetForeignKeysRequest) ProtoMessage() {}
 
 func (x *GetForeignKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[69]
+	mi := &file_sickrock_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4010,7 +5153,7 @@ func (x *GetForeignKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetForeignKeysRequest.ProtoReflect.Descriptor instead.
 func (*GetForeignKeysRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{69}
+	return file_sickrock_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *GetForeignKeysRequest) GetTableName() string {
@@ -4029,7 +5172,7 @@ type GetForeignKeysResponse struct {
 
 func (x *GetForeignKeysResponse) Reset() {
 	*x = GetForeignKeysResponse{}
-	mi := &file_sickrock_proto_msgTypes[70]
+	mi := &file_sickrock_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4041,7 +5184,7 @@ func (x *GetForeignKeysResponse) String() string {
 func (*GetForeignKeysResponse) ProtoMessage() {}
 
 func (x *GetForeignKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[70]
+	mi := &file_sickrock_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4054,7 +5197,7 @@ func (x *GetForeignKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetForeignKeysResponse.ProtoReflect.Descriptor instead.
 func (*GetForeignKeysResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{70}
+	return file_sickrock_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *GetForeignKeysResponse) GetForeignKeys() []*ForeignKey {
@@ -4073,7 +5216,7 @@ type DeleteForeignKeyRequest struct {
 
 func (x *DeleteForeignKeyRequest) Reset() {
 	*x = DeleteForeignKeyRequest{}
-	mi := &file_sickrock_proto_msgTypes[71]
+	mi := &file_sickrock_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4085,7 +5228,7 @@ func (x *DeleteForeignKeyRequest) String() string {
 func (*DeleteForeignKeyRequest) ProtoMessage() {}
 
 func (x *DeleteForeignKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[71]
+	mi := &file_sickrock_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4098,7 +5241,7 @@ func (x *DeleteForeignKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteForeignKeyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteForeignKeyRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{71}
+	return file_sickrock_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *DeleteForeignKeyRequest) GetConstraintName() string {
@@ -4118,7 +5261,7 @@ type DeleteForeignKeyResponse struct {
 
 func (x *DeleteForeignKeyResponse) Reset() {
 	*x = DeleteForeignKeyResponse{}
-	mi := &file_sickrock_proto_msgTypes[72]
+	mi := &file_sickrock_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4130,7 +5273,7 @@ func (x *DeleteForeignKeyResponse) String() string {
 func (*DeleteForeignKeyResponse) ProtoMessage() {}
 
 func (x *DeleteForeignKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[72]
+	mi := &file_sickrock_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4143,7 +5286,7 @@ func (x *DeleteForeignKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteForeignKeyResponse.ProtoReflect.Descriptor instead.
 func (*DeleteForeignKeyResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{72}
+	return file_sickrock_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *DeleteForeignKeyResponse) GetSuccess() bool {
@@ -4172,7 +5315,7 @@ type ChangeColumnTypeRequest struct {
 
 func (x *ChangeColumnTypeRequest) Reset() {
 	*x = ChangeColumnTypeRequest{}
-	mi := &file_sickrock_proto_msgTypes[73]
+	mi := &file_sickrock_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4184,7 +5327,7 @@ func (x *ChangeColumnTypeRequest) String() string {
 func (*ChangeColumnTypeRequest) ProtoMessage() {}
 
 func (x *ChangeColumnTypeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[73]
+	mi := &file_sickrock_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4197,7 +5340,7 @@ func (x *ChangeColumnTypeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeColumnTypeRequest.ProtoReflect.Descriptor instead.
 func (*ChangeColumnTypeRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{73}
+	return file_sickrock_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *ChangeColumnTypeRequest) GetTableName() string {
@@ -4231,7 +5374,7 @@ type ChangeColumnTypeResponse struct {
 
 func (x *ChangeColumnTypeResponse) Reset() {
 	*x = ChangeColumnTypeResponse{}
-	mi := &file_sickrock_proto_msgTypes[74]
+	mi := &file_sickrock_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4243,7 +5386,7 @@ func (x *ChangeColumnTypeResponse) String() string {
 func (*ChangeColumnTypeResponse) ProtoMessage() {}
 
 func (x *ChangeColumnTypeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[74]
+	mi := &file_sickrock_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4256,7 +5399,7 @@ func (x *ChangeColumnTypeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeColumnTypeResponse.ProtoReflect.Descriptor instead.
 func (*ChangeColumnTypeResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{74}
+	return file_sickrock_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *ChangeColumnTypeResponse) GetSuccess() bool {
@@ -4284,7 +5427,7 @@ type DropColumnRequest struct {
 
 func (x *DropColumnRequest) Reset() {
 	*x = DropColumnRequest{}
-	mi := &file_sickrock_proto_msgTypes[75]
+	mi := &file_sickrock_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4296,7 +5439,7 @@ func (x *DropColumnRequest) String() string {
 func (*DropColumnRequest) ProtoMessage() {}
 
 func (x *DropColumnRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[75]
+	mi := &file_sickrock_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4309,7 +5452,7 @@ func (x *DropColumnRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DropColumnRequest.ProtoReflect.Descriptor instead.
 func (*DropColumnRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{75}
+	return file_sickrock_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *DropColumnRequest) GetTableName() string {
@@ -4336,7 +5479,7 @@ type DropColumnResponse struct {
 
 func (x *DropColumnResponse) Reset() {
 	*x = DropColumnResponse{}
-	mi := &file_sickrock_proto_msgTypes[76]
+	mi := &file_sickrock_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4348,7 +5491,7 @@ func (x *DropColumnResponse) String() string {
 func (*DropColumnResponse) ProtoMessage() {}
 
 func (x *DropColumnResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[76]
+	mi := &file_sickrock_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4361,7 +5504,7 @@ func (x *DropColumnResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DropColumnResponse.ProtoReflect.Descriptor instead.
 func (*DropColumnResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{76}
+	return file_sickrock_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *DropColumnResponse) GetSuccess() bool {
@@ -4390,7 +5533,7 @@ type ChangeColumnNameRequest struct {
 
 func (x *ChangeColumnNameRequest) Reset() {
 	*x = ChangeColumnNameRequest{}
-	mi := &file_sickrock_proto_msgTypes[77]
+	mi := &file_sickrock_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4402,7 +5545,7 @@ func (x *ChangeColumnNameRequest) String() string {
 func (*ChangeColumnNameRequest) ProtoMessage() {}
 
 func (x *ChangeColumnNameRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[77]
+	mi := &file_sickrock_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4415,7 +5558,7 @@ func (x *ChangeColumnNameRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeColumnNameRequest.ProtoReflect.Descriptor instead.
 func (*ChangeColumnNameRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{77}
+	return file_sickrock_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *ChangeColumnNameRequest) GetTableName() string {
@@ -4449,7 +5592,7 @@ type ChangeColumnNameResponse struct {
 
 func (x *ChangeColumnNameResponse) Reset() {
 	*x = ChangeColumnNameResponse{}
-	mi := &file_sickrock_proto_msgTypes[78]
+	mi := &file_sickrock_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4461,7 +5604,7 @@ func (x *ChangeColumnNameResponse) String() string {
 func (*ChangeColumnNameResponse) ProtoMessage() {}
 
 func (x *ChangeColumnNameResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[78]
+	mi := &file_sickrock_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4474,7 +5617,7 @@ func (x *ChangeColumnNameResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeColumnNameResponse.ProtoReflect.Descriptor instead.
 func (*ChangeColumnNameResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{78}
+	return file_sickrock_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *ChangeColumnNameResponse) GetSuccess() bool {
@@ -4501,7 +5644,7 @@ type GetMostRecentlyViewedRequest struct {
 
 func (x *GetMostRecentlyViewedRequest) Reset() {
 	*x = GetMostRecentlyViewedRequest{}
-	mi := &file_sickrock_proto_msgTypes[79]
+	mi := &file_sickrock_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4513,7 +5656,7 @@ func (x *GetMostRecentlyViewedRequest) String() string {
 func (*GetMostRecentlyViewedRequest) ProtoMessage() {}
 
 func (x *GetMostRecentlyViewedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[79]
+	mi := &file_sickrock_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4526,7 +5669,7 @@ func (x *GetMostRecentlyViewedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMostRecentlyViewedRequest.ProtoReflect.Descriptor instead.
 func (*GetMostRecentlyViewedRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{79}
+	return file_sickrock_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *GetMostRecentlyViewedRequest) GetLimit() int32 {
@@ -4550,7 +5693,7 @@ type RecentlyViewedItem struct {
 
 func (x *RecentlyViewedItem) Reset() {
 	*x = RecentlyViewedItem{}
-	mi := &file_sickrock_proto_msgTypes[80]
+	mi := &file_sickrock_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4562,7 +5705,7 @@ func (x *RecentlyViewedItem) String() string {
 func (*RecentlyViewedItem) ProtoMessage() {}
 
 func (x *RecentlyViewedItem) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[80]
+	mi := &file_sickrock_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4575,7 +5718,7 @@ func (x *RecentlyViewedItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RecentlyViewedItem.ProtoReflect.Descriptor instead.
 func (*RecentlyViewedItem) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{80}
+	return file_sickrock_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *RecentlyViewedItem) GetName() string {
@@ -4629,7 +5772,7 @@ type GetMostRecentlyViewedResponse struct {
 
 func (x *GetMostRecentlyViewedResponse) Reset() {
 	*x = GetMostRecentlyViewedResponse{}
-	mi := &file_sickrock_proto_msgTypes[81]
+	mi := &file_sickrock_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4641,7 +5784,7 @@ func (x *GetMostRecentlyViewedResponse) String() string {
 func (*GetMostRecentlyViewedResponse) ProtoMessage() {}
 
 func (x *GetMostRecentlyViewedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[81]
+	mi := &file_sickrock_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4654,7 +5797,7 @@ func (x *GetMostRecentlyViewedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMostRecentlyViewedResponse.ProtoReflect.Descriptor instead.
 func (*GetMostRecentlyViewedResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{81}
+	return file_sickrock_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *GetMostRecentlyViewedResponse) GetItems() []*RecentlyViewedItem {
@@ -4676,7 +5819,7 @@ type Dashboard struct {
 
 func (x *Dashboard) Reset() {
 	*x = Dashboard{}
-	mi := &file_sickrock_proto_msgTypes[82]
+	mi := &file_sickrock_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4688,7 +5831,7 @@ func (x *Dashboard) String() string {
 func (*Dashboard) ProtoMessage() {}
 
 func (x *Dashboard) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[82]
+	mi := &file_sickrock_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4701,7 +5844,7 @@ func (x *Dashboard) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Dashboard.ProtoReflect.Descriptor instead.
 func (*Dashboard) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{82}
+	return file_sickrock_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *Dashboard) GetId() int32 {
@@ -4733,7 +5876,7 @@ type GetDashboardsRequest struct {
 
 func (x *GetDashboardsRequest) Reset() {
 	*x = GetDashboardsRequest{}
-	mi := &file_sickrock_proto_msgTypes[83]
+	mi := &file_sickrock_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4745,7 +5888,7 @@ func (x *GetDashboardsRequest) String() string {
 func (*GetDashboardsRequest) ProtoMessage() {}
 
 func (x *GetDashboardsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[83]
+	mi := &file_sickrock_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4758,7 +5901,7 @@ func (x *GetDashboardsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardsRequest.ProtoReflect.Descriptor instead.
 func (*GetDashboardsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{83}
+	return file_sickrock_proto_rawDescGZIP(), []int{101}
 }
 
 type GetDashboardsResponse struct {
@@ -4770,7 +5913,7 @@ type GetDashboardsResponse struct {
 
 func (x *GetDashboardsResponse) Reset() {
 	*x = GetDashboardsResponse{}
-	mi := &file_sickrock_proto_msgTypes[84]
+	mi := &file_sickrock_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4782,7 +5925,7 @@ func (x *GetDashboardsResponse) String() string {
 func (*GetDashboardsResponse) ProtoMessage() {}
 
 func (x *GetDashboardsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[84]
+	mi := &file_sickrock_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4795,7 +5938,7 @@ func (x *GetDashboardsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardsResponse.ProtoReflect.Descriptor instead.
 func (*GetDashboardsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{84}
+	return file_sickrock_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *GetDashboardsResponse) GetDashboards() []*Dashboard {
@@ -4816,7 +5959,7 @@ type CreateDashboardRequest struct {
 
 func (x *CreateDashboardRequest) Reset() {
 	*x = CreateDashboardRequest{}
-	mi := &file_sickrock_proto_msgTypes[85]
+	mi := &file_sickrock_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4828,7 +5971,7 @@ func (x *CreateDashboardRequest) String() string {
 func (*CreateDashboardRequest) ProtoMessage() {}
 
 func (x *CreateDashboardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[85]
+	mi := &file_sickrock_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4841,7 +5984,7 @@ func (x *CreateDashboardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDashboardRequest.ProtoReflect.Descriptor instead.
 func (*CreateDashboardRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{85}
+	return file_sickrock_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *CreateDashboardRequest) GetName() string {
@@ -4869,7 +6012,7 @@ type CreateDashboardResponse struct {
 
 func (x *CreateDashboardResponse) Reset() {
 	*x = CreateDashboardResponse{}
-	mi := &file_sickrock_proto_msgTypes[86]
+	mi := &file_sickrock_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4881,7 +6024,7 @@ func (x *CreateDashboardResponse) String() string {
 func (*CreateDashboardResponse) ProtoMessage() {}
 
 func (x *CreateDashboardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[86]
+	mi := &file_sickrock_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4894,7 +6037,7 @@ func (x *CreateDashboardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDashboardResponse.ProtoReflect.Descriptor instead.
 func (*CreateDashboardResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{86}
+	return file_sickrock_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *CreateDashboardResponse) GetSuccess() bool {
@@ -4932,7 +6075,7 @@ type DashboardComponent struct {
 
 func (x *DashboardComponent) Reset() {
 	*x = DashboardComponent{}
-	mi := &file_sickrock_proto_msgTypes[87]
+	mi := &file_sickrock_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4944,7 +6087,7 @@ func (x *DashboardComponent) String() string {
 func (*DashboardComponent) ProtoMessage() {}
 
 func (x *DashboardComponent) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[87]
+	mi := &file_sickrock_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4957,7 +6100,7 @@ func (x *DashboardComponent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DashboardComponent.ProtoReflect.Descriptor instead.
 func (*DashboardComponent) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{87}
+	return file_sickrock_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *DashboardComponent) GetId() int32 {
@@ -5015,7 +6158,7 @@ type DashboardComponentRule struct {
 
 func (x *DashboardComponentRule) Reset() {
 	*x = DashboardComponentRule{}
-	mi := &file_sickrock_proto_msgTypes[88]
+	mi := &file_sickrock_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5027,7 +6170,7 @@ func (x *DashboardComponentRule) String() string {
 func (*DashboardComponentRule) ProtoMessage() {}
 
 func (x *DashboardComponentRule) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[88]
+	mi := &file_sickrock_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5040,7 +6183,7 @@ func (x *DashboardComponentRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DashboardComponentRule.ProtoReflect.Descriptor instead.
 func (*DashboardComponentRule) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{88}
+	return file_sickrock_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *DashboardComponentRule) GetId() int32 {
@@ -5087,7 +6230,7 @@ type GetDashboardComponentRulesRequest struct {
 
 func (x *GetDashboardComponentRulesRequest) Reset() {
 	*x = GetDashboardComponentRulesRequest{}
-	mi := &file_sickrock_proto_msgTypes[89]
+	mi := &file_sickrock_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5099,7 +6242,7 @@ func (x *GetDashboardComponentRulesRequest) String() string {
 func (*GetDashboardComponentRulesRequest) ProtoMessage() {}
 
 func (x *GetDashboardComponentRulesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[89]
+	mi := &file_sickrock_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5112,7 +6255,7 @@ func (x *GetDashboardComponentRulesRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetDashboardComponentRulesRequest.ProtoReflect.Descriptor instead.
 func (*GetDashboardComponentRulesRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{89}
+	return file_sickrock_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *GetDashboardComponentRulesRequest) GetComponent() int32 {
@@ -5131,7 +6274,7 @@ type GetDashboardComponentRulesResponse struct {
 
 func (x *GetDashboardComponentRulesResponse) Reset() {
 	*x = GetDashboardComponentRulesResponse{}
-	mi := &file_sickrock_proto_msgTypes[90]
+	mi := &file_sickrock_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5143,7 +6286,7 @@ func (x *GetDashboardComponentRulesResponse) String() string {
 func (*GetDashboardComponentRulesResponse) ProtoMessage() {}
 
 func (x *GetDashboardComponentRulesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[90]
+	mi := &file_sickrock_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5156,7 +6299,7 @@ func (x *GetDashboardComponentRulesResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetDashboardComponentRulesResponse.ProtoReflect.Descriptor instead.
 func (*GetDashboardComponentRulesResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{90}
+	return file_sickrock_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *GetDashboardComponentRulesResponse) GetRules() []*DashboardComponentRule {
@@ -5178,7 +6321,7 @@ type CreateDashboardComponentRuleRequest struct {
 
 func (x *CreateDashboardComponentRuleRequest) Reset() {
 	*x = CreateDashboardComponentRuleRequest{}
-	mi := &file_sickrock_proto_msgTypes[91]
+	mi := &file_sickrock_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5190,7 +6333,7 @@ func (x *CreateDashboardComponentRuleRequest) String() string {
 func (*CreateDashboardComponentRuleRequest) ProtoMessage() {}
 
 func (x *CreateDashboardComponentRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[91]
+	mi := &file_sickrock_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5203,7 +6346,7 @@ func (x *CreateDashboardComponentRuleRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CreateDashboardComponentRuleRequest.ProtoReflect.Descriptor instead.
 func (*CreateDashboardComponentRuleRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{91}
+	return file_sickrock_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *CreateDashboardComponentRuleRequest) GetComponent() int32 {
@@ -5243,7 +6386,7 @@ type CreateDashboardComponentRuleResponse struct {
 
 func (x *CreateDashboardComponentRuleResponse) Reset() {
 	*x = CreateDashboardComponentRuleResponse{}
-	mi := &file_sickrock_proto_msgTypes[92]
+	mi := &file_sickrock_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5255,7 +6398,7 @@ func (x *CreateDashboardComponentRuleResponse) String() string {
 func (*CreateDashboardComponentRuleResponse) ProtoMessage() {}
 
 func (x *CreateDashboardComponentRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[92]
+	mi := &file_sickrock_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5268,7 +6411,7 @@ func (x *CreateDashboardComponentRuleResponse) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use CreateDashboardComponentRuleResponse.ProtoReflect.Descriptor instead.
 func (*CreateDashboardComponentRuleResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{92}
+	return file_sickrock_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *CreateDashboardComponentRuleResponse) GetRule() *DashboardComponentRule {
@@ -5287,7 +6430,7 @@ type InitRequest struct {
 
 func (x *InitRequest) Reset() {
 	*x = InitRequest{}
-	mi := &file_sickrock_proto_msgTypes[93]
+	mi := &file_sickrock_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5299,7 +6442,7 @@ func (x *InitRequest) String() string {
 func (*InitRequest) ProtoMessage() {}
 
 func (x *InitRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[93]
+	mi := &file_sickrock_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5312,7 +6455,7 @@ func (x *InitRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitRequest.ProtoReflect.Descriptor instead.
 func (*InitRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{93}
+	return file_sickrock_proto_rawDescGZIP(), []int{111}
 }
 
 type OAuthProvider struct {
@@ -5326,7 +6469,7 @@ type OAuthProvider struct {
 
 func (x *OAuthProvider) Reset() {
 	*x = OAuthProvider{}
-	mi := &file_sickrock_proto_msgTypes[94]
+	mi := &file_sickrock_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5338,7 +6481,7 @@ func (x *OAuthProvider) String() string {
 func (*OAuthProvider) ProtoMessage() {}
 
 func (x *OAuthProvider) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[94]
+	mi := &file_sickrock_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5351,7 +6494,7 @@ func (x *OAuthProvider) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use OAuthProvider.ProtoReflect.Descriptor instead.
 func (*OAuthProvider) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{94}
+	return file_sickrock_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *OAuthProvider) GetId() string {
@@ -5391,7 +6534,7 @@ type InitResponse struct {
 
 func (x *InitResponse) Reset() {
 	*x = InitResponse{}
-	mi := &file_sickrock_proto_msgTypes[95]
+	mi := &file_sickrock_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5403,7 +6546,7 @@ func (x *InitResponse) String() string {
 func (*InitResponse) ProtoMessage() {}
 
 func (x *InitResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[95]
+	mi := &file_sickrock_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5416,7 +6559,7 @@ func (x *InitResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InitResponse.ProtoReflect.Descriptor instead.
 func (*InitResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{95}
+	return file_sickrock_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *InitResponse) GetVersion() string {
@@ -5486,7 +6629,7 @@ type LoginRequest struct {
 
 func (x *LoginRequest) Reset() {
 	*x = LoginRequest{}
-	mi := &file_sickrock_proto_msgTypes[96]
+	mi := &file_sickrock_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5498,7 +6641,7 @@ func (x *LoginRequest) String() string {
 func (*LoginRequest) ProtoMessage() {}
 
 func (x *LoginRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[96]
+	mi := &file_sickrock_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5511,7 +6654,7 @@ func (x *LoginRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginRequest.ProtoReflect.Descriptor instead.
 func (*LoginRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{96}
+	return file_sickrock_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *LoginRequest) GetUsername() string {
@@ -5540,7 +6683,7 @@ type LoginResponse struct {
 
 func (x *LoginResponse) Reset() {
 	*x = LoginResponse{}
-	mi := &file_sickrock_proto_msgTypes[97]
+	mi := &file_sickrock_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5552,7 +6695,7 @@ func (x *LoginResponse) String() string {
 func (*LoginResponse) ProtoMessage() {}
 
 func (x *LoginResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[97]
+	mi := &file_sickrock_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5565,7 +6708,7 @@ func (x *LoginResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LoginResponse.ProtoReflect.Descriptor instead.
 func (*LoginResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{97}
+	return file_sickrock_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *LoginResponse) GetSuccess() bool {
@@ -5604,7 +6747,7 @@ type LogoutRequest struct {
 
 func (x *LogoutRequest) Reset() {
 	*x = LogoutRequest{}
-	mi := &file_sickrock_proto_msgTypes[98]
+	mi := &file_sickrock_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5616,7 +6759,7 @@ func (x *LogoutRequest) String() string {
 func (*LogoutRequest) ProtoMessage() {}
 
 func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[98]
+	mi := &file_sickrock_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5629,7 +6772,7 @@ func (x *LogoutRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutRequest.ProtoReflect.Descriptor instead.
 func (*LogoutRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{98}
+	return file_sickrock_proto_rawDescGZIP(), []int{116}
 }
 
 type LogoutResponse struct {
@@ -5642,7 +6785,7 @@ type LogoutResponse struct {
 
 func (x *LogoutResponse) Reset() {
 	*x = LogoutResponse{}
-	mi := &file_sickrock_proto_msgTypes[99]
+	mi := &file_sickrock_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5654,7 +6797,7 @@ func (x *LogoutResponse) String() string {
 func (*LogoutResponse) ProtoMessage() {}
 
 func (x *LogoutResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[99]
+	mi := &file_sickrock_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5667,7 +6810,7 @@ func (x *LogoutResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogoutResponse.ProtoReflect.Descriptor instead.
 func (*LogoutResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{99}
+	return file_sickrock_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *LogoutResponse) GetSuccess() bool {
@@ -5694,7 +6837,7 @@ type ResetUserPasswordRequest struct {
 
 func (x *ResetUserPasswordRequest) Reset() {
 	*x = ResetUserPasswordRequest{}
-	mi := &file_sickrock_proto_msgTypes[100]
+	mi := &file_sickrock_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5706,7 +6849,7 @@ func (x *ResetUserPasswordRequest) String() string {
 func (*ResetUserPasswordRequest) ProtoMessage() {}
 
 func (x *ResetUserPasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[100]
+	mi := &file_sickrock_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5719,7 +6862,7 @@ func (x *ResetUserPasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetUserPasswordRequest.ProtoReflect.Descriptor instead.
 func (*ResetUserPasswordRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{100}
+	return file_sickrock_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *ResetUserPasswordRequest) GetUsername() string {
@@ -5746,7 +6889,7 @@ type ResetUserPasswordResponse struct {
 
 func (x *ResetUserPasswordResponse) Reset() {
 	*x = ResetUserPasswordResponse{}
-	mi := &file_sickrock_proto_msgTypes[101]
+	mi := &file_sickrock_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5758,7 +6901,7 @@ func (x *ResetUserPasswordResponse) String() string {
 func (*ResetUserPasswordResponse) ProtoMessage() {}
 
 func (x *ResetUserPasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[101]
+	mi := &file_sickrock_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5771,7 +6914,7 @@ func (x *ResetUserPasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetUserPasswordResponse.ProtoReflect.Descriptor instead.
 func (*ResetUserPasswordResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{101}
+	return file_sickrock_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *ResetUserPasswordResponse) GetSuccess() bool {
@@ -5797,7 +6940,7 @@ type ValidateTokenRequest struct {
 
 func (x *ValidateTokenRequest) Reset() {
 	*x = ValidateTokenRequest{}
-	mi := &file_sickrock_proto_msgTypes[102]
+	mi := &file_sickrock_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5809,7 +6952,7 @@ func (x *ValidateTokenRequest) String() string {
 func (*ValidateTokenRequest) ProtoMessage() {}
 
 func (x *ValidateTokenRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[102]
+	mi := &file_sickrock_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5822,7 +6965,7 @@ func (x *ValidateTokenRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateTokenRequest.ProtoReflect.Descriptor instead.
 func (*ValidateTokenRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{102}
+	return file_sickrock_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *ValidateTokenRequest) GetToken() string {
@@ -5846,7 +6989,7 @@ type ValidateTokenResponse struct {
 
 func (x *ValidateTokenResponse) Reset() {
 	*x = ValidateTokenResponse{}
-	mi := &file_sickrock_proto_msgTypes[103]
+	mi := &file_sickrock_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5858,7 +7001,7 @@ func (x *ValidateTokenResponse) String() string {
 func (*ValidateTokenResponse) ProtoMessage() {}
 
 func (x *ValidateTokenResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[103]
+	mi := &file_sickrock_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5871,7 +7014,7 @@ func (x *ValidateTokenResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateTokenResponse.ProtoReflect.Descriptor instead.
 func (*ValidateTokenResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{103}
+	return file_sickrock_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *ValidateTokenResponse) GetValid() bool {
@@ -5926,7 +7069,7 @@ type ChangePasswordRequest struct {
 
 func (x *ChangePasswordRequest) Reset() {
 	*x = ChangePasswordRequest{}
-	mi := &file_sickrock_proto_msgTypes[104]
+	mi := &file_sickrock_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5938,7 +7081,7 @@ func (x *ChangePasswordRequest) String() string {
 func (*ChangePasswordRequest) ProtoMessage() {}
 
 func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[104]
+	mi := &file_sickrock_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5951,7 +7094,7 @@ func (x *ChangePasswordRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePasswordRequest.ProtoReflect.Descriptor instead.
 func (*ChangePasswordRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{104}
+	return file_sickrock_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *ChangePasswordRequest) GetCurrentPassword() string {
@@ -5978,7 +7121,7 @@ type ChangePasswordResponse struct {
 
 func (x *ChangePasswordResponse) Reset() {
 	*x = ChangePasswordResponse{}
-	mi := &file_sickrock_proto_msgTypes[105]
+	mi := &file_sickrock_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5990,7 +7133,7 @@ func (x *ChangePasswordResponse) String() string {
 func (*ChangePasswordResponse) ProtoMessage() {}
 
 func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[105]
+	mi := &file_sickrock_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6003,7 +7146,7 @@ func (x *ChangePasswordResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangePasswordResponse.ProtoReflect.Descriptor instead.
 func (*ChangePasswordResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{105}
+	return file_sickrock_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *ChangePasswordResponse) GetSuccess() bool {
@@ -6032,7 +7175,7 @@ type IamUser struct {
 
 func (x *IamUser) Reset() {
 	*x = IamUser{}
-	mi := &file_sickrock_proto_msgTypes[106]
+	mi := &file_sickrock_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6044,7 +7187,7 @@ func (x *IamUser) String() string {
 func (*IamUser) ProtoMessage() {}
 
 func (x *IamUser) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[106]
+	mi := &file_sickrock_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6057,7 +7200,7 @@ func (x *IamUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IamUser.ProtoReflect.Descriptor instead.
 func (*IamUser) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{106}
+	return file_sickrock_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *IamUser) GetId() int32 {
@@ -6092,7 +7235,7 @@ type RbacPermission struct {
 
 func (x *RbacPermission) Reset() {
 	*x = RbacPermission{}
-	mi := &file_sickrock_proto_msgTypes[107]
+	mi := &file_sickrock_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6104,7 +7247,7 @@ func (x *RbacPermission) String() string {
 func (*RbacPermission) ProtoMessage() {}
 
 func (x *RbacPermission) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[107]
+	mi := &file_sickrock_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6117,7 +7260,7 @@ func (x *RbacPermission) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RbacPermission.ProtoReflect.Descriptor instead.
 func (*RbacPermission) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{107}
+	return file_sickrock_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *RbacPermission) GetId() int32 {
@@ -6153,7 +7296,7 @@ type RbacRole struct {
 
 func (x *RbacRole) Reset() {
 	*x = RbacRole{}
-	mi := &file_sickrock_proto_msgTypes[108]
+	mi := &file_sickrock_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6165,7 +7308,7 @@ func (x *RbacRole) String() string {
 func (*RbacRole) ProtoMessage() {}
 
 func (x *RbacRole) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[108]
+	mi := &file_sickrock_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6178,7 +7321,7 @@ func (x *RbacRole) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RbacRole.ProtoReflect.Descriptor instead.
 func (*RbacRole) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{108}
+	return file_sickrock_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *RbacRole) GetId() int32 {
@@ -6220,7 +7363,7 @@ type UserGroup struct {
 
 func (x *UserGroup) Reset() {
 	*x = UserGroup{}
-	mi := &file_sickrock_proto_msgTypes[109]
+	mi := &file_sickrock_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6232,7 +7375,7 @@ func (x *UserGroup) String() string {
 func (*UserGroup) ProtoMessage() {}
 
 func (x *UserGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[109]
+	mi := &file_sickrock_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6245,7 +7388,7 @@ func (x *UserGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserGroup.ProtoReflect.Descriptor instead.
 func (*UserGroup) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{109}
+	return file_sickrock_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *UserGroup) GetId() int32 {
@@ -6280,7 +7423,7 @@ type MyPermissionAuditRow struct {
 
 func (x *MyPermissionAuditRow) Reset() {
 	*x = MyPermissionAuditRow{}
-	mi := &file_sickrock_proto_msgTypes[110]
+	mi := &file_sickrock_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6292,7 +7435,7 @@ func (x *MyPermissionAuditRow) String() string {
 func (*MyPermissionAuditRow) ProtoMessage() {}
 
 func (x *MyPermissionAuditRow) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[110]
+	mi := &file_sickrock_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6305,7 +7448,7 @@ func (x *MyPermissionAuditRow) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MyPermissionAuditRow.ProtoReflect.Descriptor instead.
 func (*MyPermissionAuditRow) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{110}
+	return file_sickrock_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *MyPermissionAuditRow) GetPermission() string {
@@ -6337,7 +7480,7 @@ type ListUsersRequest struct {
 
 func (x *ListUsersRequest) Reset() {
 	*x = ListUsersRequest{}
-	mi := &file_sickrock_proto_msgTypes[111]
+	mi := &file_sickrock_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6349,7 +7492,7 @@ func (x *ListUsersRequest) String() string {
 func (*ListUsersRequest) ProtoMessage() {}
 
 func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[111]
+	mi := &file_sickrock_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6362,7 +7505,7 @@ func (x *ListUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersRequest.ProtoReflect.Descriptor instead.
 func (*ListUsersRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{111}
+	return file_sickrock_proto_rawDescGZIP(), []int{129}
 }
 
 type ListUsersResponse struct {
@@ -6374,7 +7517,7 @@ type ListUsersResponse struct {
 
 func (x *ListUsersResponse) Reset() {
 	*x = ListUsersResponse{}
-	mi := &file_sickrock_proto_msgTypes[112]
+	mi := &file_sickrock_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6386,7 +7529,7 @@ func (x *ListUsersResponse) String() string {
 func (*ListUsersResponse) ProtoMessage() {}
 
 func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[112]
+	mi := &file_sickrock_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6399,7 +7542,7 @@ func (x *ListUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUsersResponse.ProtoReflect.Descriptor instead.
 func (*ListUsersResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{112}
+	return file_sickrock_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *ListUsersResponse) GetUsers() []*IamUser {
@@ -6418,7 +7561,7 @@ type GetUserRequest struct {
 
 func (x *GetUserRequest) Reset() {
 	*x = GetUserRequest{}
-	mi := &file_sickrock_proto_msgTypes[113]
+	mi := &file_sickrock_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6430,7 +7573,7 @@ func (x *GetUserRequest) String() string {
 func (*GetUserRequest) ProtoMessage() {}
 
 func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[113]
+	mi := &file_sickrock_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6443,7 +7586,7 @@ func (x *GetUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserRequest.ProtoReflect.Descriptor instead.
 func (*GetUserRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{113}
+	return file_sickrock_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *GetUserRequest) GetUserId() int32 {
@@ -6462,7 +7605,7 @@ type GetUserResponse struct {
 
 func (x *GetUserResponse) Reset() {
 	*x = GetUserResponse{}
-	mi := &file_sickrock_proto_msgTypes[114]
+	mi := &file_sickrock_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6474,7 +7617,7 @@ func (x *GetUserResponse) String() string {
 func (*GetUserResponse) ProtoMessage() {}
 
 func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[114]
+	mi := &file_sickrock_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6487,7 +7630,7 @@ func (x *GetUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserResponse.ProtoReflect.Descriptor instead.
 func (*GetUserResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{114}
+	return file_sickrock_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *GetUserResponse) GetUser() *IamUser {
@@ -6507,7 +7650,7 @@ type CreateUserRequest struct {
 
 func (x *CreateUserRequest) Reset() {
 	*x = CreateUserRequest{}
-	mi := &file_sickrock_proto_msgTypes[115]
+	mi := &file_sickrock_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6519,7 +7662,7 @@ func (x *CreateUserRequest) String() string {
 func (*CreateUserRequest) ProtoMessage() {}
 
 func (x *CreateUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[115]
+	mi := &file_sickrock_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6532,7 +7675,7 @@ func (x *CreateUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{115}
+	return file_sickrock_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *CreateUserRequest) GetUsername() string {
@@ -6558,7 +7701,7 @@ type CreateUserResponse struct {
 
 func (x *CreateUserResponse) Reset() {
 	*x = CreateUserResponse{}
-	mi := &file_sickrock_proto_msgTypes[116]
+	mi := &file_sickrock_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6570,7 +7713,7 @@ func (x *CreateUserResponse) String() string {
 func (*CreateUserResponse) ProtoMessage() {}
 
 func (x *CreateUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[116]
+	mi := &file_sickrock_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6583,7 +7726,7 @@ func (x *CreateUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserResponse.ProtoReflect.Descriptor instead.
 func (*CreateUserResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{116}
+	return file_sickrock_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *CreateUserResponse) GetUser() *IamUser {
@@ -6602,7 +7745,7 @@ type DeleteUserRequest struct {
 
 func (x *DeleteUserRequest) Reset() {
 	*x = DeleteUserRequest{}
-	mi := &file_sickrock_proto_msgTypes[117]
+	mi := &file_sickrock_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6614,7 +7757,7 @@ func (x *DeleteUserRequest) String() string {
 func (*DeleteUserRequest) ProtoMessage() {}
 
 func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[117]
+	mi := &file_sickrock_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6627,7 +7770,7 @@ func (x *DeleteUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{117}
+	return file_sickrock_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *DeleteUserRequest) GetUserId() int32 {
@@ -6646,7 +7789,7 @@ type DeleteUserResponse struct {
 
 func (x *DeleteUserResponse) Reset() {
 	*x = DeleteUserResponse{}
-	mi := &file_sickrock_proto_msgTypes[118]
+	mi := &file_sickrock_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6658,7 +7801,7 @@ func (x *DeleteUserResponse) String() string {
 func (*DeleteUserResponse) ProtoMessage() {}
 
 func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[118]
+	mi := &file_sickrock_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6671,7 +7814,7 @@ func (x *DeleteUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{118}
+	return file_sickrock_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *DeleteUserResponse) GetSuccess() bool {
@@ -6689,7 +7832,7 @@ type ListRbacPermissionsRequest struct {
 
 func (x *ListRbacPermissionsRequest) Reset() {
 	*x = ListRbacPermissionsRequest{}
-	mi := &file_sickrock_proto_msgTypes[119]
+	mi := &file_sickrock_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6701,7 +7844,7 @@ func (x *ListRbacPermissionsRequest) String() string {
 func (*ListRbacPermissionsRequest) ProtoMessage() {}
 
 func (x *ListRbacPermissionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[119]
+	mi := &file_sickrock_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6714,7 +7857,7 @@ func (x *ListRbacPermissionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRbacPermissionsRequest.ProtoReflect.Descriptor instead.
 func (*ListRbacPermissionsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{119}
+	return file_sickrock_proto_rawDescGZIP(), []int{137}
 }
 
 type ListRbacPermissionsResponse struct {
@@ -6726,7 +7869,7 @@ type ListRbacPermissionsResponse struct {
 
 func (x *ListRbacPermissionsResponse) Reset() {
 	*x = ListRbacPermissionsResponse{}
-	mi := &file_sickrock_proto_msgTypes[120]
+	mi := &file_sickrock_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6738,7 +7881,7 @@ func (x *ListRbacPermissionsResponse) String() string {
 func (*ListRbacPermissionsResponse) ProtoMessage() {}
 
 func (x *ListRbacPermissionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[120]
+	mi := &file_sickrock_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6751,7 +7894,7 @@ func (x *ListRbacPermissionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRbacPermissionsResponse.ProtoReflect.Descriptor instead.
 func (*ListRbacPermissionsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{120}
+	return file_sickrock_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *ListRbacPermissionsResponse) GetPermissions() []*RbacPermission {
@@ -6769,7 +7912,7 @@ type ListRbacRolesRequest struct {
 
 func (x *ListRbacRolesRequest) Reset() {
 	*x = ListRbacRolesRequest{}
-	mi := &file_sickrock_proto_msgTypes[121]
+	mi := &file_sickrock_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6781,7 +7924,7 @@ func (x *ListRbacRolesRequest) String() string {
 func (*ListRbacRolesRequest) ProtoMessage() {}
 
 func (x *ListRbacRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[121]
+	mi := &file_sickrock_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6794,7 +7937,7 @@ func (x *ListRbacRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRbacRolesRequest.ProtoReflect.Descriptor instead.
 func (*ListRbacRolesRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{121}
+	return file_sickrock_proto_rawDescGZIP(), []int{139}
 }
 
 type ListRbacRolesResponse struct {
@@ -6806,7 +7949,7 @@ type ListRbacRolesResponse struct {
 
 func (x *ListRbacRolesResponse) Reset() {
 	*x = ListRbacRolesResponse{}
-	mi := &file_sickrock_proto_msgTypes[122]
+	mi := &file_sickrock_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6818,7 +7961,7 @@ func (x *ListRbacRolesResponse) String() string {
 func (*ListRbacRolesResponse) ProtoMessage() {}
 
 func (x *ListRbacRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[122]
+	mi := &file_sickrock_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6831,7 +7974,7 @@ func (x *ListRbacRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRbacRolesResponse.ProtoReflect.Descriptor instead.
 func (*ListRbacRolesResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{122}
+	return file_sickrock_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *ListRbacRolesResponse) GetRoles() []*RbacRole {
@@ -6852,7 +7995,7 @@ type CreateRbacRoleRequest struct {
 
 func (x *CreateRbacRoleRequest) Reset() {
 	*x = CreateRbacRoleRequest{}
-	mi := &file_sickrock_proto_msgTypes[123]
+	mi := &file_sickrock_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6864,7 +8007,7 @@ func (x *CreateRbacRoleRequest) String() string {
 func (*CreateRbacRoleRequest) ProtoMessage() {}
 
 func (x *CreateRbacRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[123]
+	mi := &file_sickrock_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6877,7 +8020,7 @@ func (x *CreateRbacRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRbacRoleRequest.ProtoReflect.Descriptor instead.
 func (*CreateRbacRoleRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{123}
+	return file_sickrock_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *CreateRbacRoleRequest) GetName() string {
@@ -6910,7 +8053,7 @@ type CreateRbacRoleResponse struct {
 
 func (x *CreateRbacRoleResponse) Reset() {
 	*x = CreateRbacRoleResponse{}
-	mi := &file_sickrock_proto_msgTypes[124]
+	mi := &file_sickrock_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6922,7 +8065,7 @@ func (x *CreateRbacRoleResponse) String() string {
 func (*CreateRbacRoleResponse) ProtoMessage() {}
 
 func (x *CreateRbacRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[124]
+	mi := &file_sickrock_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6935,7 +8078,7 @@ func (x *CreateRbacRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateRbacRoleResponse.ProtoReflect.Descriptor instead.
 func (*CreateRbacRoleResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{124}
+	return file_sickrock_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *CreateRbacRoleResponse) GetRole() *RbacRole {
@@ -6957,7 +8100,7 @@ type UpdateRbacRoleRequest struct {
 
 func (x *UpdateRbacRoleRequest) Reset() {
 	*x = UpdateRbacRoleRequest{}
-	mi := &file_sickrock_proto_msgTypes[125]
+	mi := &file_sickrock_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6969,7 +8112,7 @@ func (x *UpdateRbacRoleRequest) String() string {
 func (*UpdateRbacRoleRequest) ProtoMessage() {}
 
 func (x *UpdateRbacRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[125]
+	mi := &file_sickrock_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6982,7 +8125,7 @@ func (x *UpdateRbacRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRbacRoleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateRbacRoleRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{125}
+	return file_sickrock_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *UpdateRbacRoleRequest) GetRoleId() int32 {
@@ -7022,7 +8165,7 @@ type UpdateRbacRoleResponse struct {
 
 func (x *UpdateRbacRoleResponse) Reset() {
 	*x = UpdateRbacRoleResponse{}
-	mi := &file_sickrock_proto_msgTypes[126]
+	mi := &file_sickrock_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7034,7 +8177,7 @@ func (x *UpdateRbacRoleResponse) String() string {
 func (*UpdateRbacRoleResponse) ProtoMessage() {}
 
 func (x *UpdateRbacRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[126]
+	mi := &file_sickrock_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7047,7 +8190,7 @@ func (x *UpdateRbacRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateRbacRoleResponse.ProtoReflect.Descriptor instead.
 func (*UpdateRbacRoleResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{126}
+	return file_sickrock_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *UpdateRbacRoleResponse) GetRole() *RbacRole {
@@ -7066,7 +8209,7 @@ type DeleteRbacRoleRequest struct {
 
 func (x *DeleteRbacRoleRequest) Reset() {
 	*x = DeleteRbacRoleRequest{}
-	mi := &file_sickrock_proto_msgTypes[127]
+	mi := &file_sickrock_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7078,7 +8221,7 @@ func (x *DeleteRbacRoleRequest) String() string {
 func (*DeleteRbacRoleRequest) ProtoMessage() {}
 
 func (x *DeleteRbacRoleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[127]
+	mi := &file_sickrock_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7091,7 +8234,7 @@ func (x *DeleteRbacRoleRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRbacRoleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteRbacRoleRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{127}
+	return file_sickrock_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *DeleteRbacRoleRequest) GetRoleId() int32 {
@@ -7110,7 +8253,7 @@ type DeleteRbacRoleResponse struct {
 
 func (x *DeleteRbacRoleResponse) Reset() {
 	*x = DeleteRbacRoleResponse{}
-	mi := &file_sickrock_proto_msgTypes[128]
+	mi := &file_sickrock_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7122,7 +8265,7 @@ func (x *DeleteRbacRoleResponse) String() string {
 func (*DeleteRbacRoleResponse) ProtoMessage() {}
 
 func (x *DeleteRbacRoleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[128]
+	mi := &file_sickrock_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7135,7 +8278,7 @@ func (x *DeleteRbacRoleResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteRbacRoleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteRbacRoleResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{128}
+	return file_sickrock_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *DeleteRbacRoleResponse) GetSuccess() bool {
@@ -7154,7 +8297,7 @@ type GetUserRbacRolesRequest struct {
 
 func (x *GetUserRbacRolesRequest) Reset() {
 	*x = GetUserRbacRolesRequest{}
-	mi := &file_sickrock_proto_msgTypes[129]
+	mi := &file_sickrock_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7166,7 +8309,7 @@ func (x *GetUserRbacRolesRequest) String() string {
 func (*GetUserRbacRolesRequest) ProtoMessage() {}
 
 func (x *GetUserRbacRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[129]
+	mi := &file_sickrock_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7179,7 +8322,7 @@ func (x *GetUserRbacRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserRbacRolesRequest.ProtoReflect.Descriptor instead.
 func (*GetUserRbacRolesRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{129}
+	return file_sickrock_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *GetUserRbacRolesRequest) GetUserId() int32 {
@@ -7198,7 +8341,7 @@ type GetUserRbacRolesResponse struct {
 
 func (x *GetUserRbacRolesResponse) Reset() {
 	*x = GetUserRbacRolesResponse{}
-	mi := &file_sickrock_proto_msgTypes[130]
+	mi := &file_sickrock_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7210,7 +8353,7 @@ func (x *GetUserRbacRolesResponse) String() string {
 func (*GetUserRbacRolesResponse) ProtoMessage() {}
 
 func (x *GetUserRbacRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[130]
+	mi := &file_sickrock_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7223,7 +8366,7 @@ func (x *GetUserRbacRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserRbacRolesResponse.ProtoReflect.Descriptor instead.
 func (*GetUserRbacRolesResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{130}
+	return file_sickrock_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *GetUserRbacRolesResponse) GetRoleIds() []int32 {
@@ -7245,7 +8388,7 @@ type UserEffectiveRoleGrant struct {
 
 func (x *UserEffectiveRoleGrant) Reset() {
 	*x = UserEffectiveRoleGrant{}
-	mi := &file_sickrock_proto_msgTypes[131]
+	mi := &file_sickrock_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7257,7 +8400,7 @@ func (x *UserEffectiveRoleGrant) String() string {
 func (*UserEffectiveRoleGrant) ProtoMessage() {}
 
 func (x *UserEffectiveRoleGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[131]
+	mi := &file_sickrock_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7270,7 +8413,7 @@ func (x *UserEffectiveRoleGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserEffectiveRoleGrant.ProtoReflect.Descriptor instead.
 func (*UserEffectiveRoleGrant) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{131}
+	return file_sickrock_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *UserEffectiveRoleGrant) GetRoleId() int32 {
@@ -7310,7 +8453,7 @@ type GetUserEffectiveRoleGrantsRequest struct {
 
 func (x *GetUserEffectiveRoleGrantsRequest) Reset() {
 	*x = GetUserEffectiveRoleGrantsRequest{}
-	mi := &file_sickrock_proto_msgTypes[132]
+	mi := &file_sickrock_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7322,7 +8465,7 @@ func (x *GetUserEffectiveRoleGrantsRequest) String() string {
 func (*GetUserEffectiveRoleGrantsRequest) ProtoMessage() {}
 
 func (x *GetUserEffectiveRoleGrantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[132]
+	mi := &file_sickrock_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7335,7 +8478,7 @@ func (x *GetUserEffectiveRoleGrantsRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetUserEffectiveRoleGrantsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserEffectiveRoleGrantsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{132}
+	return file_sickrock_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *GetUserEffectiveRoleGrantsRequest) GetUserId() int32 {
@@ -7355,7 +8498,7 @@ type GetUserEffectiveRoleGrantsResponse struct {
 
 func (x *GetUserEffectiveRoleGrantsResponse) Reset() {
 	*x = GetUserEffectiveRoleGrantsResponse{}
-	mi := &file_sickrock_proto_msgTypes[133]
+	mi := &file_sickrock_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7367,7 +8510,7 @@ func (x *GetUserEffectiveRoleGrantsResponse) String() string {
 func (*GetUserEffectiveRoleGrantsResponse) ProtoMessage() {}
 
 func (x *GetUserEffectiveRoleGrantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[133]
+	mi := &file_sickrock_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7380,7 +8523,7 @@ func (x *GetUserEffectiveRoleGrantsResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetUserEffectiveRoleGrantsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserEffectiveRoleGrantsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{133}
+	return file_sickrock_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *GetUserEffectiveRoleGrantsResponse) GetIsSuperuser() bool {
@@ -7406,7 +8549,7 @@ type GetUserGroupRbacRolesRequest struct {
 
 func (x *GetUserGroupRbacRolesRequest) Reset() {
 	*x = GetUserGroupRbacRolesRequest{}
-	mi := &file_sickrock_proto_msgTypes[134]
+	mi := &file_sickrock_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7418,7 +8561,7 @@ func (x *GetUserGroupRbacRolesRequest) String() string {
 func (*GetUserGroupRbacRolesRequest) ProtoMessage() {}
 
 func (x *GetUserGroupRbacRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[134]
+	mi := &file_sickrock_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7431,7 +8574,7 @@ func (x *GetUserGroupRbacRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserGroupRbacRolesRequest.ProtoReflect.Descriptor instead.
 func (*GetUserGroupRbacRolesRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{134}
+	return file_sickrock_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *GetUserGroupRbacRolesRequest) GetGroupId() int32 {
@@ -7450,7 +8593,7 @@ type GetUserGroupRbacRolesResponse struct {
 
 func (x *GetUserGroupRbacRolesResponse) Reset() {
 	*x = GetUserGroupRbacRolesResponse{}
-	mi := &file_sickrock_proto_msgTypes[135]
+	mi := &file_sickrock_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7462,7 +8605,7 @@ func (x *GetUserGroupRbacRolesResponse) String() string {
 func (*GetUserGroupRbacRolesResponse) ProtoMessage() {}
 
 func (x *GetUserGroupRbacRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[135]
+	mi := &file_sickrock_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7475,7 +8618,7 @@ func (x *GetUserGroupRbacRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserGroupRbacRolesResponse.ProtoReflect.Descriptor instead.
 func (*GetUserGroupRbacRolesResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{135}
+	return file_sickrock_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *GetUserGroupRbacRolesResponse) GetRoleIds() []int32 {
@@ -7495,7 +8638,7 @@ type SetUserGroupRbacRolesRequest struct {
 
 func (x *SetUserGroupRbacRolesRequest) Reset() {
 	*x = SetUserGroupRbacRolesRequest{}
-	mi := &file_sickrock_proto_msgTypes[136]
+	mi := &file_sickrock_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7507,7 +8650,7 @@ func (x *SetUserGroupRbacRolesRequest) String() string {
 func (*SetUserGroupRbacRolesRequest) ProtoMessage() {}
 
 func (x *SetUserGroupRbacRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[136]
+	mi := &file_sickrock_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7520,7 +8663,7 @@ func (x *SetUserGroupRbacRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserGroupRbacRolesRequest.ProtoReflect.Descriptor instead.
 func (*SetUserGroupRbacRolesRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{136}
+	return file_sickrock_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *SetUserGroupRbacRolesRequest) GetGroupId() int32 {
@@ -7546,7 +8689,7 @@ type SetUserGroupRbacRolesResponse struct {
 
 func (x *SetUserGroupRbacRolesResponse) Reset() {
 	*x = SetUserGroupRbacRolesResponse{}
-	mi := &file_sickrock_proto_msgTypes[137]
+	mi := &file_sickrock_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7558,7 +8701,7 @@ func (x *SetUserGroupRbacRolesResponse) String() string {
 func (*SetUserGroupRbacRolesResponse) ProtoMessage() {}
 
 func (x *SetUserGroupRbacRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[137]
+	mi := &file_sickrock_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7571,7 +8714,7 @@ func (x *SetUserGroupRbacRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserGroupRbacRolesResponse.ProtoReflect.Descriptor instead.
 func (*SetUserGroupRbacRolesResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{137}
+	return file_sickrock_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *SetUserGroupRbacRolesResponse) GetSuccess() bool {
@@ -7591,7 +8734,7 @@ type GroupTableRoleGrant struct {
 
 func (x *GroupTableRoleGrant) Reset() {
 	*x = GroupTableRoleGrant{}
-	mi := &file_sickrock_proto_msgTypes[138]
+	mi := &file_sickrock_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7603,7 +8746,7 @@ func (x *GroupTableRoleGrant) String() string {
 func (*GroupTableRoleGrant) ProtoMessage() {}
 
 func (x *GroupTableRoleGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[138]
+	mi := &file_sickrock_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7616,7 +8759,7 @@ func (x *GroupTableRoleGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GroupTableRoleGrant.ProtoReflect.Descriptor instead.
 func (*GroupTableRoleGrant) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{138}
+	return file_sickrock_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *GroupTableRoleGrant) GetTableKey() string {
@@ -7642,7 +8785,7 @@ type ListGroupTableRoleGrantsRequest struct {
 
 func (x *ListGroupTableRoleGrantsRequest) Reset() {
 	*x = ListGroupTableRoleGrantsRequest{}
-	mi := &file_sickrock_proto_msgTypes[139]
+	mi := &file_sickrock_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7654,7 +8797,7 @@ func (x *ListGroupTableRoleGrantsRequest) String() string {
 func (*ListGroupTableRoleGrantsRequest) ProtoMessage() {}
 
 func (x *ListGroupTableRoleGrantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[139]
+	mi := &file_sickrock_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7667,7 +8810,7 @@ func (x *ListGroupTableRoleGrantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGroupTableRoleGrantsRequest.ProtoReflect.Descriptor instead.
 func (*ListGroupTableRoleGrantsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{139}
+	return file_sickrock_proto_rawDescGZIP(), []int{157}
 }
 
 func (x *ListGroupTableRoleGrantsRequest) GetGroupId() int32 {
@@ -7686,7 +8829,7 @@ type ListGroupTableRoleGrantsResponse struct {
 
 func (x *ListGroupTableRoleGrantsResponse) Reset() {
 	*x = ListGroupTableRoleGrantsResponse{}
-	mi := &file_sickrock_proto_msgTypes[140]
+	mi := &file_sickrock_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7698,7 +8841,7 @@ func (x *ListGroupTableRoleGrantsResponse) String() string {
 func (*ListGroupTableRoleGrantsResponse) ProtoMessage() {}
 
 func (x *ListGroupTableRoleGrantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[140]
+	mi := &file_sickrock_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7711,7 +8854,7 @@ func (x *ListGroupTableRoleGrantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListGroupTableRoleGrantsResponse.ProtoReflect.Descriptor instead.
 func (*ListGroupTableRoleGrantsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{140}
+	return file_sickrock_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *ListGroupTableRoleGrantsResponse) GetGrants() []*GroupTableRoleGrant {
@@ -7731,7 +8874,7 @@ type SetGroupTableRoleGrantsRequest struct {
 
 func (x *SetGroupTableRoleGrantsRequest) Reset() {
 	*x = SetGroupTableRoleGrantsRequest{}
-	mi := &file_sickrock_proto_msgTypes[141]
+	mi := &file_sickrock_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7743,7 +8886,7 @@ func (x *SetGroupTableRoleGrantsRequest) String() string {
 func (*SetGroupTableRoleGrantsRequest) ProtoMessage() {}
 
 func (x *SetGroupTableRoleGrantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[141]
+	mi := &file_sickrock_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7756,7 +8899,7 @@ func (x *SetGroupTableRoleGrantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGroupTableRoleGrantsRequest.ProtoReflect.Descriptor instead.
 func (*SetGroupTableRoleGrantsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{141}
+	return file_sickrock_proto_rawDescGZIP(), []int{159}
 }
 
 func (x *SetGroupTableRoleGrantsRequest) GetGroupId() int32 {
@@ -7782,7 +8925,7 @@ type SetGroupTableRoleGrantsResponse struct {
 
 func (x *SetGroupTableRoleGrantsResponse) Reset() {
 	*x = SetGroupTableRoleGrantsResponse{}
-	mi := &file_sickrock_proto_msgTypes[142]
+	mi := &file_sickrock_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7794,7 +8937,7 @@ func (x *SetGroupTableRoleGrantsResponse) String() string {
 func (*SetGroupTableRoleGrantsResponse) ProtoMessage() {}
 
 func (x *SetGroupTableRoleGrantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[142]
+	mi := &file_sickrock_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7807,7 +8950,7 @@ func (x *SetGroupTableRoleGrantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetGroupTableRoleGrantsResponse.ProtoReflect.Descriptor instead.
 func (*SetGroupTableRoleGrantsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{142}
+	return file_sickrock_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *SetGroupTableRoleGrantsResponse) GetSuccess() bool {
@@ -7826,7 +8969,7 @@ type GetTableAccessRequest struct {
 
 func (x *GetTableAccessRequest) Reset() {
 	*x = GetTableAccessRequest{}
-	mi := &file_sickrock_proto_msgTypes[143]
+	mi := &file_sickrock_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7838,7 +8981,7 @@ func (x *GetTableAccessRequest) String() string {
 func (*GetTableAccessRequest) ProtoMessage() {}
 
 func (x *GetTableAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[143]
+	mi := &file_sickrock_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7851,7 +8994,7 @@ func (x *GetTableAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTableAccessRequest.ProtoReflect.Descriptor instead.
 func (*GetTableAccessRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{143}
+	return file_sickrock_proto_rawDescGZIP(), []int{161}
 }
 
 func (x *GetTableAccessRequest) GetTableName() string {
@@ -7873,7 +9016,7 @@ type GetTableAccessResponse struct {
 
 func (x *GetTableAccessResponse) Reset() {
 	*x = GetTableAccessResponse{}
-	mi := &file_sickrock_proto_msgTypes[144]
+	mi := &file_sickrock_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7885,7 +9028,7 @@ func (x *GetTableAccessResponse) String() string {
 func (*GetTableAccessResponse) ProtoMessage() {}
 
 func (x *GetTableAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[144]
+	mi := &file_sickrock_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7898,7 +9041,7 @@ func (x *GetTableAccessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTableAccessResponse.ProtoReflect.Descriptor instead.
 func (*GetTableAccessResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{144}
+	return file_sickrock_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *GetTableAccessResponse) GetCanView() bool {
@@ -7940,7 +9083,7 @@ type TableShareGrant struct {
 
 func (x *TableShareGrant) Reset() {
 	*x = TableShareGrant{}
-	mi := &file_sickrock_proto_msgTypes[145]
+	mi := &file_sickrock_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7952,7 +9095,7 @@ func (x *TableShareGrant) String() string {
 func (*TableShareGrant) ProtoMessage() {}
 
 func (x *TableShareGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[145]
+	mi := &file_sickrock_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7965,7 +9108,7 @@ func (x *TableShareGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TableShareGrant.ProtoReflect.Descriptor instead.
 func (*TableShareGrant) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{145}
+	return file_sickrock_proto_rawDescGZIP(), []int{163}
 }
 
 func (x *TableShareGrant) GetGroupId() int32 {
@@ -7998,7 +9141,7 @@ type ListTableShareGrantsRequest struct {
 
 func (x *ListTableShareGrantsRequest) Reset() {
 	*x = ListTableShareGrantsRequest{}
-	mi := &file_sickrock_proto_msgTypes[146]
+	mi := &file_sickrock_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8010,7 +9153,7 @@ func (x *ListTableShareGrantsRequest) String() string {
 func (*ListTableShareGrantsRequest) ProtoMessage() {}
 
 func (x *ListTableShareGrantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[146]
+	mi := &file_sickrock_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8023,7 +9166,7 @@ func (x *ListTableShareGrantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTableShareGrantsRequest.ProtoReflect.Descriptor instead.
 func (*ListTableShareGrantsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{146}
+	return file_sickrock_proto_rawDescGZIP(), []int{164}
 }
 
 func (x *ListTableShareGrantsRequest) GetTableKey() string {
@@ -8042,7 +9185,7 @@ type ListTableShareGrantsResponse struct {
 
 func (x *ListTableShareGrantsResponse) Reset() {
 	*x = ListTableShareGrantsResponse{}
-	mi := &file_sickrock_proto_msgTypes[147]
+	mi := &file_sickrock_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8054,7 +9197,7 @@ func (x *ListTableShareGrantsResponse) String() string {
 func (*ListTableShareGrantsResponse) ProtoMessage() {}
 
 func (x *ListTableShareGrantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[147]
+	mi := &file_sickrock_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8067,7 +9210,7 @@ func (x *ListTableShareGrantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTableShareGrantsResponse.ProtoReflect.Descriptor instead.
 func (*ListTableShareGrantsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{147}
+	return file_sickrock_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *ListTableShareGrantsResponse) GetGrants() []*TableShareGrant {
@@ -8087,7 +9230,7 @@ type SetTableShareGrantsRequest struct {
 
 func (x *SetTableShareGrantsRequest) Reset() {
 	*x = SetTableShareGrantsRequest{}
-	mi := &file_sickrock_proto_msgTypes[148]
+	mi := &file_sickrock_proto_msgTypes[166]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8099,7 +9242,7 @@ func (x *SetTableShareGrantsRequest) String() string {
 func (*SetTableShareGrantsRequest) ProtoMessage() {}
 
 func (x *SetTableShareGrantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[148]
+	mi := &file_sickrock_proto_msgTypes[166]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8112,7 +9255,7 @@ func (x *SetTableShareGrantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTableShareGrantsRequest.ProtoReflect.Descriptor instead.
 func (*SetTableShareGrantsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{148}
+	return file_sickrock_proto_rawDescGZIP(), []int{166}
 }
 
 func (x *SetTableShareGrantsRequest) GetTableKey() string {
@@ -8138,7 +9281,7 @@ type SetTableShareGrantsResponse struct {
 
 func (x *SetTableShareGrantsResponse) Reset() {
 	*x = SetTableShareGrantsResponse{}
-	mi := &file_sickrock_proto_msgTypes[149]
+	mi := &file_sickrock_proto_msgTypes[167]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8150,7 +9293,7 @@ func (x *SetTableShareGrantsResponse) String() string {
 func (*SetTableShareGrantsResponse) ProtoMessage() {}
 
 func (x *SetTableShareGrantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[149]
+	mi := &file_sickrock_proto_msgTypes[167]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8163,7 +9306,7 @@ func (x *SetTableShareGrantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTableShareGrantsResponse.ProtoReflect.Descriptor instead.
 func (*SetTableShareGrantsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{149}
+	return file_sickrock_proto_rawDescGZIP(), []int{167}
 }
 
 func (x *SetTableShareGrantsResponse) GetSuccess() bool {
@@ -8182,7 +9325,7 @@ type GetRbacRoleUsersRequest struct {
 
 func (x *GetRbacRoleUsersRequest) Reset() {
 	*x = GetRbacRoleUsersRequest{}
-	mi := &file_sickrock_proto_msgTypes[150]
+	mi := &file_sickrock_proto_msgTypes[168]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8194,7 +9337,7 @@ func (x *GetRbacRoleUsersRequest) String() string {
 func (*GetRbacRoleUsersRequest) ProtoMessage() {}
 
 func (x *GetRbacRoleUsersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[150]
+	mi := &file_sickrock_proto_msgTypes[168]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8207,7 +9350,7 @@ func (x *GetRbacRoleUsersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRbacRoleUsersRequest.ProtoReflect.Descriptor instead.
 func (*GetRbacRoleUsersRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{150}
+	return file_sickrock_proto_rawDescGZIP(), []int{168}
 }
 
 func (x *GetRbacRoleUsersRequest) GetRoleId() int32 {
@@ -8226,7 +9369,7 @@ type GetRbacRoleUsersResponse struct {
 
 func (x *GetRbacRoleUsersResponse) Reset() {
 	*x = GetRbacRoleUsersResponse{}
-	mi := &file_sickrock_proto_msgTypes[151]
+	mi := &file_sickrock_proto_msgTypes[169]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8238,7 +9381,7 @@ func (x *GetRbacRoleUsersResponse) String() string {
 func (*GetRbacRoleUsersResponse) ProtoMessage() {}
 
 func (x *GetRbacRoleUsersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[151]
+	mi := &file_sickrock_proto_msgTypes[169]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8251,7 +9394,7 @@ func (x *GetRbacRoleUsersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRbacRoleUsersResponse.ProtoReflect.Descriptor instead.
 func (*GetRbacRoleUsersResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{151}
+	return file_sickrock_proto_rawDescGZIP(), []int{169}
 }
 
 func (x *GetRbacRoleUsersResponse) GetUsernames() []string {
@@ -8270,7 +9413,7 @@ type GetRbacRoleGroupsRequest struct {
 
 func (x *GetRbacRoleGroupsRequest) Reset() {
 	*x = GetRbacRoleGroupsRequest{}
-	mi := &file_sickrock_proto_msgTypes[152]
+	mi := &file_sickrock_proto_msgTypes[170]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8282,7 +9425,7 @@ func (x *GetRbacRoleGroupsRequest) String() string {
 func (*GetRbacRoleGroupsRequest) ProtoMessage() {}
 
 func (x *GetRbacRoleGroupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[152]
+	mi := &file_sickrock_proto_msgTypes[170]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8295,7 +9438,7 @@ func (x *GetRbacRoleGroupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRbacRoleGroupsRequest.ProtoReflect.Descriptor instead.
 func (*GetRbacRoleGroupsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{152}
+	return file_sickrock_proto_rawDescGZIP(), []int{170}
 }
 
 func (x *GetRbacRoleGroupsRequest) GetRoleId() int32 {
@@ -8314,7 +9457,7 @@ type GetRbacRoleGroupsResponse struct {
 
 func (x *GetRbacRoleGroupsResponse) Reset() {
 	*x = GetRbacRoleGroupsResponse{}
-	mi := &file_sickrock_proto_msgTypes[153]
+	mi := &file_sickrock_proto_msgTypes[171]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8326,7 +9469,7 @@ func (x *GetRbacRoleGroupsResponse) String() string {
 func (*GetRbacRoleGroupsResponse) ProtoMessage() {}
 
 func (x *GetRbacRoleGroupsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[153]
+	mi := &file_sickrock_proto_msgTypes[171]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8339,7 +9482,7 @@ func (x *GetRbacRoleGroupsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRbacRoleGroupsResponse.ProtoReflect.Descriptor instead.
 func (*GetRbacRoleGroupsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{153}
+	return file_sickrock_proto_rawDescGZIP(), []int{171}
 }
 
 func (x *GetRbacRoleGroupsResponse) GetGroupNames() []string {
@@ -8357,7 +9500,7 @@ type GetMyPermissionsAuditRequest struct {
 
 func (x *GetMyPermissionsAuditRequest) Reset() {
 	*x = GetMyPermissionsAuditRequest{}
-	mi := &file_sickrock_proto_msgTypes[154]
+	mi := &file_sickrock_proto_msgTypes[172]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8369,7 +9512,7 @@ func (x *GetMyPermissionsAuditRequest) String() string {
 func (*GetMyPermissionsAuditRequest) ProtoMessage() {}
 
 func (x *GetMyPermissionsAuditRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[154]
+	mi := &file_sickrock_proto_msgTypes[172]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8382,7 +9525,7 @@ func (x *GetMyPermissionsAuditRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyPermissionsAuditRequest.ProtoReflect.Descriptor instead.
 func (*GetMyPermissionsAuditRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{154}
+	return file_sickrock_proto_rawDescGZIP(), []int{172}
 }
 
 type GetMyPermissionsAuditResponse struct {
@@ -8397,7 +9540,7 @@ type GetMyPermissionsAuditResponse struct {
 
 func (x *GetMyPermissionsAuditResponse) Reset() {
 	*x = GetMyPermissionsAuditResponse{}
-	mi := &file_sickrock_proto_msgTypes[155]
+	mi := &file_sickrock_proto_msgTypes[173]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8409,7 +9552,7 @@ func (x *GetMyPermissionsAuditResponse) String() string {
 func (*GetMyPermissionsAuditResponse) ProtoMessage() {}
 
 func (x *GetMyPermissionsAuditResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[155]
+	mi := &file_sickrock_proto_msgTypes[173]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8422,7 +9565,7 @@ func (x *GetMyPermissionsAuditResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetMyPermissionsAuditResponse.ProtoReflect.Descriptor instead.
 func (*GetMyPermissionsAuditResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{155}
+	return file_sickrock_proto_rawDescGZIP(), []int{173}
 }
 
 func (x *GetMyPermissionsAuditResponse) GetGroupNames() []string {
@@ -8461,7 +9604,7 @@ type ListUserGroupsRequest struct {
 
 func (x *ListUserGroupsRequest) Reset() {
 	*x = ListUserGroupsRequest{}
-	mi := &file_sickrock_proto_msgTypes[156]
+	mi := &file_sickrock_proto_msgTypes[174]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8473,7 +9616,7 @@ func (x *ListUserGroupsRequest) String() string {
 func (*ListUserGroupsRequest) ProtoMessage() {}
 
 func (x *ListUserGroupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[156]
+	mi := &file_sickrock_proto_msgTypes[174]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8486,7 +9629,7 @@ func (x *ListUserGroupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUserGroupsRequest.ProtoReflect.Descriptor instead.
 func (*ListUserGroupsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{156}
+	return file_sickrock_proto_rawDescGZIP(), []int{174}
 }
 
 type ListUserGroupsResponse struct {
@@ -8498,7 +9641,7 @@ type ListUserGroupsResponse struct {
 
 func (x *ListUserGroupsResponse) Reset() {
 	*x = ListUserGroupsResponse{}
-	mi := &file_sickrock_proto_msgTypes[157]
+	mi := &file_sickrock_proto_msgTypes[175]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8510,7 +9653,7 @@ func (x *ListUserGroupsResponse) String() string {
 func (*ListUserGroupsResponse) ProtoMessage() {}
 
 func (x *ListUserGroupsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[157]
+	mi := &file_sickrock_proto_msgTypes[175]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8523,7 +9666,7 @@ func (x *ListUserGroupsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListUserGroupsResponse.ProtoReflect.Descriptor instead.
 func (*ListUserGroupsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{157}
+	return file_sickrock_proto_rawDescGZIP(), []int{175}
 }
 
 func (x *ListUserGroupsResponse) GetGroups() []*UserGroup {
@@ -8542,7 +9685,7 @@ type CreateUserGroupRequest struct {
 
 func (x *CreateUserGroupRequest) Reset() {
 	*x = CreateUserGroupRequest{}
-	mi := &file_sickrock_proto_msgTypes[158]
+	mi := &file_sickrock_proto_msgTypes[176]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8554,7 +9697,7 @@ func (x *CreateUserGroupRequest) String() string {
 func (*CreateUserGroupRequest) ProtoMessage() {}
 
 func (x *CreateUserGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[158]
+	mi := &file_sickrock_proto_msgTypes[176]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8567,7 +9710,7 @@ func (x *CreateUserGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserGroupRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserGroupRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{158}
+	return file_sickrock_proto_rawDescGZIP(), []int{176}
 }
 
 func (x *CreateUserGroupRequest) GetName() string {
@@ -8586,7 +9729,7 @@ type CreateUserGroupResponse struct {
 
 func (x *CreateUserGroupResponse) Reset() {
 	*x = CreateUserGroupResponse{}
-	mi := &file_sickrock_proto_msgTypes[159]
+	mi := &file_sickrock_proto_msgTypes[177]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8598,7 +9741,7 @@ func (x *CreateUserGroupResponse) String() string {
 func (*CreateUserGroupResponse) ProtoMessage() {}
 
 func (x *CreateUserGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[159]
+	mi := &file_sickrock_proto_msgTypes[177]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8611,7 +9754,7 @@ func (x *CreateUserGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserGroupResponse.ProtoReflect.Descriptor instead.
 func (*CreateUserGroupResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{159}
+	return file_sickrock_proto_rawDescGZIP(), []int{177}
 }
 
 func (x *CreateUserGroupResponse) GetGroup() *UserGroup {
@@ -8630,7 +9773,7 @@ type DeleteUserGroupRequest struct {
 
 func (x *DeleteUserGroupRequest) Reset() {
 	*x = DeleteUserGroupRequest{}
-	mi := &file_sickrock_proto_msgTypes[160]
+	mi := &file_sickrock_proto_msgTypes[178]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8642,7 +9785,7 @@ func (x *DeleteUserGroupRequest) String() string {
 func (*DeleteUserGroupRequest) ProtoMessage() {}
 
 func (x *DeleteUserGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[160]
+	mi := &file_sickrock_proto_msgTypes[178]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8655,7 +9798,7 @@ func (x *DeleteUserGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserGroupRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserGroupRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{160}
+	return file_sickrock_proto_rawDescGZIP(), []int{178}
 }
 
 func (x *DeleteUserGroupRequest) GetGroupId() int32 {
@@ -8674,7 +9817,7 @@ type DeleteUserGroupResponse struct {
 
 func (x *DeleteUserGroupResponse) Reset() {
 	*x = DeleteUserGroupResponse{}
-	mi := &file_sickrock_proto_msgTypes[161]
+	mi := &file_sickrock_proto_msgTypes[179]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8686,7 +9829,7 @@ func (x *DeleteUserGroupResponse) String() string {
 func (*DeleteUserGroupResponse) ProtoMessage() {}
 
 func (x *DeleteUserGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[161]
+	mi := &file_sickrock_proto_msgTypes[179]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8699,7 +9842,7 @@ func (x *DeleteUserGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserGroupResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserGroupResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{161}
+	return file_sickrock_proto_rawDescGZIP(), []int{179}
 }
 
 func (x *DeleteUserGroupResponse) GetSuccess() bool {
@@ -8718,7 +9861,7 @@ type GetUserGroupMembersRequest struct {
 
 func (x *GetUserGroupMembersRequest) Reset() {
 	*x = GetUserGroupMembersRequest{}
-	mi := &file_sickrock_proto_msgTypes[162]
+	mi := &file_sickrock_proto_msgTypes[180]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8730,7 +9873,7 @@ func (x *GetUserGroupMembersRequest) String() string {
 func (*GetUserGroupMembersRequest) ProtoMessage() {}
 
 func (x *GetUserGroupMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[162]
+	mi := &file_sickrock_proto_msgTypes[180]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8743,7 +9886,7 @@ func (x *GetUserGroupMembersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserGroupMembersRequest.ProtoReflect.Descriptor instead.
 func (*GetUserGroupMembersRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{162}
+	return file_sickrock_proto_rawDescGZIP(), []int{180}
 }
 
 func (x *GetUserGroupMembersRequest) GetGroupId() int32 {
@@ -8762,7 +9905,7 @@ type GetUserGroupMembersResponse struct {
 
 func (x *GetUserGroupMembersResponse) Reset() {
 	*x = GetUserGroupMembersResponse{}
-	mi := &file_sickrock_proto_msgTypes[163]
+	mi := &file_sickrock_proto_msgTypes[181]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8774,7 +9917,7 @@ func (x *GetUserGroupMembersResponse) String() string {
 func (*GetUserGroupMembersResponse) ProtoMessage() {}
 
 func (x *GetUserGroupMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[163]
+	mi := &file_sickrock_proto_msgTypes[181]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8787,7 +9930,7 @@ func (x *GetUserGroupMembersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserGroupMembersResponse.ProtoReflect.Descriptor instead.
 func (*GetUserGroupMembersResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{163}
+	return file_sickrock_proto_rawDescGZIP(), []int{181}
 }
 
 func (x *GetUserGroupMembersResponse) GetUserIds() []int32 {
@@ -8807,7 +9950,7 @@ type SetUserGroupMembersRequest struct {
 
 func (x *SetUserGroupMembersRequest) Reset() {
 	*x = SetUserGroupMembersRequest{}
-	mi := &file_sickrock_proto_msgTypes[164]
+	mi := &file_sickrock_proto_msgTypes[182]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8819,7 +9962,7 @@ func (x *SetUserGroupMembersRequest) String() string {
 func (*SetUserGroupMembersRequest) ProtoMessage() {}
 
 func (x *SetUserGroupMembersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[164]
+	mi := &file_sickrock_proto_msgTypes[182]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8832,7 +9975,7 @@ func (x *SetUserGroupMembersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserGroupMembersRequest.ProtoReflect.Descriptor instead.
 func (*SetUserGroupMembersRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{164}
+	return file_sickrock_proto_rawDescGZIP(), []int{182}
 }
 
 func (x *SetUserGroupMembersRequest) GetGroupId() int32 {
@@ -8858,7 +10001,7 @@ type SetUserGroupMembersResponse struct {
 
 func (x *SetUserGroupMembersResponse) Reset() {
 	*x = SetUserGroupMembersResponse{}
-	mi := &file_sickrock_proto_msgTypes[165]
+	mi := &file_sickrock_proto_msgTypes[183]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8870,7 +10013,7 @@ func (x *SetUserGroupMembersResponse) String() string {
 func (*SetUserGroupMembersResponse) ProtoMessage() {}
 
 func (x *SetUserGroupMembersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[165]
+	mi := &file_sickrock_proto_msgTypes[183]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8883,7 +10026,7 @@ func (x *SetUserGroupMembersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetUserGroupMembersResponse.ProtoReflect.Descriptor instead.
 func (*SetUserGroupMembersResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{165}
+	return file_sickrock_proto_rawDescGZIP(), []int{183}
 }
 
 func (x *SetUserGroupMembersResponse) GetSuccess() bool {
@@ -8902,7 +10045,7 @@ type GenerateDeviceCodeRequest struct {
 
 func (x *GenerateDeviceCodeRequest) Reset() {
 	*x = GenerateDeviceCodeRequest{}
-	mi := &file_sickrock_proto_msgTypes[166]
+	mi := &file_sickrock_proto_msgTypes[184]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8914,7 +10057,7 @@ func (x *GenerateDeviceCodeRequest) String() string {
 func (*GenerateDeviceCodeRequest) ProtoMessage() {}
 
 func (x *GenerateDeviceCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[166]
+	mi := &file_sickrock_proto_msgTypes[184]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8927,7 +10070,7 @@ func (x *GenerateDeviceCodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateDeviceCodeRequest.ProtoReflect.Descriptor instead.
 func (*GenerateDeviceCodeRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{166}
+	return file_sickrock_proto_rawDescGZIP(), []int{184}
 }
 
 type GenerateDeviceCodeResponse struct {
@@ -8940,7 +10083,7 @@ type GenerateDeviceCodeResponse struct {
 
 func (x *GenerateDeviceCodeResponse) Reset() {
 	*x = GenerateDeviceCodeResponse{}
-	mi := &file_sickrock_proto_msgTypes[167]
+	mi := &file_sickrock_proto_msgTypes[185]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8952,7 +10095,7 @@ func (x *GenerateDeviceCodeResponse) String() string {
 func (*GenerateDeviceCodeResponse) ProtoMessage() {}
 
 func (x *GenerateDeviceCodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[167]
+	mi := &file_sickrock_proto_msgTypes[185]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8965,7 +10108,7 @@ func (x *GenerateDeviceCodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateDeviceCodeResponse.ProtoReflect.Descriptor instead.
 func (*GenerateDeviceCodeResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{167}
+	return file_sickrock_proto_rawDescGZIP(), []int{185}
 }
 
 func (x *GenerateDeviceCodeResponse) GetCode() string {
@@ -8991,7 +10134,7 @@ type ClaimDeviceCodeRequest struct {
 
 func (x *ClaimDeviceCodeRequest) Reset() {
 	*x = ClaimDeviceCodeRequest{}
-	mi := &file_sickrock_proto_msgTypes[168]
+	mi := &file_sickrock_proto_msgTypes[186]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9003,7 +10146,7 @@ func (x *ClaimDeviceCodeRequest) String() string {
 func (*ClaimDeviceCodeRequest) ProtoMessage() {}
 
 func (x *ClaimDeviceCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[168]
+	mi := &file_sickrock_proto_msgTypes[186]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9016,7 +10159,7 @@ func (x *ClaimDeviceCodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimDeviceCodeRequest.ProtoReflect.Descriptor instead.
 func (*ClaimDeviceCodeRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{168}
+	return file_sickrock_proto_rawDescGZIP(), []int{186}
 }
 
 func (x *ClaimDeviceCodeRequest) GetCode() string {
@@ -9038,7 +10181,7 @@ type ClaimDeviceCodeResponse struct {
 
 func (x *ClaimDeviceCodeResponse) Reset() {
 	*x = ClaimDeviceCodeResponse{}
-	mi := &file_sickrock_proto_msgTypes[169]
+	mi := &file_sickrock_proto_msgTypes[187]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9050,7 +10193,7 @@ func (x *ClaimDeviceCodeResponse) String() string {
 func (*ClaimDeviceCodeResponse) ProtoMessage() {}
 
 func (x *ClaimDeviceCodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[169]
+	mi := &file_sickrock_proto_msgTypes[187]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9063,7 +10206,7 @@ func (x *ClaimDeviceCodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClaimDeviceCodeResponse.ProtoReflect.Descriptor instead.
 func (*ClaimDeviceCodeResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{169}
+	return file_sickrock_proto_rawDescGZIP(), []int{187}
 }
 
 func (x *ClaimDeviceCodeResponse) GetSuccess() bool {
@@ -9103,7 +10246,7 @@ type CheckDeviceCodeRequest struct {
 
 func (x *CheckDeviceCodeRequest) Reset() {
 	*x = CheckDeviceCodeRequest{}
-	mi := &file_sickrock_proto_msgTypes[170]
+	mi := &file_sickrock_proto_msgTypes[188]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9115,7 +10258,7 @@ func (x *CheckDeviceCodeRequest) String() string {
 func (*CheckDeviceCodeRequest) ProtoMessage() {}
 
 func (x *CheckDeviceCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[170]
+	mi := &file_sickrock_proto_msgTypes[188]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9128,7 +10271,7 @@ func (x *CheckDeviceCodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckDeviceCodeRequest.ProtoReflect.Descriptor instead.
 func (*CheckDeviceCodeRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{170}
+	return file_sickrock_proto_rawDescGZIP(), []int{188}
 }
 
 func (x *CheckDeviceCodeRequest) GetCode() string {
@@ -9151,7 +10294,7 @@ type CheckDeviceCodeResponse struct {
 
 func (x *CheckDeviceCodeResponse) Reset() {
 	*x = CheckDeviceCodeResponse{}
-	mi := &file_sickrock_proto_msgTypes[171]
+	mi := &file_sickrock_proto_msgTypes[189]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9163,7 +10306,7 @@ func (x *CheckDeviceCodeResponse) String() string {
 func (*CheckDeviceCodeResponse) ProtoMessage() {}
 
 func (x *CheckDeviceCodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[171]
+	mi := &file_sickrock_proto_msgTypes[189]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9176,7 +10319,7 @@ func (x *CheckDeviceCodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CheckDeviceCodeResponse.ProtoReflect.Descriptor instead.
 func (*CheckDeviceCodeResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{171}
+	return file_sickrock_proto_rawDescGZIP(), []int{189}
 }
 
 func (x *CheckDeviceCodeResponse) GetValid() bool {
@@ -9223,7 +10366,7 @@ type GetDeviceCodeSessionRequest struct {
 
 func (x *GetDeviceCodeSessionRequest) Reset() {
 	*x = GetDeviceCodeSessionRequest{}
-	mi := &file_sickrock_proto_msgTypes[172]
+	mi := &file_sickrock_proto_msgTypes[190]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9235,7 +10378,7 @@ func (x *GetDeviceCodeSessionRequest) String() string {
 func (*GetDeviceCodeSessionRequest) ProtoMessage() {}
 
 func (x *GetDeviceCodeSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[172]
+	mi := &file_sickrock_proto_msgTypes[190]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9248,7 +10391,7 @@ func (x *GetDeviceCodeSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceCodeSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetDeviceCodeSessionRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{172}
+	return file_sickrock_proto_rawDescGZIP(), []int{190}
 }
 
 func (x *GetDeviceCodeSessionRequest) GetCode() string {
@@ -9271,7 +10414,7 @@ type GetDeviceCodeSessionResponse struct {
 
 func (x *GetDeviceCodeSessionResponse) Reset() {
 	*x = GetDeviceCodeSessionResponse{}
-	mi := &file_sickrock_proto_msgTypes[173]
+	mi := &file_sickrock_proto_msgTypes[191]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9283,7 +10426,7 @@ func (x *GetDeviceCodeSessionResponse) String() string {
 func (*GetDeviceCodeSessionResponse) ProtoMessage() {}
 
 func (x *GetDeviceCodeSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[173]
+	mi := &file_sickrock_proto_msgTypes[191]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9296,7 +10439,7 @@ func (x *GetDeviceCodeSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDeviceCodeSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetDeviceCodeSessionResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{173}
+	return file_sickrock_proto_rawDescGZIP(), []int{191}
 }
 
 func (x *GetDeviceCodeSessionResponse) GetSuccess() bool {
@@ -9343,7 +10486,7 @@ type GetSystemInfoRequest struct {
 
 func (x *GetSystemInfoRequest) Reset() {
 	*x = GetSystemInfoRequest{}
-	mi := &file_sickrock_proto_msgTypes[174]
+	mi := &file_sickrock_proto_msgTypes[192]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9355,7 +10498,7 @@ func (x *GetSystemInfoRequest) String() string {
 func (*GetSystemInfoRequest) ProtoMessage() {}
 
 func (x *GetSystemInfoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[174]
+	mi := &file_sickrock_proto_msgTypes[192]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9368,7 +10511,7 @@ func (x *GetSystemInfoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSystemInfoRequest.ProtoReflect.Descriptor instead.
 func (*GetSystemInfoRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{174}
+	return file_sickrock_proto_rawDescGZIP(), []int{192}
 }
 
 type GetSystemInfoResponse struct {
@@ -9380,7 +10523,7 @@ type GetSystemInfoResponse struct {
 
 func (x *GetSystemInfoResponse) Reset() {
 	*x = GetSystemInfoResponse{}
-	mi := &file_sickrock_proto_msgTypes[175]
+	mi := &file_sickrock_proto_msgTypes[193]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9392,7 +10535,7 @@ func (x *GetSystemInfoResponse) String() string {
 func (*GetSystemInfoResponse) ProtoMessage() {}
 
 func (x *GetSystemInfoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[175]
+	mi := &file_sickrock_proto_msgTypes[193]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9405,7 +10548,7 @@ func (x *GetSystemInfoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSystemInfoResponse.ProtoReflect.Descriptor instead.
 func (*GetSystemInfoResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{175}
+	return file_sickrock_proto_rawDescGZIP(), []int{193}
 }
 
 func (x *GetSystemInfoResponse) GetApproxTotalRows() int64 {
@@ -9424,7 +10567,7 @@ type GetUserBookmarksRequest struct {
 
 func (x *GetUserBookmarksRequest) Reset() {
 	*x = GetUserBookmarksRequest{}
-	mi := &file_sickrock_proto_msgTypes[176]
+	mi := &file_sickrock_proto_msgTypes[194]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9436,7 +10579,7 @@ func (x *GetUserBookmarksRequest) String() string {
 func (*GetUserBookmarksRequest) ProtoMessage() {}
 
 func (x *GetUserBookmarksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[176]
+	mi := &file_sickrock_proto_msgTypes[194]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9449,7 +10592,7 @@ func (x *GetUserBookmarksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserBookmarksRequest.ProtoReflect.Descriptor instead.
 func (*GetUserBookmarksRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{176}
+	return file_sickrock_proto_rawDescGZIP(), []int{194}
 }
 
 type GetUserBookmarksResponse struct {
@@ -9461,7 +10604,7 @@ type GetUserBookmarksResponse struct {
 
 func (x *GetUserBookmarksResponse) Reset() {
 	*x = GetUserBookmarksResponse{}
-	mi := &file_sickrock_proto_msgTypes[177]
+	mi := &file_sickrock_proto_msgTypes[195]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9473,7 +10616,7 @@ func (x *GetUserBookmarksResponse) String() string {
 func (*GetUserBookmarksResponse) ProtoMessage() {}
 
 func (x *GetUserBookmarksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[177]
+	mi := &file_sickrock_proto_msgTypes[195]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9486,7 +10629,7 @@ func (x *GetUserBookmarksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetUserBookmarksResponse.ProtoReflect.Descriptor instead.
 func (*GetUserBookmarksResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{177}
+	return file_sickrock_proto_rawDescGZIP(), []int{195}
 }
 
 func (x *GetUserBookmarksResponse) GetBookmarks() []*UserBookmark {
@@ -9505,7 +10648,7 @@ type CreateUserBookmarkRequest struct {
 
 func (x *CreateUserBookmarkRequest) Reset() {
 	*x = CreateUserBookmarkRequest{}
-	mi := &file_sickrock_proto_msgTypes[178]
+	mi := &file_sickrock_proto_msgTypes[196]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9517,7 +10660,7 @@ func (x *CreateUserBookmarkRequest) String() string {
 func (*CreateUserBookmarkRequest) ProtoMessage() {}
 
 func (x *CreateUserBookmarkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[178]
+	mi := &file_sickrock_proto_msgTypes[196]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9530,7 +10673,7 @@ func (x *CreateUserBookmarkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserBookmarkRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserBookmarkRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{178}
+	return file_sickrock_proto_rawDescGZIP(), []int{196}
 }
 
 func (x *CreateUserBookmarkRequest) GetNavigationItemId() int32 {
@@ -9549,7 +10692,7 @@ type CreateUserBookmarkResponse struct {
 
 func (x *CreateUserBookmarkResponse) Reset() {
 	*x = CreateUserBookmarkResponse{}
-	mi := &file_sickrock_proto_msgTypes[179]
+	mi := &file_sickrock_proto_msgTypes[197]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9561,7 +10704,7 @@ func (x *CreateUserBookmarkResponse) String() string {
 func (*CreateUserBookmarkResponse) ProtoMessage() {}
 
 func (x *CreateUserBookmarkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[179]
+	mi := &file_sickrock_proto_msgTypes[197]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9574,7 +10717,7 @@ func (x *CreateUserBookmarkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateUserBookmarkResponse.ProtoReflect.Descriptor instead.
 func (*CreateUserBookmarkResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{179}
+	return file_sickrock_proto_rawDescGZIP(), []int{197}
 }
 
 func (x *CreateUserBookmarkResponse) GetBookmark() *UserBookmark {
@@ -9593,7 +10736,7 @@ type DeleteUserBookmarkRequest struct {
 
 func (x *DeleteUserBookmarkRequest) Reset() {
 	*x = DeleteUserBookmarkRequest{}
-	mi := &file_sickrock_proto_msgTypes[180]
+	mi := &file_sickrock_proto_msgTypes[198]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9605,7 +10748,7 @@ func (x *DeleteUserBookmarkRequest) String() string {
 func (*DeleteUserBookmarkRequest) ProtoMessage() {}
 
 func (x *DeleteUserBookmarkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[180]
+	mi := &file_sickrock_proto_msgTypes[198]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9618,7 +10761,7 @@ func (x *DeleteUserBookmarkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserBookmarkRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserBookmarkRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{180}
+	return file_sickrock_proto_rawDescGZIP(), []int{198}
 }
 
 func (x *DeleteUserBookmarkRequest) GetBookmarkId() int32 {
@@ -9637,7 +10780,7 @@ type DeleteUserBookmarkResponse struct {
 
 func (x *DeleteUserBookmarkResponse) Reset() {
 	*x = DeleteUserBookmarkResponse{}
-	mi := &file_sickrock_proto_msgTypes[181]
+	mi := &file_sickrock_proto_msgTypes[199]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9649,7 +10792,7 @@ func (x *DeleteUserBookmarkResponse) String() string {
 func (*DeleteUserBookmarkResponse) ProtoMessage() {}
 
 func (x *DeleteUserBookmarkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[181]
+	mi := &file_sickrock_proto_msgTypes[199]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9662,7 +10805,7 @@ func (x *DeleteUserBookmarkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteUserBookmarkResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserBookmarkResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{181}
+	return file_sickrock_proto_rawDescGZIP(), []int{199}
 }
 
 func (x *DeleteUserBookmarkResponse) GetDeleted() bool {
@@ -9685,7 +10828,7 @@ type UserBookmark struct {
 
 func (x *UserBookmark) Reset() {
 	*x = UserBookmark{}
-	mi := &file_sickrock_proto_msgTypes[182]
+	mi := &file_sickrock_proto_msgTypes[200]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9697,7 +10840,7 @@ func (x *UserBookmark) String() string {
 func (*UserBookmark) ProtoMessage() {}
 
 func (x *UserBookmark) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[182]
+	mi := &file_sickrock_proto_msgTypes[200]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9710,7 +10853,7 @@ func (x *UserBookmark) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserBookmark.ProtoReflect.Descriptor instead.
 func (*UserBookmark) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{182}
+	return file_sickrock_proto_rawDescGZIP(), []int{200}
 }
 
 func (x *UserBookmark) GetId() int32 {
@@ -9760,7 +10903,7 @@ type CreateAPIKeyRequest struct {
 
 func (x *CreateAPIKeyRequest) Reset() {
 	*x = CreateAPIKeyRequest{}
-	mi := &file_sickrock_proto_msgTypes[183]
+	mi := &file_sickrock_proto_msgTypes[201]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9772,7 +10915,7 @@ func (x *CreateAPIKeyRequest) String() string {
 func (*CreateAPIKeyRequest) ProtoMessage() {}
 
 func (x *CreateAPIKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[183]
+	mi := &file_sickrock_proto_msgTypes[201]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9785,7 +10928,7 @@ func (x *CreateAPIKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAPIKeyRequest.ProtoReflect.Descriptor instead.
 func (*CreateAPIKeyRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{183}
+	return file_sickrock_proto_rawDescGZIP(), []int{201}
 }
 
 func (x *CreateAPIKeyRequest) GetName() string {
@@ -9821,7 +10964,7 @@ type CreateAPIKeyResponse struct {
 
 func (x *CreateAPIKeyResponse) Reset() {
 	*x = CreateAPIKeyResponse{}
-	mi := &file_sickrock_proto_msgTypes[184]
+	mi := &file_sickrock_proto_msgTypes[202]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9833,7 +10976,7 @@ func (x *CreateAPIKeyResponse) String() string {
 func (*CreateAPIKeyResponse) ProtoMessage() {}
 
 func (x *CreateAPIKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[184]
+	mi := &file_sickrock_proto_msgTypes[202]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9846,7 +10989,7 @@ func (x *CreateAPIKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAPIKeyResponse.ProtoReflect.Descriptor instead.
 func (*CreateAPIKeyResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{184}
+	return file_sickrock_proto_rawDescGZIP(), []int{202}
 }
 
 func (x *CreateAPIKeyResponse) GetSuccess() bool {
@@ -9885,7 +11028,7 @@ type GetAPIKeysRequest struct {
 
 func (x *GetAPIKeysRequest) Reset() {
 	*x = GetAPIKeysRequest{}
-	mi := &file_sickrock_proto_msgTypes[185]
+	mi := &file_sickrock_proto_msgTypes[203]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9897,7 +11040,7 @@ func (x *GetAPIKeysRequest) String() string {
 func (*GetAPIKeysRequest) ProtoMessage() {}
 
 func (x *GetAPIKeysRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[185]
+	mi := &file_sickrock_proto_msgTypes[203]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9910,7 +11053,7 @@ func (x *GetAPIKeysRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAPIKeysRequest.ProtoReflect.Descriptor instead.
 func (*GetAPIKeysRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{185}
+	return file_sickrock_proto_rawDescGZIP(), []int{203}
 }
 
 type GetAPIKeysResponse struct {
@@ -9922,7 +11065,7 @@ type GetAPIKeysResponse struct {
 
 func (x *GetAPIKeysResponse) Reset() {
 	*x = GetAPIKeysResponse{}
-	mi := &file_sickrock_proto_msgTypes[186]
+	mi := &file_sickrock_proto_msgTypes[204]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9934,7 +11077,7 @@ func (x *GetAPIKeysResponse) String() string {
 func (*GetAPIKeysResponse) ProtoMessage() {}
 
 func (x *GetAPIKeysResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[186]
+	mi := &file_sickrock_proto_msgTypes[204]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9947,7 +11090,7 @@ func (x *GetAPIKeysResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAPIKeysResponse.ProtoReflect.Descriptor instead.
 func (*GetAPIKeysResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{186}
+	return file_sickrock_proto_rawDescGZIP(), []int{204}
 }
 
 func (x *GetAPIKeysResponse) GetApiKeys() []*APIKey {
@@ -9969,7 +11112,7 @@ type UpdateAPIKeyRequest struct {
 
 func (x *UpdateAPIKeyRequest) Reset() {
 	*x = UpdateAPIKeyRequest{}
-	mi := &file_sickrock_proto_msgTypes[187]
+	mi := &file_sickrock_proto_msgTypes[205]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9981,7 +11124,7 @@ func (x *UpdateAPIKeyRequest) String() string {
 func (*UpdateAPIKeyRequest) ProtoMessage() {}
 
 func (x *UpdateAPIKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[187]
+	mi := &file_sickrock_proto_msgTypes[205]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9994,7 +11137,7 @@ func (x *UpdateAPIKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAPIKeyRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAPIKeyRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{187}
+	return file_sickrock_proto_rawDescGZIP(), []int{205}
 }
 
 func (x *UpdateAPIKeyRequest) GetApiKeyId() int32 {
@@ -10035,7 +11178,7 @@ type UpdateAPIKeyResponse struct {
 
 func (x *UpdateAPIKeyResponse) Reset() {
 	*x = UpdateAPIKeyResponse{}
-	mi := &file_sickrock_proto_msgTypes[188]
+	mi := &file_sickrock_proto_msgTypes[206]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10047,7 +11190,7 @@ func (x *UpdateAPIKeyResponse) String() string {
 func (*UpdateAPIKeyResponse) ProtoMessage() {}
 
 func (x *UpdateAPIKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[188]
+	mi := &file_sickrock_proto_msgTypes[206]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10060,7 +11203,7 @@ func (x *UpdateAPIKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAPIKeyResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAPIKeyResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{188}
+	return file_sickrock_proto_rawDescGZIP(), []int{206}
 }
 
 func (x *UpdateAPIKeyResponse) GetSuccess() bool {
@@ -10086,7 +11229,7 @@ type DeleteAPIKeyRequest struct {
 
 func (x *DeleteAPIKeyRequest) Reset() {
 	*x = DeleteAPIKeyRequest{}
-	mi := &file_sickrock_proto_msgTypes[189]
+	mi := &file_sickrock_proto_msgTypes[207]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10098,7 +11241,7 @@ func (x *DeleteAPIKeyRequest) String() string {
 func (*DeleteAPIKeyRequest) ProtoMessage() {}
 
 func (x *DeleteAPIKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[189]
+	mi := &file_sickrock_proto_msgTypes[207]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10111,7 +11254,7 @@ func (x *DeleteAPIKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAPIKeyRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAPIKeyRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{189}
+	return file_sickrock_proto_rawDescGZIP(), []int{207}
 }
 
 func (x *DeleteAPIKeyRequest) GetApiKeyId() int32 {
@@ -10131,7 +11274,7 @@ type DeleteAPIKeyResponse struct {
 
 func (x *DeleteAPIKeyResponse) Reset() {
 	*x = DeleteAPIKeyResponse{}
-	mi := &file_sickrock_proto_msgTypes[190]
+	mi := &file_sickrock_proto_msgTypes[208]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10143,7 +11286,7 @@ func (x *DeleteAPIKeyResponse) String() string {
 func (*DeleteAPIKeyResponse) ProtoMessage() {}
 
 func (x *DeleteAPIKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[190]
+	mi := &file_sickrock_proto_msgTypes[208]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10156,7 +11299,7 @@ func (x *DeleteAPIKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAPIKeyResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAPIKeyResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{190}
+	return file_sickrock_proto_rawDescGZIP(), []int{208}
 }
 
 func (x *DeleteAPIKeyResponse) GetSuccess() bool {
@@ -10182,7 +11325,7 @@ type DeactivateAPIKeyRequest struct {
 
 func (x *DeactivateAPIKeyRequest) Reset() {
 	*x = DeactivateAPIKeyRequest{}
-	mi := &file_sickrock_proto_msgTypes[191]
+	mi := &file_sickrock_proto_msgTypes[209]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10194,7 +11337,7 @@ func (x *DeactivateAPIKeyRequest) String() string {
 func (*DeactivateAPIKeyRequest) ProtoMessage() {}
 
 func (x *DeactivateAPIKeyRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[191]
+	mi := &file_sickrock_proto_msgTypes[209]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10207,7 +11350,7 @@ func (x *DeactivateAPIKeyRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeactivateAPIKeyRequest.ProtoReflect.Descriptor instead.
 func (*DeactivateAPIKeyRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{191}
+	return file_sickrock_proto_rawDescGZIP(), []int{209}
 }
 
 func (x *DeactivateAPIKeyRequest) GetApiKeyId() int32 {
@@ -10227,7 +11370,7 @@ type DeactivateAPIKeyResponse struct {
 
 func (x *DeactivateAPIKeyResponse) Reset() {
 	*x = DeactivateAPIKeyResponse{}
-	mi := &file_sickrock_proto_msgTypes[192]
+	mi := &file_sickrock_proto_msgTypes[210]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10239,7 +11382,7 @@ func (x *DeactivateAPIKeyResponse) String() string {
 func (*DeactivateAPIKeyResponse) ProtoMessage() {}
 
 func (x *DeactivateAPIKeyResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[192]
+	mi := &file_sickrock_proto_msgTypes[210]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10252,7 +11395,7 @@ func (x *DeactivateAPIKeyResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeactivateAPIKeyResponse.ProtoReflect.Descriptor instead.
 func (*DeactivateAPIKeyResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{192}
+	return file_sickrock_proto_rawDescGZIP(), []int{210}
 }
 
 func (x *DeactivateAPIKeyResponse) GetSuccess() bool {
@@ -10285,7 +11428,7 @@ type APIKey struct {
 
 func (x *APIKey) Reset() {
 	*x = APIKey{}
-	mi := &file_sickrock_proto_msgTypes[193]
+	mi := &file_sickrock_proto_msgTypes[211]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10297,7 +11440,7 @@ func (x *APIKey) String() string {
 func (*APIKey) ProtoMessage() {}
 
 func (x *APIKey) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[193]
+	mi := &file_sickrock_proto_msgTypes[211]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10310,7 +11453,7 @@ func (x *APIKey) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use APIKey.ProtoReflect.Descriptor instead.
 func (*APIKey) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{193}
+	return file_sickrock_proto_rawDescGZIP(), []int{211}
 }
 
 func (x *APIKey) GetId() int32 {
@@ -10389,7 +11532,7 @@ type ConditionalFormattingRule struct {
 
 func (x *ConditionalFormattingRule) Reset() {
 	*x = ConditionalFormattingRule{}
-	mi := &file_sickrock_proto_msgTypes[194]
+	mi := &file_sickrock_proto_msgTypes[212]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10401,7 +11544,7 @@ func (x *ConditionalFormattingRule) String() string {
 func (*ConditionalFormattingRule) ProtoMessage() {}
 
 func (x *ConditionalFormattingRule) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[194]
+	mi := &file_sickrock_proto_msgTypes[212]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10414,7 +11557,7 @@ func (x *ConditionalFormattingRule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConditionalFormattingRule.ProtoReflect.Descriptor instead.
 func (*ConditionalFormattingRule) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{194}
+	return file_sickrock_proto_rawDescGZIP(), []int{212}
 }
 
 func (x *ConditionalFormattingRule) GetId() int32 {
@@ -10503,7 +11646,7 @@ type GetConditionalFormattingRulesRequest struct {
 
 func (x *GetConditionalFormattingRulesRequest) Reset() {
 	*x = GetConditionalFormattingRulesRequest{}
-	mi := &file_sickrock_proto_msgTypes[195]
+	mi := &file_sickrock_proto_msgTypes[213]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10515,7 +11658,7 @@ func (x *GetConditionalFormattingRulesRequest) String() string {
 func (*GetConditionalFormattingRulesRequest) ProtoMessage() {}
 
 func (x *GetConditionalFormattingRulesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[195]
+	mi := &file_sickrock_proto_msgTypes[213]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10528,7 +11671,7 @@ func (x *GetConditionalFormattingRulesRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use GetConditionalFormattingRulesRequest.ProtoReflect.Descriptor instead.
 func (*GetConditionalFormattingRulesRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{195}
+	return file_sickrock_proto_rawDescGZIP(), []int{213}
 }
 
 func (x *GetConditionalFormattingRulesRequest) GetTableName() string {
@@ -10547,7 +11690,7 @@ type GetConditionalFormattingRulesResponse struct {
 
 func (x *GetConditionalFormattingRulesResponse) Reset() {
 	*x = GetConditionalFormattingRulesResponse{}
-	mi := &file_sickrock_proto_msgTypes[196]
+	mi := &file_sickrock_proto_msgTypes[214]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10559,7 +11702,7 @@ func (x *GetConditionalFormattingRulesResponse) String() string {
 func (*GetConditionalFormattingRulesResponse) ProtoMessage() {}
 
 func (x *GetConditionalFormattingRulesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[196]
+	mi := &file_sickrock_proto_msgTypes[214]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10572,7 +11715,7 @@ func (x *GetConditionalFormattingRulesResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use GetConditionalFormattingRulesResponse.ProtoReflect.Descriptor instead.
 func (*GetConditionalFormattingRulesResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{196}
+	return file_sickrock_proto_rawDescGZIP(), []int{214}
 }
 
 func (x *GetConditionalFormattingRulesResponse) GetRules() []*ConditionalFormattingRule {
@@ -10597,7 +11740,7 @@ type CreateConditionalFormattingRuleRequest struct {
 
 func (x *CreateConditionalFormattingRuleRequest) Reset() {
 	*x = CreateConditionalFormattingRuleRequest{}
-	mi := &file_sickrock_proto_msgTypes[197]
+	mi := &file_sickrock_proto_msgTypes[215]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10609,7 +11752,7 @@ func (x *CreateConditionalFormattingRuleRequest) String() string {
 func (*CreateConditionalFormattingRuleRequest) ProtoMessage() {}
 
 func (x *CreateConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[197]
+	mi := &file_sickrock_proto_msgTypes[215]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10622,7 +11765,7 @@ func (x *CreateConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use CreateConditionalFormattingRuleRequest.ProtoReflect.Descriptor instead.
 func (*CreateConditionalFormattingRuleRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{197}
+	return file_sickrock_proto_rawDescGZIP(), []int{215}
 }
 
 func (x *CreateConditionalFormattingRuleRequest) GetTableName() string {
@@ -10685,7 +11828,7 @@ type CreateConditionalFormattingRuleResponse struct {
 
 func (x *CreateConditionalFormattingRuleResponse) Reset() {
 	*x = CreateConditionalFormattingRuleResponse{}
-	mi := &file_sickrock_proto_msgTypes[198]
+	mi := &file_sickrock_proto_msgTypes[216]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10697,7 +11840,7 @@ func (x *CreateConditionalFormattingRuleResponse) String() string {
 func (*CreateConditionalFormattingRuleResponse) ProtoMessage() {}
 
 func (x *CreateConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[198]
+	mi := &file_sickrock_proto_msgTypes[216]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10710,7 +11853,7 @@ func (x *CreateConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use CreateConditionalFormattingRuleResponse.ProtoReflect.Descriptor instead.
 func (*CreateConditionalFormattingRuleResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{198}
+	return file_sickrock_proto_rawDescGZIP(), []int{216}
 }
 
 func (x *CreateConditionalFormattingRuleResponse) GetSuccess() bool {
@@ -10743,7 +11886,7 @@ type DeleteConditionalFormattingRuleRequest struct {
 
 func (x *DeleteConditionalFormattingRuleRequest) Reset() {
 	*x = DeleteConditionalFormattingRuleRequest{}
-	mi := &file_sickrock_proto_msgTypes[199]
+	mi := &file_sickrock_proto_msgTypes[217]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10755,7 +11898,7 @@ func (x *DeleteConditionalFormattingRuleRequest) String() string {
 func (*DeleteConditionalFormattingRuleRequest) ProtoMessage() {}
 
 func (x *DeleteConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[199]
+	mi := &file_sickrock_proto_msgTypes[217]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10768,7 +11911,7 @@ func (x *DeleteConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use DeleteConditionalFormattingRuleRequest.ProtoReflect.Descriptor instead.
 func (*DeleteConditionalFormattingRuleRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{199}
+	return file_sickrock_proto_rawDescGZIP(), []int{217}
 }
 
 func (x *DeleteConditionalFormattingRuleRequest) GetRuleId() int32 {
@@ -10788,7 +11931,7 @@ type DeleteConditionalFormattingRuleResponse struct {
 
 func (x *DeleteConditionalFormattingRuleResponse) Reset() {
 	*x = DeleteConditionalFormattingRuleResponse{}
-	mi := &file_sickrock_proto_msgTypes[200]
+	mi := &file_sickrock_proto_msgTypes[218]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10800,7 +11943,7 @@ func (x *DeleteConditionalFormattingRuleResponse) String() string {
 func (*DeleteConditionalFormattingRuleResponse) ProtoMessage() {}
 
 func (x *DeleteConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[200]
+	mi := &file_sickrock_proto_msgTypes[218]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10813,7 +11956,7 @@ func (x *DeleteConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use DeleteConditionalFormattingRuleResponse.ProtoReflect.Descriptor instead.
 func (*DeleteConditionalFormattingRuleResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{200}
+	return file_sickrock_proto_rawDescGZIP(), []int{218}
 }
 
 func (x *DeleteConditionalFormattingRuleResponse) GetSuccess() bool {
@@ -10847,7 +11990,7 @@ type UpdateConditionalFormattingRuleRequest struct {
 
 func (x *UpdateConditionalFormattingRuleRequest) Reset() {
 	*x = UpdateConditionalFormattingRuleRequest{}
-	mi := &file_sickrock_proto_msgTypes[201]
+	mi := &file_sickrock_proto_msgTypes[219]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10859,7 +12002,7 @@ func (x *UpdateConditionalFormattingRuleRequest) String() string {
 func (*UpdateConditionalFormattingRuleRequest) ProtoMessage() {}
 
 func (x *UpdateConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[201]
+	mi := &file_sickrock_proto_msgTypes[219]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10872,7 +12015,7 @@ func (x *UpdateConditionalFormattingRuleRequest) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use UpdateConditionalFormattingRuleRequest.ProtoReflect.Descriptor instead.
 func (*UpdateConditionalFormattingRuleRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{201}
+	return file_sickrock_proto_rawDescGZIP(), []int{219}
 }
 
 func (x *UpdateConditionalFormattingRuleRequest) GetRuleId() int32 {
@@ -10948,7 +12091,7 @@ type UpdateConditionalFormattingRuleResponse struct {
 
 func (x *UpdateConditionalFormattingRuleResponse) Reset() {
 	*x = UpdateConditionalFormattingRuleResponse{}
-	mi := &file_sickrock_proto_msgTypes[202]
+	mi := &file_sickrock_proto_msgTypes[220]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10960,7 +12103,7 @@ func (x *UpdateConditionalFormattingRuleResponse) String() string {
 func (*UpdateConditionalFormattingRuleResponse) ProtoMessage() {}
 
 func (x *UpdateConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[202]
+	mi := &file_sickrock_proto_msgTypes[220]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10973,7 +12116,7 @@ func (x *UpdateConditionalFormattingRuleResponse) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use UpdateConditionalFormattingRuleResponse.ProtoReflect.Descriptor instead.
 func (*UpdateConditionalFormattingRuleResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{202}
+	return file_sickrock_proto_rawDescGZIP(), []int{220}
 }
 
 func (x *UpdateConditionalFormattingRuleResponse) GetSuccess() bool {
@@ -11003,7 +12146,7 @@ type NotificationEvent struct {
 
 func (x *NotificationEvent) Reset() {
 	*x = NotificationEvent{}
-	mi := &file_sickrock_proto_msgTypes[203]
+	mi := &file_sickrock_proto_msgTypes[221]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11015,7 +12158,7 @@ func (x *NotificationEvent) String() string {
 func (*NotificationEvent) ProtoMessage() {}
 
 func (x *NotificationEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[203]
+	mi := &file_sickrock_proto_msgTypes[221]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11028,7 +12171,7 @@ func (x *NotificationEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NotificationEvent.ProtoReflect.Descriptor instead.
 func (*NotificationEvent) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{203}
+	return file_sickrock_proto_rawDescGZIP(), []int{221}
 }
 
 func (x *NotificationEvent) GetId() int32 {
@@ -11075,7 +12218,7 @@ type UserNotificationChannel struct {
 
 func (x *UserNotificationChannel) Reset() {
 	*x = UserNotificationChannel{}
-	mi := &file_sickrock_proto_msgTypes[204]
+	mi := &file_sickrock_proto_msgTypes[222]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11087,7 +12230,7 @@ func (x *UserNotificationChannel) String() string {
 func (*UserNotificationChannel) ProtoMessage() {}
 
 func (x *UserNotificationChannel) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[204]
+	mi := &file_sickrock_proto_msgTypes[222]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11100,7 +12243,7 @@ func (x *UserNotificationChannel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserNotificationChannel.ProtoReflect.Descriptor instead.
 func (*UserNotificationChannel) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{204}
+	return file_sickrock_proto_rawDescGZIP(), []int{222}
 }
 
 func (x *UserNotificationChannel) GetId() int32 {
@@ -11174,7 +12317,7 @@ type UserNotificationSubscription struct {
 
 func (x *UserNotificationSubscription) Reset() {
 	*x = UserNotificationSubscription{}
-	mi := &file_sickrock_proto_msgTypes[205]
+	mi := &file_sickrock_proto_msgTypes[223]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11186,7 +12329,7 @@ func (x *UserNotificationSubscription) String() string {
 func (*UserNotificationSubscription) ProtoMessage() {}
 
 func (x *UserNotificationSubscription) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[205]
+	mi := &file_sickrock_proto_msgTypes[223]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11199,7 +12342,7 @@ func (x *UserNotificationSubscription) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UserNotificationSubscription.ProtoReflect.Descriptor instead.
 func (*UserNotificationSubscription) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{205}
+	return file_sickrock_proto_rawDescGZIP(), []int{223}
 }
 
 func (x *UserNotificationSubscription) GetId() int32 {
@@ -11259,7 +12402,7 @@ type GetNotificationEventsRequest struct {
 
 func (x *GetNotificationEventsRequest) Reset() {
 	*x = GetNotificationEventsRequest{}
-	mi := &file_sickrock_proto_msgTypes[206]
+	mi := &file_sickrock_proto_msgTypes[224]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11271,7 +12414,7 @@ func (x *GetNotificationEventsRequest) String() string {
 func (*GetNotificationEventsRequest) ProtoMessage() {}
 
 func (x *GetNotificationEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[206]
+	mi := &file_sickrock_proto_msgTypes[224]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11284,7 +12427,7 @@ func (x *GetNotificationEventsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNotificationEventsRequest.ProtoReflect.Descriptor instead.
 func (*GetNotificationEventsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{206}
+	return file_sickrock_proto_rawDescGZIP(), []int{224}
 }
 
 type GetNotificationEventsResponse struct {
@@ -11296,7 +12439,7 @@ type GetNotificationEventsResponse struct {
 
 func (x *GetNotificationEventsResponse) Reset() {
 	*x = GetNotificationEventsResponse{}
-	mi := &file_sickrock_proto_msgTypes[207]
+	mi := &file_sickrock_proto_msgTypes[225]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11308,7 +12451,7 @@ func (x *GetNotificationEventsResponse) String() string {
 func (*GetNotificationEventsResponse) ProtoMessage() {}
 
 func (x *GetNotificationEventsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[207]
+	mi := &file_sickrock_proto_msgTypes[225]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11321,7 +12464,7 @@ func (x *GetNotificationEventsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetNotificationEventsResponse.ProtoReflect.Descriptor instead.
 func (*GetNotificationEventsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{207}
+	return file_sickrock_proto_rawDescGZIP(), []int{225}
 }
 
 func (x *GetNotificationEventsResponse) GetEvents() []*NotificationEvent {
@@ -11339,7 +12482,7 @@ type GetUserNotificationChannelsRequest struct {
 
 func (x *GetUserNotificationChannelsRequest) Reset() {
 	*x = GetUserNotificationChannelsRequest{}
-	mi := &file_sickrock_proto_msgTypes[208]
+	mi := &file_sickrock_proto_msgTypes[226]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11351,7 +12494,7 @@ func (x *GetUserNotificationChannelsRequest) String() string {
 func (*GetUserNotificationChannelsRequest) ProtoMessage() {}
 
 func (x *GetUserNotificationChannelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[208]
+	mi := &file_sickrock_proto_msgTypes[226]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11364,7 +12507,7 @@ func (x *GetUserNotificationChannelsRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetUserNotificationChannelsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserNotificationChannelsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{208}
+	return file_sickrock_proto_rawDescGZIP(), []int{226}
 }
 
 type GetUserNotificationChannelsResponse struct {
@@ -11376,7 +12519,7 @@ type GetUserNotificationChannelsResponse struct {
 
 func (x *GetUserNotificationChannelsResponse) Reset() {
 	*x = GetUserNotificationChannelsResponse{}
-	mi := &file_sickrock_proto_msgTypes[209]
+	mi := &file_sickrock_proto_msgTypes[227]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11388,7 +12531,7 @@ func (x *GetUserNotificationChannelsResponse) String() string {
 func (*GetUserNotificationChannelsResponse) ProtoMessage() {}
 
 func (x *GetUserNotificationChannelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[209]
+	mi := &file_sickrock_proto_msgTypes[227]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11401,7 +12544,7 @@ func (x *GetUserNotificationChannelsResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GetUserNotificationChannelsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserNotificationChannelsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{209}
+	return file_sickrock_proto_rawDescGZIP(), []int{227}
 }
 
 func (x *GetUserNotificationChannelsResponse) GetChannels() []*UserNotificationChannel {
@@ -11422,7 +12565,7 @@ type CreateUserNotificationChannelRequest struct {
 
 func (x *CreateUserNotificationChannelRequest) Reset() {
 	*x = CreateUserNotificationChannelRequest{}
-	mi := &file_sickrock_proto_msgTypes[210]
+	mi := &file_sickrock_proto_msgTypes[228]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11434,7 +12577,7 @@ func (x *CreateUserNotificationChannelRequest) String() string {
 func (*CreateUserNotificationChannelRequest) ProtoMessage() {}
 
 func (x *CreateUserNotificationChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[210]
+	mi := &file_sickrock_proto_msgTypes[228]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11447,7 +12590,7 @@ func (x *CreateUserNotificationChannelRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use CreateUserNotificationChannelRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserNotificationChannelRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{210}
+	return file_sickrock_proto_rawDescGZIP(), []int{228}
 }
 
 func (x *CreateUserNotificationChannelRequest) GetChannelType() string {
@@ -11482,7 +12625,7 @@ type CreateUserNotificationChannelResponse struct {
 
 func (x *CreateUserNotificationChannelResponse) Reset() {
 	*x = CreateUserNotificationChannelResponse{}
-	mi := &file_sickrock_proto_msgTypes[211]
+	mi := &file_sickrock_proto_msgTypes[229]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11494,7 +12637,7 @@ func (x *CreateUserNotificationChannelResponse) String() string {
 func (*CreateUserNotificationChannelResponse) ProtoMessage() {}
 
 func (x *CreateUserNotificationChannelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[211]
+	mi := &file_sickrock_proto_msgTypes[229]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11507,7 +12650,7 @@ func (x *CreateUserNotificationChannelResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use CreateUserNotificationChannelResponse.ProtoReflect.Descriptor instead.
 func (*CreateUserNotificationChannelResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{211}
+	return file_sickrock_proto_rawDescGZIP(), []int{229}
 }
 
 func (x *CreateUserNotificationChannelResponse) GetSuccess() bool {
@@ -11543,7 +12686,7 @@ type UpdateUserNotificationChannelRequest struct {
 
 func (x *UpdateUserNotificationChannelRequest) Reset() {
 	*x = UpdateUserNotificationChannelRequest{}
-	mi := &file_sickrock_proto_msgTypes[212]
+	mi := &file_sickrock_proto_msgTypes[230]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11555,7 +12698,7 @@ func (x *UpdateUserNotificationChannelRequest) String() string {
 func (*UpdateUserNotificationChannelRequest) ProtoMessage() {}
 
 func (x *UpdateUserNotificationChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[212]
+	mi := &file_sickrock_proto_msgTypes[230]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11568,7 +12711,7 @@ func (x *UpdateUserNotificationChannelRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use UpdateUserNotificationChannelRequest.ProtoReflect.Descriptor instead.
 func (*UpdateUserNotificationChannelRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{212}
+	return file_sickrock_proto_rawDescGZIP(), []int{230}
 }
 
 func (x *UpdateUserNotificationChannelRequest) GetChannelId() int32 {
@@ -11609,7 +12752,7 @@ type UpdateUserNotificationChannelResponse struct {
 
 func (x *UpdateUserNotificationChannelResponse) Reset() {
 	*x = UpdateUserNotificationChannelResponse{}
-	mi := &file_sickrock_proto_msgTypes[213]
+	mi := &file_sickrock_proto_msgTypes[231]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11621,7 +12764,7 @@ func (x *UpdateUserNotificationChannelResponse) String() string {
 func (*UpdateUserNotificationChannelResponse) ProtoMessage() {}
 
 func (x *UpdateUserNotificationChannelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[213]
+	mi := &file_sickrock_proto_msgTypes[231]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11634,7 +12777,7 @@ func (x *UpdateUserNotificationChannelResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use UpdateUserNotificationChannelResponse.ProtoReflect.Descriptor instead.
 func (*UpdateUserNotificationChannelResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{213}
+	return file_sickrock_proto_rawDescGZIP(), []int{231}
 }
 
 func (x *UpdateUserNotificationChannelResponse) GetSuccess() bool {
@@ -11660,7 +12803,7 @@ type DeleteUserNotificationChannelRequest struct {
 
 func (x *DeleteUserNotificationChannelRequest) Reset() {
 	*x = DeleteUserNotificationChannelRequest{}
-	mi := &file_sickrock_proto_msgTypes[214]
+	mi := &file_sickrock_proto_msgTypes[232]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11672,7 +12815,7 @@ func (x *DeleteUserNotificationChannelRequest) String() string {
 func (*DeleteUserNotificationChannelRequest) ProtoMessage() {}
 
 func (x *DeleteUserNotificationChannelRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[214]
+	mi := &file_sickrock_proto_msgTypes[232]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11685,7 +12828,7 @@ func (x *DeleteUserNotificationChannelRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use DeleteUserNotificationChannelRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserNotificationChannelRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{214}
+	return file_sickrock_proto_rawDescGZIP(), []int{232}
 }
 
 func (x *DeleteUserNotificationChannelRequest) GetChannelId() int32 {
@@ -11705,7 +12848,7 @@ type DeleteUserNotificationChannelResponse struct {
 
 func (x *DeleteUserNotificationChannelResponse) Reset() {
 	*x = DeleteUserNotificationChannelResponse{}
-	mi := &file_sickrock_proto_msgTypes[215]
+	mi := &file_sickrock_proto_msgTypes[233]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11717,7 +12860,7 @@ func (x *DeleteUserNotificationChannelResponse) String() string {
 func (*DeleteUserNotificationChannelResponse) ProtoMessage() {}
 
 func (x *DeleteUserNotificationChannelResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[215]
+	mi := &file_sickrock_proto_msgTypes[233]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11730,7 +12873,7 @@ func (x *DeleteUserNotificationChannelResponse) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use DeleteUserNotificationChannelResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserNotificationChannelResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{215}
+	return file_sickrock_proto_rawDescGZIP(), []int{233}
 }
 
 func (x *DeleteUserNotificationChannelResponse) GetSuccess() bool {
@@ -11755,7 +12898,7 @@ type GetUserNotificationSubscriptionsRequest struct {
 
 func (x *GetUserNotificationSubscriptionsRequest) Reset() {
 	*x = GetUserNotificationSubscriptionsRequest{}
-	mi := &file_sickrock_proto_msgTypes[216]
+	mi := &file_sickrock_proto_msgTypes[234]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11767,7 +12910,7 @@ func (x *GetUserNotificationSubscriptionsRequest) String() string {
 func (*GetUserNotificationSubscriptionsRequest) ProtoMessage() {}
 
 func (x *GetUserNotificationSubscriptionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[216]
+	mi := &file_sickrock_proto_msgTypes[234]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11780,7 +12923,7 @@ func (x *GetUserNotificationSubscriptionsRequest) ProtoReflect() protoreflect.Me
 
 // Deprecated: Use GetUserNotificationSubscriptionsRequest.ProtoReflect.Descriptor instead.
 func (*GetUserNotificationSubscriptionsRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{216}
+	return file_sickrock_proto_rawDescGZIP(), []int{234}
 }
 
 type GetUserNotificationSubscriptionsResponse struct {
@@ -11792,7 +12935,7 @@ type GetUserNotificationSubscriptionsResponse struct {
 
 func (x *GetUserNotificationSubscriptionsResponse) Reset() {
 	*x = GetUserNotificationSubscriptionsResponse{}
-	mi := &file_sickrock_proto_msgTypes[217]
+	mi := &file_sickrock_proto_msgTypes[235]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11804,7 +12947,7 @@ func (x *GetUserNotificationSubscriptionsResponse) String() string {
 func (*GetUserNotificationSubscriptionsResponse) ProtoMessage() {}
 
 func (x *GetUserNotificationSubscriptionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[217]
+	mi := &file_sickrock_proto_msgTypes[235]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11817,7 +12960,7 @@ func (x *GetUserNotificationSubscriptionsResponse) ProtoReflect() protoreflect.M
 
 // Deprecated: Use GetUserNotificationSubscriptionsResponse.ProtoReflect.Descriptor instead.
 func (*GetUserNotificationSubscriptionsResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{217}
+	return file_sickrock_proto_rawDescGZIP(), []int{235}
 }
 
 func (x *GetUserNotificationSubscriptionsResponse) GetSubscriptions() []*UserNotificationSubscription {
@@ -11837,7 +12980,7 @@ type CreateUserNotificationSubscriptionRequest struct {
 
 func (x *CreateUserNotificationSubscriptionRequest) Reset() {
 	*x = CreateUserNotificationSubscriptionRequest{}
-	mi := &file_sickrock_proto_msgTypes[218]
+	mi := &file_sickrock_proto_msgTypes[236]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11849,7 +12992,7 @@ func (x *CreateUserNotificationSubscriptionRequest) String() string {
 func (*CreateUserNotificationSubscriptionRequest) ProtoMessage() {}
 
 func (x *CreateUserNotificationSubscriptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[218]
+	mi := &file_sickrock_proto_msgTypes[236]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11862,7 +13005,7 @@ func (x *CreateUserNotificationSubscriptionRequest) ProtoReflect() protoreflect.
 
 // Deprecated: Use CreateUserNotificationSubscriptionRequest.ProtoReflect.Descriptor instead.
 func (*CreateUserNotificationSubscriptionRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{218}
+	return file_sickrock_proto_rawDescGZIP(), []int{236}
 }
 
 func (x *CreateUserNotificationSubscriptionRequest) GetEventCode() string {
@@ -11890,7 +13033,7 @@ type CreateUserNotificationSubscriptionResponse struct {
 
 func (x *CreateUserNotificationSubscriptionResponse) Reset() {
 	*x = CreateUserNotificationSubscriptionResponse{}
-	mi := &file_sickrock_proto_msgTypes[219]
+	mi := &file_sickrock_proto_msgTypes[237]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11902,7 +13045,7 @@ func (x *CreateUserNotificationSubscriptionResponse) String() string {
 func (*CreateUserNotificationSubscriptionResponse) ProtoMessage() {}
 
 func (x *CreateUserNotificationSubscriptionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[219]
+	mi := &file_sickrock_proto_msgTypes[237]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11915,7 +13058,7 @@ func (x *CreateUserNotificationSubscriptionResponse) ProtoReflect() protoreflect
 
 // Deprecated: Use CreateUserNotificationSubscriptionResponse.ProtoReflect.Descriptor instead.
 func (*CreateUserNotificationSubscriptionResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{219}
+	return file_sickrock_proto_rawDescGZIP(), []int{237}
 }
 
 func (x *CreateUserNotificationSubscriptionResponse) GetSuccess() bool {
@@ -11948,7 +13091,7 @@ type DeleteUserNotificationSubscriptionRequest struct {
 
 func (x *DeleteUserNotificationSubscriptionRequest) Reset() {
 	*x = DeleteUserNotificationSubscriptionRequest{}
-	mi := &file_sickrock_proto_msgTypes[220]
+	mi := &file_sickrock_proto_msgTypes[238]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -11960,7 +13103,7 @@ func (x *DeleteUserNotificationSubscriptionRequest) String() string {
 func (*DeleteUserNotificationSubscriptionRequest) ProtoMessage() {}
 
 func (x *DeleteUserNotificationSubscriptionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[220]
+	mi := &file_sickrock_proto_msgTypes[238]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -11973,7 +13116,7 @@ func (x *DeleteUserNotificationSubscriptionRequest) ProtoReflect() protoreflect.
 
 // Deprecated: Use DeleteUserNotificationSubscriptionRequest.ProtoReflect.Descriptor instead.
 func (*DeleteUserNotificationSubscriptionRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{220}
+	return file_sickrock_proto_rawDescGZIP(), []int{238}
 }
 
 func (x *DeleteUserNotificationSubscriptionRequest) GetSubscriptionId() int32 {
@@ -11993,7 +13136,7 @@ type DeleteUserNotificationSubscriptionResponse struct {
 
 func (x *DeleteUserNotificationSubscriptionResponse) Reset() {
 	*x = DeleteUserNotificationSubscriptionResponse{}
-	mi := &file_sickrock_proto_msgTypes[221]
+	mi := &file_sickrock_proto_msgTypes[239]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12005,7 +13148,7 @@ func (x *DeleteUserNotificationSubscriptionResponse) String() string {
 func (*DeleteUserNotificationSubscriptionResponse) ProtoMessage() {}
 
 func (x *DeleteUserNotificationSubscriptionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[221]
+	mi := &file_sickrock_proto_msgTypes[239]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12018,7 +13161,7 @@ func (x *DeleteUserNotificationSubscriptionResponse) ProtoReflect() protoreflect
 
 // Deprecated: Use DeleteUserNotificationSubscriptionResponse.ProtoReflect.Descriptor instead.
 func (*DeleteUserNotificationSubscriptionResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{221}
+	return file_sickrock_proto_rawDescGZIP(), []int{239}
 }
 
 func (x *DeleteUserNotificationSubscriptionResponse) GetSuccess() bool {
@@ -12045,7 +13188,7 @@ type GetTickListStateRequest struct {
 
 func (x *GetTickListStateRequest) Reset() {
 	*x = GetTickListStateRequest{}
-	mi := &file_sickrock_proto_msgTypes[222]
+	mi := &file_sickrock_proto_msgTypes[240]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12057,7 +13200,7 @@ func (x *GetTickListStateRequest) String() string {
 func (*GetTickListStateRequest) ProtoMessage() {}
 
 func (x *GetTickListStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[222]
+	mi := &file_sickrock_proto_msgTypes[240]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12070,7 +13213,7 @@ func (x *GetTickListStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTickListStateRequest.ProtoReflect.Descriptor instead.
 func (*GetTickListStateRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{222}
+	return file_sickrock_proto_rawDescGZIP(), []int{240}
 }
 
 func (x *GetTickListStateRequest) GetTcName() string {
@@ -12089,7 +13232,7 @@ type GetTickListStateResponse struct {
 
 func (x *GetTickListStateResponse) Reset() {
 	*x = GetTickListStateResponse{}
-	mi := &file_sickrock_proto_msgTypes[223]
+	mi := &file_sickrock_proto_msgTypes[241]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12101,7 +13244,7 @@ func (x *GetTickListStateResponse) String() string {
 func (*GetTickListStateResponse) ProtoMessage() {}
 
 func (x *GetTickListStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[223]
+	mi := &file_sickrock_proto_msgTypes[241]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12114,7 +13257,7 @@ func (x *GetTickListStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTickListStateResponse.ProtoReflect.Descriptor instead.
 func (*GetTickListStateResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{223}
+	return file_sickrock_proto_rawDescGZIP(), []int{241}
 }
 
 func (x *GetTickListStateResponse) GetCompletedByItemId() map[string]bool {
@@ -12135,7 +13278,7 @@ type SetTickListCompletionRequest struct {
 
 func (x *SetTickListCompletionRequest) Reset() {
 	*x = SetTickListCompletionRequest{}
-	mi := &file_sickrock_proto_msgTypes[224]
+	mi := &file_sickrock_proto_msgTypes[242]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12147,7 +13290,7 @@ func (x *SetTickListCompletionRequest) String() string {
 func (*SetTickListCompletionRequest) ProtoMessage() {}
 
 func (x *SetTickListCompletionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[224]
+	mi := &file_sickrock_proto_msgTypes[242]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12160,7 +13303,7 @@ func (x *SetTickListCompletionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTickListCompletionRequest.ProtoReflect.Descriptor instead.
 func (*SetTickListCompletionRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{224}
+	return file_sickrock_proto_rawDescGZIP(), []int{242}
 }
 
 func (x *SetTickListCompletionRequest) GetTcName() string {
@@ -12192,7 +13335,7 @@ type SetTickListCompletionResponse struct {
 
 func (x *SetTickListCompletionResponse) Reset() {
 	*x = SetTickListCompletionResponse{}
-	mi := &file_sickrock_proto_msgTypes[225]
+	mi := &file_sickrock_proto_msgTypes[243]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12204,7 +13347,7 @@ func (x *SetTickListCompletionResponse) String() string {
 func (*SetTickListCompletionResponse) ProtoMessage() {}
 
 func (x *SetTickListCompletionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[225]
+	mi := &file_sickrock_proto_msgTypes[243]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12217,7 +13360,7 @@ func (x *SetTickListCompletionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetTickListCompletionResponse.ProtoReflect.Descriptor instead.
 func (*SetTickListCompletionResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{225}
+	return file_sickrock_proto_rawDescGZIP(), []int{243}
 }
 
 type ClearTickListStateRequest struct {
@@ -12229,7 +13372,7 @@ type ClearTickListStateRequest struct {
 
 func (x *ClearTickListStateRequest) Reset() {
 	*x = ClearTickListStateRequest{}
-	mi := &file_sickrock_proto_msgTypes[226]
+	mi := &file_sickrock_proto_msgTypes[244]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12241,7 +13384,7 @@ func (x *ClearTickListStateRequest) String() string {
 func (*ClearTickListStateRequest) ProtoMessage() {}
 
 func (x *ClearTickListStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[226]
+	mi := &file_sickrock_proto_msgTypes[244]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12254,7 +13397,7 @@ func (x *ClearTickListStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearTickListStateRequest.ProtoReflect.Descriptor instead.
 func (*ClearTickListStateRequest) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{226}
+	return file_sickrock_proto_rawDescGZIP(), []int{244}
 }
 
 func (x *ClearTickListStateRequest) GetTcName() string {
@@ -12272,7 +13415,7 @@ type ClearTickListStateResponse struct {
 
 func (x *ClearTickListStateResponse) Reset() {
 	*x = ClearTickListStateResponse{}
-	mi := &file_sickrock_proto_msgTypes[227]
+	mi := &file_sickrock_proto_msgTypes[245]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -12284,7 +13427,7 @@ func (x *ClearTickListStateResponse) String() string {
 func (*ClearTickListStateResponse) ProtoMessage() {}
 
 func (x *ClearTickListStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_sickrock_proto_msgTypes[227]
+	mi := &file_sickrock_proto_msgTypes[245]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -12297,7 +13440,7 @@ func (x *ClearTickListStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearTickListStateResponse.ProtoReflect.Descriptor instead.
 func (*ClearTickListStateResponse) Descriptor() ([]byte, []int) {
-	return file_sickrock_proto_rawDescGZIP(), []int{227}
+	return file_sickrock_proto_rawDescGZIP(), []int{245}
 }
 
 var File_sickrock_proto protoreflect.FileDescriptor
@@ -12332,12 +13475,13 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x05table\x18\x02 \x01(\tR\x05table\"I\n" +
 	"\x13CreateTableResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xc0\x01\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xec\x01\n" +
 	"\x1fCreateTableConfigurationRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1a\n" +
 	"\bdatabase\x18\x02 \x01(\tR\bdatabase\x12\x14\n" +
 	"\x05table\x18\x03 \x01(\tR\x05table\x12;\n" +
-	"\x17create_navigation_entry\x18\x04 \x01(\bH\x00R\x15createNavigationEntry\x88\x01\x01B\x1a\n" +
+	"\x17create_navigation_entry\x18\x04 \x01(\bH\x00R\x15createNavigationEntry\x88\x01\x01\x12*\n" +
+	"\x11navigation_app_id\x18\x05 \x01(\x05R\x0fnavigationAppIdB\x1a\n" +
 	"\x18_create_navigation_entry\"V\n" +
 	" CreateTableConfigurationResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
@@ -12352,7 +13496,12 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x04view\x18\x04 \x01(\tR\x04view\"L\n" +
 	"\x19GetDatabaseTablesResponse\x12/\n" +
 	"\x06tables\x18\x01 \x03(\v2\x17.sickrock.DatabaseTableR\x06tables\"\x16\n" +
-	"\x14GetNavigationRequest\"\x84\x03\n" +
+	"\x14GetNavigationRequest\"\x7f\n" +
+	"\rNavigationApp\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12\x18\n" +
+	"\aordinal\x18\x03 \x01(\x05R\aordinal\x12.\n" +
+	"\x05items\x18\x04 \x03(\v2\x18.sickrock.NavigationItemR\x05items\"\x84\x03\n" +
 	"\x0eNavigationItem\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x18\n" +
 	"\aordinal\x18\x02 \x01(\x05R\aordinal\x12/\n" +
@@ -12376,11 +13525,13 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x18\n" +
 	"\aordinal\x18\x03 \x01(\x05R\aordinal\x12\x12\n" +
 	"\x04icon\x18\x04 \x01(\tR\x04icon\x12.\n" +
-	"\x05items\x18\x05 \x03(\v2\x18.sickrock.NavigationItemR\x05items\"\xaf\x01\n" +
+	"\x05items\x18\x05 \x03(\v2\x18.sickrock.NavigationItemR\x05items\"\x9f\x02\n" +
 	"\x15GetNavigationResponse\x12.\n" +
 	"\x05items\x18\x01 \x03(\v2\x18.sickrock.NavigationItemR\x05items\x124\n" +
 	"\tbookmarks\x18\x02 \x03(\v2\x16.sickrock.UserBookmarkR\tbookmarks\x120\n" +
-	"\tworkflows\x18\x03 \x03(\v2\x12.sickrock.WorkflowR\tworkflows\"b\n" +
+	"\tworkflows\x18\x03 \x03(\v2\x12.sickrock.WorkflowR\tworkflows\x12+\n" +
+	"\x04apps\x18\x04 \x03(\v2\x17.sickrock.NavigationAppR\x04apps\x12A\n" +
+	"\x0fungrouped_items\x18\x05 \x03(\v2\x18.sickrock.NavigationItemR\x0eungroupedItems\"b\n" +
 	"\x18WorkflowNavigationMember\x12,\n" +
 	"\x12navigation_item_id\x18\x01 \x01(\x05R\x10navigationItemId\x12\x18\n" +
 	"\aordinal\x18\x02 \x01(\x05R\aordinal\"\x84\x01\n" +
@@ -12465,10 +13616,11 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x11additional_fields\x18\x06 \x03(\v2$.sickrock.Item.AdditionalFieldsEntryR\x10additionalFields\x1aC\n" +
 	"\x15AdditionalFieldsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xa2\x01\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xdc\x01\n" +
 	"\x10ListItemsRequest\x12\x17\n" +
 	"\atc_name\x18\x01 \x01(\tR\x06tcName\x12;\n" +
-	"\x05where\x18\x02 \x03(\v2%.sickrock.ListItemsRequest.WhereEntryR\x05where\x1a8\n" +
+	"\x05where\x18\x02 \x03(\v2%.sickrock.ListItemsRequest.WhereEntryR\x05where\x128\n" +
+	"\x18relation_constraint_name\x18\x03 \x01(\tR\x16relationConstraintName\x1a8\n" +
 	"\n" +
 	"WhereEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
@@ -12505,12 +13657,60 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x12DeleteItemResponse\x12\x18\n" +
 	"\adeleted\x18\x01 \x01(\bR\adeleted\"3\n" +
 	"\x18GetTableStructureRequest\x12\x17\n" +
-	"\apage_id\x18\x01 \x01(\tR\x06pageId\"\x8c\x01\n" +
+	"\apage_id\x18\x01 \x01(\tR\x06pageId\"\xf7\x01\n" +
 	"\x05Field\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x1a\n" +
 	"\brequired\x18\x03 \x01(\bR\brequired\x12?\n" +
-	"\x1cdefault_to_current_timestamp\x18\x04 \x01(\bR\x19defaultToCurrentTimestamp\"\xf5\x02\n" +
+	"\x1cdefault_to_current_timestamp\x18\x04 \x01(\bR\x19defaultToCurrentTimestamp\x12#\n" +
+	"\rdisplay_label\x18\x05 \x01(\tR\fdisplayLabel\x12!\n" +
+	"\fvalue_prefix\x18\x06 \x01(\tR\vvaluePrefix\x12!\n" +
+	"\fvalue_suffix\x18\a \x01(\tR\vvalueSuffix\"{\n" +
+	"\x0fPageLayoutBlock\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x18\n" +
+	"\aordinal\x18\x02 \x01(\x05R\aordinal\x12\x1d\n" +
+	"\n" +
+	"block_type\x18\x03 \x01(\tR\tblockType\x12\x1f\n" +
+	"\vconfig_json\x18\x04 \x01(\tR\n" +
+	"configJson\"C\n" +
+	"\x0eItemPageLayout\x121\n" +
+	"\x06blocks\x18\x01 \x03(\v2\x19.sickrock.PageLayoutBlockR\x06blocks\"s\n" +
+	"\x0eItemFieldGroup\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x18\n" +
+	"\aordinal\x18\x02 \x01(\x05R\aordinal\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12!\n" +
+	"\fcolumn_names\x18\x04 \x03(\tR\vcolumnNames\"C\n" +
+	"\x0fItemFieldGroups\x120\n" +
+	"\x06groups\x18\x01 \x03(\v2\x18.sickrock.ItemFieldGroupR\x06groups\"h\n" +
+	"\x13ItemFieldGroupInput\x12\x18\n" +
+	"\aordinal\x18\x01 \x01(\x05R\aordinal\x12\x14\n" +
+	"\x05title\x18\x02 \x01(\tR\x05title\x12!\n" +
+	"\fcolumn_names\x18\x03 \x03(\tR\vcolumnNames\"\x83\x01\n" +
+	"\x19SetItemFieldGroupsRequest\x12/\n" +
+	"\x13table_configuration\x18\x01 \x01(\tR\x12tableConfiguration\x125\n" +
+	"\x06groups\x18\x02 \x03(\v2\x1d.sickrock.ItemFieldGroupInputR\x06groups\"P\n" +
+	"\x1aSetItemFieldGroupsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\xa7\x01\n" +
+	"\x19ColumnDisplaySettingInput\x12\x1f\n" +
+	"\vcolumn_name\x18\x01 \x01(\tR\n" +
+	"columnName\x12#\n" +
+	"\rdisplay_label\x18\x02 \x01(\tR\fdisplayLabel\x12!\n" +
+	"\fvalue_prefix\x18\x03 \x01(\tR\vvaluePrefix\x12!\n" +
+	"\fvalue_suffix\x18\x04 \x01(\tR\vvalueSuffix\"\x93\x01\n" +
+	"\x1fSetColumnDisplaySettingsRequest\x12/\n" +
+	"\x13table_configuration\x18\x01 \x01(\tR\x12tableConfiguration\x12?\n" +
+	"\bsettings\x18\x02 \x03(\v2#.sickrock.ColumnDisplaySettingInputR\bsettings\"V\n" +
+	" SetColumnDisplaySettingsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x8e\x01\n" +
+	"\x18SetTableRowLabelsRequest\x12/\n" +
+	"\x13table_configuration\x18\x01 \x01(\tR\x12tableConfiguration\x12\x19\n" +
+	"\brow_name\x18\x02 \x01(\tR\arowName\x12&\n" +
+	"\x0frow_name_plural\x18\x03 \x01(\tR\rrowNamePlural\"O\n" +
+	"\x19SetTableRowLabelsResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x85\x05\n" +
 	"\x19GetTableStructureResponse\x12'\n" +
 	"\x06fields\x18\x01 \x03(\v2\x0f.sickrock.FieldR\x06fields\x12*\n" +
 	"\x10CreateButtonText\x18\x02 \x01(\tR\x10CreateButtonText\x12\x12\n" +
@@ -12520,7 +13720,18 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x13default_sort_column\x18\x06 \x01(\tR\x11defaultSortColumn\x12'\n" +
 	"\x0fcreate_delegate\x18\a \x01(\tR\x0ecreateDelegate\x12\x14\n" +
 	"\x05title\x18\b \x01(\tR\x05title\x12\x19\n" +
-	"\brow_name\x18\t \x01(\tR\arowName\"W\n" +
+	"\brow_name\x18\t \x01(\tR\arowName\x12B\n" +
+	"\x10item_page_layout\x18\n" +
+	" \x01(\v2\x18.sickrock.ItemPageLayoutR\x0eitemPageLayout\x12E\n" +
+	"\x11item_field_groups\x18\v \x01(\v2\x19.sickrock.ItemFieldGroupsR\x0fitemFieldGroups\x12&\n" +
+	"\x0frow_name_plural\x18\f \x01(\tR\rrowNamePlural\x12[\n" +
+	"\x17column_display_settings\x18\r \x03(\v2#.sickrock.ColumnDisplaySettingInputR\x15columnDisplaySettings\"~\n" +
+	"\x18SetItemPageLayoutRequest\x12/\n" +
+	"\x13table_configuration\x18\x01 \x01(\tR\x12tableConfiguration\x121\n" +
+	"\x06blocks\x18\x02 \x03(\v2\x19.sickrock.PageLayoutBlockR\x06blocks\"O\n" +
+	"\x19SetItemPageLayoutResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"W\n" +
 	"\x15AddTableColumnRequest\x12\x17\n" +
 	"\apage_id\x18\x01 \x01(\tR\x06pageId\x12%\n" +
 	"\x05field\x18\x02 \x01(\v2\x0f.sickrock.FieldR\x05field\"\x93\x01\n" +
@@ -12569,7 +13780,7 @@ const file_sickrock_proto_rawDesc = "" +
 	"\aview_id\x18\x01 \x01(\x05R\x06viewId\"M\n" +
 	"\x17DeleteTableViewResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"\xfe\x02\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x96\x04\n" +
 	"\n" +
 	"ForeignKey\x12'\n" +
 	"\x0fconstraint_name\x18\x01 \x01(\tR\x0econstraintName\x12\x1d\n" +
@@ -12582,7 +13793,24 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x10on_delete_action\x18\x06 \x01(\tR\x0eonDeleteAction\x12(\n" +
 	"\x10on_update_action\x18\a \x01(\tR\x0eonUpdateAction\x12\"\n" +
 	"\rtable_tc_name\x18\b \x01(\tR\vtableTcName\x127\n" +
-	"\x18referenced_table_tc_name\x18\t \x01(\tR\x15referencedTableTcName\"\x85\x02\n" +
+	"\x18referenced_table_tc_name\x18\t \x01(\tR\x15referencedTableTcName\x12!\n" +
+	"\fdisplay_name\x18\n" +
+	" \x01(\tR\vdisplayName\x12\x1f\n" +
+	"\vrelation_id\x18\v \x01(\x05R\n" +
+	"relationId\x12R\n" +
+	"\x13pull_through_fields\x18\f \x03(\v2\".sickrock.RelationPullThroughFieldR\x11pullThroughFields\"\x86\x01\n" +
+	"\x18RelationPullThroughField\x12\x1b\n" +
+	"\tfk_column\x18\x01 \x01(\tR\bfkColumn\x12\x14\n" +
+	"\x05field\x18\x02 \x01(\tR\x05field\x12#\n" +
+	"\rdisplay_label\x18\x03 \x01(\tR\fdisplayLabel\x12\x12\n" +
+	"\x04expr\x18\x04 \x01(\tR\x04expr\"\xbc\x01\n" +
+	"\x1aUpdateTableRelationRequest\x12'\n" +
+	"\x0fconstraint_name\x18\x01 \x01(\tR\x0econstraintName\x12!\n" +
+	"\fdisplay_name\x18\x02 \x01(\tR\vdisplayName\x12R\n" +
+	"\x13pull_through_fields\x18\x03 \x03(\v2\".sickrock.RelationPullThroughFieldR\x11pullThroughFields\"Q\n" +
+	"\x1bUpdateTableRelationResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x85\x02\n" +
 	"\x17CreateForeignKeyRequest\x12\x1d\n" +
 	"\n" +
 	"table_name\x18\x01 \x01(\tR\ttableName\x12\x1f\n" +
@@ -13148,7 +14376,7 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x1dSetTickListCompletionResponse\"4\n" +
 	"\x19ClearTickListStateRequest\x12\x17\n" +
 	"\atc_name\x18\x01 \x01(\tR\x06tcName\"\x1c\n" +
-	"\x1aClearTickListStateResponse2\xddI\n" +
+	"\x1aClearTickListStateResponse2\xd1M\n" +
 	"\bSickRock\x125\n" +
 	"\x04Init\x12\x15.sickrock.InitRequest\x1a\x16.sickrock.InitResponse\x125\n" +
 	"\x04Ping\x12\x15.sickrock.PingRequest\x1a\x16.sickrock.PingResponse\x128\n" +
@@ -13219,7 +14447,12 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x0fDeleteTableView\x12 .sickrock.DeleteTableViewRequest\x1a!.sickrock.DeleteTableViewResponse\x12Y\n" +
 	"\x10CreateForeignKey\x12!.sickrock.CreateForeignKeyRequest\x1a\".sickrock.CreateForeignKeyResponse\x12S\n" +
 	"\x0eGetForeignKeys\x12\x1f.sickrock.GetForeignKeysRequest\x1a .sickrock.GetForeignKeysResponse\x12Y\n" +
-	"\x10DeleteForeignKey\x12!.sickrock.DeleteForeignKeyRequest\x1a\".sickrock.DeleteForeignKeyResponse\x12Y\n" +
+	"\x10DeleteForeignKey\x12!.sickrock.DeleteForeignKeyRequest\x1a\".sickrock.DeleteForeignKeyResponse\x12b\n" +
+	"\x13UpdateTableRelation\x12$.sickrock.UpdateTableRelationRequest\x1a%.sickrock.UpdateTableRelationResponse\x12\\\n" +
+	"\x11SetItemPageLayout\x12\".sickrock.SetItemPageLayoutRequest\x1a#.sickrock.SetItemPageLayoutResponse\x12_\n" +
+	"\x12SetItemFieldGroups\x12#.sickrock.SetItemFieldGroupsRequest\x1a$.sickrock.SetItemFieldGroupsResponse\x12q\n" +
+	"\x18SetColumnDisplaySettings\x12).sickrock.SetColumnDisplaySettingsRequest\x1a*.sickrock.SetColumnDisplaySettingsResponse\x12\\\n" +
+	"\x11SetTableRowLabels\x12\".sickrock.SetTableRowLabelsRequest\x1a#.sickrock.SetTableRowLabelsResponse\x12Y\n" +
 	"\x10ChangeColumnType\x12!.sickrock.ChangeColumnTypeRequest\x1a\".sickrock.ChangeColumnTypeResponse\x12G\n" +
 	"\n" +
 	"DropColumn\x12\x1b.sickrock.DropColumnRequest\x1a\x1c.sickrock.DropColumnResponse\x12Y\n" +
@@ -13268,7 +14501,7 @@ func file_sickrock_proto_rawDescGZIP() []byte {
 	return file_sickrock_proto_rawDescData
 }
 
-var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 233)
+var file_sickrock_proto_msgTypes = make([]protoimpl.MessageInfo, 251)
 var file_sickrock_proto_goTypes = []any{
 	(*PingRequest)(nil),                                // 0: sickrock.PingRequest
 	(*PingResponse)(nil),                               // 1: sickrock.PingResponse
@@ -13286,493 +14519,534 @@ var file_sickrock_proto_goTypes = []any{
 	(*DatabaseTable)(nil),                              // 13: sickrock.DatabaseTable
 	(*GetDatabaseTablesResponse)(nil),                  // 14: sickrock.GetDatabaseTablesResponse
 	(*GetNavigationRequest)(nil),                       // 15: sickrock.GetNavigationRequest
-	(*NavigationItem)(nil),                             // 16: sickrock.NavigationItem
-	(*Workflow)(nil),                                   // 17: sickrock.Workflow
-	(*GetNavigationResponse)(nil),                      // 18: sickrock.GetNavigationResponse
-	(*WorkflowNavigationMember)(nil),                   // 19: sickrock.WorkflowNavigationMember
-	(*SetWorkflowNavigationMembersRequest)(nil),        // 20: sickrock.SetWorkflowNavigationMembersRequest
-	(*SetWorkflowNavigationMembersResponse)(nil),       // 21: sickrock.SetWorkflowNavigationMembersResponse
-	(*GetReadOnlyCalendarExportRequest)(nil),           // 22: sickrock.GetReadOnlyCalendarExportRequest
-	(*GetReadOnlyCalendarExportResponse)(nil),          // 23: sickrock.GetReadOnlyCalendarExportResponse
-	(*ReadOnlyExportSummary)(nil),                      // 24: sickrock.ReadOnlyExportSummary
-	(*ListAccessibleReadOnlyExportsRequest)(nil),       // 25: sickrock.ListAccessibleReadOnlyExportsRequest
-	(*ListAccessibleReadOnlyExportsResponse)(nil),      // 26: sickrock.ListAccessibleReadOnlyExportsResponse
-	(*RssFieldMapping)(nil),                            // 27: sickrock.RssFieldMapping
-	(*RssCalendarFeed)(nil),                            // 28: sickrock.RssCalendarFeed
-	(*ListRssCalendarFeedsRequest)(nil),                // 29: sickrock.ListRssCalendarFeedsRequest
-	(*ListRssCalendarFeedsResponse)(nil),               // 30: sickrock.ListRssCalendarFeedsResponse
-	(*GetRssCalendarFeedRequest)(nil),                  // 31: sickrock.GetRssCalendarFeedRequest
-	(*GetRssCalendarFeedResponse)(nil),                 // 32: sickrock.GetRssCalendarFeedResponse
-	(*SaveRssCalendarFeedRequest)(nil),                 // 33: sickrock.SaveRssCalendarFeedRequest
-	(*SaveRssCalendarFeedResponse)(nil),                // 34: sickrock.SaveRssCalendarFeedResponse
-	(*DeleteRssCalendarFeedRequest)(nil),               // 35: sickrock.DeleteRssCalendarFeedRequest
-	(*DeleteRssCalendarFeedResponse)(nil),              // 36: sickrock.DeleteRssCalendarFeedResponse
-	(*RefreshRssCalendarFeedRequest)(nil),              // 37: sickrock.RefreshRssCalendarFeedRequest
-	(*RefreshRssCalendarFeedResponse)(nil),             // 38: sickrock.RefreshRssCalendarFeedResponse
-	(*PreviewRssCalendarFeedRequest)(nil),              // 39: sickrock.PreviewRssCalendarFeedRequest
-	(*PreviewRssCalendarFeedResponse)(nil),             // 40: sickrock.PreviewRssCalendarFeedResponse
-	(*Item)(nil),                                       // 41: sickrock.Item
-	(*ListItemsRequest)(nil),                           // 42: sickrock.ListItemsRequest
-	(*ListItemsResponse)(nil),                          // 43: sickrock.ListItemsResponse
-	(*CreateItemRequest)(nil),                          // 44: sickrock.CreateItemRequest
-	(*CreateItemResponse)(nil),                         // 45: sickrock.CreateItemResponse
-	(*GetItemRequest)(nil),                             // 46: sickrock.GetItemRequest
-	(*GetItemResponse)(nil),                            // 47: sickrock.GetItemResponse
-	(*EditItemRequest)(nil),                            // 48: sickrock.EditItemRequest
-	(*EditItemResponse)(nil),                           // 49: sickrock.EditItemResponse
-	(*DeleteItemRequest)(nil),                          // 50: sickrock.DeleteItemRequest
-	(*DeleteItemResponse)(nil),                         // 51: sickrock.DeleteItemResponse
-	(*GetTableStructureRequest)(nil),                   // 52: sickrock.GetTableStructureRequest
-	(*Field)(nil),                                      // 53: sickrock.Field
-	(*GetTableStructureResponse)(nil),                  // 54: sickrock.GetTableStructureResponse
-	(*AddTableColumnRequest)(nil),                      // 55: sickrock.AddTableColumnRequest
-	(*TableViewColumn)(nil),                            // 56: sickrock.TableViewColumn
-	(*CreateTableViewRequest)(nil),                     // 57: sickrock.CreateTableViewRequest
-	(*CreateTableViewResponse)(nil),                    // 58: sickrock.CreateTableViewResponse
-	(*UpdateTableViewRequest)(nil),                     // 59: sickrock.UpdateTableViewRequest
-	(*UpdateTableViewResponse)(nil),                    // 60: sickrock.UpdateTableViewResponse
-	(*GetTableViewsRequest)(nil),                       // 61: sickrock.GetTableViewsRequest
-	(*TableView)(nil),                                  // 62: sickrock.TableView
-	(*GetTableViewsResponse)(nil),                      // 63: sickrock.GetTableViewsResponse
-	(*DeleteTableViewRequest)(nil),                     // 64: sickrock.DeleteTableViewRequest
-	(*DeleteTableViewResponse)(nil),                    // 65: sickrock.DeleteTableViewResponse
-	(*ForeignKey)(nil),                                 // 66: sickrock.ForeignKey
-	(*CreateForeignKeyRequest)(nil),                    // 67: sickrock.CreateForeignKeyRequest
-	(*CreateForeignKeyResponse)(nil),                   // 68: sickrock.CreateForeignKeyResponse
-	(*GetForeignKeysRequest)(nil),                      // 69: sickrock.GetForeignKeysRequest
-	(*GetForeignKeysResponse)(nil),                     // 70: sickrock.GetForeignKeysResponse
-	(*DeleteForeignKeyRequest)(nil),                    // 71: sickrock.DeleteForeignKeyRequest
-	(*DeleteForeignKeyResponse)(nil),                   // 72: sickrock.DeleteForeignKeyResponse
-	(*ChangeColumnTypeRequest)(nil),                    // 73: sickrock.ChangeColumnTypeRequest
-	(*ChangeColumnTypeResponse)(nil),                   // 74: sickrock.ChangeColumnTypeResponse
-	(*DropColumnRequest)(nil),                          // 75: sickrock.DropColumnRequest
-	(*DropColumnResponse)(nil),                         // 76: sickrock.DropColumnResponse
-	(*ChangeColumnNameRequest)(nil),                    // 77: sickrock.ChangeColumnNameRequest
-	(*ChangeColumnNameResponse)(nil),                   // 78: sickrock.ChangeColumnNameResponse
-	(*GetMostRecentlyViewedRequest)(nil),               // 79: sickrock.GetMostRecentlyViewedRequest
-	(*RecentlyViewedItem)(nil),                         // 80: sickrock.RecentlyViewedItem
-	(*GetMostRecentlyViewedResponse)(nil),              // 81: sickrock.GetMostRecentlyViewedResponse
-	(*Dashboard)(nil),                                  // 82: sickrock.Dashboard
-	(*GetDashboardsRequest)(nil),                       // 83: sickrock.GetDashboardsRequest
-	(*GetDashboardsResponse)(nil),                      // 84: sickrock.GetDashboardsResponse
-	(*CreateDashboardRequest)(nil),                     // 85: sickrock.CreateDashboardRequest
-	(*CreateDashboardResponse)(nil),                    // 86: sickrock.CreateDashboardResponse
-	(*DashboardComponent)(nil),                         // 87: sickrock.DashboardComponent
-	(*DashboardComponentRule)(nil),                     // 88: sickrock.DashboardComponentRule
-	(*GetDashboardComponentRulesRequest)(nil),          // 89: sickrock.GetDashboardComponentRulesRequest
-	(*GetDashboardComponentRulesResponse)(nil),         // 90: sickrock.GetDashboardComponentRulesResponse
-	(*CreateDashboardComponentRuleRequest)(nil),        // 91: sickrock.CreateDashboardComponentRuleRequest
-	(*CreateDashboardComponentRuleResponse)(nil),       // 92: sickrock.CreateDashboardComponentRuleResponse
-	(*InitRequest)(nil),                                // 93: sickrock.InitRequest
-	(*OAuthProvider)(nil),                              // 94: sickrock.OAuthProvider
-	(*InitResponse)(nil),                               // 95: sickrock.InitResponse
-	(*LoginRequest)(nil),                               // 96: sickrock.LoginRequest
-	(*LoginResponse)(nil),                              // 97: sickrock.LoginResponse
-	(*LogoutRequest)(nil),                              // 98: sickrock.LogoutRequest
-	(*LogoutResponse)(nil),                             // 99: sickrock.LogoutResponse
-	(*ResetUserPasswordRequest)(nil),                   // 100: sickrock.ResetUserPasswordRequest
-	(*ResetUserPasswordResponse)(nil),                  // 101: sickrock.ResetUserPasswordResponse
-	(*ValidateTokenRequest)(nil),                       // 102: sickrock.ValidateTokenRequest
-	(*ValidateTokenResponse)(nil),                      // 103: sickrock.ValidateTokenResponse
-	(*ChangePasswordRequest)(nil),                      // 104: sickrock.ChangePasswordRequest
-	(*ChangePasswordResponse)(nil),                     // 105: sickrock.ChangePasswordResponse
-	(*IamUser)(nil),                                    // 106: sickrock.IamUser
-	(*RbacPermission)(nil),                             // 107: sickrock.RbacPermission
-	(*RbacRole)(nil),                                   // 108: sickrock.RbacRole
-	(*UserGroup)(nil),                                  // 109: sickrock.UserGroup
-	(*MyPermissionAuditRow)(nil),                       // 110: sickrock.MyPermissionAuditRow
-	(*ListUsersRequest)(nil),                           // 111: sickrock.ListUsersRequest
-	(*ListUsersResponse)(nil),                          // 112: sickrock.ListUsersResponse
-	(*GetUserRequest)(nil),                             // 113: sickrock.GetUserRequest
-	(*GetUserResponse)(nil),                            // 114: sickrock.GetUserResponse
-	(*CreateUserRequest)(nil),                          // 115: sickrock.CreateUserRequest
-	(*CreateUserResponse)(nil),                         // 116: sickrock.CreateUserResponse
-	(*DeleteUserRequest)(nil),                          // 117: sickrock.DeleteUserRequest
-	(*DeleteUserResponse)(nil),                         // 118: sickrock.DeleteUserResponse
-	(*ListRbacPermissionsRequest)(nil),                 // 119: sickrock.ListRbacPermissionsRequest
-	(*ListRbacPermissionsResponse)(nil),                // 120: sickrock.ListRbacPermissionsResponse
-	(*ListRbacRolesRequest)(nil),                       // 121: sickrock.ListRbacRolesRequest
-	(*ListRbacRolesResponse)(nil),                      // 122: sickrock.ListRbacRolesResponse
-	(*CreateRbacRoleRequest)(nil),                      // 123: sickrock.CreateRbacRoleRequest
-	(*CreateRbacRoleResponse)(nil),                     // 124: sickrock.CreateRbacRoleResponse
-	(*UpdateRbacRoleRequest)(nil),                      // 125: sickrock.UpdateRbacRoleRequest
-	(*UpdateRbacRoleResponse)(nil),                     // 126: sickrock.UpdateRbacRoleResponse
-	(*DeleteRbacRoleRequest)(nil),                      // 127: sickrock.DeleteRbacRoleRequest
-	(*DeleteRbacRoleResponse)(nil),                     // 128: sickrock.DeleteRbacRoleResponse
-	(*GetUserRbacRolesRequest)(nil),                    // 129: sickrock.GetUserRbacRolesRequest
-	(*GetUserRbacRolesResponse)(nil),                   // 130: sickrock.GetUserRbacRolesResponse
-	(*UserEffectiveRoleGrant)(nil),                     // 131: sickrock.UserEffectiveRoleGrant
-	(*GetUserEffectiveRoleGrantsRequest)(nil),          // 132: sickrock.GetUserEffectiveRoleGrantsRequest
-	(*GetUserEffectiveRoleGrantsResponse)(nil),         // 133: sickrock.GetUserEffectiveRoleGrantsResponse
-	(*GetUserGroupRbacRolesRequest)(nil),               // 134: sickrock.GetUserGroupRbacRolesRequest
-	(*GetUserGroupRbacRolesResponse)(nil),              // 135: sickrock.GetUserGroupRbacRolesResponse
-	(*SetUserGroupRbacRolesRequest)(nil),               // 136: sickrock.SetUserGroupRbacRolesRequest
-	(*SetUserGroupRbacRolesResponse)(nil),              // 137: sickrock.SetUserGroupRbacRolesResponse
-	(*GroupTableRoleGrant)(nil),                        // 138: sickrock.GroupTableRoleGrant
-	(*ListGroupTableRoleGrantsRequest)(nil),            // 139: sickrock.ListGroupTableRoleGrantsRequest
-	(*ListGroupTableRoleGrantsResponse)(nil),           // 140: sickrock.ListGroupTableRoleGrantsResponse
-	(*SetGroupTableRoleGrantsRequest)(nil),             // 141: sickrock.SetGroupTableRoleGrantsRequest
-	(*SetGroupTableRoleGrantsResponse)(nil),            // 142: sickrock.SetGroupTableRoleGrantsResponse
-	(*GetTableAccessRequest)(nil),                      // 143: sickrock.GetTableAccessRequest
-	(*GetTableAccessResponse)(nil),                     // 144: sickrock.GetTableAccessResponse
-	(*TableShareGrant)(nil),                            // 145: sickrock.TableShareGrant
-	(*ListTableShareGrantsRequest)(nil),                // 146: sickrock.ListTableShareGrantsRequest
-	(*ListTableShareGrantsResponse)(nil),               // 147: sickrock.ListTableShareGrantsResponse
-	(*SetTableShareGrantsRequest)(nil),                 // 148: sickrock.SetTableShareGrantsRequest
-	(*SetTableShareGrantsResponse)(nil),                // 149: sickrock.SetTableShareGrantsResponse
-	(*GetRbacRoleUsersRequest)(nil),                    // 150: sickrock.GetRbacRoleUsersRequest
-	(*GetRbacRoleUsersResponse)(nil),                   // 151: sickrock.GetRbacRoleUsersResponse
-	(*GetRbacRoleGroupsRequest)(nil),                   // 152: sickrock.GetRbacRoleGroupsRequest
-	(*GetRbacRoleGroupsResponse)(nil),                  // 153: sickrock.GetRbacRoleGroupsResponse
-	(*GetMyPermissionsAuditRequest)(nil),               // 154: sickrock.GetMyPermissionsAuditRequest
-	(*GetMyPermissionsAuditResponse)(nil),              // 155: sickrock.GetMyPermissionsAuditResponse
-	(*ListUserGroupsRequest)(nil),                      // 156: sickrock.ListUserGroupsRequest
-	(*ListUserGroupsResponse)(nil),                     // 157: sickrock.ListUserGroupsResponse
-	(*CreateUserGroupRequest)(nil),                     // 158: sickrock.CreateUserGroupRequest
-	(*CreateUserGroupResponse)(nil),                    // 159: sickrock.CreateUserGroupResponse
-	(*DeleteUserGroupRequest)(nil),                     // 160: sickrock.DeleteUserGroupRequest
-	(*DeleteUserGroupResponse)(nil),                    // 161: sickrock.DeleteUserGroupResponse
-	(*GetUserGroupMembersRequest)(nil),                 // 162: sickrock.GetUserGroupMembersRequest
-	(*GetUserGroupMembersResponse)(nil),                // 163: sickrock.GetUserGroupMembersResponse
-	(*SetUserGroupMembersRequest)(nil),                 // 164: sickrock.SetUserGroupMembersRequest
-	(*SetUserGroupMembersResponse)(nil),                // 165: sickrock.SetUserGroupMembersResponse
-	(*GenerateDeviceCodeRequest)(nil),                  // 166: sickrock.GenerateDeviceCodeRequest
-	(*GenerateDeviceCodeResponse)(nil),                 // 167: sickrock.GenerateDeviceCodeResponse
-	(*ClaimDeviceCodeRequest)(nil),                     // 168: sickrock.ClaimDeviceCodeRequest
-	(*ClaimDeviceCodeResponse)(nil),                    // 169: sickrock.ClaimDeviceCodeResponse
-	(*CheckDeviceCodeRequest)(nil),                     // 170: sickrock.CheckDeviceCodeRequest
-	(*CheckDeviceCodeResponse)(nil),                    // 171: sickrock.CheckDeviceCodeResponse
-	(*GetDeviceCodeSessionRequest)(nil),                // 172: sickrock.GetDeviceCodeSessionRequest
-	(*GetDeviceCodeSessionResponse)(nil),               // 173: sickrock.GetDeviceCodeSessionResponse
-	(*GetSystemInfoRequest)(nil),                       // 174: sickrock.GetSystemInfoRequest
-	(*GetSystemInfoResponse)(nil),                      // 175: sickrock.GetSystemInfoResponse
-	(*GetUserBookmarksRequest)(nil),                    // 176: sickrock.GetUserBookmarksRequest
-	(*GetUserBookmarksResponse)(nil),                   // 177: sickrock.GetUserBookmarksResponse
-	(*CreateUserBookmarkRequest)(nil),                  // 178: sickrock.CreateUserBookmarkRequest
-	(*CreateUserBookmarkResponse)(nil),                 // 179: sickrock.CreateUserBookmarkResponse
-	(*DeleteUserBookmarkRequest)(nil),                  // 180: sickrock.DeleteUserBookmarkRequest
-	(*DeleteUserBookmarkResponse)(nil),                 // 181: sickrock.DeleteUserBookmarkResponse
-	(*UserBookmark)(nil),                               // 182: sickrock.UserBookmark
-	(*CreateAPIKeyRequest)(nil),                        // 183: sickrock.CreateAPIKeyRequest
-	(*CreateAPIKeyResponse)(nil),                       // 184: sickrock.CreateAPIKeyResponse
-	(*GetAPIKeysRequest)(nil),                          // 185: sickrock.GetAPIKeysRequest
-	(*GetAPIKeysResponse)(nil),                         // 186: sickrock.GetAPIKeysResponse
-	(*UpdateAPIKeyRequest)(nil),                        // 187: sickrock.UpdateAPIKeyRequest
-	(*UpdateAPIKeyResponse)(nil),                       // 188: sickrock.UpdateAPIKeyResponse
-	(*DeleteAPIKeyRequest)(nil),                        // 189: sickrock.DeleteAPIKeyRequest
-	(*DeleteAPIKeyResponse)(nil),                       // 190: sickrock.DeleteAPIKeyResponse
-	(*DeactivateAPIKeyRequest)(nil),                    // 191: sickrock.DeactivateAPIKeyRequest
-	(*DeactivateAPIKeyResponse)(nil),                   // 192: sickrock.DeactivateAPIKeyResponse
-	(*APIKey)(nil),                                     // 193: sickrock.APIKey
-	(*ConditionalFormattingRule)(nil),                  // 194: sickrock.ConditionalFormattingRule
-	(*GetConditionalFormattingRulesRequest)(nil),       // 195: sickrock.GetConditionalFormattingRulesRequest
-	(*GetConditionalFormattingRulesResponse)(nil),      // 196: sickrock.GetConditionalFormattingRulesResponse
-	(*CreateConditionalFormattingRuleRequest)(nil),     // 197: sickrock.CreateConditionalFormattingRuleRequest
-	(*CreateConditionalFormattingRuleResponse)(nil),    // 198: sickrock.CreateConditionalFormattingRuleResponse
-	(*DeleteConditionalFormattingRuleRequest)(nil),     // 199: sickrock.DeleteConditionalFormattingRuleRequest
-	(*DeleteConditionalFormattingRuleResponse)(nil),    // 200: sickrock.DeleteConditionalFormattingRuleResponse
-	(*UpdateConditionalFormattingRuleRequest)(nil),     // 201: sickrock.UpdateConditionalFormattingRuleRequest
-	(*UpdateConditionalFormattingRuleResponse)(nil),    // 202: sickrock.UpdateConditionalFormattingRuleResponse
-	(*NotificationEvent)(nil),                          // 203: sickrock.NotificationEvent
-	(*UserNotificationChannel)(nil),                    // 204: sickrock.UserNotificationChannel
-	(*UserNotificationSubscription)(nil),               // 205: sickrock.UserNotificationSubscription
-	(*GetNotificationEventsRequest)(nil),               // 206: sickrock.GetNotificationEventsRequest
-	(*GetNotificationEventsResponse)(nil),              // 207: sickrock.GetNotificationEventsResponse
-	(*GetUserNotificationChannelsRequest)(nil),         // 208: sickrock.GetUserNotificationChannelsRequest
-	(*GetUserNotificationChannelsResponse)(nil),        // 209: sickrock.GetUserNotificationChannelsResponse
-	(*CreateUserNotificationChannelRequest)(nil),       // 210: sickrock.CreateUserNotificationChannelRequest
-	(*CreateUserNotificationChannelResponse)(nil),      // 211: sickrock.CreateUserNotificationChannelResponse
-	(*UpdateUserNotificationChannelRequest)(nil),       // 212: sickrock.UpdateUserNotificationChannelRequest
-	(*UpdateUserNotificationChannelResponse)(nil),      // 213: sickrock.UpdateUserNotificationChannelResponse
-	(*DeleteUserNotificationChannelRequest)(nil),       // 214: sickrock.DeleteUserNotificationChannelRequest
-	(*DeleteUserNotificationChannelResponse)(nil),      // 215: sickrock.DeleteUserNotificationChannelResponse
-	(*GetUserNotificationSubscriptionsRequest)(nil),    // 216: sickrock.GetUserNotificationSubscriptionsRequest
-	(*GetUserNotificationSubscriptionsResponse)(nil),   // 217: sickrock.GetUserNotificationSubscriptionsResponse
-	(*CreateUserNotificationSubscriptionRequest)(nil),  // 218: sickrock.CreateUserNotificationSubscriptionRequest
-	(*CreateUserNotificationSubscriptionResponse)(nil), // 219: sickrock.CreateUserNotificationSubscriptionResponse
-	(*DeleteUserNotificationSubscriptionRequest)(nil),  // 220: sickrock.DeleteUserNotificationSubscriptionRequest
-	(*DeleteUserNotificationSubscriptionResponse)(nil), // 221: sickrock.DeleteUserNotificationSubscriptionResponse
-	(*GetTickListStateRequest)(nil),                    // 222: sickrock.GetTickListStateRequest
-	(*GetTickListStateResponse)(nil),                   // 223: sickrock.GetTickListStateResponse
-	(*SetTickListCompletionRequest)(nil),               // 224: sickrock.SetTickListCompletionRequest
-	(*SetTickListCompletionResponse)(nil),              // 225: sickrock.SetTickListCompletionResponse
-	(*ClearTickListStateRequest)(nil),                  // 226: sickrock.ClearTickListStateRequest
-	(*ClearTickListStateResponse)(nil),                 // 227: sickrock.ClearTickListStateResponse
-	nil,                                                // 228: sickrock.Item.AdditionalFieldsEntry
-	nil,                                                // 229: sickrock.ListItemsRequest.WhereEntry
-	nil,                                                // 230: sickrock.CreateItemRequest.AdditionalFieldsEntry
-	nil,                                                // 231: sickrock.EditItemRequest.AdditionalFieldsEntry
-	nil,                                                // 232: sickrock.GetTickListStateResponse.CompletedByItemIdEntry
+	(*NavigationApp)(nil),                              // 16: sickrock.NavigationApp
+	(*NavigationItem)(nil),                             // 17: sickrock.NavigationItem
+	(*Workflow)(nil),                                   // 18: sickrock.Workflow
+	(*GetNavigationResponse)(nil),                      // 19: sickrock.GetNavigationResponse
+	(*WorkflowNavigationMember)(nil),                   // 20: sickrock.WorkflowNavigationMember
+	(*SetWorkflowNavigationMembersRequest)(nil),        // 21: sickrock.SetWorkflowNavigationMembersRequest
+	(*SetWorkflowNavigationMembersResponse)(nil),       // 22: sickrock.SetWorkflowNavigationMembersResponse
+	(*GetReadOnlyCalendarExportRequest)(nil),           // 23: sickrock.GetReadOnlyCalendarExportRequest
+	(*GetReadOnlyCalendarExportResponse)(nil),          // 24: sickrock.GetReadOnlyCalendarExportResponse
+	(*ReadOnlyExportSummary)(nil),                      // 25: sickrock.ReadOnlyExportSummary
+	(*ListAccessibleReadOnlyExportsRequest)(nil),       // 26: sickrock.ListAccessibleReadOnlyExportsRequest
+	(*ListAccessibleReadOnlyExportsResponse)(nil),      // 27: sickrock.ListAccessibleReadOnlyExportsResponse
+	(*RssFieldMapping)(nil),                            // 28: sickrock.RssFieldMapping
+	(*RssCalendarFeed)(nil),                            // 29: sickrock.RssCalendarFeed
+	(*ListRssCalendarFeedsRequest)(nil),                // 30: sickrock.ListRssCalendarFeedsRequest
+	(*ListRssCalendarFeedsResponse)(nil),               // 31: sickrock.ListRssCalendarFeedsResponse
+	(*GetRssCalendarFeedRequest)(nil),                  // 32: sickrock.GetRssCalendarFeedRequest
+	(*GetRssCalendarFeedResponse)(nil),                 // 33: sickrock.GetRssCalendarFeedResponse
+	(*SaveRssCalendarFeedRequest)(nil),                 // 34: sickrock.SaveRssCalendarFeedRequest
+	(*SaveRssCalendarFeedResponse)(nil),                // 35: sickrock.SaveRssCalendarFeedResponse
+	(*DeleteRssCalendarFeedRequest)(nil),               // 36: sickrock.DeleteRssCalendarFeedRequest
+	(*DeleteRssCalendarFeedResponse)(nil),              // 37: sickrock.DeleteRssCalendarFeedResponse
+	(*RefreshRssCalendarFeedRequest)(nil),              // 38: sickrock.RefreshRssCalendarFeedRequest
+	(*RefreshRssCalendarFeedResponse)(nil),             // 39: sickrock.RefreshRssCalendarFeedResponse
+	(*PreviewRssCalendarFeedRequest)(nil),              // 40: sickrock.PreviewRssCalendarFeedRequest
+	(*PreviewRssCalendarFeedResponse)(nil),             // 41: sickrock.PreviewRssCalendarFeedResponse
+	(*Item)(nil),                                       // 42: sickrock.Item
+	(*ListItemsRequest)(nil),                           // 43: sickrock.ListItemsRequest
+	(*ListItemsResponse)(nil),                          // 44: sickrock.ListItemsResponse
+	(*CreateItemRequest)(nil),                          // 45: sickrock.CreateItemRequest
+	(*CreateItemResponse)(nil),                         // 46: sickrock.CreateItemResponse
+	(*GetItemRequest)(nil),                             // 47: sickrock.GetItemRequest
+	(*GetItemResponse)(nil),                            // 48: sickrock.GetItemResponse
+	(*EditItemRequest)(nil),                            // 49: sickrock.EditItemRequest
+	(*EditItemResponse)(nil),                           // 50: sickrock.EditItemResponse
+	(*DeleteItemRequest)(nil),                          // 51: sickrock.DeleteItemRequest
+	(*DeleteItemResponse)(nil),                         // 52: sickrock.DeleteItemResponse
+	(*GetTableStructureRequest)(nil),                   // 53: sickrock.GetTableStructureRequest
+	(*Field)(nil),                                      // 54: sickrock.Field
+	(*PageLayoutBlock)(nil),                            // 55: sickrock.PageLayoutBlock
+	(*ItemPageLayout)(nil),                             // 56: sickrock.ItemPageLayout
+	(*ItemFieldGroup)(nil),                             // 57: sickrock.ItemFieldGroup
+	(*ItemFieldGroups)(nil),                            // 58: sickrock.ItemFieldGroups
+	(*ItemFieldGroupInput)(nil),                        // 59: sickrock.ItemFieldGroupInput
+	(*SetItemFieldGroupsRequest)(nil),                  // 60: sickrock.SetItemFieldGroupsRequest
+	(*SetItemFieldGroupsResponse)(nil),                 // 61: sickrock.SetItemFieldGroupsResponse
+	(*ColumnDisplaySettingInput)(nil),                  // 62: sickrock.ColumnDisplaySettingInput
+	(*SetColumnDisplaySettingsRequest)(nil),            // 63: sickrock.SetColumnDisplaySettingsRequest
+	(*SetColumnDisplaySettingsResponse)(nil),           // 64: sickrock.SetColumnDisplaySettingsResponse
+	(*SetTableRowLabelsRequest)(nil),                   // 65: sickrock.SetTableRowLabelsRequest
+	(*SetTableRowLabelsResponse)(nil),                  // 66: sickrock.SetTableRowLabelsResponse
+	(*GetTableStructureResponse)(nil),                  // 67: sickrock.GetTableStructureResponse
+	(*SetItemPageLayoutRequest)(nil),                   // 68: sickrock.SetItemPageLayoutRequest
+	(*SetItemPageLayoutResponse)(nil),                  // 69: sickrock.SetItemPageLayoutResponse
+	(*AddTableColumnRequest)(nil),                      // 70: sickrock.AddTableColumnRequest
+	(*TableViewColumn)(nil),                            // 71: sickrock.TableViewColumn
+	(*CreateTableViewRequest)(nil),                     // 72: sickrock.CreateTableViewRequest
+	(*CreateTableViewResponse)(nil),                    // 73: sickrock.CreateTableViewResponse
+	(*UpdateTableViewRequest)(nil),                     // 74: sickrock.UpdateTableViewRequest
+	(*UpdateTableViewResponse)(nil),                    // 75: sickrock.UpdateTableViewResponse
+	(*GetTableViewsRequest)(nil),                       // 76: sickrock.GetTableViewsRequest
+	(*TableView)(nil),                                  // 77: sickrock.TableView
+	(*GetTableViewsResponse)(nil),                      // 78: sickrock.GetTableViewsResponse
+	(*DeleteTableViewRequest)(nil),                     // 79: sickrock.DeleteTableViewRequest
+	(*DeleteTableViewResponse)(nil),                    // 80: sickrock.DeleteTableViewResponse
+	(*ForeignKey)(nil),                                 // 81: sickrock.ForeignKey
+	(*RelationPullThroughField)(nil),                   // 82: sickrock.RelationPullThroughField
+	(*UpdateTableRelationRequest)(nil),                 // 83: sickrock.UpdateTableRelationRequest
+	(*UpdateTableRelationResponse)(nil),                // 84: sickrock.UpdateTableRelationResponse
+	(*CreateForeignKeyRequest)(nil),                    // 85: sickrock.CreateForeignKeyRequest
+	(*CreateForeignKeyResponse)(nil),                   // 86: sickrock.CreateForeignKeyResponse
+	(*GetForeignKeysRequest)(nil),                      // 87: sickrock.GetForeignKeysRequest
+	(*GetForeignKeysResponse)(nil),                     // 88: sickrock.GetForeignKeysResponse
+	(*DeleteForeignKeyRequest)(nil),                    // 89: sickrock.DeleteForeignKeyRequest
+	(*DeleteForeignKeyResponse)(nil),                   // 90: sickrock.DeleteForeignKeyResponse
+	(*ChangeColumnTypeRequest)(nil),                    // 91: sickrock.ChangeColumnTypeRequest
+	(*ChangeColumnTypeResponse)(nil),                   // 92: sickrock.ChangeColumnTypeResponse
+	(*DropColumnRequest)(nil),                          // 93: sickrock.DropColumnRequest
+	(*DropColumnResponse)(nil),                         // 94: sickrock.DropColumnResponse
+	(*ChangeColumnNameRequest)(nil),                    // 95: sickrock.ChangeColumnNameRequest
+	(*ChangeColumnNameResponse)(nil),                   // 96: sickrock.ChangeColumnNameResponse
+	(*GetMostRecentlyViewedRequest)(nil),               // 97: sickrock.GetMostRecentlyViewedRequest
+	(*RecentlyViewedItem)(nil),                         // 98: sickrock.RecentlyViewedItem
+	(*GetMostRecentlyViewedResponse)(nil),              // 99: sickrock.GetMostRecentlyViewedResponse
+	(*Dashboard)(nil),                                  // 100: sickrock.Dashboard
+	(*GetDashboardsRequest)(nil),                       // 101: sickrock.GetDashboardsRequest
+	(*GetDashboardsResponse)(nil),                      // 102: sickrock.GetDashboardsResponse
+	(*CreateDashboardRequest)(nil),                     // 103: sickrock.CreateDashboardRequest
+	(*CreateDashboardResponse)(nil),                    // 104: sickrock.CreateDashboardResponse
+	(*DashboardComponent)(nil),                         // 105: sickrock.DashboardComponent
+	(*DashboardComponentRule)(nil),                     // 106: sickrock.DashboardComponentRule
+	(*GetDashboardComponentRulesRequest)(nil),          // 107: sickrock.GetDashboardComponentRulesRequest
+	(*GetDashboardComponentRulesResponse)(nil),         // 108: sickrock.GetDashboardComponentRulesResponse
+	(*CreateDashboardComponentRuleRequest)(nil),        // 109: sickrock.CreateDashboardComponentRuleRequest
+	(*CreateDashboardComponentRuleResponse)(nil),       // 110: sickrock.CreateDashboardComponentRuleResponse
+	(*InitRequest)(nil),                                // 111: sickrock.InitRequest
+	(*OAuthProvider)(nil),                              // 112: sickrock.OAuthProvider
+	(*InitResponse)(nil),                               // 113: sickrock.InitResponse
+	(*LoginRequest)(nil),                               // 114: sickrock.LoginRequest
+	(*LoginResponse)(nil),                              // 115: sickrock.LoginResponse
+	(*LogoutRequest)(nil),                              // 116: sickrock.LogoutRequest
+	(*LogoutResponse)(nil),                             // 117: sickrock.LogoutResponse
+	(*ResetUserPasswordRequest)(nil),                   // 118: sickrock.ResetUserPasswordRequest
+	(*ResetUserPasswordResponse)(nil),                  // 119: sickrock.ResetUserPasswordResponse
+	(*ValidateTokenRequest)(nil),                       // 120: sickrock.ValidateTokenRequest
+	(*ValidateTokenResponse)(nil),                      // 121: sickrock.ValidateTokenResponse
+	(*ChangePasswordRequest)(nil),                      // 122: sickrock.ChangePasswordRequest
+	(*ChangePasswordResponse)(nil),                     // 123: sickrock.ChangePasswordResponse
+	(*IamUser)(nil),                                    // 124: sickrock.IamUser
+	(*RbacPermission)(nil),                             // 125: sickrock.RbacPermission
+	(*RbacRole)(nil),                                   // 126: sickrock.RbacRole
+	(*UserGroup)(nil),                                  // 127: sickrock.UserGroup
+	(*MyPermissionAuditRow)(nil),                       // 128: sickrock.MyPermissionAuditRow
+	(*ListUsersRequest)(nil),                           // 129: sickrock.ListUsersRequest
+	(*ListUsersResponse)(nil),                          // 130: sickrock.ListUsersResponse
+	(*GetUserRequest)(nil),                             // 131: sickrock.GetUserRequest
+	(*GetUserResponse)(nil),                            // 132: sickrock.GetUserResponse
+	(*CreateUserRequest)(nil),                          // 133: sickrock.CreateUserRequest
+	(*CreateUserResponse)(nil),                         // 134: sickrock.CreateUserResponse
+	(*DeleteUserRequest)(nil),                          // 135: sickrock.DeleteUserRequest
+	(*DeleteUserResponse)(nil),                         // 136: sickrock.DeleteUserResponse
+	(*ListRbacPermissionsRequest)(nil),                 // 137: sickrock.ListRbacPermissionsRequest
+	(*ListRbacPermissionsResponse)(nil),                // 138: sickrock.ListRbacPermissionsResponse
+	(*ListRbacRolesRequest)(nil),                       // 139: sickrock.ListRbacRolesRequest
+	(*ListRbacRolesResponse)(nil),                      // 140: sickrock.ListRbacRolesResponse
+	(*CreateRbacRoleRequest)(nil),                      // 141: sickrock.CreateRbacRoleRequest
+	(*CreateRbacRoleResponse)(nil),                     // 142: sickrock.CreateRbacRoleResponse
+	(*UpdateRbacRoleRequest)(nil),                      // 143: sickrock.UpdateRbacRoleRequest
+	(*UpdateRbacRoleResponse)(nil),                     // 144: sickrock.UpdateRbacRoleResponse
+	(*DeleteRbacRoleRequest)(nil),                      // 145: sickrock.DeleteRbacRoleRequest
+	(*DeleteRbacRoleResponse)(nil),                     // 146: sickrock.DeleteRbacRoleResponse
+	(*GetUserRbacRolesRequest)(nil),                    // 147: sickrock.GetUserRbacRolesRequest
+	(*GetUserRbacRolesResponse)(nil),                   // 148: sickrock.GetUserRbacRolesResponse
+	(*UserEffectiveRoleGrant)(nil),                     // 149: sickrock.UserEffectiveRoleGrant
+	(*GetUserEffectiveRoleGrantsRequest)(nil),          // 150: sickrock.GetUserEffectiveRoleGrantsRequest
+	(*GetUserEffectiveRoleGrantsResponse)(nil),         // 151: sickrock.GetUserEffectiveRoleGrantsResponse
+	(*GetUserGroupRbacRolesRequest)(nil),               // 152: sickrock.GetUserGroupRbacRolesRequest
+	(*GetUserGroupRbacRolesResponse)(nil),              // 153: sickrock.GetUserGroupRbacRolesResponse
+	(*SetUserGroupRbacRolesRequest)(nil),               // 154: sickrock.SetUserGroupRbacRolesRequest
+	(*SetUserGroupRbacRolesResponse)(nil),              // 155: sickrock.SetUserGroupRbacRolesResponse
+	(*GroupTableRoleGrant)(nil),                        // 156: sickrock.GroupTableRoleGrant
+	(*ListGroupTableRoleGrantsRequest)(nil),            // 157: sickrock.ListGroupTableRoleGrantsRequest
+	(*ListGroupTableRoleGrantsResponse)(nil),           // 158: sickrock.ListGroupTableRoleGrantsResponse
+	(*SetGroupTableRoleGrantsRequest)(nil),             // 159: sickrock.SetGroupTableRoleGrantsRequest
+	(*SetGroupTableRoleGrantsResponse)(nil),            // 160: sickrock.SetGroupTableRoleGrantsResponse
+	(*GetTableAccessRequest)(nil),                      // 161: sickrock.GetTableAccessRequest
+	(*GetTableAccessResponse)(nil),                     // 162: sickrock.GetTableAccessResponse
+	(*TableShareGrant)(nil),                            // 163: sickrock.TableShareGrant
+	(*ListTableShareGrantsRequest)(nil),                // 164: sickrock.ListTableShareGrantsRequest
+	(*ListTableShareGrantsResponse)(nil),               // 165: sickrock.ListTableShareGrantsResponse
+	(*SetTableShareGrantsRequest)(nil),                 // 166: sickrock.SetTableShareGrantsRequest
+	(*SetTableShareGrantsResponse)(nil),                // 167: sickrock.SetTableShareGrantsResponse
+	(*GetRbacRoleUsersRequest)(nil),                    // 168: sickrock.GetRbacRoleUsersRequest
+	(*GetRbacRoleUsersResponse)(nil),                   // 169: sickrock.GetRbacRoleUsersResponse
+	(*GetRbacRoleGroupsRequest)(nil),                   // 170: sickrock.GetRbacRoleGroupsRequest
+	(*GetRbacRoleGroupsResponse)(nil),                  // 171: sickrock.GetRbacRoleGroupsResponse
+	(*GetMyPermissionsAuditRequest)(nil),               // 172: sickrock.GetMyPermissionsAuditRequest
+	(*GetMyPermissionsAuditResponse)(nil),              // 173: sickrock.GetMyPermissionsAuditResponse
+	(*ListUserGroupsRequest)(nil),                      // 174: sickrock.ListUserGroupsRequest
+	(*ListUserGroupsResponse)(nil),                     // 175: sickrock.ListUserGroupsResponse
+	(*CreateUserGroupRequest)(nil),                     // 176: sickrock.CreateUserGroupRequest
+	(*CreateUserGroupResponse)(nil),                    // 177: sickrock.CreateUserGroupResponse
+	(*DeleteUserGroupRequest)(nil),                     // 178: sickrock.DeleteUserGroupRequest
+	(*DeleteUserGroupResponse)(nil),                    // 179: sickrock.DeleteUserGroupResponse
+	(*GetUserGroupMembersRequest)(nil),                 // 180: sickrock.GetUserGroupMembersRequest
+	(*GetUserGroupMembersResponse)(nil),                // 181: sickrock.GetUserGroupMembersResponse
+	(*SetUserGroupMembersRequest)(nil),                 // 182: sickrock.SetUserGroupMembersRequest
+	(*SetUserGroupMembersResponse)(nil),                // 183: sickrock.SetUserGroupMembersResponse
+	(*GenerateDeviceCodeRequest)(nil),                  // 184: sickrock.GenerateDeviceCodeRequest
+	(*GenerateDeviceCodeResponse)(nil),                 // 185: sickrock.GenerateDeviceCodeResponse
+	(*ClaimDeviceCodeRequest)(nil),                     // 186: sickrock.ClaimDeviceCodeRequest
+	(*ClaimDeviceCodeResponse)(nil),                    // 187: sickrock.ClaimDeviceCodeResponse
+	(*CheckDeviceCodeRequest)(nil),                     // 188: sickrock.CheckDeviceCodeRequest
+	(*CheckDeviceCodeResponse)(nil),                    // 189: sickrock.CheckDeviceCodeResponse
+	(*GetDeviceCodeSessionRequest)(nil),                // 190: sickrock.GetDeviceCodeSessionRequest
+	(*GetDeviceCodeSessionResponse)(nil),               // 191: sickrock.GetDeviceCodeSessionResponse
+	(*GetSystemInfoRequest)(nil),                       // 192: sickrock.GetSystemInfoRequest
+	(*GetSystemInfoResponse)(nil),                      // 193: sickrock.GetSystemInfoResponse
+	(*GetUserBookmarksRequest)(nil),                    // 194: sickrock.GetUserBookmarksRequest
+	(*GetUserBookmarksResponse)(nil),                   // 195: sickrock.GetUserBookmarksResponse
+	(*CreateUserBookmarkRequest)(nil),                  // 196: sickrock.CreateUserBookmarkRequest
+	(*CreateUserBookmarkResponse)(nil),                 // 197: sickrock.CreateUserBookmarkResponse
+	(*DeleteUserBookmarkRequest)(nil),                  // 198: sickrock.DeleteUserBookmarkRequest
+	(*DeleteUserBookmarkResponse)(nil),                 // 199: sickrock.DeleteUserBookmarkResponse
+	(*UserBookmark)(nil),                               // 200: sickrock.UserBookmark
+	(*CreateAPIKeyRequest)(nil),                        // 201: sickrock.CreateAPIKeyRequest
+	(*CreateAPIKeyResponse)(nil),                       // 202: sickrock.CreateAPIKeyResponse
+	(*GetAPIKeysRequest)(nil),                          // 203: sickrock.GetAPIKeysRequest
+	(*GetAPIKeysResponse)(nil),                         // 204: sickrock.GetAPIKeysResponse
+	(*UpdateAPIKeyRequest)(nil),                        // 205: sickrock.UpdateAPIKeyRequest
+	(*UpdateAPIKeyResponse)(nil),                       // 206: sickrock.UpdateAPIKeyResponse
+	(*DeleteAPIKeyRequest)(nil),                        // 207: sickrock.DeleteAPIKeyRequest
+	(*DeleteAPIKeyResponse)(nil),                       // 208: sickrock.DeleteAPIKeyResponse
+	(*DeactivateAPIKeyRequest)(nil),                    // 209: sickrock.DeactivateAPIKeyRequest
+	(*DeactivateAPIKeyResponse)(nil),                   // 210: sickrock.DeactivateAPIKeyResponse
+	(*APIKey)(nil),                                     // 211: sickrock.APIKey
+	(*ConditionalFormattingRule)(nil),                  // 212: sickrock.ConditionalFormattingRule
+	(*GetConditionalFormattingRulesRequest)(nil),       // 213: sickrock.GetConditionalFormattingRulesRequest
+	(*GetConditionalFormattingRulesResponse)(nil),      // 214: sickrock.GetConditionalFormattingRulesResponse
+	(*CreateConditionalFormattingRuleRequest)(nil),     // 215: sickrock.CreateConditionalFormattingRuleRequest
+	(*CreateConditionalFormattingRuleResponse)(nil),    // 216: sickrock.CreateConditionalFormattingRuleResponse
+	(*DeleteConditionalFormattingRuleRequest)(nil),     // 217: sickrock.DeleteConditionalFormattingRuleRequest
+	(*DeleteConditionalFormattingRuleResponse)(nil),    // 218: sickrock.DeleteConditionalFormattingRuleResponse
+	(*UpdateConditionalFormattingRuleRequest)(nil),     // 219: sickrock.UpdateConditionalFormattingRuleRequest
+	(*UpdateConditionalFormattingRuleResponse)(nil),    // 220: sickrock.UpdateConditionalFormattingRuleResponse
+	(*NotificationEvent)(nil),                          // 221: sickrock.NotificationEvent
+	(*UserNotificationChannel)(nil),                    // 222: sickrock.UserNotificationChannel
+	(*UserNotificationSubscription)(nil),               // 223: sickrock.UserNotificationSubscription
+	(*GetNotificationEventsRequest)(nil),               // 224: sickrock.GetNotificationEventsRequest
+	(*GetNotificationEventsResponse)(nil),              // 225: sickrock.GetNotificationEventsResponse
+	(*GetUserNotificationChannelsRequest)(nil),         // 226: sickrock.GetUserNotificationChannelsRequest
+	(*GetUserNotificationChannelsResponse)(nil),        // 227: sickrock.GetUserNotificationChannelsResponse
+	(*CreateUserNotificationChannelRequest)(nil),       // 228: sickrock.CreateUserNotificationChannelRequest
+	(*CreateUserNotificationChannelResponse)(nil),      // 229: sickrock.CreateUserNotificationChannelResponse
+	(*UpdateUserNotificationChannelRequest)(nil),       // 230: sickrock.UpdateUserNotificationChannelRequest
+	(*UpdateUserNotificationChannelResponse)(nil),      // 231: sickrock.UpdateUserNotificationChannelResponse
+	(*DeleteUserNotificationChannelRequest)(nil),       // 232: sickrock.DeleteUserNotificationChannelRequest
+	(*DeleteUserNotificationChannelResponse)(nil),      // 233: sickrock.DeleteUserNotificationChannelResponse
+	(*GetUserNotificationSubscriptionsRequest)(nil),    // 234: sickrock.GetUserNotificationSubscriptionsRequest
+	(*GetUserNotificationSubscriptionsResponse)(nil),   // 235: sickrock.GetUserNotificationSubscriptionsResponse
+	(*CreateUserNotificationSubscriptionRequest)(nil),  // 236: sickrock.CreateUserNotificationSubscriptionRequest
+	(*CreateUserNotificationSubscriptionResponse)(nil), // 237: sickrock.CreateUserNotificationSubscriptionResponse
+	(*DeleteUserNotificationSubscriptionRequest)(nil),  // 238: sickrock.DeleteUserNotificationSubscriptionRequest
+	(*DeleteUserNotificationSubscriptionResponse)(nil), // 239: sickrock.DeleteUserNotificationSubscriptionResponse
+	(*GetTickListStateRequest)(nil),                    // 240: sickrock.GetTickListStateRequest
+	(*GetTickListStateResponse)(nil),                   // 241: sickrock.GetTickListStateResponse
+	(*SetTickListCompletionRequest)(nil),               // 242: sickrock.SetTickListCompletionRequest
+	(*SetTickListCompletionResponse)(nil),              // 243: sickrock.SetTickListCompletionResponse
+	(*ClearTickListStateRequest)(nil),                  // 244: sickrock.ClearTickListStateRequest
+	(*ClearTickListStateResponse)(nil),                 // 245: sickrock.ClearTickListStateResponse
+	nil,                                                // 246: sickrock.Item.AdditionalFieldsEntry
+	nil,                                                // 247: sickrock.ListItemsRequest.WhereEntry
+	nil,                                                // 248: sickrock.CreateItemRequest.AdditionalFieldsEntry
+	nil,                                                // 249: sickrock.EditItemRequest.AdditionalFieldsEntry
+	nil,                                                // 250: sickrock.GetTickListStateResponse.CompletedByItemIdEntry
 }
 var file_sickrock_proto_depIdxs = []int32{
 	3,   // 0: sickrock.GetNavigationLinksResponse.links:type_name -> sickrock.NavigationLink
 	6,   // 1: sickrock.GetTableConfigurationsResponse.pages:type_name -> sickrock.Page
 	13,  // 2: sickrock.GetDatabaseTablesResponse.tables:type_name -> sickrock.DatabaseTable
-	16,  // 3: sickrock.Workflow.items:type_name -> sickrock.NavigationItem
-	16,  // 4: sickrock.GetNavigationResponse.items:type_name -> sickrock.NavigationItem
-	182, // 5: sickrock.GetNavigationResponse.bookmarks:type_name -> sickrock.UserBookmark
-	17,  // 6: sickrock.GetNavigationResponse.workflows:type_name -> sickrock.Workflow
-	19,  // 7: sickrock.SetWorkflowNavigationMembersRequest.members:type_name -> sickrock.WorkflowNavigationMember
-	41,  // 8: sickrock.GetReadOnlyCalendarExportResponse.items:type_name -> sickrock.Item
-	24,  // 9: sickrock.ListAccessibleReadOnlyExportsResponse.exports:type_name -> sickrock.ReadOnlyExportSummary
-	27,  // 10: sickrock.RssCalendarFeed.field_mappings:type_name -> sickrock.RssFieldMapping
-	28,  // 11: sickrock.ListRssCalendarFeedsResponse.feeds:type_name -> sickrock.RssCalendarFeed
-	28,  // 12: sickrock.GetRssCalendarFeedResponse.feed:type_name -> sickrock.RssCalendarFeed
-	28,  // 13: sickrock.SaveRssCalendarFeedRequest.feed:type_name -> sickrock.RssCalendarFeed
-	28,  // 14: sickrock.SaveRssCalendarFeedResponse.feed:type_name -> sickrock.RssCalendarFeed
-	28,  // 15: sickrock.RefreshRssCalendarFeedResponse.feed:type_name -> sickrock.RssCalendarFeed
-	27,  // 16: sickrock.PreviewRssCalendarFeedResponse.sample_values:type_name -> sickrock.RssFieldMapping
-	228, // 17: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
-	229, // 18: sickrock.ListItemsRequest.where:type_name -> sickrock.ListItemsRequest.WhereEntry
-	41,  // 19: sickrock.ListItemsResponse.items:type_name -> sickrock.Item
-	230, // 20: sickrock.CreateItemRequest.additional_fields:type_name -> sickrock.CreateItemRequest.AdditionalFieldsEntry
-	41,  // 21: sickrock.CreateItemResponse.item:type_name -> sickrock.Item
-	41,  // 22: sickrock.GetItemResponse.item:type_name -> sickrock.Item
-	231, // 23: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
-	41,  // 24: sickrock.EditItemResponse.item:type_name -> sickrock.Item
-	53,  // 25: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
-	66,  // 26: sickrock.GetTableStructureResponse.foreign_keys:type_name -> sickrock.ForeignKey
-	53,  // 27: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
-	56,  // 28: sickrock.CreateTableViewRequest.columns:type_name -> sickrock.TableViewColumn
-	56,  // 29: sickrock.UpdateTableViewRequest.columns:type_name -> sickrock.TableViewColumn
-	56,  // 30: sickrock.TableView.columns:type_name -> sickrock.TableViewColumn
-	62,  // 31: sickrock.GetTableViewsResponse.views:type_name -> sickrock.TableView
-	66,  // 32: sickrock.GetForeignKeysResponse.foreign_keys:type_name -> sickrock.ForeignKey
-	80,  // 33: sickrock.GetMostRecentlyViewedResponse.items:type_name -> sickrock.RecentlyViewedItem
-	87,  // 34: sickrock.Dashboard.components:type_name -> sickrock.DashboardComponent
-	82,  // 35: sickrock.GetDashboardsResponse.dashboards:type_name -> sickrock.Dashboard
-	88,  // 36: sickrock.GetDashboardComponentRulesResponse.rules:type_name -> sickrock.DashboardComponentRule
-	88,  // 37: sickrock.CreateDashboardComponentRuleResponse.rule:type_name -> sickrock.DashboardComponentRule
-	94,  // 38: sickrock.InitResponse.oauth_providers:type_name -> sickrock.OAuthProvider
-	106, // 39: sickrock.ListUsersResponse.users:type_name -> sickrock.IamUser
-	106, // 40: sickrock.GetUserResponse.user:type_name -> sickrock.IamUser
-	106, // 41: sickrock.CreateUserResponse.user:type_name -> sickrock.IamUser
-	107, // 42: sickrock.ListRbacPermissionsResponse.permissions:type_name -> sickrock.RbacPermission
-	108, // 43: sickrock.ListRbacRolesResponse.roles:type_name -> sickrock.RbacRole
-	108, // 44: sickrock.CreateRbacRoleResponse.role:type_name -> sickrock.RbacRole
-	108, // 45: sickrock.UpdateRbacRoleResponse.role:type_name -> sickrock.RbacRole
-	131, // 46: sickrock.GetUserEffectiveRoleGrantsResponse.grants:type_name -> sickrock.UserEffectiveRoleGrant
-	138, // 47: sickrock.ListGroupTableRoleGrantsResponse.grants:type_name -> sickrock.GroupTableRoleGrant
-	138, // 48: sickrock.SetGroupTableRoleGrantsRequest.grants:type_name -> sickrock.GroupTableRoleGrant
-	145, // 49: sickrock.ListTableShareGrantsResponse.grants:type_name -> sickrock.TableShareGrant
-	145, // 50: sickrock.SetTableShareGrantsRequest.grants:type_name -> sickrock.TableShareGrant
-	110, // 51: sickrock.GetMyPermissionsAuditResponse.permissions:type_name -> sickrock.MyPermissionAuditRow
-	109, // 52: sickrock.ListUserGroupsResponse.groups:type_name -> sickrock.UserGroup
-	109, // 53: sickrock.CreateUserGroupResponse.group:type_name -> sickrock.UserGroup
-	182, // 54: sickrock.GetUserBookmarksResponse.bookmarks:type_name -> sickrock.UserBookmark
-	182, // 55: sickrock.CreateUserBookmarkResponse.bookmark:type_name -> sickrock.UserBookmark
-	16,  // 56: sickrock.UserBookmark.navigation_item:type_name -> sickrock.NavigationItem
-	193, // 57: sickrock.GetAPIKeysResponse.api_keys:type_name -> sickrock.APIKey
-	194, // 58: sickrock.GetConditionalFormattingRulesResponse.rules:type_name -> sickrock.ConditionalFormattingRule
-	203, // 59: sickrock.UserNotificationSubscription.event:type_name -> sickrock.NotificationEvent
-	204, // 60: sickrock.UserNotificationSubscription.channel:type_name -> sickrock.UserNotificationChannel
-	203, // 61: sickrock.GetNotificationEventsResponse.events:type_name -> sickrock.NotificationEvent
-	204, // 62: sickrock.GetUserNotificationChannelsResponse.channels:type_name -> sickrock.UserNotificationChannel
-	204, // 63: sickrock.CreateUserNotificationChannelResponse.channel:type_name -> sickrock.UserNotificationChannel
-	205, // 64: sickrock.GetUserNotificationSubscriptionsResponse.subscriptions:type_name -> sickrock.UserNotificationSubscription
-	205, // 65: sickrock.CreateUserNotificationSubscriptionResponse.subscription:type_name -> sickrock.UserNotificationSubscription
-	232, // 66: sickrock.GetTickListStateResponse.completed_by_item_id:type_name -> sickrock.GetTickListStateResponse.CompletedByItemIdEntry
-	93,  // 67: sickrock.SickRock.Init:input_type -> sickrock.InitRequest
-	0,   // 68: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
-	96,  // 69: sickrock.SickRock.Login:input_type -> sickrock.LoginRequest
-	98,  // 70: sickrock.SickRock.Logout:input_type -> sickrock.LogoutRequest
-	102, // 71: sickrock.SickRock.ValidateToken:input_type -> sickrock.ValidateTokenRequest
-	100, // 72: sickrock.SickRock.ResetUserPassword:input_type -> sickrock.ResetUserPasswordRequest
-	104, // 73: sickrock.SickRock.ChangePassword:input_type -> sickrock.ChangePasswordRequest
-	111, // 74: sickrock.SickRock.ListUsers:input_type -> sickrock.ListUsersRequest
-	113, // 75: sickrock.SickRock.GetUser:input_type -> sickrock.GetUserRequest
-	115, // 76: sickrock.SickRock.CreateUser:input_type -> sickrock.CreateUserRequest
-	117, // 77: sickrock.SickRock.DeleteUser:input_type -> sickrock.DeleteUserRequest
-	119, // 78: sickrock.SickRock.ListRbacPermissions:input_type -> sickrock.ListRbacPermissionsRequest
-	121, // 79: sickrock.SickRock.ListRbacRoles:input_type -> sickrock.ListRbacRolesRequest
-	123, // 80: sickrock.SickRock.CreateRbacRole:input_type -> sickrock.CreateRbacRoleRequest
-	125, // 81: sickrock.SickRock.UpdateRbacRole:input_type -> sickrock.UpdateRbacRoleRequest
-	127, // 82: sickrock.SickRock.DeleteRbacRole:input_type -> sickrock.DeleteRbacRoleRequest
-	129, // 83: sickrock.SickRock.GetUserRbacRoles:input_type -> sickrock.GetUserRbacRolesRequest
-	132, // 84: sickrock.SickRock.GetUserEffectiveRoleGrants:input_type -> sickrock.GetUserEffectiveRoleGrantsRequest
-	134, // 85: sickrock.SickRock.GetUserGroupRbacRoles:input_type -> sickrock.GetUserGroupRbacRolesRequest
-	136, // 86: sickrock.SickRock.SetUserGroupRbacRoles:input_type -> sickrock.SetUserGroupRbacRolesRequest
-	139, // 87: sickrock.SickRock.ListGroupTableRoleGrants:input_type -> sickrock.ListGroupTableRoleGrantsRequest
-	141, // 88: sickrock.SickRock.SetGroupTableRoleGrants:input_type -> sickrock.SetGroupTableRoleGrantsRequest
-	146, // 89: sickrock.SickRock.ListTableShareGrants:input_type -> sickrock.ListTableShareGrantsRequest
-	148, // 90: sickrock.SickRock.SetTableShareGrants:input_type -> sickrock.SetTableShareGrantsRequest
-	150, // 91: sickrock.SickRock.GetRbacRoleUsers:input_type -> sickrock.GetRbacRoleUsersRequest
-	152, // 92: sickrock.SickRock.GetRbacRoleGroups:input_type -> sickrock.GetRbacRoleGroupsRequest
-	154, // 93: sickrock.SickRock.GetMyPermissionsAudit:input_type -> sickrock.GetMyPermissionsAuditRequest
-	156, // 94: sickrock.SickRock.ListUserGroups:input_type -> sickrock.ListUserGroupsRequest
-	158, // 95: sickrock.SickRock.CreateUserGroup:input_type -> sickrock.CreateUserGroupRequest
-	160, // 96: sickrock.SickRock.DeleteUserGroup:input_type -> sickrock.DeleteUserGroupRequest
-	162, // 97: sickrock.SickRock.GetUserGroupMembers:input_type -> sickrock.GetUserGroupMembersRequest
-	164, // 98: sickrock.SickRock.SetUserGroupMembers:input_type -> sickrock.SetUserGroupMembersRequest
-	166, // 99: sickrock.SickRock.GenerateDeviceCode:input_type -> sickrock.GenerateDeviceCodeRequest
-	168, // 100: sickrock.SickRock.ClaimDeviceCode:input_type -> sickrock.ClaimDeviceCodeRequest
-	170, // 101: sickrock.SickRock.CheckDeviceCode:input_type -> sickrock.CheckDeviceCodeRequest
-	172, // 102: sickrock.SickRock.GetDeviceCodeSession:input_type -> sickrock.GetDeviceCodeSessionRequest
-	2,   // 103: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
-	5,   // 104: sickrock.SickRock.GetTableConfigurations:input_type -> sickrock.GetTableConfigurationsRequest
-	8,   // 105: sickrock.SickRock.CreateTable:input_type -> sickrock.CreateTableRequest
-	10,  // 106: sickrock.SickRock.CreateTableConfiguration:input_type -> sickrock.CreateTableConfigurationRequest
-	12,  // 107: sickrock.SickRock.GetDatabaseTables:input_type -> sickrock.GetDatabaseTablesRequest
-	15,  // 108: sickrock.SickRock.GetNavigation:input_type -> sickrock.GetNavigationRequest
-	20,  // 109: sickrock.SickRock.SetWorkflowNavigationMembers:input_type -> sickrock.SetWorkflowNavigationMembersRequest
-	22,  // 110: sickrock.SickRock.GetReadOnlyCalendarExport:input_type -> sickrock.GetReadOnlyCalendarExportRequest
-	25,  // 111: sickrock.SickRock.ListAccessibleReadOnlyExports:input_type -> sickrock.ListAccessibleReadOnlyExportsRequest
-	29,  // 112: sickrock.SickRock.ListRssCalendarFeeds:input_type -> sickrock.ListRssCalendarFeedsRequest
-	31,  // 113: sickrock.SickRock.GetRssCalendarFeed:input_type -> sickrock.GetRssCalendarFeedRequest
-	33,  // 114: sickrock.SickRock.SaveRssCalendarFeed:input_type -> sickrock.SaveRssCalendarFeedRequest
-	35,  // 115: sickrock.SickRock.DeleteRssCalendarFeed:input_type -> sickrock.DeleteRssCalendarFeedRequest
-	37,  // 116: sickrock.SickRock.RefreshRssCalendarFeed:input_type -> sickrock.RefreshRssCalendarFeedRequest
-	39,  // 117: sickrock.SickRock.PreviewRssCalendarFeed:input_type -> sickrock.PreviewRssCalendarFeedRequest
-	42,  // 118: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
-	44,  // 119: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
-	46,  // 120: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
-	48,  // 121: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
-	50,  // 122: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
-	52,  // 123: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
-	143, // 124: sickrock.SickRock.GetTableAccess:input_type -> sickrock.GetTableAccessRequest
-	55,  // 125: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
-	57,  // 126: sickrock.SickRock.CreateTableView:input_type -> sickrock.CreateTableViewRequest
-	59,  // 127: sickrock.SickRock.UpdateTableView:input_type -> sickrock.UpdateTableViewRequest
-	61,  // 128: sickrock.SickRock.GetTableViews:input_type -> sickrock.GetTableViewsRequest
-	64,  // 129: sickrock.SickRock.DeleteTableView:input_type -> sickrock.DeleteTableViewRequest
-	67,  // 130: sickrock.SickRock.CreateForeignKey:input_type -> sickrock.CreateForeignKeyRequest
-	69,  // 131: sickrock.SickRock.GetForeignKeys:input_type -> sickrock.GetForeignKeysRequest
-	71,  // 132: sickrock.SickRock.DeleteForeignKey:input_type -> sickrock.DeleteForeignKeyRequest
-	73,  // 133: sickrock.SickRock.ChangeColumnType:input_type -> sickrock.ChangeColumnTypeRequest
-	75,  // 134: sickrock.SickRock.DropColumn:input_type -> sickrock.DropColumnRequest
-	77,  // 135: sickrock.SickRock.ChangeColumnName:input_type -> sickrock.ChangeColumnNameRequest
-	79,  // 136: sickrock.SickRock.GetMostRecentlyViewed:input_type -> sickrock.GetMostRecentlyViewedRequest
-	83,  // 137: sickrock.SickRock.GetDashboards:input_type -> sickrock.GetDashboardsRequest
-	85,  // 138: sickrock.SickRock.CreateDashboard:input_type -> sickrock.CreateDashboardRequest
-	89,  // 139: sickrock.SickRock.GetDashboardComponentRules:input_type -> sickrock.GetDashboardComponentRulesRequest
-	91,  // 140: sickrock.SickRock.CreateDashboardComponentRule:input_type -> sickrock.CreateDashboardComponentRuleRequest
-	174, // 141: sickrock.SickRock.GetSystemInfo:input_type -> sickrock.GetSystemInfoRequest
-	176, // 142: sickrock.SickRock.GetUserBookmarks:input_type -> sickrock.GetUserBookmarksRequest
-	178, // 143: sickrock.SickRock.CreateUserBookmark:input_type -> sickrock.CreateUserBookmarkRequest
-	180, // 144: sickrock.SickRock.DeleteUserBookmark:input_type -> sickrock.DeleteUserBookmarkRequest
-	183, // 145: sickrock.SickRock.CreateAPIKey:input_type -> sickrock.CreateAPIKeyRequest
-	185, // 146: sickrock.SickRock.GetAPIKeys:input_type -> sickrock.GetAPIKeysRequest
-	187, // 147: sickrock.SickRock.UpdateAPIKey:input_type -> sickrock.UpdateAPIKeyRequest
-	189, // 148: sickrock.SickRock.DeleteAPIKey:input_type -> sickrock.DeleteAPIKeyRequest
-	191, // 149: sickrock.SickRock.DeactivateAPIKey:input_type -> sickrock.DeactivateAPIKeyRequest
-	195, // 150: sickrock.SickRock.GetConditionalFormattingRules:input_type -> sickrock.GetConditionalFormattingRulesRequest
-	197, // 151: sickrock.SickRock.CreateConditionalFormattingRule:input_type -> sickrock.CreateConditionalFormattingRuleRequest
-	201, // 152: sickrock.SickRock.UpdateConditionalFormattingRule:input_type -> sickrock.UpdateConditionalFormattingRuleRequest
-	199, // 153: sickrock.SickRock.DeleteConditionalFormattingRule:input_type -> sickrock.DeleteConditionalFormattingRuleRequest
-	206, // 154: sickrock.SickRock.GetNotificationEvents:input_type -> sickrock.GetNotificationEventsRequest
-	208, // 155: sickrock.SickRock.GetUserNotificationChannels:input_type -> sickrock.GetUserNotificationChannelsRequest
-	210, // 156: sickrock.SickRock.CreateUserNotificationChannel:input_type -> sickrock.CreateUserNotificationChannelRequest
-	212, // 157: sickrock.SickRock.UpdateUserNotificationChannel:input_type -> sickrock.UpdateUserNotificationChannelRequest
-	214, // 158: sickrock.SickRock.DeleteUserNotificationChannel:input_type -> sickrock.DeleteUserNotificationChannelRequest
-	216, // 159: sickrock.SickRock.GetUserNotificationSubscriptions:input_type -> sickrock.GetUserNotificationSubscriptionsRequest
-	218, // 160: sickrock.SickRock.CreateUserNotificationSubscription:input_type -> sickrock.CreateUserNotificationSubscriptionRequest
-	220, // 161: sickrock.SickRock.DeleteUserNotificationSubscription:input_type -> sickrock.DeleteUserNotificationSubscriptionRequest
-	222, // 162: sickrock.SickRock.GetTickListState:input_type -> sickrock.GetTickListStateRequest
-	224, // 163: sickrock.SickRock.SetTickListCompletion:input_type -> sickrock.SetTickListCompletionRequest
-	226, // 164: sickrock.SickRock.ClearTickListState:input_type -> sickrock.ClearTickListStateRequest
-	95,  // 165: sickrock.SickRock.Init:output_type -> sickrock.InitResponse
-	1,   // 166: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
-	97,  // 167: sickrock.SickRock.Login:output_type -> sickrock.LoginResponse
-	99,  // 168: sickrock.SickRock.Logout:output_type -> sickrock.LogoutResponse
-	103, // 169: sickrock.SickRock.ValidateToken:output_type -> sickrock.ValidateTokenResponse
-	101, // 170: sickrock.SickRock.ResetUserPassword:output_type -> sickrock.ResetUserPasswordResponse
-	105, // 171: sickrock.SickRock.ChangePassword:output_type -> sickrock.ChangePasswordResponse
-	112, // 172: sickrock.SickRock.ListUsers:output_type -> sickrock.ListUsersResponse
-	114, // 173: sickrock.SickRock.GetUser:output_type -> sickrock.GetUserResponse
-	116, // 174: sickrock.SickRock.CreateUser:output_type -> sickrock.CreateUserResponse
-	118, // 175: sickrock.SickRock.DeleteUser:output_type -> sickrock.DeleteUserResponse
-	120, // 176: sickrock.SickRock.ListRbacPermissions:output_type -> sickrock.ListRbacPermissionsResponse
-	122, // 177: sickrock.SickRock.ListRbacRoles:output_type -> sickrock.ListRbacRolesResponse
-	124, // 178: sickrock.SickRock.CreateRbacRole:output_type -> sickrock.CreateRbacRoleResponse
-	126, // 179: sickrock.SickRock.UpdateRbacRole:output_type -> sickrock.UpdateRbacRoleResponse
-	128, // 180: sickrock.SickRock.DeleteRbacRole:output_type -> sickrock.DeleteRbacRoleResponse
-	130, // 181: sickrock.SickRock.GetUserRbacRoles:output_type -> sickrock.GetUserRbacRolesResponse
-	133, // 182: sickrock.SickRock.GetUserEffectiveRoleGrants:output_type -> sickrock.GetUserEffectiveRoleGrantsResponse
-	135, // 183: sickrock.SickRock.GetUserGroupRbacRoles:output_type -> sickrock.GetUserGroupRbacRolesResponse
-	137, // 184: sickrock.SickRock.SetUserGroupRbacRoles:output_type -> sickrock.SetUserGroupRbacRolesResponse
-	140, // 185: sickrock.SickRock.ListGroupTableRoleGrants:output_type -> sickrock.ListGroupTableRoleGrantsResponse
-	142, // 186: sickrock.SickRock.SetGroupTableRoleGrants:output_type -> sickrock.SetGroupTableRoleGrantsResponse
-	147, // 187: sickrock.SickRock.ListTableShareGrants:output_type -> sickrock.ListTableShareGrantsResponse
-	149, // 188: sickrock.SickRock.SetTableShareGrants:output_type -> sickrock.SetTableShareGrantsResponse
-	151, // 189: sickrock.SickRock.GetRbacRoleUsers:output_type -> sickrock.GetRbacRoleUsersResponse
-	153, // 190: sickrock.SickRock.GetRbacRoleGroups:output_type -> sickrock.GetRbacRoleGroupsResponse
-	155, // 191: sickrock.SickRock.GetMyPermissionsAudit:output_type -> sickrock.GetMyPermissionsAuditResponse
-	157, // 192: sickrock.SickRock.ListUserGroups:output_type -> sickrock.ListUserGroupsResponse
-	159, // 193: sickrock.SickRock.CreateUserGroup:output_type -> sickrock.CreateUserGroupResponse
-	161, // 194: sickrock.SickRock.DeleteUserGroup:output_type -> sickrock.DeleteUserGroupResponse
-	163, // 195: sickrock.SickRock.GetUserGroupMembers:output_type -> sickrock.GetUserGroupMembersResponse
-	165, // 196: sickrock.SickRock.SetUserGroupMembers:output_type -> sickrock.SetUserGroupMembersResponse
-	167, // 197: sickrock.SickRock.GenerateDeviceCode:output_type -> sickrock.GenerateDeviceCodeResponse
-	169, // 198: sickrock.SickRock.ClaimDeviceCode:output_type -> sickrock.ClaimDeviceCodeResponse
-	171, // 199: sickrock.SickRock.CheckDeviceCode:output_type -> sickrock.CheckDeviceCodeResponse
-	173, // 200: sickrock.SickRock.GetDeviceCodeSession:output_type -> sickrock.GetDeviceCodeSessionResponse
-	4,   // 201: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
-	7,   // 202: sickrock.SickRock.GetTableConfigurations:output_type -> sickrock.GetTableConfigurationsResponse
-	9,   // 203: sickrock.SickRock.CreateTable:output_type -> sickrock.CreateTableResponse
-	11,  // 204: sickrock.SickRock.CreateTableConfiguration:output_type -> sickrock.CreateTableConfigurationResponse
-	14,  // 205: sickrock.SickRock.GetDatabaseTables:output_type -> sickrock.GetDatabaseTablesResponse
-	18,  // 206: sickrock.SickRock.GetNavigation:output_type -> sickrock.GetNavigationResponse
-	21,  // 207: sickrock.SickRock.SetWorkflowNavigationMembers:output_type -> sickrock.SetWorkflowNavigationMembersResponse
-	23,  // 208: sickrock.SickRock.GetReadOnlyCalendarExport:output_type -> sickrock.GetReadOnlyCalendarExportResponse
-	26,  // 209: sickrock.SickRock.ListAccessibleReadOnlyExports:output_type -> sickrock.ListAccessibleReadOnlyExportsResponse
-	30,  // 210: sickrock.SickRock.ListRssCalendarFeeds:output_type -> sickrock.ListRssCalendarFeedsResponse
-	32,  // 211: sickrock.SickRock.GetRssCalendarFeed:output_type -> sickrock.GetRssCalendarFeedResponse
-	34,  // 212: sickrock.SickRock.SaveRssCalendarFeed:output_type -> sickrock.SaveRssCalendarFeedResponse
-	36,  // 213: sickrock.SickRock.DeleteRssCalendarFeed:output_type -> sickrock.DeleteRssCalendarFeedResponse
-	38,  // 214: sickrock.SickRock.RefreshRssCalendarFeed:output_type -> sickrock.RefreshRssCalendarFeedResponse
-	40,  // 215: sickrock.SickRock.PreviewRssCalendarFeed:output_type -> sickrock.PreviewRssCalendarFeedResponse
-	43,  // 216: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
-	45,  // 217: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
-	47,  // 218: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
-	49,  // 219: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
-	51,  // 220: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
-	54,  // 221: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
-	144, // 222: sickrock.SickRock.GetTableAccess:output_type -> sickrock.GetTableAccessResponse
-	54,  // 223: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
-	58,  // 224: sickrock.SickRock.CreateTableView:output_type -> sickrock.CreateTableViewResponse
-	60,  // 225: sickrock.SickRock.UpdateTableView:output_type -> sickrock.UpdateTableViewResponse
-	63,  // 226: sickrock.SickRock.GetTableViews:output_type -> sickrock.GetTableViewsResponse
-	65,  // 227: sickrock.SickRock.DeleteTableView:output_type -> sickrock.DeleteTableViewResponse
-	68,  // 228: sickrock.SickRock.CreateForeignKey:output_type -> sickrock.CreateForeignKeyResponse
-	70,  // 229: sickrock.SickRock.GetForeignKeys:output_type -> sickrock.GetForeignKeysResponse
-	72,  // 230: sickrock.SickRock.DeleteForeignKey:output_type -> sickrock.DeleteForeignKeyResponse
-	74,  // 231: sickrock.SickRock.ChangeColumnType:output_type -> sickrock.ChangeColumnTypeResponse
-	76,  // 232: sickrock.SickRock.DropColumn:output_type -> sickrock.DropColumnResponse
-	78,  // 233: sickrock.SickRock.ChangeColumnName:output_type -> sickrock.ChangeColumnNameResponse
-	81,  // 234: sickrock.SickRock.GetMostRecentlyViewed:output_type -> sickrock.GetMostRecentlyViewedResponse
-	84,  // 235: sickrock.SickRock.GetDashboards:output_type -> sickrock.GetDashboardsResponse
-	86,  // 236: sickrock.SickRock.CreateDashboard:output_type -> sickrock.CreateDashboardResponse
-	90,  // 237: sickrock.SickRock.GetDashboardComponentRules:output_type -> sickrock.GetDashboardComponentRulesResponse
-	92,  // 238: sickrock.SickRock.CreateDashboardComponentRule:output_type -> sickrock.CreateDashboardComponentRuleResponse
-	175, // 239: sickrock.SickRock.GetSystemInfo:output_type -> sickrock.GetSystemInfoResponse
-	177, // 240: sickrock.SickRock.GetUserBookmarks:output_type -> sickrock.GetUserBookmarksResponse
-	179, // 241: sickrock.SickRock.CreateUserBookmark:output_type -> sickrock.CreateUserBookmarkResponse
-	181, // 242: sickrock.SickRock.DeleteUserBookmark:output_type -> sickrock.DeleteUserBookmarkResponse
-	184, // 243: sickrock.SickRock.CreateAPIKey:output_type -> sickrock.CreateAPIKeyResponse
-	186, // 244: sickrock.SickRock.GetAPIKeys:output_type -> sickrock.GetAPIKeysResponse
-	188, // 245: sickrock.SickRock.UpdateAPIKey:output_type -> sickrock.UpdateAPIKeyResponse
-	190, // 246: sickrock.SickRock.DeleteAPIKey:output_type -> sickrock.DeleteAPIKeyResponse
-	192, // 247: sickrock.SickRock.DeactivateAPIKey:output_type -> sickrock.DeactivateAPIKeyResponse
-	196, // 248: sickrock.SickRock.GetConditionalFormattingRules:output_type -> sickrock.GetConditionalFormattingRulesResponse
-	198, // 249: sickrock.SickRock.CreateConditionalFormattingRule:output_type -> sickrock.CreateConditionalFormattingRuleResponse
-	202, // 250: sickrock.SickRock.UpdateConditionalFormattingRule:output_type -> sickrock.UpdateConditionalFormattingRuleResponse
-	200, // 251: sickrock.SickRock.DeleteConditionalFormattingRule:output_type -> sickrock.DeleteConditionalFormattingRuleResponse
-	207, // 252: sickrock.SickRock.GetNotificationEvents:output_type -> sickrock.GetNotificationEventsResponse
-	209, // 253: sickrock.SickRock.GetUserNotificationChannels:output_type -> sickrock.GetUserNotificationChannelsResponse
-	211, // 254: sickrock.SickRock.CreateUserNotificationChannel:output_type -> sickrock.CreateUserNotificationChannelResponse
-	213, // 255: sickrock.SickRock.UpdateUserNotificationChannel:output_type -> sickrock.UpdateUserNotificationChannelResponse
-	215, // 256: sickrock.SickRock.DeleteUserNotificationChannel:output_type -> sickrock.DeleteUserNotificationChannelResponse
-	217, // 257: sickrock.SickRock.GetUserNotificationSubscriptions:output_type -> sickrock.GetUserNotificationSubscriptionsResponse
-	219, // 258: sickrock.SickRock.CreateUserNotificationSubscription:output_type -> sickrock.CreateUserNotificationSubscriptionResponse
-	221, // 259: sickrock.SickRock.DeleteUserNotificationSubscription:output_type -> sickrock.DeleteUserNotificationSubscriptionResponse
-	223, // 260: sickrock.SickRock.GetTickListState:output_type -> sickrock.GetTickListStateResponse
-	225, // 261: sickrock.SickRock.SetTickListCompletion:output_type -> sickrock.SetTickListCompletionResponse
-	227, // 262: sickrock.SickRock.ClearTickListState:output_type -> sickrock.ClearTickListStateResponse
-	165, // [165:263] is the sub-list for method output_type
-	67,  // [67:165] is the sub-list for method input_type
-	67,  // [67:67] is the sub-list for extension type_name
-	67,  // [67:67] is the sub-list for extension extendee
-	0,   // [0:67] is the sub-list for field type_name
+	17,  // 3: sickrock.NavigationApp.items:type_name -> sickrock.NavigationItem
+	17,  // 4: sickrock.Workflow.items:type_name -> sickrock.NavigationItem
+	17,  // 5: sickrock.GetNavigationResponse.items:type_name -> sickrock.NavigationItem
+	200, // 6: sickrock.GetNavigationResponse.bookmarks:type_name -> sickrock.UserBookmark
+	18,  // 7: sickrock.GetNavigationResponse.workflows:type_name -> sickrock.Workflow
+	16,  // 8: sickrock.GetNavigationResponse.apps:type_name -> sickrock.NavigationApp
+	17,  // 9: sickrock.GetNavigationResponse.ungrouped_items:type_name -> sickrock.NavigationItem
+	20,  // 10: sickrock.SetWorkflowNavigationMembersRequest.members:type_name -> sickrock.WorkflowNavigationMember
+	42,  // 11: sickrock.GetReadOnlyCalendarExportResponse.items:type_name -> sickrock.Item
+	25,  // 12: sickrock.ListAccessibleReadOnlyExportsResponse.exports:type_name -> sickrock.ReadOnlyExportSummary
+	28,  // 13: sickrock.RssCalendarFeed.field_mappings:type_name -> sickrock.RssFieldMapping
+	29,  // 14: sickrock.ListRssCalendarFeedsResponse.feeds:type_name -> sickrock.RssCalendarFeed
+	29,  // 15: sickrock.GetRssCalendarFeedResponse.feed:type_name -> sickrock.RssCalendarFeed
+	29,  // 16: sickrock.SaveRssCalendarFeedRequest.feed:type_name -> sickrock.RssCalendarFeed
+	29,  // 17: sickrock.SaveRssCalendarFeedResponse.feed:type_name -> sickrock.RssCalendarFeed
+	29,  // 18: sickrock.RefreshRssCalendarFeedResponse.feed:type_name -> sickrock.RssCalendarFeed
+	28,  // 19: sickrock.PreviewRssCalendarFeedResponse.sample_values:type_name -> sickrock.RssFieldMapping
+	246, // 20: sickrock.Item.additional_fields:type_name -> sickrock.Item.AdditionalFieldsEntry
+	247, // 21: sickrock.ListItemsRequest.where:type_name -> sickrock.ListItemsRequest.WhereEntry
+	42,  // 22: sickrock.ListItemsResponse.items:type_name -> sickrock.Item
+	248, // 23: sickrock.CreateItemRequest.additional_fields:type_name -> sickrock.CreateItemRequest.AdditionalFieldsEntry
+	42,  // 24: sickrock.CreateItemResponse.item:type_name -> sickrock.Item
+	42,  // 25: sickrock.GetItemResponse.item:type_name -> sickrock.Item
+	249, // 26: sickrock.EditItemRequest.additional_fields:type_name -> sickrock.EditItemRequest.AdditionalFieldsEntry
+	42,  // 27: sickrock.EditItemResponse.item:type_name -> sickrock.Item
+	55,  // 28: sickrock.ItemPageLayout.blocks:type_name -> sickrock.PageLayoutBlock
+	57,  // 29: sickrock.ItemFieldGroups.groups:type_name -> sickrock.ItemFieldGroup
+	59,  // 30: sickrock.SetItemFieldGroupsRequest.groups:type_name -> sickrock.ItemFieldGroupInput
+	62,  // 31: sickrock.SetColumnDisplaySettingsRequest.settings:type_name -> sickrock.ColumnDisplaySettingInput
+	54,  // 32: sickrock.GetTableStructureResponse.fields:type_name -> sickrock.Field
+	81,  // 33: sickrock.GetTableStructureResponse.foreign_keys:type_name -> sickrock.ForeignKey
+	56,  // 34: sickrock.GetTableStructureResponse.item_page_layout:type_name -> sickrock.ItemPageLayout
+	58,  // 35: sickrock.GetTableStructureResponse.item_field_groups:type_name -> sickrock.ItemFieldGroups
+	62,  // 36: sickrock.GetTableStructureResponse.column_display_settings:type_name -> sickrock.ColumnDisplaySettingInput
+	55,  // 37: sickrock.SetItemPageLayoutRequest.blocks:type_name -> sickrock.PageLayoutBlock
+	54,  // 38: sickrock.AddTableColumnRequest.field:type_name -> sickrock.Field
+	71,  // 39: sickrock.CreateTableViewRequest.columns:type_name -> sickrock.TableViewColumn
+	71,  // 40: sickrock.UpdateTableViewRequest.columns:type_name -> sickrock.TableViewColumn
+	71,  // 41: sickrock.TableView.columns:type_name -> sickrock.TableViewColumn
+	77,  // 42: sickrock.GetTableViewsResponse.views:type_name -> sickrock.TableView
+	82,  // 43: sickrock.ForeignKey.pull_through_fields:type_name -> sickrock.RelationPullThroughField
+	82,  // 44: sickrock.UpdateTableRelationRequest.pull_through_fields:type_name -> sickrock.RelationPullThroughField
+	81,  // 45: sickrock.GetForeignKeysResponse.foreign_keys:type_name -> sickrock.ForeignKey
+	98,  // 46: sickrock.GetMostRecentlyViewedResponse.items:type_name -> sickrock.RecentlyViewedItem
+	105, // 47: sickrock.Dashboard.components:type_name -> sickrock.DashboardComponent
+	100, // 48: sickrock.GetDashboardsResponse.dashboards:type_name -> sickrock.Dashboard
+	106, // 49: sickrock.GetDashboardComponentRulesResponse.rules:type_name -> sickrock.DashboardComponentRule
+	106, // 50: sickrock.CreateDashboardComponentRuleResponse.rule:type_name -> sickrock.DashboardComponentRule
+	112, // 51: sickrock.InitResponse.oauth_providers:type_name -> sickrock.OAuthProvider
+	124, // 52: sickrock.ListUsersResponse.users:type_name -> sickrock.IamUser
+	124, // 53: sickrock.GetUserResponse.user:type_name -> sickrock.IamUser
+	124, // 54: sickrock.CreateUserResponse.user:type_name -> sickrock.IamUser
+	125, // 55: sickrock.ListRbacPermissionsResponse.permissions:type_name -> sickrock.RbacPermission
+	126, // 56: sickrock.ListRbacRolesResponse.roles:type_name -> sickrock.RbacRole
+	126, // 57: sickrock.CreateRbacRoleResponse.role:type_name -> sickrock.RbacRole
+	126, // 58: sickrock.UpdateRbacRoleResponse.role:type_name -> sickrock.RbacRole
+	149, // 59: sickrock.GetUserEffectiveRoleGrantsResponse.grants:type_name -> sickrock.UserEffectiveRoleGrant
+	156, // 60: sickrock.ListGroupTableRoleGrantsResponse.grants:type_name -> sickrock.GroupTableRoleGrant
+	156, // 61: sickrock.SetGroupTableRoleGrantsRequest.grants:type_name -> sickrock.GroupTableRoleGrant
+	163, // 62: sickrock.ListTableShareGrantsResponse.grants:type_name -> sickrock.TableShareGrant
+	163, // 63: sickrock.SetTableShareGrantsRequest.grants:type_name -> sickrock.TableShareGrant
+	128, // 64: sickrock.GetMyPermissionsAuditResponse.permissions:type_name -> sickrock.MyPermissionAuditRow
+	127, // 65: sickrock.ListUserGroupsResponse.groups:type_name -> sickrock.UserGroup
+	127, // 66: sickrock.CreateUserGroupResponse.group:type_name -> sickrock.UserGroup
+	200, // 67: sickrock.GetUserBookmarksResponse.bookmarks:type_name -> sickrock.UserBookmark
+	200, // 68: sickrock.CreateUserBookmarkResponse.bookmark:type_name -> sickrock.UserBookmark
+	17,  // 69: sickrock.UserBookmark.navigation_item:type_name -> sickrock.NavigationItem
+	211, // 70: sickrock.GetAPIKeysResponse.api_keys:type_name -> sickrock.APIKey
+	212, // 71: sickrock.GetConditionalFormattingRulesResponse.rules:type_name -> sickrock.ConditionalFormattingRule
+	221, // 72: sickrock.UserNotificationSubscription.event:type_name -> sickrock.NotificationEvent
+	222, // 73: sickrock.UserNotificationSubscription.channel:type_name -> sickrock.UserNotificationChannel
+	221, // 74: sickrock.GetNotificationEventsResponse.events:type_name -> sickrock.NotificationEvent
+	222, // 75: sickrock.GetUserNotificationChannelsResponse.channels:type_name -> sickrock.UserNotificationChannel
+	222, // 76: sickrock.CreateUserNotificationChannelResponse.channel:type_name -> sickrock.UserNotificationChannel
+	223, // 77: sickrock.GetUserNotificationSubscriptionsResponse.subscriptions:type_name -> sickrock.UserNotificationSubscription
+	223, // 78: sickrock.CreateUserNotificationSubscriptionResponse.subscription:type_name -> sickrock.UserNotificationSubscription
+	250, // 79: sickrock.GetTickListStateResponse.completed_by_item_id:type_name -> sickrock.GetTickListStateResponse.CompletedByItemIdEntry
+	111, // 80: sickrock.SickRock.Init:input_type -> sickrock.InitRequest
+	0,   // 81: sickrock.SickRock.Ping:input_type -> sickrock.PingRequest
+	114, // 82: sickrock.SickRock.Login:input_type -> sickrock.LoginRequest
+	116, // 83: sickrock.SickRock.Logout:input_type -> sickrock.LogoutRequest
+	120, // 84: sickrock.SickRock.ValidateToken:input_type -> sickrock.ValidateTokenRequest
+	118, // 85: sickrock.SickRock.ResetUserPassword:input_type -> sickrock.ResetUserPasswordRequest
+	122, // 86: sickrock.SickRock.ChangePassword:input_type -> sickrock.ChangePasswordRequest
+	129, // 87: sickrock.SickRock.ListUsers:input_type -> sickrock.ListUsersRequest
+	131, // 88: sickrock.SickRock.GetUser:input_type -> sickrock.GetUserRequest
+	133, // 89: sickrock.SickRock.CreateUser:input_type -> sickrock.CreateUserRequest
+	135, // 90: sickrock.SickRock.DeleteUser:input_type -> sickrock.DeleteUserRequest
+	137, // 91: sickrock.SickRock.ListRbacPermissions:input_type -> sickrock.ListRbacPermissionsRequest
+	139, // 92: sickrock.SickRock.ListRbacRoles:input_type -> sickrock.ListRbacRolesRequest
+	141, // 93: sickrock.SickRock.CreateRbacRole:input_type -> sickrock.CreateRbacRoleRequest
+	143, // 94: sickrock.SickRock.UpdateRbacRole:input_type -> sickrock.UpdateRbacRoleRequest
+	145, // 95: sickrock.SickRock.DeleteRbacRole:input_type -> sickrock.DeleteRbacRoleRequest
+	147, // 96: sickrock.SickRock.GetUserRbacRoles:input_type -> sickrock.GetUserRbacRolesRequest
+	150, // 97: sickrock.SickRock.GetUserEffectiveRoleGrants:input_type -> sickrock.GetUserEffectiveRoleGrantsRequest
+	152, // 98: sickrock.SickRock.GetUserGroupRbacRoles:input_type -> sickrock.GetUserGroupRbacRolesRequest
+	154, // 99: sickrock.SickRock.SetUserGroupRbacRoles:input_type -> sickrock.SetUserGroupRbacRolesRequest
+	157, // 100: sickrock.SickRock.ListGroupTableRoleGrants:input_type -> sickrock.ListGroupTableRoleGrantsRequest
+	159, // 101: sickrock.SickRock.SetGroupTableRoleGrants:input_type -> sickrock.SetGroupTableRoleGrantsRequest
+	164, // 102: sickrock.SickRock.ListTableShareGrants:input_type -> sickrock.ListTableShareGrantsRequest
+	166, // 103: sickrock.SickRock.SetTableShareGrants:input_type -> sickrock.SetTableShareGrantsRequest
+	168, // 104: sickrock.SickRock.GetRbacRoleUsers:input_type -> sickrock.GetRbacRoleUsersRequest
+	170, // 105: sickrock.SickRock.GetRbacRoleGroups:input_type -> sickrock.GetRbacRoleGroupsRequest
+	172, // 106: sickrock.SickRock.GetMyPermissionsAudit:input_type -> sickrock.GetMyPermissionsAuditRequest
+	174, // 107: sickrock.SickRock.ListUserGroups:input_type -> sickrock.ListUserGroupsRequest
+	176, // 108: sickrock.SickRock.CreateUserGroup:input_type -> sickrock.CreateUserGroupRequest
+	178, // 109: sickrock.SickRock.DeleteUserGroup:input_type -> sickrock.DeleteUserGroupRequest
+	180, // 110: sickrock.SickRock.GetUserGroupMembers:input_type -> sickrock.GetUserGroupMembersRequest
+	182, // 111: sickrock.SickRock.SetUserGroupMembers:input_type -> sickrock.SetUserGroupMembersRequest
+	184, // 112: sickrock.SickRock.GenerateDeviceCode:input_type -> sickrock.GenerateDeviceCodeRequest
+	186, // 113: sickrock.SickRock.ClaimDeviceCode:input_type -> sickrock.ClaimDeviceCodeRequest
+	188, // 114: sickrock.SickRock.CheckDeviceCode:input_type -> sickrock.CheckDeviceCodeRequest
+	190, // 115: sickrock.SickRock.GetDeviceCodeSession:input_type -> sickrock.GetDeviceCodeSessionRequest
+	2,   // 116: sickrock.SickRock.GetNavigationLinks:input_type -> sickrock.GetNavigationLinksRequest
+	5,   // 117: sickrock.SickRock.GetTableConfigurations:input_type -> sickrock.GetTableConfigurationsRequest
+	8,   // 118: sickrock.SickRock.CreateTable:input_type -> sickrock.CreateTableRequest
+	10,  // 119: sickrock.SickRock.CreateTableConfiguration:input_type -> sickrock.CreateTableConfigurationRequest
+	12,  // 120: sickrock.SickRock.GetDatabaseTables:input_type -> sickrock.GetDatabaseTablesRequest
+	15,  // 121: sickrock.SickRock.GetNavigation:input_type -> sickrock.GetNavigationRequest
+	21,  // 122: sickrock.SickRock.SetWorkflowNavigationMembers:input_type -> sickrock.SetWorkflowNavigationMembersRequest
+	23,  // 123: sickrock.SickRock.GetReadOnlyCalendarExport:input_type -> sickrock.GetReadOnlyCalendarExportRequest
+	26,  // 124: sickrock.SickRock.ListAccessibleReadOnlyExports:input_type -> sickrock.ListAccessibleReadOnlyExportsRequest
+	30,  // 125: sickrock.SickRock.ListRssCalendarFeeds:input_type -> sickrock.ListRssCalendarFeedsRequest
+	32,  // 126: sickrock.SickRock.GetRssCalendarFeed:input_type -> sickrock.GetRssCalendarFeedRequest
+	34,  // 127: sickrock.SickRock.SaveRssCalendarFeed:input_type -> sickrock.SaveRssCalendarFeedRequest
+	36,  // 128: sickrock.SickRock.DeleteRssCalendarFeed:input_type -> sickrock.DeleteRssCalendarFeedRequest
+	38,  // 129: sickrock.SickRock.RefreshRssCalendarFeed:input_type -> sickrock.RefreshRssCalendarFeedRequest
+	40,  // 130: sickrock.SickRock.PreviewRssCalendarFeed:input_type -> sickrock.PreviewRssCalendarFeedRequest
+	43,  // 131: sickrock.SickRock.ListItems:input_type -> sickrock.ListItemsRequest
+	45,  // 132: sickrock.SickRock.CreateItem:input_type -> sickrock.CreateItemRequest
+	47,  // 133: sickrock.SickRock.GetItem:input_type -> sickrock.GetItemRequest
+	49,  // 134: sickrock.SickRock.EditItem:input_type -> sickrock.EditItemRequest
+	51,  // 135: sickrock.SickRock.DeleteItem:input_type -> sickrock.DeleteItemRequest
+	53,  // 136: sickrock.SickRock.GetTableStructure:input_type -> sickrock.GetTableStructureRequest
+	161, // 137: sickrock.SickRock.GetTableAccess:input_type -> sickrock.GetTableAccessRequest
+	70,  // 138: sickrock.SickRock.AddTableColumn:input_type -> sickrock.AddTableColumnRequest
+	72,  // 139: sickrock.SickRock.CreateTableView:input_type -> sickrock.CreateTableViewRequest
+	74,  // 140: sickrock.SickRock.UpdateTableView:input_type -> sickrock.UpdateTableViewRequest
+	76,  // 141: sickrock.SickRock.GetTableViews:input_type -> sickrock.GetTableViewsRequest
+	79,  // 142: sickrock.SickRock.DeleteTableView:input_type -> sickrock.DeleteTableViewRequest
+	85,  // 143: sickrock.SickRock.CreateForeignKey:input_type -> sickrock.CreateForeignKeyRequest
+	87,  // 144: sickrock.SickRock.GetForeignKeys:input_type -> sickrock.GetForeignKeysRequest
+	89,  // 145: sickrock.SickRock.DeleteForeignKey:input_type -> sickrock.DeleteForeignKeyRequest
+	83,  // 146: sickrock.SickRock.UpdateTableRelation:input_type -> sickrock.UpdateTableRelationRequest
+	68,  // 147: sickrock.SickRock.SetItemPageLayout:input_type -> sickrock.SetItemPageLayoutRequest
+	60,  // 148: sickrock.SickRock.SetItemFieldGroups:input_type -> sickrock.SetItemFieldGroupsRequest
+	63,  // 149: sickrock.SickRock.SetColumnDisplaySettings:input_type -> sickrock.SetColumnDisplaySettingsRequest
+	65,  // 150: sickrock.SickRock.SetTableRowLabels:input_type -> sickrock.SetTableRowLabelsRequest
+	91,  // 151: sickrock.SickRock.ChangeColumnType:input_type -> sickrock.ChangeColumnTypeRequest
+	93,  // 152: sickrock.SickRock.DropColumn:input_type -> sickrock.DropColumnRequest
+	95,  // 153: sickrock.SickRock.ChangeColumnName:input_type -> sickrock.ChangeColumnNameRequest
+	97,  // 154: sickrock.SickRock.GetMostRecentlyViewed:input_type -> sickrock.GetMostRecentlyViewedRequest
+	101, // 155: sickrock.SickRock.GetDashboards:input_type -> sickrock.GetDashboardsRequest
+	103, // 156: sickrock.SickRock.CreateDashboard:input_type -> sickrock.CreateDashboardRequest
+	107, // 157: sickrock.SickRock.GetDashboardComponentRules:input_type -> sickrock.GetDashboardComponentRulesRequest
+	109, // 158: sickrock.SickRock.CreateDashboardComponentRule:input_type -> sickrock.CreateDashboardComponentRuleRequest
+	192, // 159: sickrock.SickRock.GetSystemInfo:input_type -> sickrock.GetSystemInfoRequest
+	194, // 160: sickrock.SickRock.GetUserBookmarks:input_type -> sickrock.GetUserBookmarksRequest
+	196, // 161: sickrock.SickRock.CreateUserBookmark:input_type -> sickrock.CreateUserBookmarkRequest
+	198, // 162: sickrock.SickRock.DeleteUserBookmark:input_type -> sickrock.DeleteUserBookmarkRequest
+	201, // 163: sickrock.SickRock.CreateAPIKey:input_type -> sickrock.CreateAPIKeyRequest
+	203, // 164: sickrock.SickRock.GetAPIKeys:input_type -> sickrock.GetAPIKeysRequest
+	205, // 165: sickrock.SickRock.UpdateAPIKey:input_type -> sickrock.UpdateAPIKeyRequest
+	207, // 166: sickrock.SickRock.DeleteAPIKey:input_type -> sickrock.DeleteAPIKeyRequest
+	209, // 167: sickrock.SickRock.DeactivateAPIKey:input_type -> sickrock.DeactivateAPIKeyRequest
+	213, // 168: sickrock.SickRock.GetConditionalFormattingRules:input_type -> sickrock.GetConditionalFormattingRulesRequest
+	215, // 169: sickrock.SickRock.CreateConditionalFormattingRule:input_type -> sickrock.CreateConditionalFormattingRuleRequest
+	219, // 170: sickrock.SickRock.UpdateConditionalFormattingRule:input_type -> sickrock.UpdateConditionalFormattingRuleRequest
+	217, // 171: sickrock.SickRock.DeleteConditionalFormattingRule:input_type -> sickrock.DeleteConditionalFormattingRuleRequest
+	224, // 172: sickrock.SickRock.GetNotificationEvents:input_type -> sickrock.GetNotificationEventsRequest
+	226, // 173: sickrock.SickRock.GetUserNotificationChannels:input_type -> sickrock.GetUserNotificationChannelsRequest
+	228, // 174: sickrock.SickRock.CreateUserNotificationChannel:input_type -> sickrock.CreateUserNotificationChannelRequest
+	230, // 175: sickrock.SickRock.UpdateUserNotificationChannel:input_type -> sickrock.UpdateUserNotificationChannelRequest
+	232, // 176: sickrock.SickRock.DeleteUserNotificationChannel:input_type -> sickrock.DeleteUserNotificationChannelRequest
+	234, // 177: sickrock.SickRock.GetUserNotificationSubscriptions:input_type -> sickrock.GetUserNotificationSubscriptionsRequest
+	236, // 178: sickrock.SickRock.CreateUserNotificationSubscription:input_type -> sickrock.CreateUserNotificationSubscriptionRequest
+	238, // 179: sickrock.SickRock.DeleteUserNotificationSubscription:input_type -> sickrock.DeleteUserNotificationSubscriptionRequest
+	240, // 180: sickrock.SickRock.GetTickListState:input_type -> sickrock.GetTickListStateRequest
+	242, // 181: sickrock.SickRock.SetTickListCompletion:input_type -> sickrock.SetTickListCompletionRequest
+	244, // 182: sickrock.SickRock.ClearTickListState:input_type -> sickrock.ClearTickListStateRequest
+	113, // 183: sickrock.SickRock.Init:output_type -> sickrock.InitResponse
+	1,   // 184: sickrock.SickRock.Ping:output_type -> sickrock.PingResponse
+	115, // 185: sickrock.SickRock.Login:output_type -> sickrock.LoginResponse
+	117, // 186: sickrock.SickRock.Logout:output_type -> sickrock.LogoutResponse
+	121, // 187: sickrock.SickRock.ValidateToken:output_type -> sickrock.ValidateTokenResponse
+	119, // 188: sickrock.SickRock.ResetUserPassword:output_type -> sickrock.ResetUserPasswordResponse
+	123, // 189: sickrock.SickRock.ChangePassword:output_type -> sickrock.ChangePasswordResponse
+	130, // 190: sickrock.SickRock.ListUsers:output_type -> sickrock.ListUsersResponse
+	132, // 191: sickrock.SickRock.GetUser:output_type -> sickrock.GetUserResponse
+	134, // 192: sickrock.SickRock.CreateUser:output_type -> sickrock.CreateUserResponse
+	136, // 193: sickrock.SickRock.DeleteUser:output_type -> sickrock.DeleteUserResponse
+	138, // 194: sickrock.SickRock.ListRbacPermissions:output_type -> sickrock.ListRbacPermissionsResponse
+	140, // 195: sickrock.SickRock.ListRbacRoles:output_type -> sickrock.ListRbacRolesResponse
+	142, // 196: sickrock.SickRock.CreateRbacRole:output_type -> sickrock.CreateRbacRoleResponse
+	144, // 197: sickrock.SickRock.UpdateRbacRole:output_type -> sickrock.UpdateRbacRoleResponse
+	146, // 198: sickrock.SickRock.DeleteRbacRole:output_type -> sickrock.DeleteRbacRoleResponse
+	148, // 199: sickrock.SickRock.GetUserRbacRoles:output_type -> sickrock.GetUserRbacRolesResponse
+	151, // 200: sickrock.SickRock.GetUserEffectiveRoleGrants:output_type -> sickrock.GetUserEffectiveRoleGrantsResponse
+	153, // 201: sickrock.SickRock.GetUserGroupRbacRoles:output_type -> sickrock.GetUserGroupRbacRolesResponse
+	155, // 202: sickrock.SickRock.SetUserGroupRbacRoles:output_type -> sickrock.SetUserGroupRbacRolesResponse
+	158, // 203: sickrock.SickRock.ListGroupTableRoleGrants:output_type -> sickrock.ListGroupTableRoleGrantsResponse
+	160, // 204: sickrock.SickRock.SetGroupTableRoleGrants:output_type -> sickrock.SetGroupTableRoleGrantsResponse
+	165, // 205: sickrock.SickRock.ListTableShareGrants:output_type -> sickrock.ListTableShareGrantsResponse
+	167, // 206: sickrock.SickRock.SetTableShareGrants:output_type -> sickrock.SetTableShareGrantsResponse
+	169, // 207: sickrock.SickRock.GetRbacRoleUsers:output_type -> sickrock.GetRbacRoleUsersResponse
+	171, // 208: sickrock.SickRock.GetRbacRoleGroups:output_type -> sickrock.GetRbacRoleGroupsResponse
+	173, // 209: sickrock.SickRock.GetMyPermissionsAudit:output_type -> sickrock.GetMyPermissionsAuditResponse
+	175, // 210: sickrock.SickRock.ListUserGroups:output_type -> sickrock.ListUserGroupsResponse
+	177, // 211: sickrock.SickRock.CreateUserGroup:output_type -> sickrock.CreateUserGroupResponse
+	179, // 212: sickrock.SickRock.DeleteUserGroup:output_type -> sickrock.DeleteUserGroupResponse
+	181, // 213: sickrock.SickRock.GetUserGroupMembers:output_type -> sickrock.GetUserGroupMembersResponse
+	183, // 214: sickrock.SickRock.SetUserGroupMembers:output_type -> sickrock.SetUserGroupMembersResponse
+	185, // 215: sickrock.SickRock.GenerateDeviceCode:output_type -> sickrock.GenerateDeviceCodeResponse
+	187, // 216: sickrock.SickRock.ClaimDeviceCode:output_type -> sickrock.ClaimDeviceCodeResponse
+	189, // 217: sickrock.SickRock.CheckDeviceCode:output_type -> sickrock.CheckDeviceCodeResponse
+	191, // 218: sickrock.SickRock.GetDeviceCodeSession:output_type -> sickrock.GetDeviceCodeSessionResponse
+	4,   // 219: sickrock.SickRock.GetNavigationLinks:output_type -> sickrock.GetNavigationLinksResponse
+	7,   // 220: sickrock.SickRock.GetTableConfigurations:output_type -> sickrock.GetTableConfigurationsResponse
+	9,   // 221: sickrock.SickRock.CreateTable:output_type -> sickrock.CreateTableResponse
+	11,  // 222: sickrock.SickRock.CreateTableConfiguration:output_type -> sickrock.CreateTableConfigurationResponse
+	14,  // 223: sickrock.SickRock.GetDatabaseTables:output_type -> sickrock.GetDatabaseTablesResponse
+	19,  // 224: sickrock.SickRock.GetNavigation:output_type -> sickrock.GetNavigationResponse
+	22,  // 225: sickrock.SickRock.SetWorkflowNavigationMembers:output_type -> sickrock.SetWorkflowNavigationMembersResponse
+	24,  // 226: sickrock.SickRock.GetReadOnlyCalendarExport:output_type -> sickrock.GetReadOnlyCalendarExportResponse
+	27,  // 227: sickrock.SickRock.ListAccessibleReadOnlyExports:output_type -> sickrock.ListAccessibleReadOnlyExportsResponse
+	31,  // 228: sickrock.SickRock.ListRssCalendarFeeds:output_type -> sickrock.ListRssCalendarFeedsResponse
+	33,  // 229: sickrock.SickRock.GetRssCalendarFeed:output_type -> sickrock.GetRssCalendarFeedResponse
+	35,  // 230: sickrock.SickRock.SaveRssCalendarFeed:output_type -> sickrock.SaveRssCalendarFeedResponse
+	37,  // 231: sickrock.SickRock.DeleteRssCalendarFeed:output_type -> sickrock.DeleteRssCalendarFeedResponse
+	39,  // 232: sickrock.SickRock.RefreshRssCalendarFeed:output_type -> sickrock.RefreshRssCalendarFeedResponse
+	41,  // 233: sickrock.SickRock.PreviewRssCalendarFeed:output_type -> sickrock.PreviewRssCalendarFeedResponse
+	44,  // 234: sickrock.SickRock.ListItems:output_type -> sickrock.ListItemsResponse
+	46,  // 235: sickrock.SickRock.CreateItem:output_type -> sickrock.CreateItemResponse
+	48,  // 236: sickrock.SickRock.GetItem:output_type -> sickrock.GetItemResponse
+	50,  // 237: sickrock.SickRock.EditItem:output_type -> sickrock.EditItemResponse
+	52,  // 238: sickrock.SickRock.DeleteItem:output_type -> sickrock.DeleteItemResponse
+	67,  // 239: sickrock.SickRock.GetTableStructure:output_type -> sickrock.GetTableStructureResponse
+	162, // 240: sickrock.SickRock.GetTableAccess:output_type -> sickrock.GetTableAccessResponse
+	67,  // 241: sickrock.SickRock.AddTableColumn:output_type -> sickrock.GetTableStructureResponse
+	73,  // 242: sickrock.SickRock.CreateTableView:output_type -> sickrock.CreateTableViewResponse
+	75,  // 243: sickrock.SickRock.UpdateTableView:output_type -> sickrock.UpdateTableViewResponse
+	78,  // 244: sickrock.SickRock.GetTableViews:output_type -> sickrock.GetTableViewsResponse
+	80,  // 245: sickrock.SickRock.DeleteTableView:output_type -> sickrock.DeleteTableViewResponse
+	86,  // 246: sickrock.SickRock.CreateForeignKey:output_type -> sickrock.CreateForeignKeyResponse
+	88,  // 247: sickrock.SickRock.GetForeignKeys:output_type -> sickrock.GetForeignKeysResponse
+	90,  // 248: sickrock.SickRock.DeleteForeignKey:output_type -> sickrock.DeleteForeignKeyResponse
+	84,  // 249: sickrock.SickRock.UpdateTableRelation:output_type -> sickrock.UpdateTableRelationResponse
+	69,  // 250: sickrock.SickRock.SetItemPageLayout:output_type -> sickrock.SetItemPageLayoutResponse
+	61,  // 251: sickrock.SickRock.SetItemFieldGroups:output_type -> sickrock.SetItemFieldGroupsResponse
+	64,  // 252: sickrock.SickRock.SetColumnDisplaySettings:output_type -> sickrock.SetColumnDisplaySettingsResponse
+	66,  // 253: sickrock.SickRock.SetTableRowLabels:output_type -> sickrock.SetTableRowLabelsResponse
+	92,  // 254: sickrock.SickRock.ChangeColumnType:output_type -> sickrock.ChangeColumnTypeResponse
+	94,  // 255: sickrock.SickRock.DropColumn:output_type -> sickrock.DropColumnResponse
+	96,  // 256: sickrock.SickRock.ChangeColumnName:output_type -> sickrock.ChangeColumnNameResponse
+	99,  // 257: sickrock.SickRock.GetMostRecentlyViewed:output_type -> sickrock.GetMostRecentlyViewedResponse
+	102, // 258: sickrock.SickRock.GetDashboards:output_type -> sickrock.GetDashboardsResponse
+	104, // 259: sickrock.SickRock.CreateDashboard:output_type -> sickrock.CreateDashboardResponse
+	108, // 260: sickrock.SickRock.GetDashboardComponentRules:output_type -> sickrock.GetDashboardComponentRulesResponse
+	110, // 261: sickrock.SickRock.CreateDashboardComponentRule:output_type -> sickrock.CreateDashboardComponentRuleResponse
+	193, // 262: sickrock.SickRock.GetSystemInfo:output_type -> sickrock.GetSystemInfoResponse
+	195, // 263: sickrock.SickRock.GetUserBookmarks:output_type -> sickrock.GetUserBookmarksResponse
+	197, // 264: sickrock.SickRock.CreateUserBookmark:output_type -> sickrock.CreateUserBookmarkResponse
+	199, // 265: sickrock.SickRock.DeleteUserBookmark:output_type -> sickrock.DeleteUserBookmarkResponse
+	202, // 266: sickrock.SickRock.CreateAPIKey:output_type -> sickrock.CreateAPIKeyResponse
+	204, // 267: sickrock.SickRock.GetAPIKeys:output_type -> sickrock.GetAPIKeysResponse
+	206, // 268: sickrock.SickRock.UpdateAPIKey:output_type -> sickrock.UpdateAPIKeyResponse
+	208, // 269: sickrock.SickRock.DeleteAPIKey:output_type -> sickrock.DeleteAPIKeyResponse
+	210, // 270: sickrock.SickRock.DeactivateAPIKey:output_type -> sickrock.DeactivateAPIKeyResponse
+	214, // 271: sickrock.SickRock.GetConditionalFormattingRules:output_type -> sickrock.GetConditionalFormattingRulesResponse
+	216, // 272: sickrock.SickRock.CreateConditionalFormattingRule:output_type -> sickrock.CreateConditionalFormattingRuleResponse
+	220, // 273: sickrock.SickRock.UpdateConditionalFormattingRule:output_type -> sickrock.UpdateConditionalFormattingRuleResponse
+	218, // 274: sickrock.SickRock.DeleteConditionalFormattingRule:output_type -> sickrock.DeleteConditionalFormattingRuleResponse
+	225, // 275: sickrock.SickRock.GetNotificationEvents:output_type -> sickrock.GetNotificationEventsResponse
+	227, // 276: sickrock.SickRock.GetUserNotificationChannels:output_type -> sickrock.GetUserNotificationChannelsResponse
+	229, // 277: sickrock.SickRock.CreateUserNotificationChannel:output_type -> sickrock.CreateUserNotificationChannelResponse
+	231, // 278: sickrock.SickRock.UpdateUserNotificationChannel:output_type -> sickrock.UpdateUserNotificationChannelResponse
+	233, // 279: sickrock.SickRock.DeleteUserNotificationChannel:output_type -> sickrock.DeleteUserNotificationChannelResponse
+	235, // 280: sickrock.SickRock.GetUserNotificationSubscriptions:output_type -> sickrock.GetUserNotificationSubscriptionsResponse
+	237, // 281: sickrock.SickRock.CreateUserNotificationSubscription:output_type -> sickrock.CreateUserNotificationSubscriptionResponse
+	239, // 282: sickrock.SickRock.DeleteUserNotificationSubscription:output_type -> sickrock.DeleteUserNotificationSubscriptionResponse
+	241, // 283: sickrock.SickRock.GetTickListState:output_type -> sickrock.GetTickListStateResponse
+	243, // 284: sickrock.SickRock.SetTickListCompletion:output_type -> sickrock.SetTickListCompletionResponse
+	245, // 285: sickrock.SickRock.ClearTickListState:output_type -> sickrock.ClearTickListStateResponse
+	183, // [183:286] is the sub-list for method output_type
+	80,  // [80:183] is the sub-list for method input_type
+	80,  // [80:80] is the sub-list for extension type_name
+	80,  // [80:80] is the sub-list for extension extendee
+	0,   // [0:80] is the sub-list for field type_name
 }
 
 func init() { file_sickrock_proto_init() }
@@ -13781,15 +15055,15 @@ func file_sickrock_proto_init() {
 		return
 	}
 	file_sickrock_proto_msgTypes[10].OneofWrappers = []any{}
-	file_sickrock_proto_msgTypes[85].OneofWrappers = []any{}
-	file_sickrock_proto_msgTypes[187].OneofWrappers = []any{}
+	file_sickrock_proto_msgTypes[103].OneofWrappers = []any{}
+	file_sickrock_proto_msgTypes[205].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sickrock_proto_rawDesc), len(file_sickrock_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   233,
+			NumMessages:   251,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

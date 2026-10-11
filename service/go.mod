@@ -4,27 +4,28 @@ go 1.26.0
 
 require (
 	connectrpc.com/connect v1.21.0
+	github.com/arran4/golang-ical v0.3.7
 	github.com/expr-lang/expr v1.17.8
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-sql-driver/mysql v1.10.1
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/google/uuid v1.6.0
 	github.com/jamesread/armature-iam v1.0.1
-	github.com/jamesread/golure v0.0.0-20260902093223-27b18778c9a5
+	github.com/jamesread/golure v0.0.0-20260927082702-900b761e432f
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/knadh/koanf/parsers/yaml v1.1.1
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/providers/file v1.2.1
-	github.com/knadh/koanf/v2 v2.3.6
+	github.com/knadh/koanf/v2 v2.3.7
 	github.com/mark3labs/mcp-go v1.1.1
-	github.com/mmcdole/gofeed v1.3.0
+	github.com/mmcdole/gofeed v1.5.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
 	github.com/yuin/goldmark v1.8.6
 	go.akshayshah.org/connectproto v0.6.0
 	golang.org/x/crypto v0.57.0
 	google.golang.org/protobuf v1.36.12
-	modernc.org/sqlite v1.59.0
+	modernc.org/sqlite v1.60.1
 )
 
 require (
@@ -32,10 +33,7 @@ require (
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/MicahParks/jwkset v0.11.3 // indirect
 	github.com/MicahParks/keyfunc/v3 v3.8.2 // indirect
-	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/alexedwards/argon2id v1.0.0 // indirect
-	github.com/andybalholm/cascadia v1.3.1 // indirect
-	github.com/arran4/golang-ical v0.3.2 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
 	github.com/bytedance/sonic v1.15.4 // indirect
 	github.com/bytedance/sonic/loader v0.5.2 // indirect
@@ -44,11 +42,11 @@ require (
 	github.com/fsnotify/fsnotify v1.10.1 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
 	github.com/gin-contrib/sse v1.1.2 // indirect
-	github.com/go-playground/locales v0.14.1 // indirect
+	github.com/go-playground/locales v0.14.2 // indirect
 	github.com/go-playground/universal-translator v0.18.2 // indirect
 	github.com/go-playground/validator/v10 v10.30.5 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
-	github.com/goccy/go-json v0.10.6 // indirect
+	github.com/goccy/go-json v0.11.2 // indirect
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
@@ -61,10 +59,10 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.52 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
-	github.com/mmcdole/goxpp v1.1.1-0.20240225020742-a0c311522b23 // indirect
+	github.com/mmcdole/goxpp/v2 v2.0.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/ncruces/go-strftime v1.1.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/quic-go/qpack v0.6.0 // indirect
 	github.com/quic-go/quic-go v0.63.0 // indirect
@@ -74,7 +72,7 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	go.mongodb.org/mongo-driver/v2 v2.9.1 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.9.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/arch v0.31.0 // indirect
 	golang.org/x/net v0.59.0 // indirect

@@ -6,6 +6,9 @@ import { createApiClient } from '../stores/api'
 import ViewsButton from './ViewsButton.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Cancel01Icon, CheckListIcon, CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
+import { useDesignMode } from '../composables/useDesignMode'
+
+const { designModeEnabled } = useDesignMode()
 
 const props = defineProps<{
   tableId: string
@@ -204,7 +207,11 @@ onMounted(() => {
         <HugeiconsIcon :icon="Cancel01Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Clear Ticks</span>
       </button>
-      <router-link :to="`/table/${props.tableId}/column-types`" class="button neutral">Structure</router-link>
+      <router-link
+        v-if="designModeEnabled"
+        :to="`/table/${props.tableId}/column-types`"
+        class="button neutral design-only"
+      >Structure</router-link>
       <router-link :to="`/table/${props.tableId}/insert-row`" class="button inline-icon good">
         <HugeiconsIcon :icon="CheckmarkSquare03Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Add Item</span>

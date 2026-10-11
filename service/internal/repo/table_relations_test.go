@@ -30,6 +30,7 @@ func TestGetForeignKeysFromTableRelations(t *testing.T) {
 			create_button_text TEXT,
 			create_delegate TEXT,
 			row_name TEXT,
+			row_name_plural TEXT,
 			icon TEXT,
 			primary_key_column TEXT,
 			default_sort_column TEXT
@@ -46,6 +47,7 @@ func TestGetForeignKeysFromTableRelations(t *testing.T) {
 			referenced_column TEXT NOT NULL,
 			on_delete_action TEXT NOT NULL DEFAULT 'NO ACTION',
 			on_update_action TEXT NOT NULL DEFAULT 'NO ACTION',
+			display_name TEXT,
 			created_at TEXT NOT NULL DEFAULT (datetime('now'))
 		);
 		INSERT INTO table_relations (

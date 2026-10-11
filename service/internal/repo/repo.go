@@ -198,6 +198,7 @@ type TableConfig struct {
 	CreateButtonText  sql.NullString   `db:"create_button_text"`
 	CreateDelegate    sql.NullString   `db:"create_delegate"`
 	RowName           sql.NullString   `db:"row_name"`
+	RowNamePlural     sql.NullString   `db:"row_name_plural"`
 	Table             sql.NullString   `db:"table"`
 	Db                sql.NullString   `db:"db"`
 	PrimaryKeyColumn  sql.NullString   `db:"primary_key_column"`
@@ -246,6 +247,7 @@ type NavigationItem struct {
 	DashboardID        sql.NullInt64
 	DashboardName      sql.NullString
 	Navigation         sql.NullString
+	TitleOverride      sql.NullString
 	WorkflowID         sql.NullInt64
 	WorkflowName       sql.NullString
 }
@@ -262,6 +264,7 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
             tn.dashboard_id as dashboard_id,
             td.name as dashboard_name,
             tn.name as navigation,
+            tn.title as link_title,
             tn.workflow_id as workflow_id,
             tw.name as workflow_name
 		FROM table_navigation tn
@@ -290,6 +293,7 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 			&item.DashboardID,
 			&item.DashboardName,
 			&item.Navigation,
+			&item.TitleOverride,
 			&item.WorkflowID,
 			&item.WorkflowName,
 		); err != nil {
@@ -323,6 +327,7 @@ func (r *Repository) GetNavigationItemsForWorkflowMembership(ctx context.Context
             tn.dashboard_id as dashboard_id,
             td.name as dashboard_name,
             tn.name as navigation,
+            tn.title as link_title,
             tn.workflow_id as nav_workflow_id,
             tw.name as workflow_name
 		FROM workflow_navigation_members wnm
@@ -357,6 +362,7 @@ func (r *Repository) GetNavigationItemsForWorkflowMembership(ctx context.Context
 			&item.DashboardID,
 			&item.DashboardName,
 			&item.Navigation,
+			&item.TitleOverride,
 			&navWorkflowID,
 			&item.WorkflowName,
 		); err != nil {
@@ -933,8 +939,29 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 	}
 
 	// Add additional fields
+	columnByName := make(map[string]FieldSpec, len(columns))
+	for _, col := range columns {
+		columnByName[col.Name] = col
+	}
 	for key, value := range additionalFields {
-		insertColumns = append(insertColumns, fmt.Sprintf("`%s`", key))
+		if IsRelationSyntheticColumn(key) {
+			continue
+		}
+		col, ok := columnByName[key]
+		if !ok {
+			for name, spec := range columnByName {
+				if strings.EqualFold(name, key) {
+					col = spec
+					ok = true
+					key = name
+					break
+				}
+			}
+		}
+		if !ok {
+			continue
+		}
+		insertColumns = append(insertColumns, fmt.Sprintf("`%s`", col.Name))
 		placeholders = append(placeholders, "?")
 		values = append(values, value)
 	}
@@ -1090,6 +1117,25 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 	}
 
 	for fieldName, fieldValue := range additionalFields {
+		if IsRelationSyntheticColumn(fieldName) {
+			continue
+		}
+
+		var col *FieldSpec
+		for i := range columns {
+			if columns[i].Name == fieldName {
+				col = &columns[i]
+				break
+			}
+			if strings.EqualFold(columns[i].Name, fieldName) {
+				col = &columns[i]
+				break
+			}
+		}
+		if col == nil {
+			continue
+		}
+
 		// Sanitize field name to prevent SQL injection
 		sanitizedFieldName := sanitizeDatabaseIdentifier(fieldName)
 
@@ -1100,26 +1146,8 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 		// Nullable FK ints on navigation (explicit names for reliable clears from the UI)
 		if (fieldName == "workflow_id" || fieldName == "dashboard_id") && (fieldValue == "" || fieldValue == "0") {
 			shouldSetNull = true
-		} else {
-			// Check column metadata for other nullable fields
-			var col *FieldSpec
-			for i := range columns {
-				// Try exact match first
-				if columns[i].Name == fieldName {
-					col = &columns[i]
-					break
-				}
-				// Try case-insensitive match
-				if strings.EqualFold(columns[i].Name, fieldName) {
-					col = &columns[i]
-					break
-				}
-			}
-
-			// If field is nullable and value is empty or "0", set to NULL
-			if col != nil && !col.Required && (fieldValue == "" || fieldValue == "0") {
-				shouldSetNull = true
-			}
+		} else if !col.Required && (fieldValue == "" || fieldValue == "0") {
+			shouldSetNull = true
 		}
 
 		if shouldSetNull {
@@ -1395,7 +1423,7 @@ func (r *Repository) CreateTable(ctx context.Context, database, table string) er
 
 // CreateTableConfiguration creates a new table configuration entry.
 // When createNavigation is true, a row is added to table_navigation for the new configuration.
-func (r *Repository) CreateTableConfiguration(ctx context.Context, name, database, table string, createNavigation bool) error {
+func (r *Repository) CreateTableConfiguration(ctx context.Context, name, database, table string, createNavigation bool, navigationAppID int) error {
 	log.WithFields(log.Fields{
 		"name":     name,
 		"database": database,
@@ -1435,11 +1463,19 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 
 	if createNavigation {
 		navQuery := "INSERT INTO table_navigation (ordinal, table_configuration, name) VALUES (99, ?, ?)"
-		_, err = r.db.ExecContext(ctx, navQuery, configID, name)
+		navResult, err := r.db.ExecContext(ctx, navQuery, configID, name)
 		if err != nil {
 			log.Warnf("Failed to create navigation entry for table configuration %s: %v", name, err)
 		} else {
 			log.Infof("Created navigation entry for table configuration: %s", name)
+			if navigationAppID > 0 {
+				navID, idErr := navResult.LastInsertId()
+				if idErr != nil {
+					log.Warnf("Failed to get navigation item id for app assignment: %v", idErr)
+				} else if linkErr := r.AssignNavigationItemToApp(ctx, navigationAppID, int(navID), 99); linkErr != nil {
+					log.Warnf("Failed to assign navigation item to app %d: %v", navigationAppID, linkErr)
+				}
+			}
 		}
 	}
 
@@ -1468,6 +1504,8 @@ func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error 
 		{"table_configurations", "Table Configurations", "table_configurations", 1, "/admin/table/create", "Create Table", "Table configuration"},
 		{"table_workflows", "Workflows", "table_workflows", 2, "", "Add Workflow", "Workflow"},
 		{"table_navigation", "Navigation", "table_navigation", 3, "", "Add Navigation Item", "Navigation item"},
+		{"table_apps", "Sidebar apps", "apps", 9, "", "Add app", "App"},
+		{"table_app_navigation_links", "App navigation links", "app_navigation_links", 10, "", "Add link", "App navigation link"},
 		{"table_dashboards", "Dashboards", "table_dashboards", 4, "/admin/dashboard/create", "Create Dashboard", "Dashboard"},
 		{"table_dashboard_components", "Dashboard components", "table_dashboard_components", 8, "", "Add Component", "Dashboard component"},
 		{"table_read_only_exports", "Read-only calendar exports", "read_only_calendar_exports", 5, "", "Add Export", "Calendar export"},
@@ -1767,6 +1805,7 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 
 // ForeignKey represents a foreign key constraint
 type ForeignKey struct {
+	RelationID       int    `db:"-"`
 	ConstraintName   string `db:"constraint_name"`
 	TableSchema      string `db:"table_schema"`
 	TableName        string `db:"table_name"`
@@ -1776,6 +1815,8 @@ type ForeignKey struct {
 	ReferencedColumn string `db:"referenced_column"`
 	OnDeleteAction   string `db:"on_delete_action"`
 	OnUpdateAction   string `db:"on_update_action"`
+	DisplayName       string                   `db:"display_name"`
+	PullThroughFields []RelationPullThroughField `db:"-"`
 }
 
 // CreateForeignKey records a relation in table_relations and applies a database FK when supported.
@@ -1908,7 +1949,10 @@ func (r *Repository) DropColumn(ctx context.Context, tableName, columnName strin
 	}
 
 	_, err = r.db.ExecContext(ctx, alterQuery)
-	return err
+	if err != nil {
+		return err
+	}
+	return r.DeleteColumnDisplay(ctx, tableName, columnName)
 }
 
 // ChangeColumnName renames a column in a table
@@ -1934,7 +1978,10 @@ func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnN
 	}
 
 	_, err = r.db.ExecContext(ctx, alterQuery)
-	return err
+	if err != nil {
+		return err
+	}
+	return r.RenameColumnDisplay(ctx, tableName, oldColumnName, newColumnName)
 }
 
 // InsertRecentlyViewed adds a table and item ID to the recently viewed tracking table for one user.
@@ -2119,6 +2166,7 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			tn.dashboard_id as dashboard_id,
 			td.name as dashboard_name,
 			tn.name as navigation,
+			tn.title as link_title,
 			tn.workflow_id as workflow_id,
 			tw.name as workflow_name,
 			tn.name as title
@@ -2154,6 +2202,7 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			&navItem.DashboardID,
 			&navItem.DashboardName,
 			&navItem.Navigation,
+			&navItem.TitleOverride,
 			&navItem.WorkflowID,
 			&navItem.WorkflowName,
 			&bookmark.Title,

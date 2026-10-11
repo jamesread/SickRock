@@ -6,10 +6,7 @@ import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import {
   Add01Icon,
-  AddCircleIcon,
   DatabaseIcon,
-  Download01Icon,
-  Settings01Icon,
 } from '@hugeicons/core-free-icons'
 
 import type { Field, GetTableStructureResponse, Item } from '../gen/sickrock_pb'
@@ -17,6 +14,12 @@ import type { TableView } from '../composables/useTableViewManager'
 import { useKeyboardShortcuts, type KeyboardShortcut } from '../composables/useKeyboardShortcuts'
 import { createApiClient } from '../stores/api'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
+import {
+  relatedTableEmptyHeading,
+  rowInsertActionLabel,
+  tableEmptyHeading,
+  tableViewSectionTitle,
+} from '../utils/rowInsertLabel'
 import { hasUuidColumn, isOnline, loadTableData, saveTableData } from '../utils/indexedDB'
 import {
   buildTableHeaders,
@@ -35,7 +38,20 @@ import { useIamUsers } from '../composables/useIamUsers'
 import { isUserRefColumn as columnIsUserRef, isUserRefFieldType } from '../utils/fieldTypes'
 import InsertRow from './InsertRow.vue'
 import RowActionsDropdown from './RowActionsDropdown.vue'
-import ViewsButton from './ViewsButton.vue'
+import TableComponentToolbar from './TableComponentToolbar.vue'
+import UserRefChip from './UserRefChip.vue'
+import { useDesignMode } from '../composables/useDesignMode'
+import {
+  applyFieldValueAffixes,
+  foreignKeyReferencedDisplayLabel,
+  mergeItemFieldRecord,
+} from '../utils/fieldColumnDisplay'
+import { findFieldDef } from '../utils/fieldTypes'
+import { isPullThroughColumn, isRelationSyntheticColumn } from '../utils/relationPullThrough'
+import { enrichTableItemsWithRelationExtras } from '../utils/tableRelationExtraColumns'
+import { urlConditionalFormatLink } from '../utils/conditionalFormattingUrl'
+
+const { designModeEnabled } = useDesignMode()
 
 const ACTIONS_COLUMN = '__sickrock_actions'
 
@@ -85,7 +101,17 @@ const props = defineProps<{
   showInsert?: boolean
   showPagination?: boolean
   title?: string
+  wrapInSection?: boolean
+  toolbarTeleport?: string
+  /** When set, empty state shows "No {plural} for {label}" (related item panels). */
+  relatedEmptyParentLabel?: string
+  insertRouteOverride?: string | { path: string; query?: Record<string, string> }
+  /** Synthetic columns (e.g. relation pull-through); forced visible when embedded. */
+  extraFields?: Field[]
 }>()
+
+const wrapInSection = computed(() => props.wrapInSection !== false)
+const useOwnSection = computed(() => wrapInSection.value && !props.toolbarTeleport)
 
 const emit = defineEmits<{
   'view-created': []
@@ -102,17 +128,28 @@ const tableTitle = ref('')
 const items = ref<Item[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
+const relationExtraFields = ref<Field[]>([])
 
 const fieldDefs = computed<Field[]>(() => {
+  let base: Field[]
   if (props.fields?.length) {
-    return props.fields.map(field => ({
+    base = props.fields.map(field => ({
       name: field.name,
       type: field.type,
       required: false,
       defaultToCurrentTimestamp: false,
     })) as Field[]
+  } else {
+    base = tableStructure.value?.fields ?? []
   }
-  return tableStructure.value?.fields ?? []
+  const extra = props.extraFields?.length
+    ? props.extraFields
+    : relationExtraFields.value
+  if (!extra.length) {
+    return base
+  }
+  const names = new Set(base.map(field => field.name))
+  return [...base, ...extra.filter(field => !names.has(field.name))]
 })
 
 const sourceItems = computed<Item[]>(() => (props.items ?? items.value) as Item[])
@@ -137,10 +174,23 @@ const flattenedRows = computed<TableRow[]>(() => {
   return rows
 })
 
-const sectionTitle = computed(() => props.title || tableTitle.value || props.tableId)
-const insertButtonText = computed(() => (
-  props.createButtonText || tableStructure.value?.CreateButtonText || 'Insert row'
-))
+const sectionTitle = computed(() => {
+  if (props.title) {
+    return props.title
+  }
+  return tableViewSectionTitle(
+    tableStructure.value?.rowNamePlural,
+    tableStructure.value?.rowName,
+    tableTitle.value || tableStructure.value?.title,
+    props.tableId,
+  )
+})
+const insertButtonText = computed(() => {
+  if (props.createButtonText) {
+    return props.createButtonText
+  }
+  return rowInsertActionLabel(tableStructure.value?.rowName)
+})
 
 const insertRoute = computed(() => {
   const delegate = tableStructure.value?.createDelegate?.trim()
@@ -150,13 +200,30 @@ const insertRoute = computed(() => {
   return `/table/${props.tableId}/insert-row`
 })
 
+const effectiveInsertRoute = computed(
+  () => props.insertRouteOverride ?? insertRoute.value,
+)
+
+const isRelatedEmptyState = computed(
+  () => props.relatedEmptyParentLabel != null && props.relatedEmptyParentLabel !== '',
+)
+
+const emptyStateHeading = computed(() => {
+  const rowNamePlural = tableStructure.value?.rowNamePlural
+  const rowName = tableStructure.value?.rowName
+  if (isRelatedEmptyState.value) {
+    return relatedTableEmptyHeading(rowNamePlural, rowName, props.relatedEmptyParentLabel ?? '')
+  }
+  return tableEmptyHeading(rowNamePlural, rowName)
+})
+
 const showQuickAdd = computed(() => showInsert.value && !tableStructure.value?.createDelegate?.trim())
 
 const showViewSwitcher = computed(() => props.showViewSwitcher !== false)
-const showViewEdit = computed(() => props.showViewEdit !== false)
-const showViewCreate = computed(() => props.showViewCreate !== false)
+const showViewEdit = computed(() => props.showViewEdit !== false && designModeEnabled.value)
+const showViewCreate = computed(() => props.showViewCreate !== false && designModeEnabled.value)
 const showExport = computed(() => props.showExport !== false)
-const showStructure = computed(() => props.showStructure !== false)
+const showStructure = computed(() => props.showStructure !== false && designModeEnabled.value)
 const showInsert = computed(() => props.showInsert !== false)
 const showPagination = computed(() => props.showPagination !== false)
 const showToolbar = computed(() => {
@@ -168,6 +235,27 @@ const showToolbar = computed(() => {
     || showStructure.value
     || showInsert.value
 })
+
+const useInlineToolbar = computed(
+  () => showToolbar.value && !props.toolbarTeleport && !wrapInSection.value,
+)
+
+const tableToolbarBindings = computed(() => ({
+  tableId: props.tableId,
+  showViewSwitcher: showViewSwitcher.value,
+  showViewEdit: showViewEdit.value,
+  showViewCreate: showViewCreate.value,
+  showExport: showExport.value,
+  showStructure: showStructure.value,
+  showInsert: showInsert.value,
+  showQuickAdd: showQuickAdd.value,
+  insertRoute: insertRoute.value,
+  insertButtonText: insertButtonText.value,
+  tableViews: tableViews.value,
+  selectedViewId: selectedViewId.value,
+  currentView: currentView.value,
+  multiSelectEnabled: multiSelectEnabled.value,
+}))
 
 // Server table views remain the source of truth. PicoCrank changes the
 // controlled state below for this component session only.
@@ -193,13 +281,21 @@ const viewOptions = computed<TableView[]>(() => {
 
 const tableFilters = ref<Record<string, unknown>>({})
 const columnVisibility = ref<Record<string, boolean>>({})
-const columnOrder = ref<string[]>([])
+const sessionColumnOrder = ref<string[] | null>(null)
 const sortBy = ref<string | null>(null)
 const sortDir = ref<SortDirection>('asc')
 const page = ref(1)
 const pageSize = ref(10)
 const selectedKeys = ref<string[]>([])
+const multiSelectEnabled = ref(false)
 const activeCell = ref<ActiveCell>(null)
+
+function toggleMultiSelect() {
+  multiSelectEnabled.value = !multiSelectEnabled.value
+  if (!multiSelectEnabled.value) {
+    selectedKeys.value = []
+  }
+}
 
 const tableHeaders = computed(() => [
   ...buildTableHeaders(fieldDefs.value, currentView.value),
@@ -214,12 +310,30 @@ const tableHeaders = computed(() => [
   },
 ])
 
+function serverColumnOrder(): string[] {
+  const mapped = mapTableView(fieldDefs.value, currentView.value)
+  const extraNames = (props.extraFields ?? []).map(field => field.name)
+  const ordered = [...mapped.orderedColumns]
+  for (const name of extraNames) {
+    if (!ordered.includes(name)) {
+      ordered.push(name)
+    }
+  }
+  return [...ordered, ACTIONS_COLUMN]
+}
+
+const columnOrder = computed(() => sessionColumnOrder.value ?? serverColumnOrder())
+
 function applyServerView() {
   const mapped = mapTableView(fieldDefs.value, currentView.value)
-  columnOrder.value = [...mapped.orderedColumns, ACTIONS_COLUMN]
+  const extraNames = (props.extraFields ?? []).map(field => field.name)
+  sessionColumnOrder.value = null
   columnVisibility.value = {
     ...mapped.columnVisibility,
     [ACTIONS_COLUMN]: true,
+  }
+  for (const name of extraNames) {
+    columnVisibility.value[name] = true
   }
   sortBy.value = mapped.sortBy
   sortDir.value = mapped.sortDir
@@ -231,6 +345,8 @@ watch(
     () => fieldDefs.value.map(field => `${field.name}:${field.type}`).join('|'),
     () => selectedViewId.value,
     () => JSON.stringify(currentView.value?.columns ?? []),
+    () => JSON.stringify((props.extraFields ?? []).map(field => field.name)),
+    () => JSON.stringify(relationExtraFields.value.map(field => field.name)),
   ],
   applyServerView,
   { immediate: true },
@@ -242,7 +358,7 @@ function onColumnVisibilityUpdate(value: Record<string, boolean>) {
 
 function onColumnOrderUpdate(value: string[]) {
   const dataColumns = value.filter(key => key !== ACTIONS_COLUMN)
-  columnOrder.value = [...dataColumns, ACTIONS_COLUMN]
+  sessionColumnOrder.value = [...dataColumns, ACTIONS_COLUMN]
 }
 
 function onFiltersUpdate(value: Record<string, unknown>) {
@@ -324,6 +440,31 @@ watch(
   },
 )
 
+async function applySourceRelationExtras(loaded: Item[]): Promise<Item[]> {
+  if (props.extraFields?.length || props.items !== undefined) {
+    return loaded
+  }
+  const structure = tableStructure.value
+  if (!structure) {
+    relationExtraFields.value = []
+    return loaded
+  }
+  try {
+    const enriched = await enrichTableItemsWithRelationExtras(
+      client,
+      props.tableId,
+      loaded,
+      structure,
+    )
+    relationExtraFields.value = enriched.extraFields
+    return enriched.items
+  } catch (enrichError) {
+    console.error('Failed to apply relation pull-through columns:', enrichError)
+    relationExtraFields.value = []
+    return loaded
+  }
+}
+
 async function load() {
   if (props.items !== undefined) {
     loading.value = false
@@ -340,7 +481,7 @@ async function load() {
     if (!isOnline() && canCacheOffline) {
       const cachedItems = await loadTableData(props.tableId, emptyWhere)
       if (cachedItems !== null) {
-        items.value = cachedItems as Item[]
+        items.value = await applySourceRelationExtras(cachedItems as Item[])
         return
       }
       items.value = []
@@ -351,7 +492,9 @@ async function load() {
     // Keep the initial request unfiltered. PicoCrank owns filtering over the
     // complete local row set, including rows loaded from the offline cache.
     const response = await client.listItems({ tcName: props.tableId, where: emptyWhere })
-    items.value = Array.isArray(response.items) ? response.items : []
+    let loaded = Array.isArray(response.items) ? response.items : []
+    loaded = await applySourceRelationExtras(loaded)
+    items.value = loaded
 
     if (canCacheOffline && isOnline()) {
       await saveTableData(props.tableId, items.value, emptyWhere)
@@ -360,7 +503,7 @@ async function load() {
     if (canCacheOffline) {
       const cachedItems = await loadTableData(props.tableId, emptyWhere)
       if (cachedItems !== null) {
-        items.value = cachedItems as Item[]
+        items.value = await applySourceRelationExtras(cachedItems as Item[])
         error.value = null
         return
       }
@@ -512,9 +655,43 @@ function applyConditionalFormatting(
       case 'italic':
         if (rule.formatValue === 'true') styles['font-style'] = 'italic'
         break
+      case 'url':
+        break
     }
   }
   return { content, styles }
+}
+
+function resolveAffixPlaceholder(columnName: string, rawValue: unknown): string {
+  if (rawValue === null || rawValue === undefined || rawValue === '') return ''
+  if (isForeignKey(columnName)) {
+    const ref = getReferencedItem(columnName, rawValue)
+    return foreignKeyReferencedDisplayLabel(
+      ref as unknown as Record<string, unknown> | undefined,
+      rawValue,
+    )
+  }
+  return String(rawValue)
+}
+
+function cellUrlLink(columnKey: string, row: TableRow) {
+  const item = sourceItemForRow(row)
+  const raw = getItemValue(item, columnKey)
+  return urlConditionalFormatLink(columnKey, raw, conditionalFormattingRules.value)
+}
+
+function formattedCellContent(columnKey: string, row: TableRow): string {
+  const value = cellValue(row, columnKey)
+  const formatted = applyConditionalFormatting(columnKey, value).content
+  if (isPullThroughColumn(columnKey)) {
+    return formatted
+  }
+  const field = findFieldDef(fieldDefs.value, columnKey)
+  const source = sourceItemForRow(row)
+  const record = source
+    ? mergeItemFieldRecord(source as unknown as Record<string, unknown>)
+    : mergeItemFieldRecord(row as Record<string, unknown>)
+  return applyFieldValueAffixes(formatted, field, record, resolveAffixPlaceholder)
 }
 
 function cellStyle(context: CellContext) {
@@ -606,6 +783,7 @@ function canEditColumn(column: string): boolean {
   return !['id', 'name', 'sr_created', 'sr_updated', ACTIONS_COLUMN].includes(column)
     && column !== tableStructure.value?.primaryKeyColumn
     && !isForeignKey(column)
+    && !isRelationSyntheticColumn(column)
 }
 
 function startEditRow(row: TableRow, column: string) {
@@ -659,6 +837,7 @@ async function saveEditRow(row: TableRow) {
     const currentItem = sourceItems.value.find(candidate => String(candidate.id) === rowId) ?? item
     const additionalFields: Record<string, string> = {}
     for (const [key, value] of Object.entries(currentItem.additionalFields ?? {})) {
+      if (isRelationSyntheticColumn(key)) continue
       additionalFields[key] = String(value)
     }
     additionalFields[column] = isDatetimeColumn(column)
@@ -685,7 +864,7 @@ const selectedItems = computed(() => {
   const keys = new Set(selectedKeys.value)
   return sourceItems.value.filter(item => keys.has(String(item.id)))
 })
-const hasSelectedItems = computed(() => selectedKeys.value.length > 0)
+const hasSelectedItems = computed(() => multiSelectEnabled.value && selectedKeys.value.length > 0)
 const showDeleteConfirm = ref(false)
 const deleting = ref(false)
 
@@ -935,62 +1114,49 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <Teleport
+    v-if="showToolbar && toolbarTeleport"
+    :to="toolbarTeleport"
+    defer
+  >
+    <TableComponentToolbar
+      v-bind="tableToolbarBindings"
+      @view-selected="selectView"
+      @open-quick-add="openQuickAddDialog"
+      @toggle-multi-select="toggleMultiSelect"
+    >
+      <template #toolbar-prefix>
+        <slot name="toolbar-prefix" />
+      </template>
+      <template #toolbar-suffix>
+        <slot name="toolbar-suffix" />
+      </template>
+    </TableComponentToolbar>
+  </Teleport>
+
   <Section
+    v-if="useOwnSection"
     :title="sectionTitle"
     :icon="DatabaseIcon"
     :padding="false"
-    class="table-component-wrapper"
   >
     <template v-if="showToolbar" #toolbar>
-      <ViewsButton
-        v-if="showViewSwitcher || showViewEdit || showViewCreate"
-        :table-id="props.tableId"
-        :show-view-create="showViewCreate"
-        :show-view-edit="showViewEdit"
-        :external-views="tableViews"
-        :external-selected-view-id="selectedViewId"
-        :external-current-view="currentView"
+      <TableComponentToolbar
+        v-bind="tableToolbarBindings"
         @view-selected="selectView"
-      />
-      <router-link
-        v-if="showExport"
-        :to="`/table/${props.tableId}/export`"
-        class="button inline-icon neutral ss-large"
+        @open-quick-add="openQuickAddDialog"
+        @toggle-multi-select="toggleMultiSelect"
       >
-        <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Export</span>
-      </router-link>
-      <router-link
-        v-if="showStructure"
-        :to="`/table/${props.tableId}/column-types`"
-        class="button inline-icon neutral ss-large"
-      >
-        <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Structure</span>
-      </router-link>
-      <div v-if="showInsert" class="insert-button-group">
-        <router-link
-          :to="insertRoute"
-          class="button inline-icon neutral insert-button"
-          accesskey="n"
-          title="Insert row"
-        >
-          <HugeiconsIcon :icon="AddCircleIcon" width="1em" height="1em" aria-hidden="true" />
-          <span>{{ insertButtonText }}</span>
-        </router-link>
-        <button
-          v-if="showQuickAdd"
-          class="button inline-icon good quick-add-button"
-          title="Quick Add"
-          aria-label="Quick Add"
-          @click="openQuickAddDialog"
-        >
-          <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span class="quick-add-text" />
-        </button>
-      </div>
+        <template #toolbar-prefix>
+          <slot name="toolbar-prefix" />
+        </template>
+        <template #toolbar-suffix>
+          <slot name="toolbar-suffix" />
+        </template>
+      </TableComponentToolbar>
     </template>
 
+    <div class="table-component-wrapper">
     <NotificationBlock v-if="error" type="error" :message="error" />
     <div v-else-if="loading" class="loading-state">Loading…</div>
     <div v-else class="section-content">
@@ -1012,11 +1178,11 @@ onUnmounted(() => {
           :active-cell="activeCell"
           :show-pagination="showPagination"
           :reset-page-on-sort="false"
-          :load-saved-layout="true"
+          :load-saved-layout="false"
           :column-options="true"
           :cell-style="cellStyle"
-          selectable
-          selection-click-mode="extended"
+          :selectable="multiSelectEnabled"
+          :selection-click-mode="multiSelectEnabled ? 'extended' : 'row'"
           @update:filters="onFiltersUpdate"
           @update:column-visibility="onColumnVisibilityUpdate"
           @update:column-order="onColumnOrderUpdate"
@@ -1114,13 +1280,11 @@ onUnmounted(() => {
               >
                 {{ cellValue(row, header.key) }}
               </router-link>
-              <router-link
+              <UserRefChip
                 v-else-if="isUserRefColumn(header.key) && cellValue(row, header.key) != null"
                 :to="`/admin/iam/users/${cellValue(row, header.key)}`"
-                class="tag note user-ref-chip"
-              >
-                {{ displayUserLabel(cellValue(row, header.key)) }}
-              </router-link>
+                :label="displayUserLabel(cellValue(row, header.key))"
+              />
               <span
                 v-else-if="isForeignKey(header.key) && cellValue(row, header.key) != null"
               >
@@ -1155,8 +1319,17 @@ onUnmounted(() => {
                 class="markdown-content"
                 v-html="getMarkdownContent(header.key, sourceItemForRow(row))"
               />
+              <a
+                v-else-if="cellUrlLink(header.key, row)"
+                :href="cellUrlLink(header.key, row)!.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click.stop
+              >
+                {{ cellUrlLink(header.key, row)!.label }}
+              </a>
               <span v-else>
-                {{ applyConditionalFormatting(header.key, cellValue(row, header.key)).content }}
+                {{ formattedCellContent(header.key, row) }}
               </span>
             </div>
           </template>
@@ -1171,13 +1344,12 @@ onUnmounted(() => {
           <template #empty>
             <div class="empty-state">
               <div class="empty-state-content">
-                <div class="empty-state-icon">📋</div>
-                <h3>No items in this table</h3>
-                <p>This table is empty. Get started by adding your first item.</p>
-                <router-link class="button" :to="insertRoute">
-                  ➕ Insert First Item
+                <div v-if="!isRelatedEmptyState" class="empty-state-icon">📋</div>
+                <h3>{{ emptyStateHeading }}</h3>
+                <router-link class="button inline-icon good" :to="effectiveInsertRoute">
+                  <span>{{ insertButtonText }}</span>
                 </router-link>
-                <div class="empty-state-actions">
+                <div v-if="!isRelatedEmptyState" class="empty-state-actions">
                   <router-link class="button" :to="`/table/${props.tableId}/add-column`">
                     Add Column
                   </router-link>
@@ -1267,7 +1439,319 @@ onUnmounted(() => {
         </Section>
       </div>
     </div>
+    </div>
   </Section>
+
+  <div
+    v-else
+    class="table-component-wrapper"
+    :class="{ 'table-component-embedded': useInlineToolbar }"
+  >
+    <div
+      v-if="useInlineToolbar"
+      class="section-header flex-row embedded-table-toolbar"
+    >
+      <div class="fg1" />
+      <div role="toolbar">
+        <TableComponentToolbar
+          v-bind="tableToolbarBindings"
+          @view-selected="selectView"
+          @open-quick-add="openQuickAddDialog"
+          @toggle-multi-select="toggleMultiSelect"
+        >
+          <template #toolbar-prefix>
+            <slot name="toolbar-prefix" />
+          </template>
+          <template #toolbar-suffix>
+            <slot name="toolbar-suffix" />
+          </template>
+        </TableComponentToolbar>
+      </div>
+    </div>
+
+    <NotificationBlock v-if="error" type="error" :message="error" />
+    <div v-else-if="loading" class="loading-state">Loading…</div>
+    <div v-else class="section-content">
+      <div class="table-host">
+        <Table
+          ref="tableRef"
+          :table-id="props.tableId"
+          :data="flattenedRows"
+          :headers="tableHeaders"
+          :row-key="getStableRowId"
+          :filters="tableFilters"
+          :column-visibility="columnVisibility"
+          :column-order="columnOrder"
+          :sort-by="sortBy"
+          :sort-dir="sortDir"
+          :page="page"
+          :page-size="pageSize"
+          :selected-keys="selectedKeys"
+          :active-cell="activeCell"
+          :show-pagination="showPagination"
+          :reset-page-on-sort="false"
+          :load-saved-layout="false"
+          :column-options="true"
+          :cell-style="cellStyle"
+          :selectable="multiSelectEnabled"
+          :selection-click-mode="multiSelectEnabled ? 'extended' : 'row'"
+          @update:filters="onFiltersUpdate"
+          @update:column-visibility="onColumnVisibilityUpdate"
+          @update:column-order="onColumnOrderUpdate"
+          @update:sort-by="sortBy = $event"
+          @update:sort-dir="sortDir = $event"
+          @update:page="page = $event"
+          @update:page-size="pageSize = $event"
+          @update:selected-keys="onSelectedKeysUpdate"
+          @update:active-cell="onActiveCellUpdate"
+        >
+          <template #cell="{ row, header }">
+            <template v-if="header.key === ACTIONS_COLUMN">
+              <RowActionsDropdown
+                :table-id="props.tableId"
+                :row-id="String(cellValue(row, 'id'))"
+                @deleted="onRowActionDeleted(row)"
+              />
+            </template>
+
+            <template v-else-if="isEditingRow(row, header.key)">
+              <div class="inline-edit" data-row-click-ignore>
+                <input
+                  v-if="isTinyintColumn(header.key)"
+                  type="checkbox"
+                  :checked="getBooleanValue(sourceItemForRow(row), header.key)"
+                  :disabled="saving"
+                  class="edit-checkbox"
+                  @change="event => {
+                    editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+                    saveEditRow(row)
+                  }"
+                />
+                <input
+                  v-else-if="isDatetimeColumn(header.key)"
+                  :ref="setEditInput"
+                  v-model="editingValue"
+                  type="datetime-local"
+                  :disabled="saving"
+                  class="edit-input"
+                  @keyup.enter="saveEditRow(row)"
+                  @keyup.escape="cancelEdit"
+                  @blur="saveEditRow(row)"
+                />
+                <input
+                  v-else
+                  :ref="setEditInput"
+                  v-model="editingValue"
+                  type="text"
+                  :disabled="saving"
+                  class="edit-input"
+                  @keyup.enter="saveEditRow(row)"
+                  @keyup.escape="cancelEdit"
+                  @blur="saveEditRow(row)"
+                />
+              </div>
+            </template>
+
+            <div
+              v-else
+              class="cell-content"
+              :class="{ editable: canEditColumn(header.key) }"
+              @click="startEditRow(row, header.key)"
+            >
+              <span
+                v-if="header.key === 'sr_created' && cellValue(row, header.key) != null"
+                class="date"
+              >
+                {{ formatUnixTimestamp(cellValue(row, header.key)) }}
+                <span
+                  v-if="relativeTime(sourceItemForRow(row), 'sr_created') != null"
+                  class="relative-time"
+                >
+                  ({{ formatRelativeTime(relativeTime(sourceItemForRow(row), 'sr_created')!) }})
+                </span>
+              </span>
+              <span
+                v-else-if="header.key === 'sr_updated' && cellValue(row, header.key) != null"
+                class="date"
+              >
+                {{ formatUnixTimestamp(cellValue(row, header.key)) }}
+                <span
+                  v-if="relativeTime(sourceItemForRow(row), 'sr_updated') != null"
+                  class="relative-time"
+                >
+                  ({{ formatRelativeTime(relativeTime(sourceItemForRow(row), 'sr_updated')!) }})
+                </span>
+              </span>
+              <router-link
+                v-else-if="
+                  header.key === 'id'
+                  || header.key === 'name'
+                  || header.key === tableStructure?.primaryKeyColumn
+                "
+                :to="`/table/${props.tableId}/${cellValue(row, 'id')}`"
+              >
+                {{ cellValue(row, header.key) }}
+              </router-link>
+              <UserRefChip
+                v-else-if="isUserRefColumn(header.key) && cellValue(row, header.key) != null"
+                :to="`/admin/iam/users/${cellValue(row, header.key)}`"
+                :label="displayUserLabel(cellValue(row, header.key))"
+              />
+              <span
+                v-else-if="isForeignKey(header.key) && cellValue(row, header.key) != null"
+              >
+                <router-link
+                  v-if="getReferencedItem(header.key, cellValue(row, header.key))"
+                  :to="`/table/${
+                    getForeignKeyInfo(header.key)?.referencedTableTcName
+                    || getForeignKeyInfo(header.key)?.referencedTable
+                  }/${cellValue(row, header.key)}`"
+                >
+                  {{
+                    getReferencedItemName(
+                      getReferencedItem(header.key, cellValue(row, header.key)),
+                    )
+                  }}
+                </router-link>
+                <template v-else>{{ cellValue(row, header.key) }}</template>
+              </span>
+              <span v-else-if="cellValue(row, header.key) == null" class="subtle">NULL</span>
+              <span v-else-if="isTinyintColumn(header.key)" class="boolean-display">
+                <span
+                  v-if="getBooleanValue(sourceItemForRow(row), header.key)"
+                  class="boolean-true"
+                >✓</span>
+                <span v-else class="boolean-false">✗</span>
+              </span>
+              <span v-else-if="isDatetimeColumn(header.key)">
+                {{ new Date(cellValue(row, header.key)).toLocaleString() }}
+              </span>
+              <div
+                v-else-if="hasMarkdownField(header.key, sourceItemForRow(row))"
+                class="markdown-content"
+                v-html="getMarkdownContent(header.key, sourceItemForRow(row))"
+              />
+              <a
+                v-else-if="cellUrlLink(header.key, row)"
+                :href="cellUrlLink(header.key, row)!.href"
+                target="_blank"
+                rel="noopener noreferrer"
+                @click.stop
+              >
+                {{ cellUrlLink(header.key, row)!.label }}
+              </a>
+              <span v-else>
+                {{ formattedCellContent(header.key, row) }}
+              </span>
+            </div>
+          </template>
+
+          <template #filtered-empty="{ clearFilters }">
+            <div class="filtered-empty-message">
+              <div>No items match this filter.</div>
+              <button class="button" @click="clearFilters">Clear filters</button>
+            </div>
+          </template>
+
+          <template #empty>
+            <div class="empty-state">
+              <div class="empty-state-content">
+                <div v-if="!isRelatedEmptyState" class="empty-state-icon">📋</div>
+                <h3>{{ emptyStateHeading }}</h3>
+                <router-link class="button inline-icon good" :to="effectiveInsertRoute">
+                  <span>{{ insertButtonText }}</span>
+                </router-link>
+                <div v-if="!isRelatedEmptyState" class="empty-state-actions">
+                  <router-link class="button" :to="`/table/${props.tableId}/add-column`">
+                    Add Column
+                  </router-link>
+                </div>
+              </div>
+            </div>
+          </template>
+        </Table>
+      </div>
+
+      <div v-if="hasSelectedItems" class="selection-controls padding">
+        <button
+          class="button bad"
+          :disabled="deleting"
+          @click="confirmDeleteSelected"
+        >
+          🗑️ Delete Selected ({{ selectedKeys.length }})
+        </button>
+      </div>
+    </div>
+
+    <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDeleteSelected">
+      <div class="modal-content" @click.stop>
+        <h3>Confirm Delete</h3>
+        <p>
+          Are you sure you want to delete {{ selectedKeys.length }} selected row(s)?
+          This action cannot be undone.
+        </p>
+        <div class="modal-actions">
+          <button
+            class="button neutral"
+            :disabled="deleting"
+            @click="cancelDeleteSelected"
+          >
+            Cancel
+          </button>
+          <button
+            class="button bad"
+            :disabled="deleting"
+            @click="deleteSelectedItems"
+          >
+            {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.length} Row(s)` }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="showQuickAddDialog"
+      class="modal-overlay"
+      tabindex="0"
+      @click="closeQuickAddDialog"
+      @keydown.escape="closeQuickAddDialog"
+    >
+      <div class="modal-content quick-add-modal" @click.stop>
+        <Section :title="insertButtonText" :icon="Add01Icon" class="quick-add-section">
+          <template #toolbar>
+            <div class="insert-toolbar">
+              <div class="view-selector">
+                <label for="quick-add-view-select">View:</label>
+                <select
+                  id="quick-add-view-select"
+                  v-model="quickAddSelectedViewId"
+                  class="view-dropdown"
+                >
+                  <option v-for="view in viewOptions" :key="view.id" :value="view.id">
+                    {{ view.viewName }}
+                  </option>
+                </select>
+              </div>
+              <button
+                type="button"
+                class="button neutral"
+                title="Close"
+                @click="closeQuickAddDialog"
+              >
+                Close
+              </button>
+            </div>
+          </template>
+          <InsertRow
+            :table-id="props.tableId"
+            :field-defs="quickAddFieldDefs"
+            @created="onQuickAddCreated"
+            @cancelled="closeQuickAddDialog"
+          />
+        </Section>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>

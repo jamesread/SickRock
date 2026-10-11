@@ -2,6 +2,7 @@ package repo
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 
@@ -17,8 +18,10 @@ type TableRelation struct {
 	SourceColumn         string `db:"source_column"`
 	ReferencedTableKey   string `db:"referenced_table_key"`
 	ReferencedColumn     string `db:"referenced_column"`
-	OnDeleteAction       string `db:"on_delete_action"`
-	OnUpdateAction       string `db:"on_update_action"`
+	OnDeleteAction       string         `db:"on_delete_action"`
+	OnUpdateAction       string         `db:"on_update_action"`
+	DisplayName          sql.NullString `db:"display_name"`
+	PullThroughJSON      sql.NullString `db:"pull_through_json"`
 }
 
 func makeForeignKeyConstraintName(sourceTableKey, sourceColumn, referencedTableKey, referencedColumn string) string {
@@ -47,8 +50,8 @@ func (r *Repository) insertTableRelation(ctx context.Context, rel TableRelation)
 	const q = `
 		INSERT INTO table_relations (
 			constraint_name, source_table_key, source_column,
-			referenced_table_key, referenced_column, on_delete_action, on_update_action
-		) VALUES (?, ?, ?, ?, ?, ?, ?)`
+			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name
+		) VALUES (?, ?, ?, ?, ?, ?, ?, NULL)`
 	_, err := r.db.ExecContext(ctx, q,
 		rel.ConstraintName, rel.SourceTableKey, rel.SourceColumn,
 		rel.ReferencedTableKey, rel.ReferencedColumn, rel.OnDeleteAction, rel.OnUpdateAction,
@@ -61,11 +64,16 @@ func (r *Repository) deleteTableRelationByConstraintName(ctx context.Context, co
 	return err
 }
 
+// GetTableRelationByConstraintName loads a relation by its constraint name.
+func (r *Repository) GetTableRelationByConstraintName(ctx context.Context, constraintName string) (*TableRelation, error) {
+	return r.getTableRelationByConstraintName(ctx, constraintName)
+}
+
 func (r *Repository) getTableRelationByConstraintName(ctx context.Context, constraintName string) (*TableRelation, error) {
 	var rel TableRelation
 	err := r.db.GetContext(ctx, &rel, `
 		SELECT id, constraint_name, source_table_key, source_column,
-			referenced_table_key, referenced_column, on_delete_action, on_update_action
+			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json
 		FROM table_relations WHERE constraint_name = ?`, constraintName)
 	if err != nil {
 		return nil, err
@@ -77,7 +85,7 @@ func (r *Repository) listTableRelationsForConfiguration(ctx context.Context, tab
 	var rows []TableRelation
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, constraint_name, source_table_key, source_column,
-			referenced_table_key, referenced_column, on_delete_action, on_update_action
+			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json
 		FROM table_relations
 		WHERE source_table_key = ? OR referenced_table_key = ?
 		ORDER BY constraint_name`, tableConfigName, tableConfigName)
@@ -88,7 +96,7 @@ func (r *Repository) listTableRelationsForSourceConfiguration(ctx context.Contex
 	var rows []TableRelation
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, constraint_name, source_table_key, source_column,
-			referenced_table_key, referenced_column, on_delete_action, on_update_action
+			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json
 		FROM table_relations
 		WHERE source_table_key = ?
 		ORDER BY constraint_name`, sourceTableKey)
@@ -104,17 +112,55 @@ func (r *Repository) tableRelationToForeignKey(ctx context.Context, rel TableRel
 	if err != nil {
 		return ForeignKey{}, err
 	}
+	displayName := ""
+	if rel.DisplayName.Valid {
+		displayName = strings.TrimSpace(rel.DisplayName.String)
+	}
+	pullThrough, err := parseRelationPullThroughJSON(rel.PullThroughJSON)
+	if err != nil {
+		return ForeignKey{}, err
+	}
 	return ForeignKey{
-		ConstraintName:   rel.ConstraintName,
-		TableSchema:      sourceTC.Db.String,
-		TableName:        sourceTC.Table.String,
-		ColumnName:       rel.SourceColumn,
-		ReferencedSchema: refTC.Db.String,
-		ReferencedTable:  refTC.Table.String,
-		ReferencedColumn: rel.ReferencedColumn,
-		OnDeleteAction:   rel.OnDeleteAction,
-		OnUpdateAction:   rel.OnUpdateAction,
+		RelationID:        rel.ID,
+		ConstraintName:    rel.ConstraintName,
+		TableSchema:       sourceTC.Db.String,
+		TableName:         sourceTC.Table.String,
+		ColumnName:        rel.SourceColumn,
+		ReferencedSchema:  refTC.Db.String,
+		ReferencedTable:   refTC.Table.String,
+		ReferencedColumn:  rel.ReferencedColumn,
+		OnDeleteAction:    rel.OnDeleteAction,
+		OnUpdateAction:    rel.OnUpdateAction,
+		DisplayName:       displayName,
+		PullThroughFields: pullThrough,
 	}, nil
+}
+
+// UpdateTableRelationDisplayName sets the friendly label for a relation (empty clears it).
+func (r *Repository) UpdateTableRelationDisplayName(ctx context.Context, constraintName, displayName string) error {
+	constraintName = strings.TrimSpace(constraintName)
+	if constraintName == "" {
+		return fmt.Errorf("constraint name is required")
+	}
+	displayName = strings.TrimSpace(displayName)
+	var arg interface{}
+	if displayName == "" {
+		arg = nil
+	} else {
+		arg = displayName
+	}
+	res, err := r.db.ExecContext(ctx, `UPDATE table_relations SET display_name = ? WHERE constraint_name = ?`, arg, constraintName)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("table relation not found")
+	}
+	return nil
 }
 
 func (r *Repository) tableRelationsToForeignKeys(ctx context.Context, relations []TableRelation) ([]ForeignKey, error) {

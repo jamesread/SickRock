@@ -141,16 +141,6 @@ function populateRecentNavigation() {
       icon: group.icon,
       path: `/table/${group.name}`,
     })
-    nav.addNavigationLink({
-      id: `home-table-${group.name}`,
-      name: `home-table-${group.name}`,
-      title: 'View table',
-      path: `/table/${group.name}`,
-      to: `/table/${group.name}`,
-      icon: tableIcon,
-      type: 'route',
-      description: group.title,
-    })
     for (const item of group.items) {
       const linkName = `home-recent-${group.name}-${item.table_id}`
       nav.addNavigationLink({
@@ -291,7 +281,11 @@ onMounted(load)
       <template v-if="hasRecentlyViewed">
         <template v-for="group in groupedRecentlyViewed" :key="group.name">
           <div class="section-subheader">
-            <h3>{{ group.title }}</h3>
+            <h3>
+              <router-link :to="`/table/${group.name}`" :title="`View table: ${group.title}`">
+                {{ group.title }}
+              </router-link>
+            </h3>
           </div>
           <div class="section-content padding">
             <Navigation :ref="(el) => setRecentNavRef(group.name, el)">

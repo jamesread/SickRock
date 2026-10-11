@@ -23,6 +23,7 @@ func TestCreateItemInTableSQLiteUsesDatetimeNow(t *testing.T) {
 			ordinal INTEGER DEFAULT 0,
 			create_button_text TEXT,
 			row_name TEXT,
+			row_name_plural TEXT,
 			create_delegate TEXT,
 			icon TEXT,
 			primary_key_column TEXT,

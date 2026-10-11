@@ -20,7 +20,11 @@ import PWAInstallPrompt from './components/PWAInstallPrompt.vue'
 import { usePWAInstall } from './composables/usePWAInstall'
 import { isOnline } from './utils/indexedDB'
 import { resolveNavigationIcon } from './utils/navigationIcon'
+import { pagesFromNavigationItems, registerMainSidebarNavigation } from './utils/registerMainSidebarNavigation'
 import { appTitle, setAppTitle } from './appTitle'
+import { useDesignMode } from './composables/useDesignMode'
+
+const { designModeEnabled, toggleDesignMode } = useDesignMode()
 
 const sidebar = ref(null)
 const navigation = ref(null)
@@ -194,6 +198,13 @@ function populateQuickSearchItems() {
         icon: HomeIcon
     })
 
+    const appCategoryByNavId = new Map<number, string>()
+    for (const app of navResponse.apps ?? []) {
+        for (const item of app.items ?? []) {
+            appCategoryByNavId.set(item.id, app.title || 'Navigation')
+        }
+    }
+
     // Add navigation items (pages) from table_navigation
     pages.value.forEach(pg => {
         const isDashboard = pg.path.startsWith('/dashboard/')
@@ -211,7 +222,7 @@ function populateQuickSearchItems() {
             name: pg.title,
             title: pg.title,
             description: description,
-            category: 'Navigation',
+            category: appCategoryByNavId.get(pg.navigationItemId) ?? 'Ungrouped',
             path: pg.path,
             type: 'route',
             icon: icon
@@ -403,45 +414,7 @@ async function loadAppData() {
           } : undefined
         }))
 
-        const sortedItems = [...(navResponse.items || [])].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
-        pages.value = sortedItems
-            .map(item => {
-                const title = item.title || String(item.id)
-                const workflowId = item.workflowId || 0
-                const dashboardId = item.dashboardId || 0
-                let path = ''
-                if (workflowId > 0 && !item.tableName && !(dashboardId > 0 && item.dashboardName)) {
-                    path = `/workflow/${workflowId}`
-                } else if (dashboardId > 0 && item.dashboardName) {
-                    path = `/dashboard/${item.dashboardName}`
-                } else if (item.tableName) {
-                    path = `/table/${item.tableName}`
-                } else if (workflowId > 0) {
-                    path = `/workflow/${workflowId}`
-                }
-                const slug = item.tableName || item.dashboardName || (workflowId > 0 ? `workflow-${workflowId}` : '')
-                let defaultIcon = 'DatabaseIcon'
-                if (dashboardId > 0) {
-                    defaultIcon = 'LayoutIcon'
-                } else if (workflowId > 0) {
-                    defaultIcon = 'WorkflowIcon'
-                }
-                const icon = item.icon || defaultIcon
-                const view = item.tableView || ''
-                const navKey = `navigation-item-${item.id}`
-                return {
-                    id: navKey,
-                    navigationItemId: item.id,
-                    title,
-                    slug,
-                    icon,
-                    view,
-                    path,
-                    workflowId,
-                    dashboardId
-                }
-            })
-            .filter(pg => !!pg.path)
+        pages.value = pagesFromNavigationItems(navResponse.items ?? [])
 
         // Build pinned workflow quick links, if any
         pinnedWorkflowId.value = null
@@ -476,62 +449,21 @@ async function loadAppData() {
         }
 
         if (navigation.value) {
-            navigation.value.clearNavigationLinks()
-        }
-        // Add navigation links to sidebar
-        if (navigation.value) {
-            navigation.value.clearNavigationLinks()
-
-            // Add home link
-            navigation.value.addNavigationLink({
-                id: 'home',
-                name: 'Home',
-                title: 'Home',
-                path: '/',
-                icon: HomeIcon
-            })
-
-            // Sidebar links from table_navigation only (ordinal order from pages)
-            pages.value.forEach(pg => {
-                navigation.value.addNavigationLink({
-                    id: pg.id,
-                    name: pg.id,
-                    title: pg.title,
-                    path: pg.path,
-                    icon: resolveNavigationIcon({
-                        icon: pg.icon,
-                        workflowId: pg.workflowId,
-                        dashboardId: pg.dashboardId,
-                        path: pg.path
-                    })
-                })
+            const rbacPerms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
+            const rbacSuperuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
+            const canSystemSettings = rbacSuperuser || rbacPerms.includes('system.settings')
+            registerMainSidebarNavigation(navigation.value, pages.value, {
+                homeIcon: HomeIcon,
+                canAccessControlPanel: canAccessControlPanel(rbacPerms, rbacSuperuser),
+                canSystemSettings,
+                databaseSettingIcon: DatabaseSettingIcon,
+                ungroupedItems: navResponse.ungroupedItems,
+                apps: navResponse.apps,
             })
         }
 
         // Populate QuickSearch if available, otherwise it will be populated when component becomes available
         populateQuickSearchItems()
-
-        if (navigation.value) {
-            const rbacPerms = authStore.user?.rbacPermissions ?? authStore.initResponse?.rbacPermissions ?? []
-            const rbacSuperuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
-            const canSystemSettings = rbacSuperuser || rbacPerms.includes('system.settings')
-            if (canAccessControlPanel(rbacPerms, rbacSuperuser) || canSystemSettings) {
-                navigation.value.addSeparator()
-                navigation.value.addSection('System', { name: 'nav-section-system' })
-            }
-            if (canAccessControlPanel(rbacPerms, rbacSuperuser)) {
-                navigation.value.addRouterLink('control-panel')
-            }
-            if (canSystemSettings) {
-                navigation.value.addNavigationLink({
-                    id: 'table-configurations',
-                    name: 'Table Configurations',
-                    title: 'Table Configurations',
-                    path: '/table/table_configurations',
-                    icon: DatabaseSettingIcon
-                })
-            }
-        }
     } catch (error) {
         console.error('Failed to load data:', error)
 
@@ -1162,6 +1094,17 @@ onMounted(async () => {
                                 <HugeiconsIcon :icon="Hugeicons.Download01Icon" width="1em" height="1em" />
                             </button>
                             <button
+                                type="button"
+                                class="neutral design-mode-button"
+                                :class="{ 'design-only': designModeEnabled }"
+                                :aria-pressed="designModeEnabled"
+                                title="Toggle design mode (table structure and layout tools)"
+                                @click="toggleDesignMode"
+                            >
+                                <HugeiconsIcon :icon="LayoutIcon" width="1em" height="1em" />
+                                <span class="design-mode-label">Design</span>
+                            </button>
+                            <button
                                 @click="showShortcutsHelp = true"
                                 class="neutral help-button"
                                 title="Keyboard Shortcuts (g then ?)"
@@ -1303,6 +1246,16 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.design-mode-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.design-mode-label {
+  font-size: 0.875rem;
+}
+
 .pwa-install-header-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;

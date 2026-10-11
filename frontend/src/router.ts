@@ -1,6 +1,7 @@
 import { watch } from 'vue'
 import { createRouter, createWebHistory, type RouteLocationNormalizedLoaded } from 'vue-router'
-import { appTitle } from './appTitle'
+import { appTitle, formatDocumentTitle } from './appTitle'
+import { rowViewPageLabel } from './utils/rowViewPageTitle'
 import HomeView from './views/HomeView.vue'
 import AboutView from './views/AboutView.vue'
 import TableView from './views/TableView.vue'
@@ -11,6 +12,7 @@ import InsertRowView from './views/InsertRowView.vue'
 import AfterInsertView from './views/AfterInsertView.vue'
 import CreateTableView from './views/CreateTableView.vue'
 import ForeignKeyManagement from './views/ForeignKeyManagement.vue'
+import ItemViewLayoutEditor from './views/ItemViewLayoutEditor.vue'
 import ColumnTypeManagement from './views/ColumnTypeManagement.vue'
 import ConditionalFormattingRules from './components/ConditionalFormattingRules.vue'
 import ExportView from './views/ExportView.vue'
@@ -227,7 +229,7 @@ const router = createRouter({
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
-          { name: `Row ${String(route.params.rowId)}` },
+          { name: rowViewPageLabel.value?.trim() || `Row ${String(route.params.rowId)}` },
         ],
       },
     },
@@ -240,7 +242,10 @@ const router = createRouter({
         requiresAuth: true,
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
-          { name: `Row ${String(route.params.rowId)}`, href: { name: 'row', params: { tableName: route.params.tableName, rowId: route.params.rowId } } },
+          {
+            name: rowViewPageLabel.value?.trim() || `Row ${String(route.params.rowId)}`,
+            href: { name: 'row', params: { tableName: route.params.tableName, rowId: route.params.rowId } },
+          },
           { name: 'Edit' },
         ],
       },
@@ -307,6 +312,19 @@ const router = createRouter({
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Edit View' },
+        ],
+      },
+    },
+    {
+      path: '/table/:tableName/item-view-layout',
+      name: 'item-view-layout',
+      component: ItemViewLayoutEditor,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: (route: RouteLocationNormalizedLoaded) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Item view layout' },
         ],
       },
     },
@@ -563,6 +581,16 @@ router.beforeEach(async (to, from, next) => {
 async function updateDocumentTitle(to: RouteLocationNormalizedLoaded) {
   const baseTitle = appTitle.value
   let title = baseTitle
+
+  if (to.name === 'row' || to.name === 'row-edit') {
+    const label = rowViewPageLabel.value?.trim()
+    if (label) {
+      document.title = formatDocumentTitle(label, baseTitle)
+      return
+    }
+    document.title = formatDocumentTitle(String(to.params.tableName ?? ''), baseTitle)
+    return
+  }
 
   // Special handling for table route - load table configuration title
   if (to.name === 'table' && to.params.tableName) {

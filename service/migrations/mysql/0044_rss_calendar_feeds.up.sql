@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS rss_calendar_feeds (
     enabled TINYINT(1) NOT NULL DEFAULT 1,
     last_refresh_at DATETIME(3) NULL,
     last_refresh_status VARCHAR(64) NOT NULL DEFAULT '',
-    last_refresh_message TEXT NOT NULL,
+    last_refresh_message TEXT NOT NULL DEFAULT (''),
     last_items_created INT NOT NULL DEFAULT 0,
     last_items_updated INT NOT NULL DEFAULT 0,
     sr_created DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

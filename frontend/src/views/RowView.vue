@@ -1,12 +1,27 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, inject, nextTick, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, inject, provide, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import type { Field, GetTableStructureResponse } from '../gen/sickrock_pb'
+import type { Field, ForeignKey, GetTableStructureResponse, Item } from '../gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { ArrowLeft01Icon, DatabaseIcon, Edit01Icon, Delete01Icon, ViewIcon } from '@hugeicons/core-free-icons'
-import Table from '../components/TableComponent.vue'
+import {
+  ArrowLeft01Icon,
+  Cancel01Icon,
+  DatabaseIcon,
+  Delete01Icon,
+  ViewIcon,
+  Link01Icon,
+  LayoutIcon,
+  GridIcon,
+} from '@hugeicons/core-free-icons'
+import FieldGroupingEditor from '../components/FieldGroupingEditor.vue'
+import { syntheticColumnNamesForSourceTable } from '../utils/relationPullThrough'
 import Section from 'picocrank/vue/components/Section.vue'
+import LoadingArea from 'picocrank/vue/components/LoadingArea.vue'
+import Tabs from 'picocrank/vue/components/Tabs.vue'
+import RelatedRelationPanel, { type RelatedTableEntry } from './RelatedRelationPanel.vue'
+import DangerZone from 'picocrank/vue/components/DangerZone.vue'
+import FormField from 'picocrank/vue/components/FormField.vue'
 import type { createApiClient } from '../stores/api'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
 import { useTableAccess } from '../composables/useTableAccess'
@@ -17,6 +32,36 @@ import {
   isUserRefColumn as columnIsUserRef,
   isUserRefFieldType,
 } from '../utils/fieldTypes'
+import { appTitle, formatDocumentTitle } from '../appTitle'
+import { rowEditActionLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
+import { getItemNameFieldValue, itemViewSectionTitle } from '../utils/itemViewSectionTitle'
+import { clearRowViewPageLabel, rowViewPageLabel } from '../utils/rowViewPageTitle'
+import {
+  relatedRowsStorageKey,
+  relationSourceTableTcName,
+  shouldShowRelatedRelationPanel,
+} from '../utils/rowViewRelatedRelations'
+import type { RelationPullThroughField } from '../gen/sickrock_pb'
+import {
+  buildRelationExtraFieldDefs,
+  enrichItemsWithPullThrough,
+  pullThroughSpecsFromRelationColumns,
+  type CalculatedColumnSpec,
+  type ReferencedPullThroughContext,
+} from '../utils/relationPullThrough'
+import {
+  applyFieldValueAffixes,
+  fieldDisplayLabel,
+  fieldHasValueAffixes,
+  foreignKeyReferencedDisplayLabel,
+  mergeItemFieldRecord,
+} from '../utils/fieldColumnDisplay'
+import { useDesignMode } from '../composables/useDesignMode'
+
+const { designModeEnabled } = useDesignMode()
+import { Accordion, AccordionItem } from '../components/accordion'
+import RowViewFieldEntries from './RowViewFieldEntries.vue'
+import { rowViewFieldUiKey } from './rowViewFieldUi'
 
 type FieldEntry = {
   key: string
@@ -84,6 +129,7 @@ const deleting = ref(false)
 
 // Foreign key and related rows state
 const foreignKeys = ref<Array<{
+  relationId: number
   constraintName: string
   tableName: string
   columnName: string
@@ -91,27 +137,28 @@ const foreignKeys = ref<Array<{
   referencedColumn: string
   onDeleteAction: string
   onUpdateAction: string
+  displayName: string
+  tableTcName?: string
+  referencedTableTcName?: string
+  pullThroughFields: RelationPullThroughField[]
 }>>([])
+const relatedChildStructures = ref<Record<string, GetTableStructureResponse>>({})
+const relatedPullThroughExtraFields = ref<Record<string, Field[]>>({})
+const fkReferencedItems = ref<Record<string, Item[]>>({})
+const relationDialog = ref<HTMLDialogElement | null>(null)
+const managingConstraintName = ref('')
+const relationDisplayNameDraft = ref('')
+const relationPullThroughDraft = ref<Array<{ fkColumn: string; field: string }>>([])
+const relationCalculatedDraft = ref<CalculatedColumnSpec[]>([])
+const relationChildForeignKeys = ref<ForeignKey[]>([])
+const relationChildFields = ref<Field[]>([])
+const relationReferencedFieldsByFk = ref<Record<string, Field[]>>({})
+const relationDialogLoading = ref(false)
+const savingRelation = ref(false)
+const relationSaveError = ref<string | null>(null)
 const relatedRows = ref<Record<string, any[]>>({})
+const relatedTableRowNames = ref<Record<string, string>>({})
 const loadingRelated = ref(false)
-
-// Index of referenced item names for quick lookup: table -> id -> name
-const referencedNameIndex = computed(() => {
-  const index: Record<string, Record<string, string>> = {}
-  for (const [key, rows] of Object.entries(relatedRows.value)) {
-    // Only build index for referenced tables (Direction 2 keys use referencedTable.referencedColumn)
-    const [table] = key.split('.')
-    if (!index[table]) index[table] = {}
-    for (const row of rows) {
-      const id = String((row && (row.id || (row.additionalFields && row.additionalFields.id))) ?? '')
-      if (!id) continue
-      const nameCandidate = (row && (row.name || (row.additionalFields && (row.additionalFields.name || row.additionalFields.title))))
-      const name = String(nameCandidate ?? id)
-      index[table][id] = name
-    }
-  }
-  return index
-})
 
 // Quick FK map: columnName -> { referencedTable, referencedColumn }
 const foreignKeyByColumn = computed(() => {
@@ -138,14 +185,18 @@ function resolveRawFieldValue(key: string): any {
 
 function getFkDisplay(key: string): { to?: string; label?: string } {
   if (isUserRefColumn(key)) return {}
-  const fk = foreignKeyByColumn.value[key]
+  const fk = foreignKeys.value.find(entry => entry.columnName === key)
   if (!fk) return {}
   const raw = resolveRawFieldValue(key)
   if (raw === null || raw === undefined || raw === '') return {}
   const id = String(raw)
-  const table = fk.referencedTable
-  const label = (referencedNameIndex.value[table] && referencedNameIndex.value[table][id]) || id
-  return { to: `/table/${table}/${id}`, label }
+  const tableRoute = fk.referencedTableTcName || fk.referencedTable
+  const items = fkReferencedItems.value[key] ?? []
+  const match = items.find(entry => String(entry.id) === id)
+  const label = match
+    ? foreignKeyReferencedDisplayLabel(match as unknown as Record<string, unknown>, id)
+    : id
+  return { to: `/table/${tableRoute}/${id}`, label }
 }
 
 function isForeignKey(columnName: string): boolean {
@@ -179,6 +230,42 @@ function getFieldDef(fieldName: string): Field | undefined {
   return findFieldDef(fieldDefs.value, fieldName)
 }
 
+function withValueAffixes(key: string, displayValue: unknown, valueClass: string): unknown {
+  if (
+    valueClass === 'markdown-content'
+    || valueClass === 'json'
+    || valueClass === 'boolean-true'
+    || valueClass === 'boolean-false'
+  ) {
+    return displayValue
+  }
+  if (isUserRefColumn(key) || isForeignKey(key)) {
+    return displayValue
+  }
+  const field = getFieldDef(key)
+  if (!fieldHasValueAffixes(field)) {
+    return displayValue
+  }
+  const record = mergeItemFieldRecord(item.value as Record<string, unknown> | null)
+  return applyFieldValueAffixes(String(displayValue), field, record, resolveAffixPlaceholder)
+}
+
+function resolveAffixPlaceholder(columnName: string, rawValue: unknown): string {
+  if (rawValue === null || rawValue === undefined || rawValue === '') return ''
+  const fk = foreignKeyByColumn.value[columnName]
+  if (fk) {
+    const items = fkReferencedItems.value[columnName] ?? []
+    const match = items.find(entry => String(entry.id) === String(rawValue))
+    if (match) {
+      return foreignKeyReferencedDisplayLabel(
+        match as unknown as Record<string, unknown>,
+        rawValue,
+      )
+    }
+  }
+  return String(rawValue)
+}
+
 function getBooleanValue(column: string): boolean {
   const value = resolveRawFieldValue(column)
   return value === true || Number(value) === 1
@@ -191,6 +278,26 @@ function canEditField(key: string, valueClass: string): boolean {
   if (key === primaryKeyColumn.value) return false
   if (isForeignKey(key)) return false
   return true
+}
+
+function showFullEditIcon(key: string, valueClass: string): boolean {
+  if (!tableAccess.value.canEdit) return false
+  if (canEditField(key, valueClass)) return false
+  if (NON_EDITABLE_FIELDS.has(key)) return false
+  if (key === primaryKeyColumn.value) return false
+  return true
+}
+
+function showReadOnlyIcon(key: string, valueClass: string): boolean {
+  return !canEditField(key, valueClass) && !showFullEditIcon(key, valueClass)
+}
+
+function fullEditTo(): string {
+  return `/table/${tableName}/${rowId}/edit`
+}
+
+function fullEditLabel(): string {
+  return editButtonText.value
 }
 
 function mysqlDatetime(value: string): string {
@@ -295,6 +402,7 @@ async function loadTableStructure() {
     const response = await client.getTableStructure({ pageId: tableName })
     tableStructure.value = response
     foreignKeys.value = (response.foreignKeys || []).map(fk => ({
+      relationId: fk.relationId ?? 0,
       constraintName: fk.constraintName,
       tableName: fk.tableName,
       columnName: fk.columnName,
@@ -302,13 +410,46 @@ async function loadTableStructure() {
       referencedColumn: fk.referencedColumn,
       onDeleteAction: fk.onDeleteAction,
       onUpdateAction: fk.onUpdateAction,
+      displayName: fk.displayName ?? '',
+      tableTcName: fk.tableTcName,
+      referencedTableTcName: fk.referencedTableTcName,
+      pullThroughFields: (fk.pullThroughFields ?? []).map(pt => ({ ...pt })),
     }))
     if (response.fields?.some(field => isUserRefColumn(field.name))) {
       void loadUsers()
     }
+    await loadFkReferencedItems()
   } catch (err) {
     console.error('Error loading table structure:', err)
   }
+}
+
+async function ensureChildTableStructure(childTcName: string): Promise<GetTableStructureResponse> {
+  const cached = relatedChildStructures.value[childTcName]
+  if (cached) {
+    return cached
+  }
+  const structure = await client.getTableStructure({ pageId: childTcName })
+  relatedChildStructures.value = {
+    ...relatedChildStructures.value,
+    [childTcName]: structure,
+  }
+  return structure
+}
+
+async function loadFkReferencedItems() {
+  const data: Record<string, Item[]> = {}
+  for (const fk of foreignKeys.value) {
+    try {
+      const tcName = fk.referencedTableTcName || fk.referencedTable
+      const res = await client.listItems({ tcName })
+      data[fk.columnName] = res.items ?? []
+    } catch (err) {
+      console.error(`Error loading FK target ${fk.referencedTable}:`, err)
+      data[fk.columnName] = []
+    }
+  }
+  fkReferencedItems.value = data
 }
 
 // Load related rows based on foreign key relationships (bidirectional)
@@ -325,36 +466,132 @@ async function loadRelatedRows() {
     console.log('Item value keys:', Object.keys(item.value))
 
     for (const fk of foreignKeys.value) {
-      console.log('Processing foreign key:', fk)
-      // Direction 1: Find rows in the referencing table that point to the current row
-      // (e.g., tasks that reference this task_list)
-      const referencedValue = item.value[fk.referencedColumn]
-      console.log(`Direction 1 - Looking for ${fk.referencedColumn} = ${referencedValue} in table ${fk.tableName}`)
+      if (!shouldShowRelatedRelationPanel(tableName, fk)) {
+        continue
+      }
+
+      const childTcName = relationSourceTableTcName(fk)
+      const storageKey = relatedRowsStorageKey(fk)
+      const referencedValue = resolveRawFieldValue(fk.referencedColumn)
+      const pkValue = resolveRawFieldValue(primaryKeyColumn.value)
+      const parentKey =
+        referencedValue !== null && referencedValue !== undefined && referencedValue !== ''
+          ? referencedValue
+          : pkValue
 
       try {
         let matchingItems: any[] = []
-        if (referencedValue !== null && referencedValue !== undefined && referencedValue !== '') {
-          const res = await client.listItems({ tcName: fk.tableName, where: { [fk.columnName]: String(referencedValue) } })
-          matchingItems = res.items || []
+        const relationColumns = fk.pullThroughFields ?? []
+        const pullSpecs = pullThroughSpecsFromRelationColumns(relationColumns)
+        const hasCalculatedColumns = relationColumns.some(col => col.expr?.trim())
+        if (parentKey !== null && parentKey !== undefined && parentKey !== '') {
+          const listParams = {
+            tcName: childTcName,
+            where: { [fk.columnName]: String(parentKey) },
+            relationConstraintName: hasCalculatedColumns ? fk.constraintName : '',
+          }
+          try {
+            const res = await client.listItems(listParams)
+            matchingItems = res.items || []
+          } catch (listErr) {
+            console.error(
+              `ListItems failed with relation calculated columns (${childTcName}):`,
+              listErr,
+            )
+            const fallback = await client.listItems({
+              tcName: childTcName,
+              where: listParams.where,
+            })
+            matchingItems = fallback.items || []
+          }
         }
-        relatedData[`${fk.tableName}.${fk.columnName}`] = matchingItems
+        if (relationColumns.length > 0) {
+          const childStructure = await ensureChildTableStructure(childTcName)
+          const referencedContextByFk: Record<string, ReferencedPullThroughContext> = {}
+          for (const spec of pullSpecs) {
+            if (referencedContextByFk[spec.fkColumn]) continue
+            const childFk = (childStructure.foreignKeys ?? []).find(
+              entry => entry.columnName === spec.fkColumn,
+            )
+            if (!childFk) continue
+            const refTc = childFk.referencedTableTcName || childFk.referencedTable
+            const refStructure = await ensureChildTableStructure(refTc)
+            const refFks = refStructure.foreignKeys ?? []
+            const referencedItemsByColumn: Record<string, Item[]> = {}
+            for (const refFk of refFks) {
+              const targetTc = refFk.referencedTableTcName || refFk.referencedTable
+              try {
+                const targetRes = await client.listItems({ tcName: targetTc })
+                referencedItemsByColumn[refFk.columnName] = targetRes.items ?? []
+              } catch (listErr) {
+                console.error(`Error loading FK targets for pull-through (${targetTc}):`, listErr)
+                referencedItemsByColumn[refFk.columnName] = []
+              }
+            }
+            referencedContextByFk[spec.fkColumn] = {
+              fields: refStructure.fields ?? [],
+              foreignKeys: refFks,
+              referencedItemsByColumn,
+            }
+          }
+          const extraFields = buildRelationExtraFieldDefs(
+            relationColumns,
+            childStructure.fields ?? [],
+            referencedContextByFk,
+            childStructure.columnDisplaySettings,
+          )
+          const displayFieldsByStorageKey = Object.fromEntries(
+            extraFields.map(field => [field.name, field]),
+          )
+          matchingItems = await enrichItemsWithPullThrough(
+            matchingItems as Item[],
+            pullSpecs,
+            childStructure.foreignKeys ?? [],
+            async (pageId, id) => {
+              const res = await client.getItem({ pageId, id })
+              return res.item ?? null
+            },
+            referencedContextByFk,
+            displayFieldsByStorageKey,
+          )
+          relatedPullThroughExtraFields.value = {
+            ...relatedPullThroughExtraFields.value,
+            [storageKey]: extraFields,
+          }
+        } else {
+          const { [storageKey]: _removed, ...rest } = relatedPullThroughExtraFields.value
+          relatedPullThroughExtraFields.value = rest
+        }
+        relatedData[storageKey] = matchingItems
       } catch (err) {
-        console.error(`Error loading related rows for ${fk.tableName}:`, err)
-        relatedData[`${fk.tableName}.${fk.columnName}`] = []
+        console.error(`Error loading related rows for ${childTcName}:`, err)
+        relatedData[storageKey] = []
       }
-
-      // Direction 2: Find rows in the referenced table that this row points to
-      // (e.g., task_list that this task references)
-      // Only process if the current table is the referencing table (has the foreign key column)
-      const currentValue = item.value[fk.columnName] || (item.value.additionalFields && item.value.additionalFields[fk.columnName])
-      console.log(`Direction 2 - Looking for ${fk.columnName} = ${currentValue} in table ${fk.referencedTable}`)
-
-      // Skip Direction 2 - only show related rows in the referencing table (Direction 1)
-      // The referenced row would typically be displayed as a foreign key link in the main row view
     }
 
     console.log('Final related data:', relatedData)
     relatedRows.value = relatedData
+
+    const relatedTableNames = [
+      ...new Set(
+        foreignKeys.value
+          .filter(fk => shouldShowRelatedRelationPanel(tableName, fk))
+          .map(fk => relationSourceTableTcName(fk)),
+      ),
+    ]
+    await Promise.all(
+      relatedTableNames.map(async (tcName) => {
+        if (relatedTableRowNames.value[tcName] !== undefined) {
+          return
+        }
+        try {
+          const structure = await client.getTableStructure({ pageId: tcName })
+          relatedTableRowNames.value[tcName] = structure.rowName ?? ''
+        } catch {
+          relatedTableRowNames.value[tcName] = ''
+        }
+      }),
+    )
   } catch (err) {
     console.error('Error loading related rows:', err)
   } finally {
@@ -431,6 +668,7 @@ const entries = computed(() => {
       valueClass = value ? 'boolean-true' : 'boolean-false'
     }
 
+    displayValue = withValueAffixes(key, displayValue, valueClass)
     entries.push({ key, displayValue, valueClass })
   }
 
@@ -497,12 +735,117 @@ const entries = computed(() => {
         }
       }
 
+      displayValue = withValueAffixes(key, displayValue, valueClass)
       entries.push({ key, displayValue, valueClass })
     }
   }
 
   return entries
 })
+
+type FieldEntrySection = { key: string; title: string; entries: FieldEntry[] }
+
+/** Item rows expose timestamps as srCreated/srUpdated; field groups store sr_created/sr_updated. */
+function fieldGroupEntryKeys(column: string): string[] {
+  switch (column) {
+    case 'sr_created':
+    case 'srCreated':
+      return ['srCreated', 'sr_created']
+    case 'sr_updated':
+    case 'srUpdated':
+      return ['srUpdated', 'sr_updated']
+    default:
+      return [column]
+  }
+}
+
+function entryForFieldGroupColumn(
+  byKey: Map<string, FieldEntry>,
+  column: string,
+): FieldEntry | undefined {
+  for (const key of fieldGroupEntryKeys(column)) {
+    const entry = byKey.get(key)
+    if (entry) return entry
+  }
+  return undefined
+}
+
+const fieldEntrySections = computed((): FieldEntrySection[] => {
+  const all = entries.value
+  if (!all.length) return []
+  const rawGroups = tableStructure.value?.itemFieldGroups?.groups ?? []
+  if (!rawGroups.length) {
+    return [{ key: 'all', title: '', entries: all }]
+  }
+  const sorted = [...rawGroups].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+  const byKey = new Map(all.map(e => [e.key, e]))
+  const used = new Set<string>()
+  const sections: FieldEntrySection[] = []
+  for (const g of sorted) {
+    const groupEntries: FieldEntry[] = []
+    for (const col of g.columnNames ?? []) {
+      const entry = entryForFieldGroupColumn(byKey, col)
+      if (entry && !used.has(entry.key)) {
+        groupEntries.push(entry)
+        used.add(entry.key)
+      }
+    }
+    if (groupEntries.length > 0) {
+      sections.push({
+        key: `group-${g.ordinal ?? sections.length}`,
+        title: (g.title ?? '').trim(),
+        entries: groupEntries,
+      })
+    }
+  }
+  const rest = all.filter(e => !used.has(e.key))
+  if (rest.length > 0) {
+    sections.push({ key: 'ungrouped', title: '', entries: rest })
+  }
+  return sections.length > 0 ? sections : [{ key: 'all', title: '', entries: all }]
+})
+
+const accordionFieldSections = computed(() =>
+  fieldEntrySections.value.filter(section => section.title),
+)
+
+const ungroupedFieldSection = computed(() =>
+  fieldEntrySections.value.find(section => !section.title),
+)
+
+const showFieldGroupAccordion = computed(
+  () => accordionFieldSections.value.length > 0,
+)
+
+const fieldGroupAccordionDefaultOpen = computed(() =>
+  accordionFieldSections.value.map(section => section.key),
+)
+
+const columnNamesForFieldGrouping = computed(() => {
+  const physical = tableStructure.value?.fields?.map(field => field.name) ?? []
+  const synthetic = syntheticColumnNamesForSourceTable(
+    tableName,
+    tableStructure.value?.foreignKeys ?? [],
+  )
+  const seen = new Set(physical)
+  return [...physical, ...synthetic.filter(name => !seen.has(name))]
+})
+
+const fieldGroupingDialog = ref<HTMLDialogElement | null>(null)
+
+function openFieldGroupingDialog() {
+  fieldGroupingDialog.value?.showModal()
+}
+
+function closeFieldGroupingDialog() {
+  if (fieldGroupingDialog.value?.open) {
+    fieldGroupingDialog.value.close()
+  }
+}
+
+async function onFieldGroupsSaved() {
+  await loadTableStructure()
+}
 
 // Computed property to format related tables data for display
 const relatedTables = computed(() => {
@@ -515,45 +858,39 @@ const relatedTables = computed(() => {
     filterColumn: string
     filterValue: string
     relationName: string
-    rowCountText: string
+    constraintName: string
+    displayName: string
+    pullThroughExtraFields?: Field[]
   }> = []
 
   for (const [key, rows] of Object.entries(relatedRows.value)) {
-    const [tableName, columnName] = key.split('.')
+    const dotIndex = key.indexOf('.')
+    if (dotIndex <= 0) continue
+    const relatedTableTc = key.slice(0, dotIndex)
+    const columnName = key.slice(dotIndex + 1)
 
-    // Determine the direction based on the foreign key relationship
-    const fk = foreignKeys.value.find(fk =>
-      (fk.tableName === tableName && fk.columnName === columnName) ||
-      (fk.referencedTable === tableName && fk.referencedColumn === columnName)
+    const fk = foreignKeys.value.find(
+      entry => relatedRowsStorageKey(entry) === key,
     )
+    if (!fk || !shouldShowRelatedRelationPanel(tableName, fk)) {
+      continue
+    }
 
-    const direction = fk && fk.tableName === tableName ? 'referencing' : 'referenced'
+    const direction: 'referencing' = 'referencing'
 
-    // Create a descriptive title including relation name (constraint or column)
-    const rowCount = `${rows.length} related row${rows.length !== 1 ? 's' : ''}`
     const relationName = fk?.constraintName || columnName
-    const title = `${tableName} - ${relationName} (${rowCount})`
-    const rowCountText = `(${rowCount})`
+    const displayName = fk?.displayName?.trim() ?? ''
+    const title = displayName || `${relatedTableTc} (${columnName})`
 
     // Determine filter column (on the related table) and value (from the current item)
     let filterColumn = columnName
     let filterValue = ''
-    if (fk) {
-      if (direction === 'referencing') {
-        // Related table column is fk.columnName, value on current item is fk.referencedColumn
-        filterColumn = fk.columnName
-        const v = resolveRawFieldValue(fk.referencedColumn)
-        filterValue = v == null ? '' : String(v)
-      } else {
-        // Related table column is fk.referencedColumn, value on current item is fk.columnName
-        filterColumn = fk.referencedColumn
-        const v = resolveRawFieldValue(fk.columnName)
-        filterValue = v == null ? '' : String(v)
-      }
-    }
+    filterColumn = fk.columnName
+    const parentKey = resolveRawFieldValue(fk.referencedColumn) ?? resolveRawFieldValue(primaryKeyColumn.value)
+    filterValue = parentKey == null ? '' : String(parentKey)
 
     tables.push({
-      tableName,
+      tableName: relatedTableTc,
       columnName,
       rows,
       title,
@@ -561,22 +898,362 @@ const relatedTables = computed(() => {
       filterColumn,
       filterValue,
       relationName,
-      rowCountText
+      constraintName: fk?.constraintName ?? '',
+      displayName,
+      pullThroughExtraFields: relatedPullThroughExtraFields.value[key],
     })
   }
 
   return tables
 })
 
-// Section title matching Table component style
-const sectionTitle = computed(() => `Table: ${tableName}`)
+type ItemLayoutBlock =
+  | { kind: 'quick_jump'; sectionTitle: string }
+  | { kind: 'relation'; constraintName: string }
+  | { kind: 'relation_tabs'; sectionTitle: string; tabs: Array<{ constraintName: string; label: string }> }
+
+type ItemLayoutJumpLink = { anchorId: string; label: string }
+
+function itemLayoutAnchorId(blockIndex: number): string {
+  return `item-layout-${blockIndex}`
+}
+
+function itemLayoutUnplacedAnchor(key: string): string {
+  const safe = key.replace(/[^a-zA-Z0-9_-]+/g, '-')
+  return `item-layout-unplaced-${safe}`
+}
+
+const itemLayoutBlocks = computed((): ItemLayoutBlock[] => {
+  const raw = tableStructure.value?.itemPageLayout?.blocks ?? []
+  const sorted = [...raw].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+  const out: ItemLayoutBlock[] = []
+  for (const b of sorted) {
+    if (!b.blockType) continue
+    try {
+      const cfg = JSON.parse(b.configJson || '{}') as Record<string, unknown>
+      if (b.blockType === 'quick_jump') {
+        out.push({
+          kind: 'quick_jump',
+          sectionTitle: String(cfg.section_title ?? '').trim(),
+        })
+      } else if (b.blockType === 'relation') {
+        const constraintName = String(cfg.constraint_name ?? '').trim()
+        if (constraintName) {
+          out.push({ kind: 'relation', constraintName })
+        }
+      } else if (b.blockType === 'relation_tabs') {
+        const tabsRaw = Array.isArray(cfg.tabs) ? cfg.tabs : []
+        const tabs = tabsRaw
+          .map((t: Record<string, unknown>) => ({
+            constraintName: String(t.constraint_name ?? '').trim(),
+            label: String(t.label ?? '').trim(),
+          }))
+          .filter(t => t.constraintName)
+        if (tabs.length > 0) {
+          out.push({
+            kind: 'relation_tabs',
+            sectionTitle: String(cfg.section_title ?? '').trim(),
+            tabs,
+          })
+        }
+      }
+    } catch {
+      // skip invalid block config
+    }
+  }
+  return out
+})
+
+const placedConstraintNames = computed(() => {
+  const names = new Set<string>()
+  for (const block of itemLayoutBlocks.value) {
+    if (block.kind === 'relation') {
+      names.add(block.constraintName)
+    } else if (block.kind === 'relation_tabs') {
+      for (const tab of block.tabs) {
+        names.add(tab.constraintName)
+      }
+    }
+  }
+  return names
+})
+
+const relatedByConstraint = computed(() => {
+  const map = new Map<string, RelatedTableEntry>()
+  for (const entry of relatedTables.value) {
+    if (entry.constraintName) {
+      map.set(entry.constraintName, entry)
+    }
+  }
+  return map
+})
+
+const unplacedRelations = computed(() =>
+  relatedTables.value.filter(
+    entry => !entry.constraintName || !placedConstraintNames.value.has(entry.constraintName),
+  ),
+)
+
+function relatedEntry(constraintName: string): RelatedTableEntry | undefined {
+  return relatedByConstraint.value.get(constraintName)
+}
+
+function tabLabelFor(constraintName: string, configuredLabel: string): string {
+  if (configuredLabel) return configuredLabel
+  const entry = relatedEntry(constraintName)
+  if (entry?.displayName) return entry.displayName
+  if (entry) return `${entry.tableName} (${entry.columnName})`
+  return constraintName
+}
+
+function layoutBlockJumpLabel(block: ItemLayoutBlock): string | null {
+  if (block.kind === 'quick_jump') return null
+  if (block.kind === 'relation') {
+    const entry = relatedEntry(block.constraintName)
+    if (!entry) return null
+    return entry.displayName?.trim() || entry.title
+  }
+  return block.sectionTitle?.trim() || 'Related'
+}
+
+function quickJumpLinksAfter(blockIndex: number): ItemLayoutJumpLink[] {
+  const links: ItemLayoutJumpLink[] = []
+  const blocks = itemLayoutBlocks.value
+  for (let i = blockIndex + 1; i < blocks.length; i++) {
+    const block = blocks[i]
+    if (block.kind === 'relation' && !relatedEntry(block.constraintName)) {
+      continue
+    }
+    const label = layoutBlockJumpLabel(block)
+    if (!label) continue
+    links.push({ anchorId: itemLayoutAnchorId(i), label })
+  }
+  for (const table of unplacedRelations.value) {
+    const key = table.constraintName || `${table.tableName}.${table.columnName}`
+    links.push({
+      anchorId: itemLayoutUnplacedAnchor(key),
+      label: table.displayName?.trim() || table.title,
+    })
+  }
+  return links
+}
+
+function scrollToLayoutAnchor(anchorId: string) {
+  const el = document.getElementById(anchorId)
+  el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function onRelatedRowDeleted(table: RelatedTableEntry, id: string) {
+  const key = `${table.tableName}.${table.columnName}`
+  if (relatedRows.value[key]) {
+    relatedRows.value[key] = relatedRows.value[key].filter((r: { id?: unknown }) => String(r.id) !== String(id))
+  }
+}
+
+const managingRelationFk = computed(() =>
+  foreignKeys.value.find(fk => fk.constraintName === managingConstraintName.value),
+)
+
+function relationEndpointLabel(table: string, tcName: string | undefined, column: string): string {
+  const tableLabel = (tcName?.trim() || table).trim()
+  return `${tableLabel}.${column}`
+}
+
+async function loadRelationDialogContext() {
+  const fk = managingRelationFk.value
+  if (!fk) return
+  relationDialogLoading.value = true
+  relationSaveError.value = null
+  try {
+    const childTc = relationSourceTableTcName(fk)
+    const childStructure = await ensureChildTableStructure(childTc)
+    relationChildFields.value = childStructure.fields ?? []
+    relationChildForeignKeys.value = childStructure.foreignKeys ?? []
+    relationReferencedFieldsByFk.value = {}
+    for (const row of relationPullThroughDraft.value) {
+      if (!row.fkColumn || relationReferencedFieldsByFk.value[row.fkColumn]) continue
+      const childFk = relationChildForeignKeys.value.find(entry => entry.columnName === row.fkColumn)
+      if (!childFk) continue
+      const refTc = childFk.referencedTableTcName || childFk.referencedTable
+      const refStructure = await ensureChildTableStructure(refTc)
+      relationReferencedFieldsByFk.value[row.fkColumn] = refStructure.fields ?? []
+    }
+  } catch (e) {
+    relationSaveError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    relationDialogLoading.value = false
+  }
+}
+
+async function onRelationPullThroughFkChange(index: number) {
+  const row = relationPullThroughDraft.value[index]
+  if (!row?.fkColumn) return
+  row.field = ''
+  const childFk = relationChildForeignKeys.value.find(entry => entry.columnName === row.fkColumn)
+  if (!childFk) return
+  const refTc = childFk.referencedTableTcName || childFk.referencedTable
+  const refStructure = await ensureChildTableStructure(refTc)
+  relationReferencedFieldsByFk.value = {
+    ...relationReferencedFieldsByFk.value,
+    [row.fkColumn]: refStructure.fields ?? [],
+  }
+}
+
+function addRelationPullThroughRow() {
+  relationPullThroughDraft.value.push({ fkColumn: '', field: '' })
+}
+
+function removeRelationPullThroughRow(index: number) {
+  relationPullThroughDraft.value.splice(index, 1)
+}
+
+function addRelationCalculatedRow() {
+  relationCalculatedDraft.value.push({ displayLabel: '', expr: '' })
+}
+
+function removeRelationCalculatedRow(index: number) {
+  relationCalculatedDraft.value.splice(index, 1)
+}
+
+function openManageRelation(constraintName: string, displayName?: string) {
+  if (!constraintName) return
+  managingConstraintName.value = constraintName
+  relationDisplayNameDraft.value = displayName ?? ''
+  const fk = foreignKeys.value.find(entry => entry.constraintName === constraintName)
+  const columns = fk?.pullThroughFields ?? []
+  relationPullThroughDraft.value = columns
+    .filter(pt => !pt.expr?.trim())
+    .map(pt => ({ fkColumn: pt.fkColumn, field: pt.field }))
+  relationCalculatedDraft.value = columns
+    .filter(pt => pt.expr?.trim())
+    .map(pt => ({
+      displayLabel: pt.displayLabel?.trim() ?? '',
+      expr: pt.expr.trim(),
+    }))
+  relationSaveError.value = null
+  nextTick(async () => {
+    relationDialog.value?.showModal()
+    await loadRelationDialogContext()
+  })
+}
+
+function closeManageRelation() {
+  relationDialog.value?.close()
+  managingConstraintName.value = ''
+  relationDisplayNameDraft.value = ''
+  relationPullThroughDraft.value = []
+  relationCalculatedDraft.value = []
+  relationChildForeignKeys.value = []
+  relationChildFields.value = []
+  relationReferencedFieldsByFk.value = {}
+  relationSaveError.value = null
+}
+
+async function saveRelationDisplayName() {
+  if (!managingConstraintName.value || savingRelation.value) return
+  savingRelation.value = true
+  relationSaveError.value = null
+  try {
+    const pullThroughFields: RelationPullThroughField[] = [
+      ...relationPullThroughDraft.value
+        .filter(row => row.fkColumn.trim() && row.field.trim())
+        .map(row => ({
+          fkColumn: row.fkColumn.trim(),
+          field: row.field.trim(),
+          displayLabel: '',
+          expr: '',
+        })),
+      ...relationCalculatedDraft.value
+        .filter(row => row.displayLabel.trim() && row.expr.trim())
+        .map(row => ({
+          fkColumn: '',
+          field: '',
+          displayLabel: row.displayLabel.trim(),
+          expr: row.expr.trim(),
+        })),
+    ]
+    const res = await client.updateTableRelation({
+      constraintName: managingConstraintName.value,
+      displayName: relationDisplayNameDraft.value.trim(),
+      pullThroughFields,
+    })
+    if (!res.success) {
+      throw new Error(res.message || 'Failed to update relation')
+    }
+    closeManageRelation()
+    await loadTableStructure()
+    await loadRelatedRows()
+  } catch (e) {
+    relationSaveError.value = e instanceof Error ? e.message : String(e)
+  } finally {
+    savingRelation.value = false
+  }
+}
+
+const sectionTitle = computed(() =>
+  itemViewSectionTitle({
+    rowName: tableStructure.value?.rowName,
+    tableTitle: tableStructure.value?.title,
+    tableName,
+    item: item.value,
+  }),
+)
+
+watch(
+  [sectionTitle, appTitle],
+  ([heading]) => {
+    rowViewPageLabel.value = heading
+    document.title = formatDocumentTitle(heading, appTitle.value)
+  },
+  { immediate: true },
+)
+
+onUnmounted(() => {
+  clearRowViewPageLabel()
+})
+
+const parentRowLabel = computed(() => {
+  const name = getItemNameFieldValue(item.value as Record<string, unknown> | null)
+  return name || rowId
+})
+
+const editButtonText = computed(() =>
+  rowEditActionLabel(tableStructure.value?.rowName),
+)
+
+const backToTableLabel = computed(() =>
+  tableListLinkLabel(tableStructure.value?.rowNamePlural, tableStructure.value?.rowName),
+)
 
 function displayFieldLabel(key: string): string {
-  if (key === 'id') return 'ID'
-  if (key === 'srCreated') return 'Created'
-  if (key === 'srUpdated') return 'Updated'
-  return key
+  return fieldDisplayLabel(getFieldDef(key), key)
 }
+
+provide(rowViewFieldUiKey, {
+  editingField,
+  editingValue,
+  savingField,
+  users,
+  setEditInput,
+  displayFieldLabel,
+  resolveRawFieldValue,
+  getFkDisplay,
+  isUserRefColumn,
+  isTinyintColumn,
+  isDatetimeColumn,
+  getFieldDef,
+  getBooleanValue,
+  canEditField,
+  showFullEditIcon,
+  showReadOnlyIcon,
+  fullEditTo,
+  fullEditLabel,
+  startEdit,
+  cancelEdit,
+  saveField,
+  hasStoredUserRefValue,
+  displayUserLabel,
+})
 
 async function deleteItem() {
   deleting.value = true
@@ -605,178 +1282,368 @@ function cancelDelete() {
 <template>
   <div>
     <!-- Main Row Section -->
-    <Section :title="sectionTitle" :icon="ViewIcon">
+    <Section :title="sectionTitle" :icon="ViewIcon" :padding="false">
       <template #toolbar>
         <router-link
           :to="`/table/${tableName}`"
           class="button inline-icon neutral"
         >
           <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Back to Table</span>
+          <span>{{ backToTableLabel }}</span>
         </router-link>
         <router-link
           v-if="tableAccess.canEdit"
           :to="`/table/${tableName}/${rowId}/edit`"
-          class="button inline-icon neutral"
+          class="button inline-icon good"
         >
-          <HugeiconsIcon :icon="Edit01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Edit Row</span>
+          <span>{{ editButtonText }}</span>
+        </router-link>
+        <router-link
+          v-if="designModeEnabled && tableAccess.canEdit && foreignKeys.length > 0"
+          :to="`/table/${tableName}/item-view-layout`"
+          class="button inline-icon neutral design-only"
+        >
+          <HugeiconsIcon :icon="LayoutIcon" width="1em" height="1em" aria-hidden="true" />
+          <span>Item layout</span>
         </router-link>
         <button
-          @click="confirmDelete"
-          class="button inline-icon bad"
-          :disabled="deleting"
+          v-if="designModeEnabled && tableAccess.canEdit"
+          type="button"
+          class="button inline-icon neutral design-only"
+          @click="openFieldGroupingDialog"
         >
-          <HugeiconsIcon :icon="Delete01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Delete Row</span>
+          <HugeiconsIcon :icon="GridIcon" width="1em" height="1em" aria-hidden="true" />
+          <span>Field groups</span>
         </button>
       </template>
 
       <div v-if="error">{{ error }}</div>
-      <div v-else-if="loading">Loading…</div>
+      <LoadingArea v-else-if="loading" message="Loading…" min-height="8rem" />
       <div v-else-if="fieldError" class="field-save-error">{{ fieldError }}</div>
-      <dl v-if="!loading && !error && entries.length > 0">
-        <template v-for="entry in entries" :key="entry.key">
-          <dt>{{ displayFieldLabel(entry.key) }}</dt>
-          <dd :class="entry.valueClass">
-            <div
-              v-if="editingField === entry.key"
-              class="inline-edit"
-              @click.stop
-            >
-              <input
-                v-if="isTinyintColumn(entry.key)"
-                type="checkbox"
-                :checked="editingValue === '1'"
-                :disabled="savingField"
-                class="edit-checkbox"
-                @change="event => {
-                  editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
-                  saveField()
-                }"
-              />
-              <select
-                v-else-if="isUserRefColumn(entry.key)"
-                :ref="setEditInput"
-                v-model="editingValue"
-                :disabled="savingField"
-                class="edit-input"
-                @change="saveField"
-                @keyup.escape="cancelEdit"
-              >
-                <option v-if="!getFieldDef(entry.key)?.required" value="">— None —</option>
-                <option
-                  v-for="user in users"
-                  :key="user.id"
-                  :value="String(user.id)"
-                >
-                  {{ user.username || `User #${user.id}` }}
-                </option>
-              </select>
-              <input
-                v-else-if="isDatetimeColumn(entry.key)"
-                :ref="setEditInput"
-                v-model="editingValue"
-                type="datetime-local"
-                :disabled="savingField"
-                class="edit-input"
-                @keyup.enter="saveField"
-                @keyup.escape="cancelEdit"
-                @blur="saveField"
-              />
-              <input
-                v-else
-                :ref="setEditInput"
-                v-model="editingValue"
-                type="text"
-                :disabled="savingField"
-                class="edit-input"
-                @keyup.enter="saveField"
-                @keyup.escape="cancelEdit"
-                @blur="saveField"
-              />
-            </div>
-            <div
-              v-else
-              class="field-display"
-              :class="{ editable: canEditField(entry.key, entry.valueClass) }"
-              @click="startEdit(entry.key, entry.valueClass)"
-            >
-              <template v-if="isUserRefColumn(entry.key) && hasStoredUserRefValue(resolveRawFieldValue(entry.key))">
-                <router-link
-                  v-if="!canEditField(entry.key, entry.valueClass)"
-                  :to="`/admin/iam/users/${resolveRawFieldValue(entry.key)}`"
-                  class="tag note user-ref-chip"
-                >
-                  {{ displayUserLabel(resolveRawFieldValue(entry.key)) }}
-                </router-link>
-                <span v-else class="tag note user-ref-chip">
-                  {{ displayUserLabel(resolveRawFieldValue(entry.key)) }}
-                </span>
-              </template>
-              <template v-else-if="getFkDisplay(entry.key).to">
-                <router-link :to="getFkDisplay(entry.key).to">{{ getFkDisplay(entry.key).label }}</router-link>
-              </template>
-              <template v-else-if="entry.valueClass === 'markdown-content'">
-                <div v-html="entry.displayValue"></div>
-              </template>
-              <template v-else-if="isTinyintColumn(entry.key)">
-                <span :class="getBooleanValue(entry.key) ? 'boolean-true' : 'boolean-false'">
-                  {{ getBooleanValue(entry.key) ? 'Yes' : 'No' }}
-                </span>
-              </template>
-              <template v-else>
-                {{ entry.displayValue }}
-              </template>
-            </div>
-          </dd>
-        </template>
-      </dl>
-      <div v-else class="no-data">
+      <template v-if="!loading && !error && entries.length > 0">
+        <Accordion
+          v-if="showFieldGroupAccordion"
+          :default-open-ids="fieldGroupAccordionDefaultOpen"
+        >
+          <AccordionItem
+            v-for="section in accordionFieldSections"
+            :key="section.key"
+            :item-id="section.key"
+            :title="section.title"
+          >
+            <RowViewFieldEntries :entries="section.entries" />
+          </AccordionItem>
+        </Accordion>
+        <RowViewFieldEntries
+          v-if="showFieldGroupAccordion && ungroupedFieldSection"
+          :entries="ungroupedFieldSection.entries"
+        />
+        <RowViewFieldEntries v-else-if="!showFieldGroupAccordion" :entries="entries" />
+      </template>
+      <div v-else-if="!loading && !error" class="no-data">
         <p>No data available for this row.</p>
       </div>
     </Section>
 
-    <!-- Related Tables as Top-Level Sections -->
+    <!-- Related tables: custom layout blocks, then unplaced defaults -->
     <template v-if="foreignKeys.length > 0">
-      <template v-for="table in relatedTables" :key="`${table.tableName}.${table.columnName}`">
-        <Section :title="table.title" :icon="DatabaseIcon">
-          <template #toolbar>
-            <router-link :to="`/table/${table.tableName}`" class="button">Open Table</router-link>
-            <router-link :to="{ path: `/table/${table.tableName}/export`, query: { where: JSON.stringify(table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) } }" class="button">Export</router-link>
-            <router-link :to="{ path: `/table/${table.tableName}/insert-row`, query: Object.assign({ fromTable: tableName, fromRowId: rowId }, table.filterValue ? { [table.filterColumn]: table.filterValue } : {}) }" class="button neutral">Insert</router-link>
-          </template>
-
-          <div v-if="loadingRelated" class="loading-related">
-            Loading related rows...
-          </div>
-          <div v-else-if="table.rows.length > 0">
-            <Table
-              :key="`${table.tableName}.${table.columnName}.${table.rows.length}`"
-              :title="''"
-              :table-id="table.tableName"
-              :items="table.rows"
-              :show-toolbar="true"
-              :show-view-edit="false"
-              :show-view-create="false"
-              :show-pagination="false"
-              :show-view-switcher="true"
-              @rows-updated="loadRelatedRows"
-              @row-deleted="(id) => {
-                // Optimistically remove the deleted row from this related section
-                const key = `${table.tableName}.${table.columnName}`
-                if (relatedRows[key]) {
-                  relatedRows[key] = relatedRows[key].filter((r: any) => String(r.id) !== String(id))
-                }
-              }"
-            />
-          </div>
-          <div v-else>
-            <p>No related rows found in this table.</p>
-          </div>
+      <template v-for="(block, blockIndex) in itemLayoutBlocks" :key="`layout-block-${blockIndex}`">
+        <Section
+          v-if="block.kind === 'quick_jump' && quickJumpLinksAfter(blockIndex).length > 0"
+          :title="block.sectionTitle || 'On this page'"
+          :icon="Link01Icon"
+        >
+          <nav class="item-layout-quick-jump" aria-label="Jump to sections on this page">
+            <template v-for="(link, linkIndex) in quickJumpLinksAfter(blockIndex)" :key="link.anchorId">
+              <span v-if="linkIndex > 0" class="item-layout-quick-jump-sep" aria-hidden="true"> · </span>
+              <a href="#" @click.prevent="scrollToLayoutAnchor(link.anchorId)">{{ link.label }}</a>
+            </template>
+          </nav>
         </Section>
+        <div
+          v-else-if="block.kind === 'relation' && relatedEntry(block.constraintName)"
+          :id="itemLayoutAnchorId(blockIndex)"
+          class="item-layout-anchor"
+        >
+          <RelatedRelationPanel
+            :table="relatedEntry(block.constraintName)!"
+            :parent-table-name="tableName"
+            :parent-row-id="rowId"
+            :parent-row-label="parentRowLabel"
+            :loading-related="loadingRelated"
+            :related-row-name="relatedTableRowNames[relatedEntry(block.constraintName)!.tableName] ?? ''"
+            :can-edit-relation="tableAccess.canEdit"
+            @rows-updated="loadRelatedRows"
+            @row-deleted="(id) => onRelatedRowDeleted(relatedEntry(block.constraintName)!, id)"
+            @manage-relation="openManageRelation"
+          />
+        </div>
+        <div
+          v-else-if="block.kind === 'relation_tabs'"
+          :id="itemLayoutAnchorId(blockIndex)"
+          class="item-layout-anchor"
+        >
+          <Section
+            :title="block.sectionTitle || 'Related'"
+            :icon="DatabaseIcon"
+            :padding="false"
+          >
+            <Tabs
+              :tabs="block.tabs.map(tab => ({
+                id: tab.constraintName,
+                label: tabLabelFor(tab.constraintName, tab.label),
+              }))"
+              :padding="false"
+            >
+              <template
+                v-for="tab in block.tabs"
+                :key="tab.constraintName"
+                #[`tab-${tab.constraintName}`]
+              >
+                <RelatedRelationPanel
+                  v-if="relatedEntry(tab.constraintName)"
+                  :table="relatedEntry(tab.constraintName)!"
+                  :parent-table-name="tableName"
+                  :parent-row-id="rowId"
+                  :parent-row-label="parentRowLabel"
+                  :loading-related="loadingRelated"
+                  :related-row-name="relatedTableRowNames[relatedEntry(tab.constraintName)!.tableName] ?? ''"
+                  :can-edit-relation="tableAccess.canEdit"
+                  embed-in-tabs
+                  @rows-updated="loadRelatedRows"
+                  @row-deleted="(id) => onRelatedRowDeleted(relatedEntry(tab.constraintName)!, id)"
+                  @manage-relation="openManageRelation"
+                />
+                <p v-else class="layout-missing-relation">This relation is no longer available.</p>
+              </template>
+            </Tabs>
+          </Section>
+        </div>
       </template>
+      <div
+        v-for="table in unplacedRelations"
+        :id="itemLayoutUnplacedAnchor(table.constraintName || `${table.tableName}.${table.columnName}`)"
+        :key="`${table.tableName}.${table.columnName}`"
+        class="item-layout-anchor"
+      >
+        <RelatedRelationPanel
+          :table="table"
+          :parent-table-name="tableName"
+          :parent-row-id="rowId"
+          :parent-row-label="parentRowLabel"
+          :loading-related="loadingRelated"
+          :related-row-name="relatedTableRowNames[table.tableName] ?? ''"
+          :can-edit-relation="tableAccess.canEdit"
+          @rows-updated="loadRelatedRows"
+          @row-deleted="(id) => onRelatedRowDeleted(table, id)"
+          @manage-relation="openManageRelation"
+        />
+      </div>
     </template>
+
+    <DangerZone
+      v-if="tableAccess.canDelete && !loading && !error"
+      title="Danger zone"
+      subtitle="Destructive actions for this row"
+      description="Permanently remove this record from the table."
+    >
+      <div role="toolbar" class="danger-zone-actions">
+        <button
+          type="button"
+          class="bad inline-icon"
+          :disabled="deleting"
+          @click="confirmDelete"
+        >
+          <HugeiconsIcon :icon="Delete01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>{{ deleting ? 'Deleting…' : 'Delete row' }}</span>
+        </button>
+      </div>
+    </DangerZone>
+
+    <dialog ref="fieldGroupingDialog" class="dialog field-grouping-dialog" @close="closeFieldGroupingDialog">
+      <div class="field-grouping-dialog-titlebar">
+        <h2>Field grouping</h2>
+        <button
+          type="button"
+          class="button inline-icon neutral dialog-close"
+          aria-label="Close"
+          @click="closeFieldGroupingDialog"
+        >
+          <HugeiconsIcon :icon="Cancel01Icon" width="1.25em" height="1.25em" aria-hidden="true" />
+        </button>
+      </div>
+      <p class="muted field-grouping-dialog-intro">
+        Organize fields on every item row page into titled accordion sections. Unassigned fields stay at the bottom.
+      </p>
+      <FieldGroupingEditor
+        embedded
+        :table-id="tableName"
+        :column-names="columnNamesForFieldGrouping"
+        :client="client"
+        @saved="onFieldGroupsSaved"
+      />
+    </dialog>
+
+    <dialog ref="relationDialog" class="dialog relation-dialog" @close="closeManageRelation">
+      <h2>Manage relation</h2>
+      <dl v-if="managingRelationFk" class="relation-endpoints">
+        <dt>Relation ID</dt>
+        <dd>
+          <code v-if="managingRelationFk.relationId">{{ managingRelationFk.relationId }}</code>
+          <span v-else class="muted">—</span>
+        </dd>
+        <dt>Constraint name</dt>
+        <dd><code>{{ managingRelationFk.constraintName }}</code></dd>
+        <dt>Source</dt>
+        <dd>
+          <code>{{
+            relationEndpointLabel(
+              managingRelationFk.tableName,
+              managingRelationFk.tableTcName,
+              managingRelationFk.columnName,
+            )
+          }}</code>
+        </dd>
+        <dt>Destination</dt>
+        <dd>
+          <code>{{
+            relationEndpointLabel(
+              managingRelationFk.referencedTable,
+              managingRelationFk.referencedTableTcName,
+              managingRelationFk.referencedColumn,
+            )
+          }}</code>
+        </dd>
+      </dl>
+      <p class="muted">Give this related list a friendly name shown in the section title.</p>
+      <FormField label="Friendly name" for="relation-display-name" :disabled="savingRelation">
+        <input
+          id="relation-display-name"
+          v-model="relationDisplayNameDraft"
+          type="text"
+          placeholder="e.g. Orders, Tasks, Line items"
+          autocomplete="off"
+          :disabled="savingRelation"
+        />
+      </FormField>
+      <h3 class="relation-dialog-subheading">Pull-through columns</h3>
+      <p class="muted">
+        Show fields from rows linked by foreign keys on the related table (for example, currency name on each opportunity).
+      </p>
+      <p v-if="relationDialogLoading" class="muted">Loading relation fields…</p>
+      <template v-else>
+        <div
+          v-for="(row, index) in relationPullThroughDraft"
+          :key="`pt-${index}`"
+          class="relation-pull-through-row"
+        >
+          <FormField label="Foreign key column" :for="`pt-fk-${index}`" :disabled="savingRelation">
+            <select
+              :id="`pt-fk-${index}`"
+              v-model="row.fkColumn"
+              :disabled="savingRelation"
+              @change="onRelationPullThroughFkChange(index)"
+            >
+              <option value="">— Select —</option>
+              <option
+                v-for="childFk in relationChildForeignKeys"
+                :key="childFk.constraintName || childFk.columnName"
+                :value="childFk.columnName"
+              >
+                {{ childFk.columnName }} → {{ childFk.referencedTableTcName || childFk.referencedTable }}
+              </option>
+            </select>
+          </FormField>
+          <FormField label="Field on linked row" :for="`pt-field-${index}`" :disabled="savingRelation">
+            <select
+              :id="`pt-field-${index}`"
+              v-model="row.field"
+              :disabled="savingRelation || !row.fkColumn"
+            >
+              <option value="">— Select —</option>
+              <option
+                v-for="field in (relationReferencedFieldsByFk[row.fkColumn] ?? [])"
+                :key="field.name"
+                :value="field.name"
+              >
+                {{ field.displayLabel || field.name }}
+              </option>
+            </select>
+          </FormField>
+          <button
+            type="button"
+            class="neutral inline-icon"
+            :disabled="savingRelation"
+            @click="removeRelationPullThroughRow(index)"
+          >
+            Remove
+          </button>
+        </div>
+        <button
+          type="button"
+          class="neutral inline-icon"
+          :disabled="savingRelation || relationChildForeignKeys.length === 0"
+          @click="addRelationPullThroughRow"
+        >
+          Add pull-through column
+        </button>
+      </template>
+      <h3 class="relation-dialog-subheading">Calculated columns</h3>
+      <p class="muted">
+        Expressions use <code>{table.column}</code> placeholders (table configuration or physical table name).
+        Values are computed on the server when related rows load, e.g.
+        <code>{skus.value} * {quote_lines.quantity}</code>.
+      </p>
+      <div
+        v-for="(row, index) in relationCalculatedDraft"
+        :key="`calc-${index}`"
+        class="relation-pull-through-row"
+      >
+        <FormField label="Column label" :for="`calc-label-${index}`" :disabled="savingRelation">
+          <input
+            :id="`calc-label-${index}`"
+            v-model="row.displayLabel"
+            type="text"
+            placeholder="e.g. Line total"
+            autocomplete="off"
+            :disabled="savingRelation"
+          />
+        </FormField>
+        <FormField label="Expression (expr)" :for="`calc-expr-${index}`" :disabled="savingRelation">
+          <input
+            :id="`calc-expr-${index}`"
+            v-model="row.expr"
+            type="text"
+            placeholder="{skus.value} * {quote_lines.quantity}"
+            autocomplete="off"
+            :disabled="savingRelation"
+          />
+        </FormField>
+        <button
+          type="button"
+          class="neutral inline-icon"
+          :disabled="savingRelation"
+          @click="removeRelationCalculatedRow(index)"
+        >
+          Remove
+        </button>
+      </div>
+      <button
+        type="button"
+        class="neutral inline-icon"
+        :disabled="savingRelation"
+        @click="addRelationCalculatedRow"
+      >
+        Add calculated column
+      </button>
+      <p v-if="relationSaveError" class="inline-notification error">{{ relationSaveError }}</p>
+      <div class="dialog-actions">
+        <button type="button" class="neutral" :disabled="savingRelation" @click="closeManageRelation">Cancel</button>
+        <button type="button" class="good" :disabled="savingRelation" @click="saveRelationDisplayName">
+          {{ savingRelation ? 'Saving…' : 'Save' }}
+        </button>
+      </div>
+    </dialog>
 
     <!-- Delete Confirmation Dialog -->
     <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDelete">
@@ -797,6 +1664,20 @@ function cancelDelete() {
 </template>
 
 <style scoped>
+.item-layout-quick-jump {
+  line-height: 1.5;
+}
+
+.item-layout-anchor {
+  scroll-margin-top: 1rem;
+}
+
+.danger-zone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 /* Modal Dialog Styles */
 .modal-overlay {
   position: fixed;
@@ -879,6 +1760,45 @@ function cancelDelete() {
 
 .field-display.editable:hover {
   background-color: var(--hover-background-color, #f8f9fa);
+}
+
+.field-grouping-dialog {
+  max-width: min(56rem, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.field-grouping-dialog-titlebar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.35rem;
+}
+
+.field-grouping-dialog-titlebar h2 {
+  margin: 0;
+}
+
+.field-grouping-dialog-intro {
+  margin-top: 0;
+}
+
+.field-grouping-dialog .dialog-close {
+  flex-shrink: 0;
+}
+
+.relation-dialog-subheading {
+  margin: 1rem 0 0.25rem;
+  font-size: 1.05em;
+}
+
+.relation-pull-through-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
 }
 
 .inline-edit {

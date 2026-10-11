@@ -6,11 +6,16 @@ import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { SickRock } from '../gen/sickrock_pb'
 import { useIamUsers } from '../composables/useIamUsers'
 import { isUserRefFieldType } from '../utils/fieldTypes'
-import type { IamUser } from '../gen/sickrock_pb'
+import { fieldDisplayLabel } from '../utils/fieldColumnDisplay'
+import UserRefChip from './UserRefChip.vue'
+import type { Field, IamUser, ItemFieldGroup } from '../gen/sickrock_pb'
+
+type InsertFieldDef = { name: string; type: string; required: boolean; displayLabel?: string }
 
 const props = defineProps<{
   tableId: string,
-  fieldDefs: Array<{ name: string; type: string; required: boolean }>,
+  fieldDefs: InsertFieldDef[],
+  fieldGroups?: ItemFieldGroup[],
   selectedDate?: string | null,
   // Edit mode props
   editMode?: boolean,
@@ -32,6 +37,41 @@ const error = ref<string | null>(null)
 // Edit mode state
 const isEditMode = computed(() => props.editMode || false)
 const saving = ref(false)
+
+function fieldLabel(field: InsertFieldDef): string {
+  return fieldDisplayLabel(
+    { displayLabel: field.displayLabel ?? '' } as Field,
+    field.name,
+  )
+}
+
+const orderedFields = computed(() => {
+  const fields = props.fieldDefs.filter(field => field.name !== 'id')
+  const groups = [...(props.fieldGroups ?? [])].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0))
+  if (!groups.length) {
+    return fields.map(field => ({ field, heading: '' }))
+  }
+  const byName = new Map(fields.map(field => [field.name, field]))
+  const used = new Set<string>()
+  const rows: Array<{ field: InsertFieldDef; heading: string }> = []
+  for (const group of groups) {
+    const title = group.title?.trim() ?? ''
+    let first = true
+    for (const columnName of group.columnNames ?? []) {
+      const field = byName.get(columnName)
+      if (!field || used.has(field.name)) continue
+      used.add(field.name)
+      rows.push({ field, heading: first && title ? title : '' })
+      first = false
+    }
+  }
+  for (const field of fields) {
+    if (!used.has(field.name)) {
+      rows.push({ field, heading: '' })
+    }
+  }
+  return rows
+})
 
 const { users, loading: loadingUsers, loadUsers, displayUserLabel } = useIamUsers()
 const filteredUsers = ref<Record<string, IamUser[]>>({})
@@ -206,6 +246,10 @@ const FALLBACK_FK_BY_TABLE: Record<string, Record<string, string>> = {
     workflow_id: 'table_workflows',
     dashboard_id: 'table_dashboards',
     table_configuration: 'table_configurations'
+  },
+  table_app_navigation_links: {
+    app_id: 'table_apps',
+    navigation_item_id: 'table_navigation',
   },
   table_dashboard_components: {
     dashboard: 'table_dashboards',
@@ -679,14 +723,15 @@ function cancel() {
 <template>
   <div>
     <form @submit.prevent="submit">
-      <template v-for="f in fieldDefs" :key="f.name">
+      <template v-for="{ field: f, heading } in orderedFields" :key="f.name">
         <template v-if="f.name !== 'id'">
-            <label :for="'field-' + f.name">{{ f.name }}<span v-if="f.required" aria-label="required" title="required">*</span></label>
+            <h3 v-if="heading" class="field-group-heading">{{ heading }}</h3>
+            <label :for="'field-' + f.name">{{ fieldLabel(f) }}<span v-if="f.required" aria-label="required" title="required">*</span></label>
 
             <!-- User reference picker -->
             <div v-if="isUserRefField(f.name)" class="foreign-key-dropdown user-ref-dropdown">
               <div v-if="form[f.name]" class="user-ref-selected">
-                <span class="tag note">{{ displayUserLabel(form[f.name]) }}</span>
+                <UserRefChip :label="displayUserLabel(form[f.name])" />
                 <button
                   v-if="!f.required"
                   type="button"
@@ -701,7 +746,7 @@ function cancel() {
                 <input
                   :id="'field-' + f.name"
                   v-model="searchQueries[f.name]"
-                  :placeholder="`Search users for ${f.name}...`"
+                  :placeholder="`Search users for ${fieldLabel(f)}...`"
                   :disabled="loadingUsers"
                   class="search-input"
                   @input="filterUsers(f.name, ($event.target as HTMLInputElement).value)"
@@ -753,7 +798,7 @@ function cancel() {
                   @input="onSearchInput(f.name, ($event.target as HTMLInputElement).value)"
                   @focus="toggleDropdown(f.name)"
                   @blur="handleBlur(f.name)"
-                  :placeholder="`Search ${f.name}...`"
+                  :placeholder="`Search ${fieldLabel(f)}...`"
                   :disabled="loadingForeignKeys"
                   class="search-input"
                 />
@@ -811,7 +856,7 @@ function cancel() {
             <input
               v-else-if="f.type === 'string' || f.type === 'varchar' || f.type === 'text'"
               v-model="form[f.name]"
-              :placeholder="f.name"
+              :placeholder="fieldLabel(f)"
               :id="'field-' + f.name"
               type="text"
               @keyup.enter="submit"
@@ -820,7 +865,7 @@ function cancel() {
             <input
               v-else-if="f.type === 'int64' || f.type === 'int' || f.type === 'bigint' || f.type === 'integer' || f.type === 'float'"
               v-model.number="form[f.name]"
-              :placeholder="f.name"
+              :placeholder="fieldLabel(f)"
               :id="'field-' + f.name"
               type="number"
               :step="f.type === 'float' ? '0.01' : '1'"
@@ -830,7 +875,7 @@ function cancel() {
             <input
               v-else-if="f.type === 'datetime' || f.type === 'timestamp'"
               v-model="form[f.name]"
-              :placeholder="f.name"
+              :placeholder="fieldLabel(f)"
               :id="'field-' + f.name"
               type="datetime-local"
               @keyup.enter="submit"
@@ -839,7 +884,7 @@ function cancel() {
             <input
               v-else
               v-model="form[f.name]"
-              :placeholder="f.name"
+              :placeholder="fieldLabel(f)"
               :id="'field-' + f.name"
               type="text"
               @keyup.enter="submit"
@@ -899,8 +944,15 @@ function cancel() {
 }
 
 form {
+  display: grid;
   grid-template-columns: max-content 1fr;
   gap: 1em;
+}
+
+.field-group-heading {
+  grid-column: 1 / -1;
+  margin: 0.75rem 0 0;
+  font-size: 1rem;
 }
 
 .user-ref-selected {

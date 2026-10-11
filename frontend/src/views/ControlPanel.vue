@@ -142,6 +142,26 @@ onMounted(async () => {
         type: 'route',
         description: 'Manage navigation items',
       })
+
+      localNavigation.value.addNavigationLink({
+        id: 'sidebar-apps',
+        name: 'sidebar-apps',
+        title: 'Sidebar apps',
+        path: '/table/table_apps',
+        icon: LayoutIcon,
+        type: 'route',
+        description: 'Group sidebar links into collapsible sections',
+      })
+
+      localNavigation.value.addNavigationLink({
+        id: 'app-navigation-links',
+        name: 'app-navigation-links',
+        title: 'App navigation links',
+        path: '/table/table_app_navigation_links',
+        icon: LayoutIcon,
+        type: 'route',
+        description: 'Assign navigation items to sidebar apps',
+      })
     }
 
     if (canManageExports(perms, superuser)) {

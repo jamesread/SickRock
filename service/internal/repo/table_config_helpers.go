@@ -77,7 +77,7 @@ func (r *Repository) LookupTableConfigNames(ctx context.Context, pairs []DbTable
 
 const defaultTableKeyColumn = "id"
 
-const tableConfigurationSelectColumns = "name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, create_delegate, row_name, icon, primary_key_column, default_sort_column"
+const tableConfigurationSelectColumns = "name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, create_delegate, row_name, row_name_plural, icon, primary_key_column, default_sort_column"
 
 // DisplayRowName returns the singular row label for UI messages (e.g. "Customer created successfully").
 func (tc *TableConfig) DisplayRowName() string {
@@ -93,6 +93,53 @@ func (tc *TableConfig) DisplayRowName() string {
 		return title
 	}
 	return "Row"
+}
+
+// DisplayRowNamePlural returns the plural row label for list empty states (e.g. "Customers").
+// SetTableRowLabels updates singular and plural row labels on table_configurations.
+// Empty strings clear the stored value (NULL).
+func (r *Repository) SetTableRowLabels(ctx context.Context, tableConfiguration, rowName, rowNamePlural string) error {
+	tcName := strings.TrimSpace(tableConfiguration)
+	if tcName == "" {
+		return fmt.Errorf("table configuration is required")
+	}
+	if _, err := r.GetTableConfiguration(ctx, tcName); err != nil {
+		return err
+	}
+	var rn, rnp interface{}
+	if t := strings.TrimSpace(rowName); t != "" {
+		rn = t
+	}
+	if t := strings.TrimSpace(rowNamePlural); t != "" {
+		rnp = t
+	}
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE table_configurations SET row_name = ?, row_name_plural = ? WHERE name = ?`,
+		rn, rnp, tcName,
+	)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("table configuration not found: %s", tcName)
+	}
+	return nil
+}
+
+func (tc *TableConfig) DisplayRowNamePlural() string {
+	if tc == nil {
+		return "items"
+	}
+	if tc.RowNamePlural.Valid {
+		if label := strings.TrimSpace(tc.RowNamePlural.String); label != "" {
+			return label
+		}
+	}
+	singular := tc.DisplayRowName()
+	if singular == "Row" {
+		return "items"
+	}
+	return singular + "s"
 }
 
 func (r *Repository) sqlCurrentTimestampExpr() string {

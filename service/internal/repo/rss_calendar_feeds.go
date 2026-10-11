@@ -97,8 +97,8 @@ func (r *Repository) CreateRssCalendarFeed(ctx context.Context, feed *RssCalenda
 	res, err := r.db.ExecContext(ctx, `
 		INSERT INTO rss_calendar_feeds (
 			name, feed_url, table_configuration, field_mapping_json, unique_column,
-			refresh_interval_minutes, enabled
-		) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			refresh_interval_minutes, enabled, last_refresh_status, last_refresh_message
+		) VALUES (?, ?, ?, ?, ?, ?, ?, '', '')`,
 		feed.Name,
 		feed.FeedURL,
 		feed.TableConfiguration,

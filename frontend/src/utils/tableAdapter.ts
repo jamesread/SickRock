@@ -1,4 +1,5 @@
 import type { Field, GetTableStructureResponse, Item } from '../gen/sickrock_pb'
+import { fieldDisplayLabel } from './fieldColumnDisplay'
 
 export type SortDirection = 'asc' | 'desc'
 export type TableFilterType = 'text' | 'number' | 'boolean'
@@ -524,7 +525,7 @@ export function buildTableHeaders(
 
     const header: SickRockTableHeader = {
       key: columnName,
-      label: labelFor(columnName),
+      label: fieldDisplayLabel(field, columnName),
       sortable: true,
       filterable: true,
       filterType: filterTypeFor(field.type),

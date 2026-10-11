@@ -17,6 +17,8 @@ const table = ref('')
 const createTableInDatabase = ref(true)
 const createConfiguration = ref(true)
 const createNavigationEntry = ref(true)
+const navigationAppId = ref(0)
+const sidebarApps = ref<Array<{ id: number; title: string; ordinal: number }>>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const success = ref<string | null>(null)
@@ -44,6 +46,28 @@ const submitLabel = computed(() => {
   return 'Create'
 })
 
+async function loadSidebarApps() {
+  try {
+    const response = await client.listItems({ tcName: 'table_apps', limit: 500 })
+    sidebarApps.value = (response.items ?? [])
+      .map((item) => {
+        const fields = item.additionalFields ?? {}
+        const title = String(fields.title ?? fields.name ?? item.id ?? '').trim()
+        const ordinal = Number(fields.ordinal ?? 99)
+        return {
+          id: Number(item.id),
+          title: title || `App ${item.id}`,
+          ordinal: Number.isFinite(ordinal) ? ordinal : 99,
+        }
+      })
+      .filter((app) => app.id > 0)
+      .sort((a, b) => a.ordinal - b.ordinal || a.title.localeCompare(b.title))
+  } catch (e) {
+    console.warn('Failed to load sidebar apps:', e)
+    sidebarApps.value = []
+  }
+}
+
 async function loadAvailableDatabases() {
   try {
     const response = await client.getTableConfigurations({})
@@ -67,8 +91,14 @@ async function loadAvailableDatabases() {
   }
 }
 
+watch(createNavigationEntry, (enabled) => {
+  if (!enabled) {
+    navigationAppId.value = 0
+  }
+})
+
 onMounted(async () => {
-  await loadAvailableDatabases()
+  await Promise.all([loadAvailableDatabases(), loadSidebarApps()])
 
   if (route.query.table) {
     table.value = String(route.query.table)
@@ -133,6 +163,7 @@ async function submit() {
         database: database.value,
         table: table.value,
         createNavigationEntry: createNavigationEntry.value,
+        navigationAppId: createNavigationEntry.value ? navigationAppId.value : 0,
       })
 
       if (!response.success) {
@@ -244,6 +275,21 @@ async function submit() {
           type="checkbox"
           :disabled="loading"
         />
+      </FormField>
+
+      <FormField
+        v-if="createConfiguration && createNavigationEntry"
+        label="Sidebar app"
+        for="navigation-app-id"
+        description="Optionally group the new link under a sidebar app section (leave ungrouped otherwise)"
+        :disabled="loading"
+      >
+        <select id="navigation-app-id" v-model.number="navigationAppId" :disabled="loading">
+          <option :value="0">None (ungrouped)</option>
+          <option v-for="app in sidebarApps" :key="app.id" :value="app.id">
+            {{ app.title }}
+          </option>
+        </select>
       </FormField>
 
       <FormField

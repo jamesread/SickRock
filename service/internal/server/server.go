@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"connectrpc.com/connect"
 	armpassword "github.com/jamesread/armature-iam/password"
@@ -204,7 +205,8 @@ func (s *SickRockServer) CreateTableConfiguration(ctx context.Context, req *conn
 		createNavigation = req.Msg.GetCreateNavigationEntry()
 	}
 
-	err := s.repo.CreateTableConfiguration(ctx, name, database, table, createNavigation)
+	navigationAppID := int(req.Msg.GetNavigationAppId())
+	err := s.repo.CreateTableConfiguration(ctx, name, database, table, createNavigation, navigationAppID)
 	if err != nil {
 		log.Errorf("Failed to create table configuration: %v", err)
 		return connect.NewResponse(&sickrockpb.CreateTableConfigurationResponse{
@@ -250,6 +252,34 @@ func (s *SickRockServer) GetDatabaseTables(ctx context.Context, req *connect.Req
 	return res, nil
 }
 
+// displayNavigationTitle formats a stored navigation name for display.
+// Underscores become spaces, and each word is title-cased. The stored value is unchanged.
+func displayNavigationTitle(raw string) string {
+	words := strings.Fields(strings.ReplaceAll(raw, "_", " "))
+	for i, word := range words {
+		runes := []rune(strings.ToLower(word))
+		runes[0] = unicode.ToUpper(runes[0])
+		words[i] = string(runes)
+	}
+	return strings.Join(words, " ")
+}
+
+// navigationLinkTitle returns the sidebar label for a navigation item.
+// A non-empty title overrides the name-based calculation.
+func navigationLinkTitle(item repo.NavigationItem) string {
+	if override := strings.TrimSpace(item.TitleOverride.String); override != "" {
+		return override
+	}
+	return displayNavigationTitle(item.Navigation.String)
+}
+
+func bookmarkLinkTitle(bookmark repo.UserBookmark) string {
+	if bookmark.NavigationItem != nil {
+		return navigationLinkTitle(*bookmark.NavigationItem)
+	}
+	return displayNavigationTitle(bookmark.Title.String)
+}
+
 func navigationItemRepoToProto(item repo.NavigationItem, tableView string) *sickrockpb.NavigationItem {
 	return &sickrockpb.NavigationItem{
 		Id:      int32(item.ID),
@@ -261,7 +291,7 @@ func navigationItemRepoToProto(item repo.NavigationItem, tableView string) *sick
 			return 0
 		}(),
 		TableName:  item.TableName.String,
-		TableTitle: item.TableTitle.String,
+		TableTitle: displayNavigationTitle(item.TableTitle.String),
 		Icon:       item.Icon.String,
 		TableView:  tableView,
 		DashboardId: func() int32 {
@@ -271,7 +301,7 @@ func navigationItemRepoToProto(item repo.NavigationItem, tableView string) *sick
 			return 0
 		}(),
 		DashboardName: item.DashboardName.String,
-		Title:         item.Navigation.String,
+		Title:         navigationLinkTitle(item),
 		WorkflowId: func() int32 {
 			if item.WorkflowID.Valid {
 				return int32(item.WorkflowID.Int64)
@@ -288,12 +318,53 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 
+	visibleByID := make(map[int]repo.NavigationItem)
 	navigationItems := make([]*sickrockpb.NavigationItem, 0, len(items))
 	for _, item := range items {
 		if !s.canViewNavigationItem(ctx, item) {
 			continue
 		}
+		visibleByID[item.ID] = item
 		navigationItems = append(navigationItems, navigationItemRepoToProto(item, ""))
+	}
+
+	var navigationApps []*sickrockpb.NavigationApp
+	assignedNavIDs, errAssigned := s.repo.NavigationItemIDsInApps(ctx)
+	if errAssigned != nil {
+		log.Warnf("Failed to load app navigation assignments: %v", errAssigned)
+		assignedNavIDs = map[int]struct{}{}
+	}
+	navApps, errApps := s.repo.GetNavigationApps(ctx)
+	if errApps != nil {
+		log.Warnf("Failed to load navigation apps: %v", errApps)
+	} else {
+		for _, app := range navApps {
+			members := make([]*sickrockpb.NavigationItem, 0, len(app.MemberIDs))
+			for _, navID := range app.MemberIDs {
+				if item, ok := visibleByID[navID]; ok {
+					members = append(members, navigationItemRepoToProto(item, ""))
+				}
+			}
+			if len(members) == 0 {
+				continue
+			}
+			navigationApps = append(navigationApps, &sickrockpb.NavigationApp{
+				Id:      int32(app.ID),
+				Title:   app.Title,
+				Ordinal: int32(app.Ordinal),
+				Items:   members,
+			})
+		}
+	}
+	ungroupedItems := make([]*sickrockpb.NavigationItem, 0, len(visibleByID))
+	for _, item := range items {
+		if _, visible := visibleByID[item.ID]; !visible {
+			continue
+		}
+		if _, assigned := assignedNavIDs[item.ID]; assigned {
+			continue
+		}
+		ungroupedItems = append(ungroupedItems, navigationItemRepoToProto(item, ""))
 	}
 
 	// Get user bookmarks if authenticated
@@ -312,35 +383,7 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 				}
 				var navItem *sickrockpb.NavigationItem
 				if bookmark.NavigationItem != nil {
-					navItem = &sickrockpb.NavigationItem{
-						Id:      int32(bookmark.NavigationItem.ID),
-						Ordinal: int32(bookmark.NavigationItem.Ordinal),
-						TableConfiguration: func() int32 {
-							if bookmark.NavigationItem.TableConfiguration.Valid {
-								return int32(bookmark.NavigationItem.TableConfiguration.Int64)
-							}
-							return 0
-						}(),
-						TableName:  bookmark.NavigationItem.TableName.String,
-						TableTitle: bookmark.NavigationItem.TableTitle.String,
-						Icon:       bookmark.NavigationItem.Icon.String,
-						TableView:  bookmark.NavigationItem.TableView.String,
-						DashboardId: func() int32 {
-							if bookmark.NavigationItem.DashboardID.Valid {
-								return int32(bookmark.NavigationItem.DashboardID.Int64)
-							}
-							return 0
-						}(),
-						DashboardName: bookmark.NavigationItem.DashboardName.String,
-						Title:         bookmark.NavigationItem.Navigation.String,
-						WorkflowId: func() int32 {
-							if bookmark.NavigationItem.WorkflowID.Valid {
-								return int32(bookmark.NavigationItem.WorkflowID.Int64)
-							}
-							return 0
-						}(),
-						WorkflowName: bookmark.NavigationItem.WorkflowName.String,
-					}
+					navItem = navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
 				}
 
 				bookmarks = append(bookmarks, &sickrockpb.UserBookmark{
@@ -348,7 +391,7 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 					UserId:           int32(bookmark.UserID),
 					NavigationItemId: int32(bookmark.NavigationItemID),
 					NavigationItem:   navItem,
-					Title:            bookmark.Title.String,
+					Title:            bookmarkLinkTitle(bookmark),
 				})
 			}
 		}
@@ -419,9 +462,11 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 	}
 
 	res := connect.NewResponse(&sickrockpb.GetNavigationResponse{
-		Items:     navigationItems,
-		Bookmarks: bookmarks,
-		Workflows: workflowProtos,
+		Items:          navigationItems,
+		Bookmarks:      bookmarks,
+		Workflows:      workflowProtos,
+		Apps:           navigationApps,
+		UngroupedItems: ungroupedItems,
 	})
 	return res, nil
 }
@@ -485,6 +530,37 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 
 	if err != nil {
 		return nil, err
+	}
+
+	constraintName := strings.TrimSpace(req.Msg.GetRelationConstraintName())
+	if constraintName != "" {
+		rel, relErr := s.repo.GetTableRelationByConstraintName(ctx, constraintName)
+		if relErr != nil {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("relation not found: %w", relErr))
+		}
+		if !strings.EqualFold(strings.TrimSpace(rel.SourceTableKey), strings.TrimSpace(table)) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("relation %q is not for table %q", constraintName, table))
+		}
+		columns, parseErr := repo.ParseRelationPullThroughJSON(rel.PullThroughJSON)
+		if parseErr != nil {
+			return nil, connect.NewError(connect.CodeInternal, parseErr)
+		}
+		enriched, enrichErr := s.repo.ApplyRelationCalculatedColumns(ctx, rel.SourceTableKey, columns, items)
+		if enrichErr != nil {
+			log.WithError(enrichErr).WithFields(log.Fields{
+				"constraint": constraintName,
+				"table":      table,
+			}).Warn("ListItems: relation calculated columns skipped")
+		} else {
+			items = enriched
+		}
+	} else {
+		enriched, enrichErr := s.repo.ApplyAllSourceRelationCalculatedColumns(ctx, table, items)
+		if enrichErr != nil {
+			log.WithError(enrichErr).WithField("table", table).Warn("ListItems: source relation calculated columns skipped")
+		} else {
+			items = enriched
+		}
 	}
 
 	// Get conditional formatting rules once for all items (not per item)
@@ -940,14 +1016,31 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		log.WithField("columnCount", len(cols)).Debugf("list columns for table %s", tcName)
 	}
 	cols = s.repo.ApplyColumnSemantics(ctx, tcName, cols)
+	displayByColumn, displayErr := s.repo.GetColumnDisplaySettings(ctx, tcName)
+	if displayErr != nil {
+		log.WithError(displayErr).Warn("Failed to load column display settings")
+		displayByColumn = map[string]repo.ColumnDisplaySetting{}
+	}
 	fields := make([]*sickrockpb.Field, 0, len(cols))
 	for _, c := range cols {
-		fields = append(fields, &sickrockpb.Field{
+		pbField := &sickrockpb.Field{
 			Name:                      c.Name,
 			Type:                      c.Type,
 			Required:                  c.Required,
 			DefaultToCurrentTimestamp: false, // This information is not stored in database metadata
-		})
+		}
+		if d, ok := repo.LookupColumnDisplay(displayByColumn, c.Name); ok {
+			if d.DisplayLabel.Valid {
+				pbField.DisplayLabel = strings.TrimSpace(d.DisplayLabel.String)
+			}
+			if d.ValuePrefix.Valid {
+				pbField.ValuePrefix = d.ValuePrefix.String
+			}
+			if d.ValueSuffix.Valid {
+				pbField.ValueSuffix = d.ValueSuffix.String
+			}
+		}
+		fields = append(fields, pbField)
 	}
 
 	createButtonText := "Insert Row"
@@ -1008,6 +1101,7 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 			referencedTcName := tcNameByDbTable[repo.DbTableLookupKey(referencedDb, fk.ReferencedTable)]
 
 			pbForeignKeys = append(pbForeignKeys, &sickrockpb.ForeignKey{
+				RelationId:            int32(fk.RelationID),
 				ConstraintName:        fk.ConstraintName,
 				TableName:             fk.TableName,
 				ColumnName:            fk.ColumnName,
@@ -1017,6 +1111,8 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 				OnUpdateAction:        fk.OnUpdateAction,
 				TableTcName:           tableTcName,
 				ReferencedTableTcName: referencedTcName,
+				DisplayName:           fk.DisplayName,
+				PullThroughFields:     pullThroughFieldsToProto(fk.PullThroughFields),
 			})
 		}
 	}
@@ -1045,6 +1141,52 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 	if tc.Title != "" {
 		displayTitle = tc.Title
 	}
+
+	layoutBlocks, layoutErr := s.repo.GetItemPageLayoutBlocks(ctx, tcName)
+	if layoutErr != nil {
+		log.WithError(layoutErr).Warn("Failed to load item page layout")
+		layoutBlocks = nil
+	}
+	pbLayoutBlocks := make([]*sickrockpb.PageLayoutBlock, 0, len(layoutBlocks))
+	for _, b := range layoutBlocks {
+		pbLayoutBlocks = append(pbLayoutBlocks, &sickrockpb.PageLayoutBlock{
+			Id:         int32(b.ID),
+			Ordinal:    int32(b.Ordinal),
+			BlockType:  b.BlockType,
+			ConfigJson: b.ConfigJSON,
+		})
+	}
+
+	fieldGroups, fgErr := s.repo.GetItemFieldGroups(ctx, tcName)
+	if fgErr != nil {
+		log.WithError(fgErr).Warn("Failed to load item field groups")
+		fieldGroups = nil
+	}
+	pbFieldGroups := make([]*sickrockpb.ItemFieldGroup, 0, len(fieldGroups))
+	for i, g := range fieldGroups {
+		pbFieldGroups = append(pbFieldGroups, &sickrockpb.ItemFieldGroup{
+			Id:          int32(i + 1),
+			Ordinal:     int32(g.Ordinal),
+			Title:       g.Title,
+			ColumnNames: append([]string(nil), g.ColumnNames...),
+		})
+	}
+
+	pbColumnDisplay := make([]*sickrockpb.ColumnDisplaySettingInput, 0, len(displayByColumn))
+	for columnName, d := range displayByColumn {
+		row := &sickrockpb.ColumnDisplaySettingInput{ColumnName: columnName}
+		if d.DisplayLabel.Valid {
+			row.DisplayLabel = strings.TrimSpace(d.DisplayLabel.String)
+		}
+		if d.ValuePrefix.Valid {
+			row.ValuePrefix = d.ValuePrefix.String
+		}
+		if d.ValueSuffix.Valid {
+			row.ValueSuffix = d.ValueSuffix.String
+		}
+		pbColumnDisplay = append(pbColumnDisplay, row)
+	}
+
 	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
 		Fields:            fields,
 		CreateButtonText:  createButtonText,
@@ -1055,6 +1197,127 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		CreateDelegate:    createDelegate,
 		Title:             displayTitle,
 		RowName:           tc.DisplayRowName(),
+		RowNamePlural:     tc.DisplayRowNamePlural(),
+		ItemPageLayout: &sickrockpb.ItemPageLayout{
+			Blocks: pbLayoutBlocks,
+		},
+		ItemFieldGroups: &sickrockpb.ItemFieldGroups{
+			Groups: pbFieldGroups,
+		},
+		ColumnDisplaySettings: pbColumnDisplay,
+	}), nil
+}
+
+func (s *SickRockServer) SetItemFieldGroups(ctx context.Context, req *connect.Request[sickrockpb.SetItemFieldGroupsRequest]) (*connect.Response[sickrockpb.SetItemFieldGroupsResponse], error) {
+	tcName := strings.TrimSpace(req.Msg.GetTableConfiguration())
+	if tcName == "" {
+		return connect.NewResponse(&sickrockpb.SetItemFieldGroupsResponse{
+			Success: false,
+			Message: "Table configuration is required",
+		}), nil
+	}
+	if err := s.requireDataTableAccess(ctx, tcName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
+	inputs := make([]repo.FieldGroupInput, 0, len(req.Msg.GetGroups()))
+	for i, g := range req.Msg.GetGroups() {
+		ord := int(g.GetOrdinal())
+		if ord <= 0 {
+			ord = i + 1
+		}
+		inputs = append(inputs, repo.FieldGroupInput{
+			Ordinal:     ord,
+			Title:       g.GetTitle(),
+			ColumnNames: append([]string(nil), g.GetColumnNames()...),
+		})
+	}
+	if err := s.repo.SetItemFieldGroups(ctx, tcName, inputs); err != nil {
+		return connect.NewResponse(&sickrockpb.SetItemFieldGroupsResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+	return connect.NewResponse(&sickrockpb.SetItemFieldGroupsResponse{
+		Success: true,
+		Message: "Field groups saved",
+	}), nil
+}
+
+func (s *SickRockServer) SetColumnDisplaySettings(ctx context.Context, req *connect.Request[sickrockpb.SetColumnDisplaySettingsRequest]) (*connect.Response[sickrockpb.SetColumnDisplaySettingsResponse], error) {
+	tcName := strings.TrimSpace(req.Msg.GetTableConfiguration())
+	if tcName == "" {
+		return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
+			Success: false,
+			Message: "Table configuration is required",
+		}), nil
+	}
+	if err := s.requireDataTableAccess(ctx, tcName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
+	tc, err := s.repo.GetTableConfiguration(ctx, tcName)
+	if err != nil {
+		return nil, err
+	}
+	cols, err := s.repo.ListColumns(ctx, tc)
+	if err != nil {
+		return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+	allowed := make(map[string]struct{}, len(cols))
+	for _, c := range cols {
+		allowed[c.Name] = struct{}{}
+	}
+	syntheticKeys, synErr := s.repo.ListRelationSyntheticColumnKeys(ctx, tcName)
+	if synErr != nil {
+		log.WithError(synErr).Warn("Failed to list relation synthetic columns for display settings")
+	} else {
+		for _, key := range syntheticKeys {
+			allowed[key] = struct{}{}
+		}
+	}
+	inputs := make([]repo.ColumnDisplayInput, 0, len(req.Msg.GetSettings()))
+	for _, s := range req.Msg.GetSettings() {
+		inputs = append(inputs, repo.ColumnDisplayInput{
+			ColumnName:   s.GetColumnName(),
+			DisplayLabel: s.GetDisplayLabel(),
+			ValuePrefix:  s.GetValuePrefix(),
+			ValueSuffix:  s.GetValueSuffix(),
+		})
+	}
+	if err := s.repo.SetColumnDisplaySettings(ctx, tcName, inputs, allowed); err != nil {
+		return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+	return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
+		Success: true,
+		Message: "Column display settings saved",
+	}), nil
+}
+
+func (s *SickRockServer) SetTableRowLabels(ctx context.Context, req *connect.Request[sickrockpb.SetTableRowLabelsRequest]) (*connect.Response[sickrockpb.SetTableRowLabelsResponse], error) {
+	tcName := strings.TrimSpace(req.Msg.GetTableConfiguration())
+	if tcName == "" {
+		return connect.NewResponse(&sickrockpb.SetTableRowLabelsResponse{
+			Success: false,
+			Message: "Table configuration is required",
+		}), nil
+	}
+	if err := s.requireDataTableAccess(ctx, tcName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
+	if err := s.repo.SetTableRowLabels(ctx, tcName, req.Msg.GetRowName(), req.Msg.GetRowNamePlural()); err != nil {
+		return connect.NewResponse(&sickrockpb.SetTableRowLabelsResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+	return connect.NewResponse(&sickrockpb.SetTableRowLabelsResponse{
+		Success: true,
+		Message: "Row labels saved",
 	}), nil
 }
 
@@ -1319,6 +1582,7 @@ func (s *SickRockServer) GetForeignKeys(ctx context.Context, req *connect.Reques
 	var pbForeignKeys []*sickrockpb.ForeignKey
 	for _, fk := range foreignKeys {
 		pbForeignKeys = append(pbForeignKeys, &sickrockpb.ForeignKey{
+			RelationId:       int32(fk.RelationID),
 			ConstraintName:   fk.ConstraintName,
 			TableName:        fk.TableName,
 			ColumnName:       fk.ColumnName,
@@ -1326,11 +1590,128 @@ func (s *SickRockServer) GetForeignKeys(ctx context.Context, req *connect.Reques
 			ReferencedColumn: fk.ReferencedColumn,
 			OnDeleteAction:   fk.OnDeleteAction,
 			OnUpdateAction:   fk.OnUpdateAction,
+			DisplayName:      fk.DisplayName,
 		})
 	}
 
 	return connect.NewResponse(&sickrockpb.GetForeignKeysResponse{
 		ForeignKeys: pbForeignKeys,
+	}), nil
+}
+
+func (s *SickRockServer) UpdateTableRelation(ctx context.Context, req *connect.Request[sickrockpb.UpdateTableRelationRequest]) (*connect.Response[sickrockpb.UpdateTableRelationResponse], error) {
+	constraintName := strings.TrimSpace(req.Msg.GetConstraintName())
+	if constraintName == "" {
+		return connect.NewResponse(&sickrockpb.UpdateTableRelationResponse{
+			Success: false,
+			Message: "Constraint name is required",
+		}), nil
+	}
+	rel, err := s.repo.GetTableRelationByConstraintName(ctx, constraintName)
+	if err != nil {
+		return connect.NewResponse(&sickrockpb.UpdateTableRelationResponse{
+			Success: false,
+			Message: "Relation not found",
+		}), nil
+	}
+	if s.requireTableAccess(ctx, rel.SourceTableKey, repo.ResourceActionEdit) != nil &&
+		s.requireTableAccess(ctx, rel.ReferencedTableKey, repo.ResourceActionEdit) != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("table edit access required"))
+	}
+	pullThrough := pullThroughFieldsFromProto(req.Msg.GetPullThroughFields())
+	if err := s.repo.UpdateTableRelation(ctx, constraintName, req.Msg.GetDisplayName(), pullThrough); err != nil {
+		log.Errorf("Failed to update table relation: %v", err)
+		return connect.NewResponse(&sickrockpb.UpdateTableRelationResponse{
+			Success: false,
+			Message: fmt.Sprintf("Failed to update relation: %v", err),
+		}), nil
+	}
+	return connect.NewResponse(&sickrockpb.UpdateTableRelationResponse{
+		Success: true,
+		Message: "Relation updated",
+	}), nil
+}
+
+func pullThroughFieldsFromProto(in []*sickrockpb.RelationPullThroughField) []repo.RelationPullThroughField {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]repo.RelationPullThroughField, 0, len(in))
+	for _, pt := range in {
+		if pt == nil {
+			continue
+		}
+		expr := strings.TrimSpace(pt.GetExpr())
+		if expr != "" {
+			out = append(out, repo.RelationPullThroughField{
+				DisplayLabel: strings.TrimSpace(pt.GetDisplayLabel()),
+				Expr:         expr,
+			})
+			continue
+		}
+		fkCol := strings.TrimSpace(pt.GetFkColumn())
+		field := strings.TrimSpace(pt.GetField())
+		if fkCol == "" || field == "" {
+			continue
+		}
+		out = append(out, repo.RelationPullThroughField{FKColumn: fkCol, Field: field})
+	}
+	return out
+}
+
+func pullThroughFieldsToProto(in []repo.RelationPullThroughField) []*sickrockpb.RelationPullThroughField {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make([]*sickrockpb.RelationPullThroughField, 0, len(in))
+	for _, pt := range in {
+		if pt.IsCalculated() {
+			out = append(out, &sickrockpb.RelationPullThroughField{
+				DisplayLabel: pt.DisplayLabel,
+				Expr:         pt.Expr,
+			})
+			continue
+		}
+		out = append(out, &sickrockpb.RelationPullThroughField{
+			FkColumn: pt.FKColumn,
+			Field:    pt.Field,
+		})
+	}
+	return out
+}
+
+func (s *SickRockServer) SetItemPageLayout(ctx context.Context, req *connect.Request[sickrockpb.SetItemPageLayoutRequest]) (*connect.Response[sickrockpb.SetItemPageLayoutResponse], error) {
+	tcName := strings.TrimSpace(req.Msg.GetTableConfiguration())
+	if tcName == "" {
+		return connect.NewResponse(&sickrockpb.SetItemPageLayoutResponse{
+			Success: false,
+			Message: "Table configuration is required",
+		}), nil
+	}
+	if err := s.requireDataTableAccess(ctx, tcName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
+	inputs := make([]repo.PageLayoutBlockInput, 0, len(req.Msg.GetBlocks()))
+	for i, b := range req.Msg.GetBlocks() {
+		ord := int(b.GetOrdinal())
+		if ord <= 0 {
+			ord = i + 1
+		}
+		inputs = append(inputs, repo.PageLayoutBlockInput{
+			Ordinal:    ord,
+			BlockType:  b.GetBlockType(),
+			ConfigJSON: b.GetConfigJson(),
+		})
+	}
+	if err := s.repo.SetItemPageLayoutBlocks(ctx, tcName, inputs); err != nil {
+		return connect.NewResponse(&sickrockpb.SetItemPageLayoutResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+	return connect.NewResponse(&sickrockpb.SetItemPageLayoutResponse{
+		Success: true,
+		Message: "Item page layout saved",
 	}), nil
 }
 
@@ -1753,27 +2134,7 @@ func (s *SickRockServer) GetUserBookmarks(ctx context.Context, req *connect.Requ
 	for _, bookmark := range bookmarks {
 		var navItem *sickrockpb.NavigationItem
 		if bookmark.NavigationItem != nil {
-			navItem = &sickrockpb.NavigationItem{
-				Id:      int32(bookmark.NavigationItem.ID),
-				Ordinal: int32(bookmark.NavigationItem.Ordinal),
-				TableConfiguration: func() int32 {
-					if bookmark.NavigationItem.TableConfiguration.Valid {
-						return int32(bookmark.NavigationItem.TableConfiguration.Int64)
-					}
-					return 0
-				}(),
-				TableName:  bookmark.NavigationItem.TableName.String,
-				TableTitle: bookmark.NavigationItem.TableTitle.String,
-				Icon:       bookmark.NavigationItem.Icon.String,
-				TableView:  bookmark.NavigationItem.TableView.String,
-				DashboardId: func() int32 {
-					if bookmark.NavigationItem.DashboardID.Valid {
-						return int32(bookmark.NavigationItem.DashboardID.Int64)
-					}
-					return 0
-				}(),
-				DashboardName: bookmark.NavigationItem.DashboardName.String,
-			}
+			navItem = navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
 		}
 
 		pbBookmarks = append(pbBookmarks, &sickrockpb.UserBookmark{
@@ -1781,7 +2142,7 @@ func (s *SickRockServer) GetUserBookmarks(ctx context.Context, req *connect.Requ
 			UserId:           int32(bookmark.UserID),
 			NavigationItemId: int32(bookmark.NavigationItemID),
 			NavigationItem:   navItem,
-			Title:            bookmark.Title.String,
+			Title:            bookmarkLinkTitle(bookmark),
 		})
 	}
 
@@ -1807,27 +2168,7 @@ func (s *SickRockServer) CreateUserBookmark(ctx context.Context, req *connect.Re
 
 	var navItem *sickrockpb.NavigationItem
 	if bookmark.NavigationItem != nil {
-		navItem = &sickrockpb.NavigationItem{
-			Id:      int32(bookmark.NavigationItem.ID),
-			Ordinal: int32(bookmark.NavigationItem.Ordinal),
-			TableConfiguration: func() int32 {
-				if bookmark.NavigationItem.TableConfiguration.Valid {
-					return int32(bookmark.NavigationItem.TableConfiguration.Int64)
-				}
-				return 0
-			}(),
-			TableName:  bookmark.NavigationItem.TableName.String,
-			TableTitle: bookmark.NavigationItem.TableTitle.String,
-			Icon:       bookmark.NavigationItem.Icon.String,
-			TableView:  bookmark.NavigationItem.TableView.String,
-			DashboardId: func() int32 {
-				if bookmark.NavigationItem.DashboardID.Valid {
-					return int32(bookmark.NavigationItem.DashboardID.Int64)
-				}
-				return 0
-			}(),
-			DashboardName: bookmark.NavigationItem.DashboardName.String,
-		}
+		navItem = navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
 	}
 
 	pbBookmark := &sickrockpb.UserBookmark{

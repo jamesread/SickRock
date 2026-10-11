@@ -9,6 +9,8 @@ import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Edit03Icon } from '@hugeicons/core-free-icons'
+import { rowEditActionLabel } from '../utils/rowInsertLabel'
+import type { ItemFieldGroup } from '../gen/sickrock_pb'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,7 +21,8 @@ const rowId = route.params.rowId as string
 const client = createApiClient()
 
 const item = ref<Record<string, unknown> | null>(null)
-const fieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const fieldDefs = ref<Array<{ name: string; type: string; required: boolean; displayLabel?: string }>>([])
+const fieldGroups = ref<ItemFieldGroup[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
 const createButtonText = ref<string>('Edit Row')
@@ -40,12 +43,15 @@ onMounted(async () => {
     const structureRes = await client.getTableStructure({ pageId: tableName })
     fieldDefs.value = (structureRes.fields ?? [])
       .filter(f => f.name !== 'sr_created' && f.name !== 'sr_updated') // Hide sr_created and sr_updated fields
-      .map(f => ({ name: f.name, type: f.type, required: !!f.required }))
+      .map(f => ({
+        name: f.name,
+        type: f.type,
+        required: !!f.required,
+        displayLabel: f.displayLabel ?? '',
+      }))
+    fieldGroups.value = [...(structureRes.itemFieldGroups?.groups ?? [])]
 
-    // Set the create button text as the title
-    if (structureRes.CreateButtonText) {
-      createButtonText.value = `Edit ${structureRes.CreateButtonText}`
-    }
+    createButtonText.value = rowEditActionLabel(structureRes.rowName)
   } catch (e) {
     error.value = String(e)
   } finally {
@@ -81,6 +87,7 @@ function goBack() {
       v-else
       :table-id="tableName"
       :field-defs="fieldDefs"
+      :field-groups="fieldGroups"
       :edit-mode="true"
       :item-id="rowId"
       :existing-item="item"
@@ -89,4 +96,3 @@ function goBack() {
     />
   </Section>
 </template>
-

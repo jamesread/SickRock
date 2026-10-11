@@ -8,6 +8,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, Download01Icon } from '@hugeicons/core-free-icons'
+import { tableListLinkLabel } from '../utils/rowInsertLabel'
 
 const route = useRoute()
 const router = useRouter()
@@ -23,6 +24,9 @@ const format = ref<'csv' | 'plaintext' | 'yaml'>('csv')
 const includeHeaders = ref<boolean>(true)
 
 const structure = ref<GetTableStructureResponse | null>(null)
+const backToTableLabel = computed(() =>
+  tableListLinkLabel(structure.value?.rowNamePlural, structure.value?.rowName),
+)
 
 // Views state
 const tableViews = ref<Array<{ id: number; tableName: string; viewName: string; isDefault: boolean; columns: Array<{ columnName: string; isVisible: boolean; columnOrder: number; sortOrder: string }> }>>([])
@@ -259,7 +263,7 @@ async function copyToClipboard() {
           class="button inline-icon"
         >
           <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Back to Table</span>
+          <span>{{ backToTableLabel }}</span>
         </router-link>
       </div>
     </template>

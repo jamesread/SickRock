@@ -8,6 +8,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, PlusSignIcon, ColumnDeleteIcon, Edit03Icon, Link01Icon } from '@hugeicons/core-free-icons'
+import { tableListLinkLabel } from '../utils/rowInsertLabel'
 
 const route = useRoute()
 const router = useRouter()
@@ -30,6 +31,10 @@ const foreignKeys = ref<Array<{
 const availableTables = ref<Array<{ name: string; title: string }>>([])
 const availableColumns = ref<Array<{ name: string; type: string }>>([])
 const referencedColumns = ref<Array<{ name: string; type: string }>>([])
+
+const tableRowName = ref<string | null>(null)
+const tableRowNamePlural = ref<string | null>(null)
+const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.value, tableRowName.value))
 
 const loading = ref(false)
 const error = ref<string | null>(null)
@@ -64,6 +69,8 @@ const canCreateForeignKey = computed(() => {
 async function loadForeignKeys() {
   try {
     const response = await client.getTableStructure({ pageId: tableId })
+    tableRowName.value = response.rowName?.trim() || null
+    tableRowNamePlural.value = response.rowNamePlural?.trim() || null
     foreignKeys.value = (response.foreignKeys || []).map(fk => ({
       constraintName: fk.constraintName,
       tableName: fk.tableName,
@@ -206,7 +213,7 @@ onMounted(async () => {
         class="button inline-icon"
       >
         <HugeiconsIcon :icon="ArrowLeft01Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Back to Table</span>
+        <span>{{ backToTableLabel }}</span>
       </router-link>
       <router-link :to="`/table/${tableId}/column-types`" class="button inline-icon neutral">
         <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />

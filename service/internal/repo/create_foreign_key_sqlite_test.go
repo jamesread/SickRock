@@ -42,7 +42,8 @@ func TestCreateForeignKeySQLite(t *testing.T) {
 			icon TEXT,
 			primary_key_column TEXT,
 			default_sort_column TEXT,
-			row_name TEXT
+			row_name TEXT,
+			row_name_plural TEXT
 		)`)
 	if err != nil {
 		t.Fatalf("table_configurations: %v", err)

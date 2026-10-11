@@ -11,7 +11,9 @@ import (
 
 var systemSettingsTableConfigurations = map[string]bool{
 	"table_settings":        true,
-	"table_navigation":      true,
+	"table_navigation":           true,
+	"table_apps":                 true,
+	"table_app_navigation_links": true,
 	"table_configurations":  true,
 	"table_workflows":       true,
 	"table_dashboards":           true,
