@@ -103,7 +103,11 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		return handleDeleteItem(ctx, srv, req)
 	})
 
-	return server.NewStreamableHTTPServer(mcpServer, server.WithEndpointPath("/mcp"))
+	return server.NewStreamableHTTPServer(
+		mcpServer,
+		server.WithEndpointPath("/mcp"),
+		server.WithDisableLocalhostProtection(true),
+	)
 }
 
 func jsonResult(v any) (*mcp.CallToolResult, error) {
