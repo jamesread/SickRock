@@ -896,17 +896,14 @@ function openQuickAddFromMenu() {
 
 async function deleteItem() {
   if (!contextMenu.value.item) {
-    console.log('No item in context menu')
     return
   }
 
   const itemId = getItemValue(contextMenu.value.item, 'id')
   if (!itemId) {
-    console.log('No item ID found')
     return
   }
 
-  console.log('Deleting item with ID:', itemId)
   deleting.value = true
   try {
     await client.deleteItem({

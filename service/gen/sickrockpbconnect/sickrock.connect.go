@@ -197,6 +197,21 @@ const (
 	// SickRockDeleteTableViewProcedure is the fully-qualified name of the SickRock's DeleteTableView
 	// RPC.
 	SickRockDeleteTableViewProcedure = "/sickrock.SickRock/DeleteTableView"
+	// SickRockSetUserDefaultTableViewProcedure is the fully-qualified name of the SickRock's
+	// SetUserDefaultTableView RPC.
+	SickRockSetUserDefaultTableViewProcedure = "/sickrock.SickRock/SetUserDefaultTableView"
+	// SickRockListHealthIssuesProcedure is the fully-qualified name of the SickRock's ListHealthIssues
+	// RPC.
+	SickRockListHealthIssuesProcedure = "/sickrock.SickRock/ListHealthIssues"
+	// SickRockGetHealthSummaryProcedure is the fully-qualified name of the SickRock's GetHealthSummary
+	// RPC.
+	SickRockGetHealthSummaryProcedure = "/sickrock.SickRock/GetHealthSummary"
+	// SickRockRunHealthChecksProcedure is the fully-qualified name of the SickRock's RunHealthChecks
+	// RPC.
+	SickRockRunHealthChecksProcedure = "/sickrock.SickRock/RunHealthChecks"
+	// SickRockAcknowledgeHealthIssueProcedure is the fully-qualified name of the SickRock's
+	// AcknowledgeHealthIssue RPC.
+	SickRockAcknowledgeHealthIssueProcedure = "/sickrock.SickRock/AcknowledgeHealthIssue"
 	// SickRockCreateForeignKeyProcedure is the fully-qualified name of the SickRock's CreateForeignKey
 	// RPC.
 	SickRockCreateForeignKeyProcedure = "/sickrock.SickRock/CreateForeignKey"
@@ -387,6 +402,12 @@ type SickRockClient interface {
 	UpdateTableView(context.Context, *connect.Request[proto.UpdateTableViewRequest]) (*connect.Response[proto.UpdateTableViewResponse], error)
 	GetTableViews(context.Context, *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error)
 	DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error)
+	SetUserDefaultTableView(context.Context, *connect.Request[proto.SetUserDefaultTableViewRequest]) (*connect.Response[proto.SetUserDefaultTableViewResponse], error)
+	// Health checks (admins only)
+	ListHealthIssues(context.Context, *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error)
+	GetHealthSummary(context.Context, *connect.Request[proto.GetHealthSummaryRequest]) (*connect.Response[proto.GetHealthSummaryResponse], error)
+	RunHealthChecks(context.Context, *connect.Request[proto.RunHealthChecksRequest]) (*connect.Response[proto.RunHealthChecksResponse], error)
+	AcknowledgeHealthIssue(context.Context, *connect.Request[proto.AcknowledgeHealthIssueRequest]) (*connect.Response[proto.AcknowledgeHealthIssueResponse], error)
 	// Foreign Key Management
 	CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error)
 	GetForeignKeys(context.Context, *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error)
@@ -829,6 +850,36 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeleteTableView")),
 			connect.WithClientOptions(opts...),
 		),
+		setUserDefaultTableView: connect.NewClient[proto.SetUserDefaultTableViewRequest, proto.SetUserDefaultTableViewResponse](
+			httpClient,
+			baseURL+SickRockSetUserDefaultTableViewProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetUserDefaultTableView")),
+			connect.WithClientOptions(opts...),
+		),
+		listHealthIssues: connect.NewClient[proto.ListHealthIssuesRequest, proto.ListHealthIssuesResponse](
+			httpClient,
+			baseURL+SickRockListHealthIssuesProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListHealthIssues")),
+			connect.WithClientOptions(opts...),
+		),
+		getHealthSummary: connect.NewClient[proto.GetHealthSummaryRequest, proto.GetHealthSummaryResponse](
+			httpClient,
+			baseURL+SickRockGetHealthSummaryProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetHealthSummary")),
+			connect.WithClientOptions(opts...),
+		),
+		runHealthChecks: connect.NewClient[proto.RunHealthChecksRequest, proto.RunHealthChecksResponse](
+			httpClient,
+			baseURL+SickRockRunHealthChecksProcedure,
+			connect.WithSchema(sickRockMethods.ByName("RunHealthChecks")),
+			connect.WithClientOptions(opts...),
+		),
+		acknowledgeHealthIssue: connect.NewClient[proto.AcknowledgeHealthIssueRequest, proto.AcknowledgeHealthIssueResponse](
+			httpClient,
+			baseURL+SickRockAcknowledgeHealthIssueProcedure,
+			connect.WithSchema(sickRockMethods.ByName("AcknowledgeHealthIssue")),
+			connect.WithClientOptions(opts...),
+		),
 		createForeignKey: connect.NewClient[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse](
 			httpClient,
 			baseURL+SickRockCreateForeignKeyProcedure,
@@ -1137,6 +1188,11 @@ type sickRockClient struct {
 	updateTableView                    *connect.Client[proto.UpdateTableViewRequest, proto.UpdateTableViewResponse]
 	getTableViews                      *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
 	deleteTableView                    *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
+	setUserDefaultTableView            *connect.Client[proto.SetUserDefaultTableViewRequest, proto.SetUserDefaultTableViewResponse]
+	listHealthIssues                   *connect.Client[proto.ListHealthIssuesRequest, proto.ListHealthIssuesResponse]
+	getHealthSummary                   *connect.Client[proto.GetHealthSummaryRequest, proto.GetHealthSummaryResponse]
+	runHealthChecks                    *connect.Client[proto.RunHealthChecksRequest, proto.RunHealthChecksResponse]
+	acknowledgeHealthIssue             *connect.Client[proto.AcknowledgeHealthIssueRequest, proto.AcknowledgeHealthIssueResponse]
 	createForeignKey                   *connect.Client[proto.CreateForeignKeyRequest, proto.CreateForeignKeyResponse]
 	getForeignKeys                     *connect.Client[proto.GetForeignKeysRequest, proto.GetForeignKeysResponse]
 	deleteForeignKey                   *connect.Client[proto.DeleteForeignKeyRequest, proto.DeleteForeignKeyResponse]
@@ -1494,6 +1550,31 @@ func (c *sickRockClient) DeleteTableView(ctx context.Context, req *connect.Reque
 	return c.deleteTableView.CallUnary(ctx, req)
 }
 
+// SetUserDefaultTableView calls sickrock.SickRock.SetUserDefaultTableView.
+func (c *sickRockClient) SetUserDefaultTableView(ctx context.Context, req *connect.Request[proto.SetUserDefaultTableViewRequest]) (*connect.Response[proto.SetUserDefaultTableViewResponse], error) {
+	return c.setUserDefaultTableView.CallUnary(ctx, req)
+}
+
+// ListHealthIssues calls sickrock.SickRock.ListHealthIssues.
+func (c *sickRockClient) ListHealthIssues(ctx context.Context, req *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error) {
+	return c.listHealthIssues.CallUnary(ctx, req)
+}
+
+// GetHealthSummary calls sickrock.SickRock.GetHealthSummary.
+func (c *sickRockClient) GetHealthSummary(ctx context.Context, req *connect.Request[proto.GetHealthSummaryRequest]) (*connect.Response[proto.GetHealthSummaryResponse], error) {
+	return c.getHealthSummary.CallUnary(ctx, req)
+}
+
+// RunHealthChecks calls sickrock.SickRock.RunHealthChecks.
+func (c *sickRockClient) RunHealthChecks(ctx context.Context, req *connect.Request[proto.RunHealthChecksRequest]) (*connect.Response[proto.RunHealthChecksResponse], error) {
+	return c.runHealthChecks.CallUnary(ctx, req)
+}
+
+// AcknowledgeHealthIssue calls sickrock.SickRock.AcknowledgeHealthIssue.
+func (c *sickRockClient) AcknowledgeHealthIssue(ctx context.Context, req *connect.Request[proto.AcknowledgeHealthIssueRequest]) (*connect.Response[proto.AcknowledgeHealthIssueResponse], error) {
+	return c.acknowledgeHealthIssue.CallUnary(ctx, req)
+}
+
 // CreateForeignKey calls sickrock.SickRock.CreateForeignKey.
 func (c *sickRockClient) CreateForeignKey(ctx context.Context, req *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error) {
 	return c.createForeignKey.CallUnary(ctx, req)
@@ -1770,6 +1851,12 @@ type SickRockHandler interface {
 	UpdateTableView(context.Context, *connect.Request[proto.UpdateTableViewRequest]) (*connect.Response[proto.UpdateTableViewResponse], error)
 	GetTableViews(context.Context, *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error)
 	DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error)
+	SetUserDefaultTableView(context.Context, *connect.Request[proto.SetUserDefaultTableViewRequest]) (*connect.Response[proto.SetUserDefaultTableViewResponse], error)
+	// Health checks (admins only)
+	ListHealthIssues(context.Context, *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error)
+	GetHealthSummary(context.Context, *connect.Request[proto.GetHealthSummaryRequest]) (*connect.Response[proto.GetHealthSummaryResponse], error)
+	RunHealthChecks(context.Context, *connect.Request[proto.RunHealthChecksRequest]) (*connect.Response[proto.RunHealthChecksResponse], error)
+	AcknowledgeHealthIssue(context.Context, *connect.Request[proto.AcknowledgeHealthIssueRequest]) (*connect.Response[proto.AcknowledgeHealthIssueResponse], error)
 	// Foreign Key Management
 	CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error)
 	GetForeignKeys(context.Context, *connect.Request[proto.GetForeignKeysRequest]) (*connect.Response[proto.GetForeignKeysResponse], error)
@@ -2208,6 +2295,36 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeleteTableView")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockSetUserDefaultTableViewHandler := connect.NewUnaryHandler(
+		SickRockSetUserDefaultTableViewProcedure,
+		svc.SetUserDefaultTableView,
+		connect.WithSchema(sickRockMethods.ByName("SetUserDefaultTableView")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListHealthIssuesHandler := connect.NewUnaryHandler(
+		SickRockListHealthIssuesProcedure,
+		svc.ListHealthIssues,
+		connect.WithSchema(sickRockMethods.ByName("ListHealthIssues")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetHealthSummaryHandler := connect.NewUnaryHandler(
+		SickRockGetHealthSummaryProcedure,
+		svc.GetHealthSummary,
+		connect.WithSchema(sickRockMethods.ByName("GetHealthSummary")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockRunHealthChecksHandler := connect.NewUnaryHandler(
+		SickRockRunHealthChecksProcedure,
+		svc.RunHealthChecks,
+		connect.WithSchema(sickRockMethods.ByName("RunHealthChecks")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockAcknowledgeHealthIssueHandler := connect.NewUnaryHandler(
+		SickRockAcknowledgeHealthIssueProcedure,
+		svc.AcknowledgeHealthIssue,
+		connect.WithSchema(sickRockMethods.ByName("AcknowledgeHealthIssue")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockCreateForeignKeyHandler := connect.NewUnaryHandler(
 		SickRockCreateForeignKeyProcedure,
 		svc.CreateForeignKey,
@@ -2576,6 +2693,16 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetTableViewsHandler.ServeHTTP(w, r)
 		case SickRockDeleteTableViewProcedure:
 			sickRockDeleteTableViewHandler.ServeHTTP(w, r)
+		case SickRockSetUserDefaultTableViewProcedure:
+			sickRockSetUserDefaultTableViewHandler.ServeHTTP(w, r)
+		case SickRockListHealthIssuesProcedure:
+			sickRockListHealthIssuesHandler.ServeHTTP(w, r)
+		case SickRockGetHealthSummaryProcedure:
+			sickRockGetHealthSummaryHandler.ServeHTTP(w, r)
+		case SickRockRunHealthChecksProcedure:
+			sickRockRunHealthChecksHandler.ServeHTTP(w, r)
+		case SickRockAcknowledgeHealthIssueProcedure:
+			sickRockAcknowledgeHealthIssueHandler.ServeHTTP(w, r)
 		case SickRockCreateForeignKeyProcedure:
 			sickRockCreateForeignKeyHandler.ServeHTTP(w, r)
 		case SickRockGetForeignKeysProcedure:
@@ -2915,6 +3042,26 @@ func (UnimplementedSickRockHandler) GetTableViews(context.Context, *connect.Requ
 
 func (UnimplementedSickRockHandler) DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteTableView is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetUserDefaultTableView(context.Context, *connect.Request[proto.SetUserDefaultTableViewRequest]) (*connect.Response[proto.SetUserDefaultTableViewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetUserDefaultTableView is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListHealthIssues(context.Context, *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListHealthIssues is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetHealthSummary(context.Context, *connect.Request[proto.GetHealthSummaryRequest]) (*connect.Response[proto.GetHealthSummaryResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetHealthSummary is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) RunHealthChecks(context.Context, *connect.Request[proto.RunHealthChecksRequest]) (*connect.Response[proto.RunHealthChecksResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.RunHealthChecks is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) AcknowledgeHealthIssue(context.Context, *connect.Request[proto.AcknowledgeHealthIssueRequest]) (*connect.Response[proto.AcknowledgeHealthIssueResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.AcknowledgeHealthIssue is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) CreateForeignKey(context.Context, *connect.Request[proto.CreateForeignKeyRequest]) (*connect.Response[proto.CreateForeignKeyResponse], error) {

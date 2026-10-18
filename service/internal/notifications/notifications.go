@@ -15,14 +15,14 @@ import (
 
 // NotificationService handles sending notifications via various channels
 type NotificationService struct {
-	repo        *repo.Repository
+	repo             *repo.Repository
 	telegramBotToken string // Telegram bot API token (from environment)
 }
 
 // NewNotificationService creates a new notification service
 func NewNotificationService(repo *repo.Repository) *NotificationService {
 	return &NotificationService{
-		repo: repo,
+		repo:             repo,
 		telegramBotToken: getTelegramBotToken(),
 	}
 }
@@ -54,8 +54,8 @@ func (ns *NotificationService) SendNotification(ctx context.Context, eventCode s
 		err := ns.sendToChannel(ctx, sub.Channel, message, data)
 		if err != nil {
 			log.WithError(err).WithFields(log.Fields{
-				"event_code": eventCode,
-				"channel_id": sub.Channel.ID,
+				"event_code":   eventCode,
+				"channel_id":   sub.Channel.ID,
 				"channel_type": sub.Channel.ChannelType,
 			}).Error("Failed to send notification")
 			// Continue with other channels even if one fails
@@ -80,6 +80,15 @@ func (ns *NotificationService) buildMessage(eventCode string, data map[string]in
 			username = u
 		}
 		return fmt.Sprintf("Password reset reminder for user %s", username)
+	case "health.issue_raised":
+		severity, _ := data["severity"].(string)
+		title, _ := data["title"].(string)
+		check, _ := data["check"].(string)
+		message := fmt.Sprintf("SickRock health %s: %s (%s)", severity, title, check)
+		if link, ok := data["link"].(string); ok && link != "" {
+			message += " — fix at " + link
+		}
+		return message
 	default:
 		return fmt.Sprintf("Notification for event: %s", eventCode)
 	}
@@ -145,9 +154,9 @@ func (ns *NotificationService) sendTelegram(ctx context.Context, telegramID stri
 // sendWebhook sends a notification via HTTP webhook
 func (ns *NotificationService) sendWebhook(ctx context.Context, webhookURL string, message string, data map[string]interface{}) error {
 	payload := map[string]interface{}{
-		"message": message,
+		"message":   message,
 		"timestamp": time.Now().Unix(),
-		"data": data,
+		"data":      data,
 	}
 
 	jsonData, err := json.Marshal(payload)

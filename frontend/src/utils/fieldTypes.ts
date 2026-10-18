@@ -6,6 +6,13 @@ export function isUserRefFieldType(fieldType: string): boolean {
   return fieldType.toLowerCase() === USER_REF_FIELD_TYPE
 }
 
+/** Column semantic for a Hugeicons icon name (edited with IconPickerField). */
+export const ICON_FIELD_TYPE = 'icon'
+
+export function isIconFieldType(fieldType: string | undefined): boolean {
+  return (fieldType ?? '').toLowerCase() === ICON_FIELD_TYPE
+}
+
 export function findFieldDef(fields: Field[], columnName: string): Field | undefined {
   const lower = columnName.toLowerCase()
   return fields.find(field => field.name.toLowerCase() === lower)

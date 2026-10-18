@@ -8,6 +8,7 @@ import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import StatusCard from 'picocrank/vue/components/StatusCard.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import {
+  Activity01Icon,
   AddIcon,
   HomeIcon,
   KeyIcon,
@@ -49,6 +50,16 @@ onMounted(async () => {
     const superuser = authStore.user?.rbacIsSuperuser ?? authStore.initResponse?.rbacIsSuperuser ?? false
 
     if (canManageSystemSettings(perms, superuser)) {
+      localNavigation.value.addNavigationLink({
+        id: 'health',
+        name: 'health',
+        title: 'Health',
+        path: '/admin/health',
+        icon: Activity01Icon,
+        type: 'route',
+        description: 'Problems found by background health checks',
+      })
+
       localNavigation.value.addNavigationLink({
         id: 'create-table',
         name: 'create-table',

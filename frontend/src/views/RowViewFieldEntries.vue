@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { inject } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Edit03Icon, FileEditIcon, SquareLock01Icon } from '@hugeicons/core-free-icons'
+import { Edit03Icon, FileEditIcon, QuestionIcon, SquareLock01Icon } from '@hugeicons/core-free-icons'
 import UserRefChip from '../components/UserRefChip.vue'
+import HugeIcon from '../components/HugeIcon.vue'
+import IconPickerField from '../components/IconPickerField.vue'
+import { isIconFieldType } from '../utils/fieldTypes'
 import { rowViewFieldUiKey, type RowViewFieldUi } from './rowViewFieldUi'
 
 export type FieldEntry = {
@@ -29,8 +32,20 @@ const { editingField, editingValue, savingField, users } = ui
           class="inline-edit"
           @click.stop
         >
+          <IconPickerField
+            v-if="isIconFieldType(ui.getFieldDef(entry.key)?.type)"
+            :model-value="editingValue"
+            :disabled="savingField"
+            :clearable="!ui.getFieldDef(entry.key)?.required"
+            auto-open
+            @update:model-value="value => {
+              editingValue = value
+              ui.saveField()
+            }"
+            @cancel="ui.cancelEdit"
+          />
           <input
-            v-if="ui.isTinyintColumn(entry.key)"
+            v-else-if="ui.isTinyintColumn(entry.key)"
             type="checkbox"
             :checked="editingValue === '1'"
             :disabled="savingField"
@@ -98,6 +113,12 @@ const { editingField, editingValue, savingField, users } = ui
                 ? undefined
                 : `/admin/iam/users/${ui.resolveRawFieldValue(entry.key)}`"
             />
+          </template>
+          <template v-else-if="isIconFieldType(ui.getFieldDef(entry.key)?.type) && entry.displayValue">
+            <span class="inline-icon">
+              <HugeIcon :name="String(entry.displayValue)" :fallback="QuestionIcon" width="1.25em" height="1.25em" aria-hidden="true" />
+              {{ entry.displayValue }}
+            </span>
           </template>
           <template v-else-if="ui.getFkDisplay(entry.key).to">
             <router-link :to="ui.getFkDisplay(entry.key).to">{{ ui.getFkDisplay(entry.key).label }}</router-link>

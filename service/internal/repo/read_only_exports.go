@@ -30,16 +30,16 @@ func (r *Repository) GetReadOnlyCalendarExportBySlug(ctx context.Context, slug s
 	}
 
 	var row struct {
-		ID                 int            `db:"id"`
-		Slug               string         `db:"slug"`
-		Title              string         `db:"title"`
-		TableConfiguration string         `db:"table_configuration"`
-		TableViewID        sql.NullInt64  `db:"table_view_id"`
-		WhereJSON          string         `db:"where_json"`
-		WeekendsOnly       int            `db:"weekends_only"`
-		DisplayMode        string         `db:"display_mode"`
-		Enabled            int            `db:"enabled"`
-		AllowedGroupIDs    string         `db:"allowed_group_ids"`
+		ID                 int           `db:"id"`
+		Slug               string        `db:"slug"`
+		Title              string        `db:"title"`
+		TableConfiguration string        `db:"table_configuration"`
+		TableViewID        sql.NullInt64 `db:"table_view_id"`
+		WhereJSON          string        `db:"where_json"`
+		WeekendsOnly       int           `db:"weekends_only"`
+		DisplayMode        string        `db:"display_mode"`
+		Enabled            int           `db:"enabled"`
+		AllowedGroupIDs    string        `db:"allowed_group_ids"`
 	}
 
 	err := r.db.GetContext(ctx, &row, `

@@ -2,7 +2,7 @@
 import { ref, onMounted, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import * as Hugeicons from '@hugeicons/core-free-icons'
+import HugeIcon from '../components/HugeIcon.vue'
 import { BookmarkIcon, DatabaseIcon, Delete01Icon } from '@hugeicons/core-free-icons'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
@@ -109,10 +109,9 @@ onMounted(async () => {
         class="bookmark-item"
       >
         <div class="bookmark-content" @click="navigateToBookmark(bookmark)">
-          <HugeiconsIcon
-            :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
-                ? (Hugeicons as any)[bookmark.navigationItem.icon]
-                : DatabaseIcon"
+          <HugeIcon
+            :name="bookmark.navigationItem?.icon"
+            :fallback="DatabaseIcon"
             class="bookmark-icon"
           />
           <div class="bookmark-info">
@@ -125,7 +124,7 @@ onMounted(async () => {
           class="remove-bookmark-btn"
           title="Remove bookmark"
         >
-          <HugeiconsIcon :icon="Hugeicons.Delete01Icon" />
+          <HugeiconsIcon :icon="Delete01Icon" />
         </button>
       </div>
     </div>

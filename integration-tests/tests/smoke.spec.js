@@ -88,7 +88,9 @@ describe('SickRock smoke', function () {
     assert.equal(authenticated, true)
 
     await driver.get(base + '/table/table_settings')
-    const table = await driver.wait(until.elementLocated(By.css('table.row-hover')), 15000)
+    // Scope to the table component's own table: the Views dialog also renders a (hidden)
+    // PicoCrank table earlier in the page, which has no row actions.
+    const table = await driver.wait(until.elementLocated(By.css('.table-host table.row-hover')), 15000)
     await driver.wait(async () => (await table.findElements(By.css('tbody tr'))).length > 0, 10000)
 
     await table.findElement(By.css('button[aria-label="Row actions"]')).click()

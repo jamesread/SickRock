@@ -2,50 +2,54 @@ import { watch } from 'vue'
 import { createRouter, createWebHistory, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { appTitle, formatDocumentTitle } from './appTitle'
 import { rowViewPageLabel } from './utils/rowViewPageTitle'
+// The entry points (login, home, table and row pages) load up front; table and row pages
+// also work offline from IndexedDB, and the service worker does not cache /assets chunks.
+// Every other page is a lazily loaded chunk, keeping the initial bundle small.
 import HomeView from './views/HomeView.vue'
-import AboutView from './views/AboutView.vue'
+const AboutView = () => import('./views/AboutView.vue')
 import TableView from './views/TableView.vue'
 import RowView from './views/RowView.vue'
-import RowEditView from './views/RowEditView.vue'
-import AddColumnView from './views/AddColumnView.vue'
-import InsertRowView from './views/InsertRowView.vue'
-import AfterInsertView from './views/AfterInsertView.vue'
-import CreateTableView from './views/CreateTableView.vue'
-import ForeignKeyManagement from './views/ForeignKeyManagement.vue'
-import ItemViewLayoutEditor from './views/ItemViewLayoutEditor.vue'
-import ColumnTypeManagement from './views/ColumnTypeManagement.vue'
-import ConditionalFormattingRules from './components/ConditionalFormattingRules.vue'
-import ExportView from './views/ExportView.vue'
-import ReadOnlyCalendarExportView from './views/ReadOnlyCalendarExportView.vue'
-import TableCreate from './views/TableCreate.vue'
-import DashboardCreate from './views/DashboardCreate.vue'
-import ControlPanel from './views/ControlPanel.vue'
-import RssCalendarFeedsView from './views/RssCalendarFeedsView.vue'
-import RssCalendarFeedEditView from './views/RssCalendarFeedEditView.vue'
-import PWAInstallation from './views/PWAInstallation.vue'
+const RowEditView = () => import('./views/RowEditView.vue')
+const AddColumnView = () => import('./views/AddColumnView.vue')
+const InsertRowView = () => import('./views/InsertRowView.vue')
+const AfterInsertView = () => import('./views/AfterInsertView.vue')
+const CreateTableView = () => import('./views/CreateTableView.vue')
+const ForeignKeyManagement = () => import('./views/ForeignKeyManagement.vue')
+const ItemViewLayoutEditor = () => import('./views/ItemViewLayoutEditor.vue')
+const ColumnTypeManagement = () => import('./views/ColumnTypeManagement.vue')
+const ConditionalFormattingRules = () => import('./components/ConditionalFormattingRules.vue')
+const ExportView = () => import('./views/ExportView.vue')
+const ReadOnlyCalendarExportView = () => import('./views/ReadOnlyCalendarExportView.vue')
+const TableCreate = () => import('./views/TableCreate.vue')
+const DashboardCreate = () => import('./views/DashboardCreate.vue')
+const ControlPanel = () => import('./views/ControlPanel.vue')
+const RssCalendarFeedsView = () => import('./views/RssCalendarFeedsView.vue')
+const RssCalendarFeedEditView = () => import('./views/RssCalendarFeedEditView.vue')
+const PWAInstallation = () => import('./views/PWAInstallation.vue')
 import LoginView from './views/LoginView.vue'
-import NotFoundView from './views/NotFoundView.vue'
-import DeviceCodeClaimerView from './views/DeviceCodeClaimerView.vue'
-import DatabaseBrowser from './views/DatabaseBrowser.vue'
+const NotFoundView = () => import('./views/NotFoundView.vue')
+const DeviceCodeClaimerView = () => import('./views/DeviceCodeClaimerView.vue')
+const DatabaseBrowser = () => import('./views/DatabaseBrowser.vue')
 import { DatabaseAddIcon } from '@hugeicons/core-free-icons'
-import DashboardListView from './views/DashboardListView.vue'
-import Dashboard from './views/Dashboard.vue'
-import WorkflowView from './views/WorkflowView.vue'
-import UserPreferences from './views/UserPreferences.vue'
-import UserControlPanel from './views/UserControlPanel.vue'
-import UserBookmarks from './views/UserBookmarks.vue'
-import UserAPIKeys from './views/UserAPIKeys.vue'
-import UserNotifications from './views/UserNotifications.vue'
-import DayView from './views/DayView.vue'
-import IamHub from './views/iam/IamHub.vue'
-import IamUsers from './views/iam/IamUsers.vue'
-import IamUserDetails from './views/iam/IamUserDetails.vue'
-import IamUserGroups from './views/iam/IamUserGroups.vue'
-import IamUserGroupDetails from './views/iam/IamUserGroupDetails.vue'
-import IamRbacRoles from './views/iam/IamRbacRoles.vue'
-import IamRbacRoleDetails from './views/iam/IamRbacRoleDetails.vue'
-import IamRbacPermissions from './views/iam/IamRbacPermissions.vue'
-import IamMyPermissions from './views/iam/IamMyPermissions.vue'
+const DashboardListView = () => import('./views/DashboardListView.vue')
+const Dashboard = () => import('./views/Dashboard.vue')
+const WorkflowView = () => import('./views/WorkflowView.vue')
+const HealthView = () => import('./views/HealthView.vue')
+const UserPreferences = () => import('./views/UserPreferences.vue')
+const UserControlPanel = () => import('./views/UserControlPanel.vue')
+const UserBookmarks = () => import('./views/UserBookmarks.vue')
+const UserAPIKeys = () => import('./views/UserAPIKeys.vue')
+const UserNotifications = () => import('./views/UserNotifications.vue')
+const DayView = () => import('./views/DayView.vue')
+const IamHub = () => import('./views/iam/IamHub.vue')
+const IamUsers = () => import('./views/iam/IamUsers.vue')
+const IamUserDetails = () => import('./views/iam/IamUserDetails.vue')
+const IamUserGroups = () => import('./views/iam/IamUserGroups.vue')
+const IamUserGroupDetails = () => import('./views/iam/IamUserGroupDetails.vue')
+const IamRbacRoles = () => import('./views/iam/IamRbacRoles.vue')
+const IamRbacRoleDetails = () => import('./views/iam/IamRbacRoleDetails.vue')
+const IamRbacPermissions = () => import('./views/iam/IamRbacPermissions.vue')
+const IamMyPermissions = () => import('./views/iam/IamMyPermissions.vue')
 import { useAuthStore } from './stores/auth'
 import {
   canAccessAdminTableConfiguration,
@@ -368,6 +372,17 @@ const router = createRouter({
       },
     },
     {
+      path: '/admin/health',
+      name: 'health',
+      component: HealthView,
+      meta: {
+        requiresAuth: true,
+        requiresPermission: 'system.settings',
+        title: 'Health',
+        icon: DatabaseAddIcon,
+      },
+    },
+    {
       path: '/admin/table/create',
       name: 'table-create',
       component: TableCreate,
@@ -647,6 +662,15 @@ router.afterEach((to) => {
 
 watch(appTitle, () => {
   void updateDocumentTitle(router.currentRoute.value)
+})
+
+// After a redeploy, an open tab may request a lazily loaded chunk that no longer exists.
+// Reload the target page instead of leaving navigation broken.
+router.onError((error, to) => {
+  const message = error instanceof Error ? error.message : String(error)
+  if (/dynamically imported module|Importing a module script failed|error loading dynamically/i.test(message)) {
+    window.location.assign(to.fullPath)
+  }
 })
 
 export default router

@@ -1,9 +1,9 @@
 package iam
 
 import (
+	"github.com/jamesread/SickRock/internal/iam/mysqlstore"
 	"github.com/jamesread/armature-iam/store"
 	iamsqlite "github.com/jamesread/armature-iam/store/sqlite"
-	"github.com/jamesread/SickRock/internal/iam/mysqlstore"
 	"github.com/jmoiron/sqlx"
 )
 

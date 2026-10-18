@@ -1,4 +1,4 @@
-.PHONY: all deps build run test lint tidy clean
+.PHONY: all deps build run test lint fmt tidy clean
 
 BIN := sickrock
 
@@ -18,6 +18,11 @@ test:
 
 lint:
 	go vet ./...
+	@unformatted=$$(gofmt -l $$(find . -name '*.go' -not -path './gen/*')); \
+	if [ -n "$$unformatted" ]; then echo "gofmt needed (run make fmt):"; echo "$$unformatted"; exit 1; fi
+
+fmt:
+	gofmt -w $$(find . -name '*.go' -not -path './gen/*')
 
 tidy:
 	go mod tidy

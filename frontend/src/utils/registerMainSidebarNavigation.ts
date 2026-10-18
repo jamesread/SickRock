@@ -68,19 +68,32 @@ export function pagesFromNavigationItems(items: NavigationItem[]): MainSidebarPa
     .filter((pg): pg is MainSidebarPage => pg != null)
 }
 
+// Bumped on every sidebar rebuild so an icon that finishes loading late never
+// re-adds a link from a previous registration.
+let registrationGeneration = 0
+
 function addPageLink(nav: SidebarNavigationApi, pg: MainSidebarPage) {
-  nav.addNavigationLink({
+  const generation = registrationGeneration
+  const link = {
     id: pg.id,
     name: pg.id,
     title: pg.title,
     path: pg.path,
-    icon: resolveNavigationIcon({
+  }
+  const icon = resolveNavigationIcon(
+    {
       icon: pg.icon,
       workflowId: pg.workflowId,
       dashboardId: pg.dashboardId,
       path: pg.path,
-    }),
-  })
+    },
+    (loaded) => {
+      if (generation === registrationGeneration) {
+        nav.addNavigationLink({ ...link, icon: loaded })
+      }
+    },
+  )
+  nav.addNavigationLink({ ...link, icon })
 }
 
 export type RegisterMainSidebarOptions = {
@@ -88,6 +101,8 @@ export type RegisterMainSidebarOptions = {
   canAccessControlPanel: boolean
   canSystemSettings: boolean
   databaseSettingIcon: unknown
+  /** Icon for the System → Health link (shown with canSystemSettings). */
+  healthIcon?: unknown
   ungroupedItems?: NavigationItem[]
   apps?: NavigationApp[]
 }
@@ -98,6 +113,7 @@ export function registerMainSidebarNavigation(
   pages: MainSidebarPage[],
   options: RegisterMainSidebarOptions,
 ) {
+  registrationGeneration++
   nav.clearNavigationLinks()
 
   nav.addNavigationLink({
@@ -148,5 +164,18 @@ export function registerMainSidebarNavigation(
       path: '/table/table_configurations',
       icon: options.databaseSettingIcon,
     })
+    updateSidebarHealthLink(nav, options.healthIcon, 0)
   }
+}
+
+/** Adds or updates the System → Health link; `count` is open, unacknowledged warnings and errors. */
+export function updateSidebarHealthLink(nav: SidebarNavigationApi, icon: unknown, count: number) {
+  nav.addNavigationLink({
+    id: 'health',
+    name: 'Health',
+    title: 'Health',
+    path: '/admin/health',
+    icon,
+    count,
+  })
 }

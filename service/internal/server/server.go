@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -11,8 +12,8 @@ import (
 	"unicode"
 
 	"connectrpc.com/connect"
-	armpassword "github.com/jamesread/armature-iam/password"
 	"github.com/expr-lang/expr"
+	armpassword "github.com/jamesread/armature-iam/password"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -20,6 +21,7 @@ import (
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/buildinfo"
+	"github.com/jamesread/SickRock/internal/health"
 	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
@@ -30,6 +32,7 @@ type SickRockServer struct {
 	repo                *repo.Repository
 	notificationService *notifications.NotificationService
 	auth                *iam.AuthLayer
+	health              *health.Service
 }
 
 // markdownRenderer is a configured goldmark instance for rendering markdown
@@ -91,14 +94,14 @@ func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrock
 	}
 
 	res := connect.NewResponse(&sickrockpb.InitResponse{
-		Version:          buildinfo.Version,
-		Commit:           buildinfo.Commit,
-		Date:             buildinfo.Date,
-		DbName:           dbName,
-		CurrentUsername:  currentUsername,
-		RbacPermissions:  rbacPerms,
-		RbacIsSuperuser:  rbacSuperuser,
-		OauthProviders:   loadOAuthProvidersFromEnv(),
+		Version:         buildinfo.Version,
+		Commit:          buildinfo.Commit,
+		Date:            buildinfo.Date,
+		DbName:          dbName,
+		CurrentUsername: currentUsername,
+		RbacPermissions: rbacPerms,
+		RbacIsSuperuser: rbacSuperuser,
+		OauthProviders:  loadOAuthProvidersFromEnv(),
 	})
 	return res, nil
 }
@@ -755,11 +758,11 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 	// Track this item as recently viewed for the authenticated user
 	if userID, uerr := s.getUserIDFromContext(ctx); uerr == nil && userID > 0 {
 		if err := s.repo.InsertRecentlyViewed(ctx, userID, table, req.Msg.GetId()); err != nil {
-		// Log the error but don't fail the request
-		log.WithError(err).WithFields(log.Fields{
-			"table": table,
-			"id":    req.Msg.GetId(),
-		}).Warn("Failed to track recently viewed item")
+			// Log the error but don't fail the request
+			log.WithError(err).WithFields(log.Fields{
+				"table": table,
+				"id":    req.Msg.GetId(),
+			}).Warn("Failed to track recently viewed item")
 		}
 	}
 
@@ -1113,6 +1116,8 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 				ReferencedTableTcName: referencedTcName,
 				DisplayName:           fk.DisplayName,
 				PullThroughFields:     pullThroughFieldsToProto(fk.PullThroughFields),
+				AbsorbIntoItem:        fk.AbsorbIntoItem,
+				AbsorbType:            fk.AbsorbType,
 			})
 		}
 	}
@@ -1121,9 +1126,16 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 	viewType := "table"
 	views, err := s.repo.GetTableViews(ctx, tcName)
 	if err == nil && len(views) > 0 {
+		userDefaultID := s.userDefaultTableView(ctx, tcName)
 		defaultView := views[0] // GetTableViews returns views ordered, first is usually default
 		for _, v := range views {
 			if v.IsDefault {
+				defaultView = v
+				break
+			}
+		}
+		for _, v := range views {
+			if userDefaultID > 0 && v.ID == userDefaultID {
 				defaultView = v
 				break
 			}
@@ -1385,8 +1397,12 @@ func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Reque
 	if viewType == "" {
 		viewType = "table" // Default to "table"
 	}
+	layoutJSON, err := validateViewLayoutJSON(req.Msg.GetLayoutJson())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
 
-	err := s.repo.CreateTableView(ctx, tableName, viewName, viewType, columns)
+	viewID, err := s.repo.CreateTableView(ctx, tableName, viewName, viewType, layoutJSON, columns)
 	if err != nil {
 		log.Errorf("Failed to create table view: %v", err)
 		return connect.NewResponse(&sickrockpb.CreateTableViewResponse{
@@ -1398,6 +1414,7 @@ func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Reque
 	return connect.NewResponse(&sickrockpb.CreateTableViewResponse{
 		Success: true,
 		Message: "Table view created successfully",
+		ViewId:  int32(viewID),
 	}), nil
 }
 
@@ -1432,7 +1449,12 @@ func (s *SickRockServer) UpdateTableView(ctx context.Context, req *connect.Reque
 		viewType = "table" // Default to "table"
 	}
 
-	err := s.repo.UpdateTableView(ctx, viewID, tableName, viewName, viewType, columns)
+	layoutJSON, err := validateViewLayoutJSON(req.Msg.GetLayoutJson())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+
+	err = s.repo.UpdateTableView(ctx, viewID, tableName, viewName, viewType, layoutJSON, columns)
 	if err != nil {
 		log.Errorf("Failed to update table view: %v", err)
 		return connect.NewResponse(&sickrockpb.UpdateTableViewResponse{
@@ -1485,18 +1507,72 @@ func (s *SickRockServer) GetTableViews(ctx context.Context, req *connect.Request
 		}
 
 		pbViews = append(pbViews, &sickrockpb.TableView{
-			Id:        int32(view.ID),
-			TableName: view.TableName,
-			ViewName:  view.ViewName,
-			IsDefault: view.IsDefault,
-			Columns:   pbColumns,
-			ViewType:  viewType,
+			Id:         int32(view.ID),
+			TableName:  view.TableName,
+			ViewName:   view.ViewName,
+			IsDefault:  view.IsDefault,
+			Columns:    pbColumns,
+			ViewType:   viewType,
+			LayoutJson: view.LayoutJSON,
 		})
 	}
 
 	return connect.NewResponse(&sickrockpb.GetTableViewsResponse{
-		Views: pbViews,
+		Views:             pbViews,
+		UserDefaultViewId: int32(s.userDefaultTableView(ctx, tableName)),
 	}), nil
+}
+
+// userDefaultTableView returns the calling user's own default view for a table (0 when unset or unknown).
+func (s *SickRockServer) userDefaultTableView(ctx context.Context, tableName string) int {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return 0
+	}
+	viewID, err := s.repo.GetUserDefaultTableView(ctx, userID, tableName)
+	if err != nil {
+		log.WithError(err).Warn("Failed to load user default table view")
+		return 0
+	}
+	return viewID
+}
+
+// SetUserDefaultTableView sets (or with view_id 0, clears) the caller's own default view.
+// It is a personal preference, so viewing the table is enough.
+func (s *SickRockServer) SetUserDefaultTableView(ctx context.Context, req *connect.Request[sickrockpb.SetUserDefaultTableViewRequest]) (*connect.Response[sickrockpb.SetUserDefaultTableViewResponse], error) {
+	tableName := strings.TrimSpace(req.Msg.GetTableName())
+	if tableName == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("table_name is required"))
+	}
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.requireDataTableAccess(ctx, tableName, repo.ResourceActionView); err != nil {
+		return nil, err
+	}
+	if err := s.repo.SetUserDefaultTableView(ctx, userID, tableName, int(req.Msg.GetViewId())); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&sickrockpb.SetUserDefaultTableViewResponse{}), nil
+}
+
+const maxViewLayoutJSONBytes = 64 * 1024
+
+// validateViewLayoutJSON checks that an optional view layout is a JSON object of a sensible size.
+func validateViewLayoutJSON(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if len(raw) > maxViewLayoutJSONBytes {
+		return "", fmt.Errorf("layout_json is larger than %d bytes", maxViewLayoutJSONBytes)
+	}
+	var layout map[string]any
+	if err := json.Unmarshal([]byte(raw), &layout); err != nil {
+		return "", fmt.Errorf("layout_json must be a JSON object: %w", err)
+	}
+	return raw, nil
 }
 
 func (s *SickRockServer) DeleteTableView(ctx context.Context, req *connect.Request[sickrockpb.DeleteTableViewRequest]) (*connect.Response[sickrockpb.DeleteTableViewResponse], error) {
@@ -1508,7 +1584,18 @@ func (s *SickRockServer) DeleteTableView(ctx context.Context, req *connect.Reque
 		}), nil
 	}
 
-	err := s.repo.DeleteTableView(ctx, viewID)
+	viewTable, err := s.repo.GetTableViewTableName(ctx, viewID)
+	if err != nil {
+		return connect.NewResponse(&sickrockpb.DeleteTableViewResponse{
+			Success: false,
+			Message: err.Error(),
+		}), nil
+	}
+	if err := s.requireDataTableAccess(ctx, viewTable, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
+
+	err = s.repo.DeleteTableView(ctx, viewID)
 	if err != nil {
 		log.Errorf("Failed to delete table view: %v", err)
 		return connect.NewResponse(&sickrockpb.DeleteTableViewResponse{
@@ -1591,6 +1678,8 @@ func (s *SickRockServer) GetForeignKeys(ctx context.Context, req *connect.Reques
 			OnDeleteAction:   fk.OnDeleteAction,
 			OnUpdateAction:   fk.OnUpdateAction,
 			DisplayName:      fk.DisplayName,
+			AbsorbIntoItem:   fk.AbsorbIntoItem,
+			AbsorbType:       fk.AbsorbType,
 		})
 	}
 
@@ -1617,6 +1706,14 @@ func (s *SickRockServer) UpdateTableRelation(ctx context.Context, req *connect.R
 	if s.requireTableAccess(ctx, rel.SourceTableKey, repo.ResourceActionEdit) != nil &&
 		s.requireTableAccess(ctx, rel.ReferencedTableKey, repo.ResourceActionEdit) != nil {
 		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("table edit access required"))
+	}
+	if req.Msg.AbsorbIntoItem != nil {
+		if err := s.repo.SetTableRelationAbsorb(ctx, constraintName, req.Msg.GetAbsorbIntoItem(), req.Msg.GetAbsorbType()); err != nil {
+			return connect.NewResponse(&sickrockpb.UpdateTableRelationResponse{
+				Success: false,
+				Message: fmt.Sprintf("Failed to update relation: %v", err),
+			}), nil
+		}
 	}
 	pullThrough := pullThroughFieldsFromProto(req.Msg.GetPullThroughFields())
 	if err := s.repo.UpdateTableRelation(ctx, constraintName, req.Msg.GetDisplayName(), pullThrough); err != nil {

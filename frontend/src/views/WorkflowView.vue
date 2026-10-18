@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, shallowRef, onMounted, computed, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { inject } from 'vue'
 import type { createApiClient } from '../stores/api'
@@ -8,9 +8,10 @@ import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { DatabaseIcon, Edit03Icon, PlayIcon, StopIcon } from '@hugeicons/core-free-icons'
-import * as Hugeicons from '@hugeicons/core-free-icons'
+import { Edit03Icon, PlayIcon, StopIcon, WorkflowIcon } from '@hugeicons/core-free-icons'
+import HugeIcon from '../components/HugeIcon.vue'
 import { resolveNavigationIcon } from '../utils/navigationIcon'
+import type { IconData } from '../utils/hugeicons'
 
 type WorkflowItem = {
   id: number
@@ -45,13 +46,21 @@ const isPinned = ref(false)
 const items = ref<WorkflowItem[]>([])
 const workflowNavigation = ref<InstanceType<typeof Navigation> | null>(null)
 
-const sectionIcon = computed(() =>
-  resolveNavigationIcon({
-    icon: workflowIcon.value,
-    workflowId: workflowId.value ?? undefined,
-    path: workflowId.value ? `/workflow/${workflowId.value}` : undefined,
-  }),
-)
+const sectionIcon = shallowRef<IconData>(WorkflowIcon)
+
+watch([workflowIcon, workflowId], () => {
+  const name = workflowIcon.value
+  sectionIcon.value = resolveNavigationIcon(
+    {
+      icon: name,
+      workflowId: workflowId.value ?? undefined,
+      path: workflowId.value ? `/workflow/${workflowId.value}` : undefined,
+    },
+    (loaded) => {
+      if (workflowIcon.value === name) sectionIcon.value = loaded
+    },
+  )
+}, { immediate: true })
 
 const showAddModal = ref(false)
 const availableItems = ref<AvailableNavItem[]>([])
@@ -64,11 +73,8 @@ function itemSubtitle(item: { dashboardId: number; tableName?: string }) {
   return item.tableName ? `Table · ${item.tableName}` : 'Table'
 }
 
-function resolveItemIcon(item: { icon: string; dashboardId: number; path?: string }) {
-  const iconName = item.icon?.trim()
-  if (iconName && (Hugeicons as Record<string, unknown>)[iconName]) {
-    return (Hugeicons as Record<string, typeof DatabaseIcon>)[iconName]
-  }
+/** Default icon for a member link, shown until its configured icon (if any) loads. */
+function defaultItemIcon(item: { icon: string; dashboardId: number; path?: string }) {
   return resolveNavigationIcon({
     icon: item.icon,
     dashboardId: item.dashboardId,
@@ -76,21 +82,31 @@ function resolveItemIcon(item: { icon: string; dashboardId: number; path?: strin
   })
 }
 
+// Bumped on every rebuild so an icon that loads late never re-adds a stale link.
+let workflowNavigationGeneration = 0
+
 function populateWorkflowNavigation() {
   const nav = workflowNavigation.value
   if (!nav) return
   nav.clearNavigationLinks()
+  const generation = ++workflowNavigationGeneration
   for (const item of items.value) {
-    nav.addNavigationLink({
+    const link = {
       id: `workflow-item-${item.id}`,
       name: `workflow-item-${item.id}`,
       title: item.title,
       path: item.path,
       to: item.path,
-      icon: resolveItemIcon(item),
       type: 'route',
       description: itemSubtitle(item),
-    })
+    }
+    const icon = resolveNavigationIcon(
+      { icon: item.icon, dashboardId: item.dashboardId, path: item.path },
+      (loaded) => {
+        if (generation === workflowNavigationGeneration) nav.addNavigationLink({ ...link, icon: loaded })
+      },
+    )
+    nav.addNavigationLink({ ...link, icon })
   }
 }
 
@@ -343,8 +359,9 @@ onMounted(load)
         <ul v-else class="member-order-list">
           <li v-for="(memberId, index) in orderedSelectedIds" :key="memberId" class="member-order-row">
             <div class="member-order-main">
-              <HugeiconsIcon
-                :icon="resolveItemIcon(availableItemById(memberId) ?? { icon: '', dashboardId: 0 })"
+              <HugeIcon
+                :name="availableItemById(memberId)?.icon"
+                :fallback="defaultItemIcon(availableItemById(memberId) ?? { icon: '', dashboardId: 0 })"
                 width="1.25em"
                 height="1.25em"
                 aria-hidden="true"
@@ -395,7 +412,7 @@ onMounted(load)
             class="item-option"
             @click="toggleItemSelection(item.id)"
           >
-            <HugeiconsIcon :icon="resolveItemIcon(item)" width="1.25em" height="1.25em" aria-hidden="true" />
+            <HugeIcon :name="item.icon" :fallback="defaultItemIcon(item)" width="1.25em" height="1.25em" aria-hidden="true" />
             <div class="item-info">
               <div class="item-title">{{ item.title }}</div>
               <div class="subtle item-subtitle">{{ itemSubtitle(item) }}</div>

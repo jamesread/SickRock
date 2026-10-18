@@ -2,6 +2,64 @@
   "openapi": "3.1.0",
   "info": {},
   "paths": {
+    "/api/sickrock.SickRock/AcknowledgeHealthIssue": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "AcknowledgeHealthIssue",
+        "operationId": "sickrock.SickRock.AcknowledgeHealthIssue",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.AcknowledgeHealthIssueRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.AcknowledgeHealthIssueResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/AddTableColumn": {
       "post": {
         "tags": [
@@ -2621,6 +2679,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/GetHealthSummary": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "GetHealthSummary",
+        "operationId": "sickrock.SickRock.GetHealthSummary",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetHealthSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetHealthSummaryResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/GetItem": {
       "post": {
         "tags": [
@@ -4196,6 +4312,65 @@
         }
       }
     },
+    "/api/sickrock.SickRock/ListHealthIssues": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "Health checks (admins only)",
+        "description": "Health checks (admins only)",
+        "operationId": "sickrock.SickRock.ListHealthIssues",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ListHealthIssuesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ListHealthIssuesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/ListItems": {
       "post": {
         "tags": [
@@ -4953,6 +5128,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/RunHealthChecks": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "RunHealthChecks",
+        "operationId": "sickrock.SickRock.RunHealthChecks",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.RunHealthChecksRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.RunHealthChecksResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/SaveRssCalendarFeed": {
       "post": {
         "tags": [
@@ -5410,6 +5643,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.SetTickListCompletionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetUserDefaultTableView": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetUserDefaultTableView",
+        "operationId": "sickrock.SickRock.SetUserDefaultTableView",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetUserDefaultTableViewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetUserDefaultTableViewResponse"
                 }
               }
             }
@@ -6144,6 +6435,31 @@
         "title": "APIKey",
         "additionalProperties": false
       },
+      "sickrock.AcknowledgeHealthIssueRequest": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "id",
+            "format": "int64"
+          },
+          "acknowledged": {
+            "type": "boolean",
+            "title": "acknowledged",
+            "description": "false un-acknowledges"
+          }
+        },
+        "title": "AcknowledgeHealthIssueRequest",
+        "additionalProperties": false
+      },
+      "sickrock.AcknowledgeHealthIssueResponse": {
+        "type": "object",
+        "title": "AcknowledgeHealthIssueResponse",
+        "additionalProperties": false
+      },
       "sickrock.AddTableColumnRequest": {
         "type": "object",
         "properties": {
@@ -6862,6 +7178,11 @@
             "type": "string",
             "title": "view_type",
             "description": "\"table\" or \"calendar\", defaults to \"table\""
+          },
+          "layoutJson": {
+            "type": "string",
+            "title": "layout_json",
+            "description": "Optional JSON object with extra layout state (filters, group-by, page size, column priorities)."
           }
         },
         "title": "CreateTableViewRequest",
@@ -6877,6 +7198,12 @@
           "message": {
             "type": "string",
             "title": "message"
+          },
+          "viewId": {
+            "type": "integer",
+            "title": "view_id",
+            "format": "int32",
+            "description": "ID of the created view (when success)"
           }
         },
         "title": "CreateTableViewResponse",
@@ -7645,6 +7972,16 @@
               "$ref": "#/components/schemas/sickrock.RelationPullThroughField"
             },
             "title": "pull_through_fields"
+          },
+          "absorbIntoItem": {
+            "type": "boolean",
+            "title": "absorb_into_item",
+            "description": "Show related rows inside the item view instead of their own section"
+          },
+          "absorbType": {
+            "type": "string",
+            "title": "absorb_type",
+            "description": "\"first_row\" when absorb_into_item is set"
           }
         },
         "title": "ForeignKey",
@@ -7859,6 +8196,34 @@
           }
         },
         "title": "GetForeignKeysResponse",
+        "additionalProperties": false
+      },
+      "sickrock.GetHealthSummaryRequest": {
+        "type": "object",
+        "title": "GetHealthSummaryRequest",
+        "additionalProperties": false,
+        "description": "Counts of open, unacknowledged issues (for the sidebar badge)."
+      },
+      "sickrock.GetHealthSummaryResponse": {
+        "type": "object",
+        "properties": {
+          "errors": {
+            "type": "integer",
+            "title": "errors",
+            "format": "int32"
+          },
+          "warnings": {
+            "type": "integer",
+            "title": "warnings",
+            "format": "int32"
+          },
+          "infos": {
+            "type": "integer",
+            "title": "infos",
+            "format": "int32"
+          }
+        },
+        "title": "GetHealthSummaryResponse",
         "additionalProperties": false
       },
       "sickrock.GetItemRequest": {
@@ -8342,6 +8707,12 @@
               "$ref": "#/components/schemas/sickrock.TableView"
             },
             "title": "views"
+          },
+          "userDefaultViewId": {
+            "type": "integer",
+            "title": "user_default_view_id",
+            "format": "int32",
+            "description": "The calling user's own default view for this table; 0 when unset"
           }
         },
         "title": "GetTableViewsResponse",
@@ -8598,6 +8969,132 @@
         },
         "title": "GroupTableRoleGrant",
         "additionalProperties": false
+      },
+      "sickrock.HealthCheckStatus": {
+        "type": "object",
+        "properties": {
+          "checkId": {
+            "type": "string",
+            "title": "check_id"
+          },
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "lastRunUnix": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "last_run_unix",
+            "format": "int64",
+            "description": "0 when the check has not run yet"
+          },
+          "durationMs": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "duration_ms",
+            "format": "int64"
+          },
+          "status": {
+            "type": "string",
+            "title": "status",
+            "description": "\"ok\", \"failed\" or \"pending\""
+          },
+          "error": {
+            "type": "string",
+            "title": "error"
+          }
+        },
+        "title": "HealthCheckStatus",
+        "additionalProperties": false
+      },
+      "sickrock.HealthIssue": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "id",
+            "format": "int64"
+          },
+          "checkId": {
+            "type": "string",
+            "title": "check_id"
+          },
+          "checkTitle": {
+            "type": "string",
+            "title": "check_title"
+          },
+          "issueKey": {
+            "type": "string",
+            "title": "issue_key"
+          },
+          "severity": {
+            "type": "string",
+            "title": "severity",
+            "description": "\"info\", \"warning\" or \"error\""
+          },
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "detail": {
+            "type": "string",
+            "title": "detail"
+          },
+          "link": {
+            "type": "string",
+            "title": "link",
+            "description": "Frontend path where the problem can be fixed; empty when none"
+          },
+          "firstSeenUnix": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "first_seen_unix",
+            "format": "int64"
+          },
+          "lastSeenUnix": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "last_seen_unix",
+            "format": "int64"
+          },
+          "occurrences": {
+            "type": "integer",
+            "title": "occurrences",
+            "format": "int32"
+          },
+          "resolvedAtUnix": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "resolved_at_unix",
+            "format": "int64",
+            "description": "0 while open"
+          },
+          "acknowledgedAtUnix": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "acknowledged_at_unix",
+            "format": "int64",
+            "description": "0 when not acknowledged"
+          }
+        },
+        "title": "HealthIssue",
+        "additionalProperties": false,
+        "description": "Health checks (see service/internal/health). Admins only (system.settings)."
       },
       "sickrock.IamUser": {
         "type": "object",
@@ -8857,6 +9354,42 @@
           }
         },
         "title": "ListGroupTableRoleGrantsResponse",
+        "additionalProperties": false
+      },
+      "sickrock.ListHealthIssuesRequest": {
+        "type": "object",
+        "properties": {
+          "includeResolved": {
+            "type": "boolean",
+            "title": "include_resolved"
+          },
+          "includeAcknowledged": {
+            "type": "boolean",
+            "title": "include_acknowledged"
+          }
+        },
+        "title": "ListHealthIssuesRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ListHealthIssuesResponse": {
+        "type": "object",
+        "properties": {
+          "issues": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.HealthIssue"
+            },
+            "title": "issues"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.HealthCheckStatus"
+            },
+            "title": "checks"
+          }
+        },
+        "title": "ListHealthIssuesResponse",
         "additionalProperties": false
       },
       "sickrock.ListItemsRequest": {
@@ -9195,7 +9728,7 @@
           "title": {
             "type": "string",
             "title": "title",
-            "description": "navigation field from table_navigation"
+            "description": "link label: table_navigation.title when set, otherwise the formatted name"
           },
           "workflowId": {
             "type": "integer",
@@ -9688,6 +10221,32 @@
         "additionalProperties": false,
         "description": "RSS calendar feed import (Control Panel → RSS calendar feeds)"
       },
+      "sickrock.RunHealthChecksRequest": {
+        "type": "object",
+        "properties": {
+          "checkId": {
+            "type": "string",
+            "title": "check_id",
+            "description": "Empty runs every check"
+          }
+        },
+        "title": "RunHealthChecksRequest",
+        "additionalProperties": false
+      },
+      "sickrock.RunHealthChecksResponse": {
+        "type": "object",
+        "properties": {
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.HealthCheckStatus"
+            },
+            "title": "checks"
+          }
+        },
+        "title": "RunHealthChecksResponse",
+        "additionalProperties": false
+      },
       "sickrock.SaveRssCalendarFeedRequest": {
         "type": "object",
         "properties": {
@@ -9926,6 +10485,28 @@
         "title": "SetTickListCompletionResponse",
         "additionalProperties": false
       },
+      "sickrock.SetUserDefaultTableViewRequest": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "title": "table_name"
+          },
+          "viewId": {
+            "type": "integer",
+            "title": "view_id",
+            "format": "int32"
+          }
+        },
+        "title": "SetUserDefaultTableViewRequest",
+        "additionalProperties": false,
+        "description": "Sets (or with view_id 0, clears) the calling user's own default view for a table."
+      },
+      "sickrock.SetUserDefaultTableViewResponse": {
+        "type": "object",
+        "title": "SetUserDefaultTableViewResponse",
+        "additionalProperties": false
+      },
       "sickrock.SetUserGroupMembersRequest": {
         "type": "object",
         "properties": {
@@ -10074,6 +10655,11 @@
             "type": "string",
             "title": "view_type",
             "description": "\"table\" or \"calendar\", defaults to \"table\""
+          },
+          "layoutJson": {
+            "type": "string",
+            "title": "layout_json",
+            "description": "Extra layout state as a JSON object; empty when unset"
           }
         },
         "title": "TableView",
@@ -10274,6 +10860,22 @@
               "$ref": "#/components/schemas/sickrock.RelationPullThroughField"
             },
             "title": "pull_through_fields"
+          },
+          "absorbIntoItem": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "title": "absorb_into_item",
+            "description": "Absorb settings change only when absorb_into_item is sent (other editors leave them alone)."
+          },
+          "absorbType": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "absorb_type",
+            "description": "\"first_row\" (default)"
           }
         },
         "title": "UpdateTableRelationRequest",
@@ -10321,6 +10923,11 @@
             "type": "string",
             "title": "view_type",
             "description": "\"table\" or \"calendar\", defaults to \"table\""
+          },
+          "layoutJson": {
+            "type": "string",
+            "title": "layout_json",
+            "description": "Optional JSON object with extra layout state (filters, group-by, page size, column priorities)."
           }
         },
         "title": "UpdateTableViewRequest",

@@ -24,14 +24,15 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/sqlite3"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	armstore "github.com/jamesread/armature-iam/store"
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	"github.com/jamesread/SickRock/internal/buildinfo"
 	"github.com/jamesread/SickRock/internal/config"
+	"github.com/jamesread/SickRock/internal/health"
 	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/mcp"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
+	armstore "github.com/jamesread/armature-iam/store"
 )
 
 //go:embed gen/openapi.json
@@ -188,6 +189,10 @@ func main() {
 	loadEnvFile(cfg)
 	configureLogging(cfg)
 
+	// Capture logged errors for the logs.recent_errors health check.
+	errorLog := health.NewErrorLog()
+	log.AddHook(errorLog)
+
 	db, err := repo.ConnectDatabase("file:../tmp/sickrock.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)")
 	if err != nil {
 		log.Fatalf("open db: %v", err)
@@ -231,6 +236,7 @@ func main() {
 
 	go startDeviceCodeCleanupJob(repository)
 	go startRssCalendarFeedRefreshJob(srv)
+	startHealthCheckJob(cfg, repository, iamStore, srv, errorLog)
 
 	jsonOpt := connectproto.WithJSON(
 		protojson.MarshalOptions{
@@ -308,7 +314,9 @@ func main() {
 	router.Static("/screenshots", filepath.Join(frontendDir, "screenshots"))
 
 	router.NoRoute(func(c *gin.Context) {
-		if strings.HasPrefix(c.Request.URL.Path, "/api") {
+		// Missing static assets (e.g. an unknown /assets/hugeicons/<version>/<Name>.json)
+		// must 404 rather than fall back to the SPA page.
+		if strings.HasPrefix(c.Request.URL.Path, "/api") || strings.HasPrefix(c.Request.URL.Path, "/assets/") {
 			c.Status(http.StatusNotFound)
 			return
 		}
@@ -426,6 +434,33 @@ func cleanupDeviceCodes(repository *repo.Repository) {
 	if err := repository.CleanupExpiredDeviceCodes(ctx); err != nil {
 		log.Errorf("Device code cleanup failed: %v", err)
 	}
+}
+
+// startHealthCheckJob creates the health check service, attaches it to the server and runs it
+// in the background (shortly after startup, then every cfg.HealthCheckInterval).
+func startHealthCheckJob(cfg *config.Config, repository *repo.Repository, iamStore armstore.Store, srv *srvpkg.SickRockServer, errorLog *health.ErrorLog) {
+	interval, err := time.ParseDuration(cfg.HealthCheckInterval)
+	if err != nil || interval < time.Minute {
+		log.Warnf("Invalid health_check_interval %q (minimum 1m), using 15m", cfg.HealthCheckInterval)
+		interval = 15 * time.Minute
+	}
+
+	checks := health.DefaultChecks(health.Deps{
+		Repo:     repository,
+		ErrorLog: errorLog,
+		AdminUsesDefaultPassword: func(ctx context.Context) (bool, error) {
+			user, err := iamStore.GetUserByUsername(ctx, "admin")
+			if err != nil || user == nil {
+				return false, nil
+			}
+			return iam.VerifyPassword(user.PasswordHash, "admin")
+		},
+		Getenv:   os.Getenv,
+		LogLevel: cfg.LogLevel,
+	})
+	svc := health.NewService(repository, checks, srv.NotificationService())
+	srv.SetHealthService(svc)
+	go svc.RunPeriodically(time.Minute, interval)
 }
 
 func startRssCalendarFeedRefreshJob(srv *srvpkg.SickRockServer) {

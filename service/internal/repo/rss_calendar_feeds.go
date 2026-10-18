@@ -336,19 +336,19 @@ func scanRssCalendarFeedRow(scanner interface {
 	StructScan(dest interface{}) error
 }) (RssCalendarFeed, error) {
 	var row struct {
-		ID                     int            `db:"id"`
-		Name                   string         `db:"name"`
-		FeedURL                string         `db:"feed_url"`
-		TableConfiguration     string         `db:"table_configuration"`
-		FieldMappingJSON       string         `db:"field_mapping_json"`
-		UniqueColumn           string         `db:"unique_column"`
-		RefreshIntervalMinutes int            `db:"refresh_interval_minutes"`
-		Enabled                int            `db:"enabled"`
-		LastRefreshAt          flexibleTime   `db:"last_refresh_at"`
-		LastRefreshStatus      string         `db:"last_refresh_status"`
-		LastRefreshMessage     string         `db:"last_refresh_message"`
-		LastItemsCreated       int            `db:"last_items_created"`
-		LastItemsUpdated       int            `db:"last_items_updated"`
+		ID                     int          `db:"id"`
+		Name                   string       `db:"name"`
+		FeedURL                string       `db:"feed_url"`
+		TableConfiguration     string       `db:"table_configuration"`
+		FieldMappingJSON       string       `db:"field_mapping_json"`
+		UniqueColumn           string       `db:"unique_column"`
+		RefreshIntervalMinutes int          `db:"refresh_interval_minutes"`
+		Enabled                int          `db:"enabled"`
+		LastRefreshAt          flexibleTime `db:"last_refresh_at"`
+		LastRefreshStatus      string       `db:"last_refresh_status"`
+		LastRefreshMessage     string       `db:"last_refresh_message"`
+		LastItemsCreated       int          `db:"last_items_created"`
+		LastItemsUpdated       int          `db:"last_items_updated"`
 	}
 	if err := scanner.StructScan(&row); err != nil {
 		return RssCalendarFeed{}, err

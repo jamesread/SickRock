@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	"github.com/jamesread/armature-iam/rbac"
-	armstore "github.com/jamesread/armature-iam/store"
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
-	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/audit"
+	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/iam/rolegrants"
 	"github.com/jamesread/SickRock/internal/repo"
+	"github.com/jamesread/armature-iam/rbac"
+	armstore "github.com/jamesread/armature-iam/store"
 )
 
 func iamUserRow(u *armstore.UserAccountRow) *sickrockpb.IamUser {

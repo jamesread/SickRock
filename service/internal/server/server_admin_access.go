@@ -5,17 +5,17 @@ import (
 	"fmt"
 
 	"connectrpc.com/connect"
-	"github.com/jamesread/armature-iam/rbac"
 	"github.com/jamesread/SickRock/internal/audit"
+	"github.com/jamesread/armature-iam/rbac"
 )
 
 var systemSettingsTableConfigurations = map[string]bool{
-	"table_settings":        true,
+	"table_settings":             true,
 	"table_navigation":           true,
 	"table_apps":                 true,
 	"table_app_navigation_links": true,
-	"table_configurations":  true,
-	"table_workflows":       true,
+	"table_configurations":       true,
+	"table_workflows":            true,
 	"table_dashboards":           true,
 	"table_dashboard_components": true,
 	"device_codes":               true,

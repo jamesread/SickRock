@@ -46,7 +46,7 @@ const pullThroughHeaders = computed(() => {
     { key: 'field', label: 'Field on linked row', sortable: false },
   ]
   if (!props.disabled) {
-    headers.push({ key: 'actions', label: '', sortable: false })
+    headers.push({ key: 'actions', label: 'Actions', sortable: false })
   }
   return headers
 })
@@ -57,7 +57,7 @@ const calculatedHeaders = computed(() => {
     { key: 'expr', label: 'Expression', sortable: false },
   ]
   if (!props.disabled) {
-    headers.push({ key: 'actions', label: '', sortable: false })
+    headers.push({ key: 'actions', label: 'Actions', sortable: false })
   }
   return headers
 })

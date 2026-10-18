@@ -29,6 +29,18 @@ const error = ref<string | null>(null)
 const saveMessage = ref<string | null>(null)
 const rows = ref<DisplayRow[]>([])
 
+/** Arrow up/down moves to the same field in the previous/next row, like a spreadsheet. */
+function moveToAdjacentRow(event: KeyboardEvent, direction: -1 | 1) {
+  const input = event.target as HTMLInputElement
+  const row = input.closest('tr')
+  const target = direction < 0 ? row?.previousElementSibling : row?.nextElementSibling
+  const next = target?.querySelector<HTMLInputElement>(`input[data-field="${input.dataset.field}"]`)
+  if (!next) return
+  event.preventDefault()
+  next.focus()
+  next.select()
+}
+
 const tableHeaders = [
   { key: 'columnName', label: 'Column', sortable: true },
   { key: 'displayLabel', label: 'Display label', sortable: false },
@@ -141,13 +153,13 @@ async function save() {
         <code>{{ row.columnName }}</code>
       </template>
       <template #cell-displayLabel="{ row }">
-        <input v-model="row.displayLabel" type="text" class="display-input" :placeholder="row.columnName" :disabled="!designModeEnabled" />
+        <input v-model="row.displayLabel" type="text" class="display-input" data-field="displayLabel" @keydown.down="moveToAdjacentRow($event, 1)" @keydown.up="moveToAdjacentRow($event, -1)" :placeholder="row.columnName" :disabled="!designModeEnabled" />
       </template>
       <template #cell-valuePrefix="{ row }">
-        <input v-model="row.valuePrefix" type="text" class="display-input" placeholder="e.g. {currency} " :disabled="!designModeEnabled" />
+        <input v-model="row.valuePrefix" type="text" class="display-input" data-field="valuePrefix" @keydown.down="moveToAdjacentRow($event, 1)" @keydown.up="moveToAdjacentRow($event, -1)" placeholder="e.g. {currency} " :disabled="!designModeEnabled" />
       </template>
       <template #cell-valueSuffix="{ row }">
-        <input v-model="row.valueSuffix" type="text" class="display-input" placeholder="e.g. / {unit}" :disabled="!designModeEnabled" />
+        <input v-model="row.valueSuffix" type="text" class="display-input" data-field="valueSuffix" @keydown.down="moveToAdjacentRow($event, 1)" @keydown.up="moveToAdjacentRow($event, -1)" placeholder="e.g. / {unit}" :disabled="!designModeEnabled" />
       </template>
     </Table>
   </Section>

@@ -2,25 +2,26 @@
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
-import { DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, HomeIcon, CheckmarkSquare03Icon, BookmarkIcon, QuestionIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
+import { Activity01Icon, DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, HomeIcon, CheckmarkSquare03Icon, BookmarkIcon, QuestionIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
 import { canAccessControlPanel } from './utils/rbacAccess'
 import { createApiClient } from './stores/api'
 import Header from 'picocrank/vue/components/Header.vue'
 import logo from './resources/images/logo.png'
 import QuickSearch from 'picocrank/vue/components/QuickSearch.vue'
-import * as Hugeicons from '@hugeicons/core-free-icons'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 import { create } from '@bufbuild/protobuf'
 import { InitRequestSchema, ItemSchema } from './gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
+import HugeIcon from './components/HugeIcon.vue'
 import { useKeyboardShortcuts, type KeyboardShortcut } from './composables/useKeyboardShortcuts'
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
 import PWAInstallPrompt from './components/PWAInstallPrompt.vue'
 import { usePWAInstall } from './composables/usePWAInstall'
 import { isOnline } from './utils/indexedDB'
 import { resolveNavigationIcon } from './utils/navigationIcon'
-import { pagesFromNavigationItems, registerMainSidebarNavigation } from './utils/registerMainSidebarNavigation'
+import { pagesFromNavigationItems, registerMainSidebarNavigation, updateSidebarHealthLink } from './utils/registerMainSidebarNavigation'
+import { HEALTH_CHANGED_EVENT } from './utils/health'
 import { appTitle, setAppTitle } from './appTitle'
 import { useDesignMode } from './composables/useDesignMode'
 
@@ -140,7 +141,7 @@ const bookmarks = ref<Array<{
 // Pinned workflow in header
 const pinnedWorkflowId = ref<number | null>(null)
 const pinnedWorkflowName = ref<string | null>(null)
-const pinnedWorkflowItems = ref<Array<{ id: number; title: string; path: string; icon: any }>>([])
+const pinnedWorkflowItems = ref<Array<{ id: number; title: string; path: string; iconName?: string; icon: any }>>([])
 
 // Toggle state for bookmark dropdown
 const showBookmarks = ref(false)
@@ -179,12 +180,25 @@ async function handlePWAInstall() {
 // Store navResponse for use in populateQuickSearchItems
 let navResponse: any = null
 
+// Bumped on every repopulate so an icon that loads late never re-adds a stale item.
+let quickSearchGeneration = 0
+
 // Helper function to populate QuickSearch with navigation items
 function populateQuickSearchItems() {
     if (!quickSearch.value || !navResponse) return
 
     // Clear existing items first
     quickSearch.value.clearItems()
+    const generation = ++quickSearchGeneration
+    // Adds the item now with its default icon, and again once a configured icon loads.
+    const addItemWithIcon = (item: Record<string, unknown>, iconCtx: Parameters<typeof resolveNavigationIcon>[0]) => {
+        const icon = resolveNavigationIcon(iconCtx, (loaded) => {
+            if (generation === quickSearchGeneration) {
+                quickSearch.value?.addItem({ ...item, icon: loaded })
+            }
+        })
+        quickSearch.value.addItem({ ...item, icon })
+    }
 
     // Add home link
     quickSearch.value.addItem({
@@ -208,16 +222,10 @@ function populateQuickSearchItems() {
     // Add navigation items (pages) from table_navigation
     pages.value.forEach(pg => {
         const isDashboard = pg.path.startsWith('/dashboard/')
-        const icon = resolveNavigationIcon({
-            icon: pg.icon,
-            workflowId: pg.workflowId,
-            dashboardId: pg.dashboardId,
-            path: pg.path
-        })
         const description = isDashboard
             ? `Dashboard: ${pg.title}`
             : `Table: ${pg.title}`
-        quickSearch.value.addItem({
+        addItemWithIcon({
             id: pg.id,
             name: pg.title,
             title: pg.title,
@@ -225,7 +233,11 @@ function populateQuickSearchItems() {
             category: appCategoryByNavId.get(pg.navigationItemId) ?? 'Ungrouped',
             path: pg.path,
             type: 'route',
-            icon: icon
+        }, {
+            icon: pg.icon,
+            workflowId: pg.workflowId,
+            dashboardId: pg.dashboardId,
+            path: pg.path
         })
     })
 
@@ -243,7 +255,7 @@ function populateQuickSearchItems() {
 
     const navWorkflows = ((navResponse as { workflows?: Array<{ id: number; name?: string; icon?: string; ordinal?: number }> })?.workflows) || []
     for (const wf of [...navWorkflows].sort((a, b) => (a.ordinal ?? 0) - (b.ordinal ?? 0) || String(a.name || '').localeCompare(String(b.name || '')))) {
-        quickSearch.value.addItem({
+        addItemWithIcon({
             id: `workflow-${wf.id}`,
             name: wf.name || `Workflow ${wf.id}`,
             title: wf.name || `Workflow ${wf.id}`,
@@ -251,11 +263,10 @@ function populateQuickSearchItems() {
             category: 'Workflows',
             path: `/workflow/${wf.id}`,
             type: 'route',
-            icon: resolveNavigationIcon({
-                icon: wf.icon,
-                workflowId: wf.id,
-                path: `/workflow/${wf.id}`,
-            }),
+        }, {
+            icon: wf.icon,
+            workflowId: wf.id,
+            path: `/workflow/${wf.id}`,
         })
     }
 
@@ -443,7 +454,7 @@ async function loadAppData() {
                         dashboardId: item.dashboardId,
                         path
                     })
-                    return { id: item.id, title, path, icon }
+                    return { id: item.id, title, path, iconName: item.icon, icon }
                 })
             }
         }
@@ -457,9 +468,12 @@ async function loadAppData() {
                 canAccessControlPanel: canAccessControlPanel(rbacPerms, rbacSuperuser),
                 canSystemSettings,
                 databaseSettingIcon: DatabaseSettingIcon,
+                healthIcon: Activity01Icon,
                 ungroupedItems: navResponse.ungroupedItems,
                 apps: navResponse.apps,
             })
+            canSeeHealth.value = canSystemSettings
+            refreshHealthBadge()
         }
 
         // Populate QuickSearch if available, otherwise it will be populated when component becomes available
@@ -607,7 +621,6 @@ async function checkCanBookmarkCurrentPage() {
         }
 
         canBookmarkCurrentPage.value = !!matchingItem
-        console.log('[Bookmarks] Can bookmark current page:', canBookmarkCurrentPage.value, 'for path:', currentPath, 'matching item:', matchingItem)
     } catch (e) {
         console.warn('Failed to check if current page can be bookmarked:', e)
         canBookmarkCurrentPage.value = false
@@ -976,14 +989,32 @@ const handleAnyKeyAfterG = (e: KeyboardEvent) => {
     }
 }
 
+// Sidebar System → Health badge: open, unacknowledged warnings and errors (admins only).
+const canSeeHealth = ref(false)
+
+async function refreshHealthBadge() {
+    if (!canSeeHealth.value || !navigation.value) return
+    try {
+        const summary = await apiClient.getHealthSummary({})
+        updateSidebarHealthLink(navigation.value, Activity01Icon, summary.errors + summary.warnings)
+    } catch (error) {
+        console.warn('Failed to load health summary:', error)
+    }
+}
+
+onMounted(() => window.addEventListener(HEALTH_CHANGED_EVENT, refreshHealthBadge))
+onUnmounted(() => window.removeEventListener(HEALTH_CHANGED_EVENT, refreshHealthBadge))
+
+// Refresh header when pinned workflow changes (e.g., from HomeView): re-fetch navigation to
+// rebuild pinnedWorkflow state. A named function so the same listener can be removed.
+function handlePinnedWorkflowChanged() {
+    loadAppData()
+}
+
 // Global listeners
 onMounted(() => {
     window.addEventListener('keydown', handleAnyKeyAfterG)
-    // Refresh header when pinned workflow changes (e.g., from HomeView)
-    window.addEventListener('pinned-workflow-changed', () => {
-        // Re-fetch navigation to rebuild pinnedWorkflow state
-        loadAppData()
-    })
+    window.addEventListener('pinned-workflow-changed', handlePinnedWorkflowChanged)
 
     // Listen for online/offline events
     const handleOnline = () => {
@@ -1010,9 +1041,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener('keydown', handleAnyKeyAfterG)
-    window.removeEventListener('pinned-workflow-changed', () => {
-        loadAppData()
-    })
+    window.removeEventListener('pinned-workflow-changed', handlePinnedWorkflowChanged)
 })
 
 useKeyboardShortcuts(shortcuts)
@@ -1073,8 +1102,9 @@ onMounted(async () => {
                                         class="bookmark-toolbar-item"
                                         :title="item.title"
                                     >
-                                        <HugeiconsIcon
-                                            :icon="item.icon"
+                                        <HugeIcon
+                                            :name="item.iconName"
+                                            :fallback="item.icon"
                                             class="bookmark-toolbar-icon"
                                         />
                                         <span class="bookmark-toolbar-text">
@@ -1091,7 +1121,7 @@ onMounted(async () => {
                                 class="neutral pwa-install-header-button"
                                 :title="installingPWA ? 'Installing...' : 'Install App'"
                             >
-                                <HugeiconsIcon :icon="Hugeicons.Download01Icon" width="1em" height="1em" />
+                                <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" />
                             </button>
                             <button
                                 type="button"
@@ -1109,7 +1139,7 @@ onMounted(async () => {
                                 class="neutral help-button"
                                 title="Keyboard Shortcuts (g then ?)"
                             >
-                                <HugeiconsIcon :icon="Hugeicons.QuestionIcon" width="1em" height="1em" />
+                                <HugeiconsIcon :icon="QuestionIcon" width="1em" height="1em" />
                             </button>
                             <button
                                 @click="showBookmarks = !showBookmarks"
@@ -1117,7 +1147,7 @@ onMounted(async () => {
                                 :class="{ 'bookmarked': isCurrentPageBookmarked }"
                                 :title="isCurrentPageBookmarked ? 'Remove bookmark' : 'Add bookmark'"
                             >
-                                <HugeiconsIcon :icon="Hugeicons.CheckmarkSquare03Icon" width="1em" height="1em" />
+                                <HugeiconsIcon :icon="CheckmarkSquare03Icon" width="1em" height="1em" />
                             </button>
                         </div>
                     </template>
@@ -1178,7 +1208,7 @@ onMounted(async () => {
                             @click="toggleCurrentPageBookmark"
                             class="button good bookmark-this-page-button"
                         >
-                            <HugeiconsIcon :icon="Hugeicons.BookmarkIcon" />
+                            <HugeiconsIcon :icon="BookmarkIcon" />
                             Bookmark this page
                         </button>
                     </div>
@@ -1202,10 +1232,9 @@ onMounted(async () => {
                                 :title="bookmark.title || bookmark.navigationItem?.tableName"
                                 @click="showBookmarks = false"
                             >
-                                <HugeiconsIcon
-                                    :icon="(bookmark.navigationItem?.icon && (Hugeicons as any)[bookmark.navigationItem.icon])
-                                        ? (Hugeicons as any)[bookmark.navigationItem.icon]
-                                        : DatabaseIcon"
+                                <HugeIcon
+                                    :name="bookmark.navigationItem?.icon"
+                                    :fallback="DatabaseIcon"
                                     class="bookmark-toolbar-icon"
                                 />
                                 <span class="bookmark-toolbar-text">
@@ -1217,7 +1246,7 @@ onMounted(async () => {
                                 class="bookmark-delete-button"
                                 :title="'Remove bookmark'"
                             >
-                                <HugeiconsIcon :icon="Hugeicons.Delete01Icon" />
+                                <HugeiconsIcon :icon="Delete01Icon" />
                             </button>
                         </div>
                     </div>

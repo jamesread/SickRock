@@ -1,11 +1,16 @@
 package rsscalendar
 
 import (
+	"errors"
 	"fmt"
 	"strings"
+	// Embed the IANA timezone database so TZID=Europe/London etc. resolve in
+	// minimal container images that do not ship /usr/share/zoneinfo.
+	_ "time/tzdata"
 
 	ics "github.com/arran4/golang-ical"
 	"github.com/mmcdole/gofeed"
+	log "github.com/sirupsen/logrus"
 )
 
 func isICalendar(contentType string, body []byte) bool {
@@ -66,9 +71,13 @@ func icalEventToItem(event *ics.VEvent) *gofeed.Item {
 		item.PublishedParsed = &t
 		item.Published = formatTime(t)
 		item.Custom["startDate"] = formatTime(t)
+	} else {
+		log.WithError(err).WithField("uid", item.GUID).Warn("RSS calendar: could not parse event DTSTART")
 	}
 	if end, err := event.GetEndAt(); err == nil {
 		item.Custom["endDate"] = formatTime(end.UTC())
+	} else if !errors.Is(err, ics.ErrPropertyNotFound) {
+		log.WithError(err).WithField("uid", item.GUID).Warn("RSS calendar: could not parse event DTEND")
 	}
 	if modified, err := event.GetLastModifiedAt(); err == nil {
 		t := modified.UTC()

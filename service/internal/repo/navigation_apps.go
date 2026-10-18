@@ -7,9 +7,9 @@ import (
 
 // NavigationApp groups sidebar navigation links under a titled section.
 type NavigationApp struct {
-	ID       int
-	Title    string
-	Ordinal  int
+	ID        int
+	Title     string
+	Ordinal   int
 	MemberIDs []int // navigation_item_id in display order (app_navigation_links.ordinal)
 }
 

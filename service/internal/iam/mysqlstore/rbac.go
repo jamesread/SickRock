@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/jamesread/armature-iam/rbac"
 	"github.com/jamesread/SickRock/internal/iam/systemroles"
+	"github.com/jamesread/armature-iam/rbac"
 	"github.com/jamesread/armature-iam/store"
 )
 

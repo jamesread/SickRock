@@ -46,7 +46,9 @@ func TestUpdateTableRelationPullThrough(t *testing.T) {
 			on_delete_action TEXT NOT NULL DEFAULT 'NO ACTION',
 			on_update_action TEXT NOT NULL DEFAULT 'NO ACTION',
 			display_name TEXT,
-			pull_through_json TEXT
+			pull_through_json TEXT,
+			absorb_into_item INTEGER NOT NULL DEFAULT 0,
+			absorb_type TEXT
 		);
 		INSERT INTO table_relations (
 			constraint_name, source_table_key, source_column,

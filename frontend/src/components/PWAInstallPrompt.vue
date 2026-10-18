@@ -3,7 +3,6 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { usePWAInstall } from '../composables/usePWAInstall'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Download01Icon } from '@hugeicons/core-free-icons'
-import * as Hugeicons from '@hugeicons/core-free-icons'
 
 const { isInstallable, isInstalled, promptInstall } = usePWAInstall()
 
@@ -87,7 +86,7 @@ function handleDismiss() {
   <div v-if="shouldShowPrompt" class="pwa-install-prompt">
     <div class="pwa-install-content">
       <div class="pwa-install-icon">
-        <HugeiconsIcon :icon="Hugeicons.Download01Icon" />
+        <HugeiconsIcon :icon="Download01Icon" />
       </div>
       <div class="pwa-install-text">
         <h3>Install SickRock</h3>

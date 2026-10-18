@@ -431,11 +431,14 @@ message CreateTableViewRequest {
   string view_name = 2;
   repeated TableViewColumn columns = 3;
   string view_type = 4; // "table" or "calendar", defaults to "table"
+  // Optional JSON object with extra layout state (filters, group-by, page size, column priorities).
+  string layout_json = 5;
 }
 
 message CreateTableViewResponse {
   bool success = 1;
   string message = 2;
+  int32 view_id = 3; // ID of the created view (when success)
 }
 
 message UpdateTableViewRequest {
@@ -444,6 +447,8 @@ message UpdateTableViewRequest {
   string view_name = 3;
   repeated TableViewColumn columns = 4;
   string view_type = 5; // "table" or "calendar", defaults to "table"
+  // Optional JSON object with extra layout state (filters, group-by, page size, column priorities).
+  string layout_json = 6;
 }
 
 message UpdateTableViewResponse {
@@ -462,11 +467,81 @@ message TableView {
   bool is_default = 4;
   repeated TableViewColumn columns = 5;
   string view_type = 6; // "table" or "calendar", defaults to "table"
+  string layout_json = 7; // Extra layout state as a JSON object; empty when unset
 }
 
 message GetTableViewsResponse {
   repeated TableView views = 1;
+  int32 user_default_view_id = 2; // The calling user's own default view for this table; 0 when unset
 }
+
+// Health checks (see service/internal/health). Admins only (system.settings).
+message HealthIssue {
+  int64 id = 1;
+  string check_id = 2;
+  string check_title = 3;
+  string issue_key = 4;
+  string severity = 5; // "info", "warning" or "error"
+  string title = 6;
+  string detail = 7;
+  string link = 8; // Frontend path where the problem can be fixed; empty when none
+  int64 first_seen_unix = 9;
+  int64 last_seen_unix = 10;
+  int32 occurrences = 11;
+  int64 resolved_at_unix = 12; // 0 while open
+  int64 acknowledged_at_unix = 13; // 0 when not acknowledged
+}
+
+message HealthCheckStatus {
+  string check_id = 1;
+  string title = 2;
+  int64 last_run_unix = 3; // 0 when the check has not run yet
+  int64 duration_ms = 4;
+  string status = 5; // "ok", "failed" or "pending"
+  string error = 6;
+}
+
+message ListHealthIssuesRequest {
+  bool include_resolved = 1;
+  bool include_acknowledged = 2;
+}
+
+message ListHealthIssuesResponse {
+  repeated HealthIssue issues = 1;
+  repeated HealthCheckStatus checks = 2;
+}
+
+// Counts of open, unacknowledged issues (for the sidebar badge).
+message GetHealthSummaryRequest {}
+
+message GetHealthSummaryResponse {
+  int32 errors = 1;
+  int32 warnings = 2;
+  int32 infos = 3;
+}
+
+message RunHealthChecksRequest {
+  string check_id = 1; // Empty runs every check
+}
+
+message RunHealthChecksResponse {
+  repeated HealthCheckStatus checks = 1;
+}
+
+message AcknowledgeHealthIssueRequest {
+  int64 id = 1;
+  bool acknowledged = 2; // false un-acknowledges
+}
+
+message AcknowledgeHealthIssueResponse {}
+
+// Sets (or with view_id 0, clears) the calling user's own default view for a table.
+message SetUserDefaultTableViewRequest {
+  string table_name = 1;
+  int32 view_id = 2;
+}
+
+message SetUserDefaultTableViewResponse {}
 
 message DeleteTableViewRequest {
   int32 view_id = 1;
@@ -491,6 +566,8 @@ message ForeignKey {
   string display_name = 10; // Optional friendly label for UI (table_relations.display_name)
   int32 relation_id = 11; // SickRock table_relations.id (stable system identifier)
   repeated RelationPullThroughField pull_through_fields = 12;
+  bool absorb_into_item = 13; // Show related rows inside the item view instead of their own section
+  string absorb_type = 14; // "first_row" when absorb_into_item is set
 }
 
 message RelationPullThroughField {
@@ -504,6 +581,9 @@ message UpdateTableRelationRequest {
   string constraint_name = 1;
   string display_name = 2;
   repeated RelationPullThroughField pull_through_fields = 3;
+  // Absorb settings change only when absorb_into_item is sent (other editors leave them alone).
+  optional bool absorb_into_item = 4;
+  optional string absorb_type = 5; // "first_row" (default)
 }
 
 message UpdateTableRelationResponse {
@@ -1379,6 +1459,13 @@ service SickRock {
   rpc UpdateTableView(UpdateTableViewRequest) returns (UpdateTableViewResponse);
   rpc GetTableViews(GetTableViewsRequest) returns (GetTableViewsResponse);
   rpc DeleteTableView(DeleteTableViewRequest) returns (DeleteTableViewResponse);
+  rpc SetUserDefaultTableView(SetUserDefaultTableViewRequest) returns (SetUserDefaultTableViewResponse);
+
+  // Health checks (admins only)
+  rpc ListHealthIssues(ListHealthIssuesRequest) returns (ListHealthIssuesResponse);
+  rpc GetHealthSummary(GetHealthSummaryRequest) returns (GetHealthSummaryResponse);
+  rpc RunHealthChecks(RunHealthChecksRequest) returns (RunHealthChecksResponse);
+  rpc AcknowledgeHealthIssue(AcknowledgeHealthIssueRequest) returns (AcknowledgeHealthIssueResponse);
 
   // Foreign Key Management
   rpc CreateForeignKey(CreateForeignKeyRequest) returns (CreateForeignKeyResponse);

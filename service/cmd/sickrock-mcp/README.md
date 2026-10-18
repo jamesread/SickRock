@@ -56,7 +56,7 @@ Use the full path to the `sickrock-mcp` binary. Restart Cursor (or reload MCP) a
 | `sickrock_get_table_configurations` | List table configurations (pages) |
 | `sickrock_get_database_tables` | List tables in a database (`database` name required) |
 | `sickrock_get_table_structure` | Fields, types, foreign keys for a table (`page_id` required) |
-| `sickrock_list_items` | List items from a table (`tc_name`; optional `where` JSON) |
+| `sickrock_list_items` | List items from a table (`tc_name`; optional `where` JSON; optional `include_tick_state` adds `completed` per item) |
 | `sickrock_get_item` | Get one item by `page_id` and `id` |
 | `sickrock_create_item` | Create item; `page_id` and `additional_fields` (JSON) |
 | `sickrock_edit_item` | Update item; `page_id`, `id`, `additional_fields` (JSON) |

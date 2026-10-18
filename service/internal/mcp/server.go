@@ -11,9 +11,9 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
 
-	armlayer "github.com/jamesread/armature-iam/layer"
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
+	armlayer "github.com/jamesread/armature-iam/layer"
 )
 
 // NewHandler returns an http.Handler that serves the MCP Streamable HTTP endpoint.
@@ -66,6 +66,7 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		mcp.WithDescription("List items from a table. tc_name is the table configuration name (e.g. from get_table_configurations). Optionally pass where as JSON object of column->value for exact-match filters."),
 		mcp.WithString("tc_name", mcp.Required(), mcp.Description("Table configuration name")),
 		mcp.WithString("where", mcp.Description("Optional JSON object of column name to value for filtering, e.g. {\"status\":\"active\"}")),
+		mcp.WithBoolean("include_tick_state", mcp.Description("Optional. When true, adds a boolean \"completed\" to each item from the table's tick list state (as shown in Tick List views).")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return handleListItems(ctx, srv, req)
 	})
@@ -136,9 +137,9 @@ func handleGetNavigation(ctx context.Context, srv *srvpkg.SickRockServer, req mc
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	out := struct {
-		Items     []*sickrockpb.NavigationItem   `json:"items"`
-		Bookmarks []*sickrockpb.UserBookmark    `json:"bookmarks"`
-		Workflows []*sickrockpb.Workflow        `json:"workflows"`
+		Items     []*sickrockpb.NavigationItem `json:"items"`
+		Bookmarks []*sickrockpb.UserBookmark   `json:"bookmarks"`
+		Workflows []*sickrockpb.Workflow       `json:"workflows"`
 	}{res.Msg.GetItems(), res.Msg.GetBookmarks(), res.Msg.GetWorkflows()}
 	return jsonResult(out)
 }
@@ -198,7 +199,25 @@ func handleListItems(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Ca
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	return jsonResult(map[string]any{"items": res.Msg.GetItems()})
+	if !req.GetBool("include_tick_state", false) {
+		return jsonResult(map[string]any{"items": res.Msg.GetItems()})
+	}
+	tickRes, err := srv.GetTickListState(ctx, connect.NewRequest(&sickrockpb.GetTickListStateRequest{TcName: tcName}))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	completedByID := tickRes.Msg.GetCompletedByItemId()
+	items := make([]itemWithTickState, 0, len(res.Msg.GetItems()))
+	for _, item := range res.Msg.GetItems() {
+		items = append(items, itemWithTickState{Item: item, Completed: completedByID[item.GetId()]})
+	}
+	return jsonResult(map[string]any{"items": items})
+}
+
+// itemWithTickState is a list item plus its tick list completion state (tick_list_state is keyed by item id).
+type itemWithTickState struct {
+	*sickrockpb.Item
+	Completed bool `json:"completed"`
 }
 
 func handleGetItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

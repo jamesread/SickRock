@@ -8,18 +8,19 @@ import InsertRow from '../components/InsertRow.vue'
 import {
   applyViewToInsertFieldDefs,
   fieldDefsForInsertForm,
+  type InsertFieldDef,
 } from '../utils/insertRowViewFields'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
-import { tableListLinkLabel } from '../utils/rowInsertLabel'
+import { rowInsertActionLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
 
 const route = useRoute()
 const router = useRouter()
 const tableId = route.params.tableName as string
-const fieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const fieldDefs = ref<InsertFieldDef[]>([])
 const initialValues = ref<Record<string, string> | null>(null)
-const displayFieldDefs = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const displayFieldDefs = ref<InsertFieldDef[]>([])
 const selectedDate = ref<string | null>(null)
 const createButtonText = ref<string>('Insert Row')
 const tableRowName = ref<string | null>(null)
@@ -63,6 +64,7 @@ onMounted(async () => {
       name: f.name,
       type: f.type,
       required: !!f.required,
+      displayLabel: f.displayLabel ?? '',
     }))
 
     // Load views for selector and initialize selection
@@ -89,10 +91,8 @@ onMounted(async () => {
 
     applyViewToFields()
 
-    // Set the create button text as the title
-    if (res.CreateButtonText) {
-      createButtonText.value = res.CreateButtonText
-    }
+    // Same label as the table toolbar's create button (e.g. "Create Setting")
+    createButtonText.value = rowInsertActionLabel(res.rowName)
 
     // Get date parameter from URL
     const dateParam = route.query.date as string

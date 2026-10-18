@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { IconData } from '../utils/hugeicons'
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import Section from 'picocrank/vue/components/Section.vue'
@@ -50,6 +51,9 @@ import { findFieldDef } from '../utils/fieldTypes'
 import { isPullThroughColumn, isRelationSyntheticColumn } from '../utils/relationPullThrough'
 import { enrichTableItemsWithRelationExtras } from '../utils/tableRelationExtraColumns'
 import { urlConditionalFormatLink } from '../utils/conditionalFormattingUrl'
+import { initialTableView, parseViewLayout, tableViewFromProto } from '../utils/serverTableViews'
+import { useServerTableViewSettings } from '../composables/useServerTableViewSettings'
+import { useTableAccess } from '../composables/useTableAccess'
 
 const { designModeEnabled } = useDesignMode()
 
@@ -108,6 +112,10 @@ const props = defineProps<{
   insertRouteOverride?: string | { path: string; query?: Record<string, string> }
   /** Synthetic columns (e.g. relation pull-through); forced visible when embedded. */
   extraFields?: Field[]
+  /** Icon for the section title (defaults to DatabaseIcon). */
+  sectionIcon?: IconData
+  /** Server-side exact-match filters (column → value), e.g. "view all related rows" links. */
+  where?: Record<string, string>
 }>()
 
 const wrapInSection = computed(() => props.wrapInSection !== false)
@@ -258,9 +266,11 @@ const tableToolbarBindings = computed(() => ({
 }))
 
 // Server table views remain the source of truth. PicoCrank changes the
-// controlled state below for this component session only.
+// controlled state below for this component session only; views saved from
+// PicoCrank's view menu go to the server (see useServerTableViewSettings).
 const tableViews = ref<TableView[]>([])
 const selectedViewId = ref<number | null>(null)
+const userDefaultViewId = ref(0)
 const currentView = computed(() => (
   tableViews.value.find(view => view.id === selectedViewId.value) ?? null
 ))
@@ -286,6 +296,8 @@ const sortBy = ref<string | null>(null)
 const sortDir = ref<SortDirection>('asc')
 const page = ref(1)
 const pageSize = ref(10)
+const groupBy = ref<string | null>(null)
+const columnPriorities = ref<Record<string, number | null>>({})
 const selectedKeys = ref<string[]>([])
 const multiSelectEnabled = ref(false)
 const activeCell = ref<ActiveCell>(null)
@@ -301,7 +313,8 @@ const tableHeaders = computed(() => [
   ...buildTableHeaders(fieldDefs.value, currentView.value),
   {
     key: ACTIONS_COLUMN,
-    label: '',
+    // PicoCrank shows the key when the label is empty, so give the column a real heading.
+    label: 'Actions',
     sortable: false,
     filterable: false,
     hideable: false,
@@ -352,6 +365,36 @@ watch(
   { immediate: true },
 )
 
+// Filters, group-by, page size and column priorities saved with a view (layout_json).
+// Applied only when the selected view changes, so structure reloads keep the user's filters.
+function applyViewLayout() {
+  const layout = parseViewLayout(currentView.value?.layoutJson)
+  tableFilters.value = layout.filters ?? {}
+  groupBy.value = layout.groupBy ?? null
+  columnPriorities.value = layout.columnPriorities ?? {}
+  if (layout.pageSize) {
+    pageSize.value = layout.pageSize
+  }
+  page.value = 1
+}
+
+watch(
+  [() => selectedViewId.value, () => currentView.value?.layoutJson ?? ''],
+  applyViewLayout,
+)
+
+const { access: tableAccess } = useTableAccess(props.tableId)
+const serverViewSettings = useServerTableViewSettings({
+  client,
+  tableId: () => props.tableId,
+  views: tableViews,
+  userDefaultViewId,
+  fieldNames: () => mapTableView(fieldDefs.value, null).orderedColumns,
+  canEdit: () => tableAccess.value.canEdit,
+  reload: loadTableViews,
+  select: selectView,
+})
+
 function onColumnVisibilityUpdate(value: Record<string, boolean>) {
   columnVisibility.value = { ...value, [ACTIONS_COLUMN]: true }
 }
@@ -376,23 +419,10 @@ function onActiveCellUpdate(value: ActiveCell) {
 async function loadTableViews() {
   try {
     const response = await client.getTableViews({ tableName: props.tableId })
-    tableViews.value = response.views.map(view => ({
-      id: view.id,
-      tableName: view.tableName,
-      viewName: view.viewName,
-      isDefault: view.isDefault,
-      viewType: view.viewType || 'table',
-      columns: view.columns.map(column => ({
-        columnName: column.columnName,
-        isVisible: column.isVisible,
-        columnOrder: column.columnOrder,
-        sortOrder: column.sortOrder,
-      })),
-    }))
+    tableViews.value = response.views.map(tableViewFromProto)
+    userDefaultViewId.value = response.userDefaultViewId
 
-    const fallback = tableViews.value.find(view => view.isDefault)
-      ?? tableViews.value[0]
-      ?? null
+    const fallback = initialTableView(tableViews.value, userDefaultViewId.value)
     const hasValidSelection = selectedViewId.value === -1
       || (
         selectedViewId.value !== null
@@ -475,7 +505,7 @@ async function load() {
   error.value = null
   const fields = tableStructure.value?.fields ?? fieldDefs.value
   const canCacheOffline = hasUuidColumn(fields)
-  const emptyWhere: Record<string, string> = {}
+  const emptyWhere: Record<string, string> = { ...(props.where ?? {}) }
 
   try {
     if (!isOnline() && canCacheOffline) {
@@ -489,8 +519,8 @@ async function load() {
       return
     }
 
-    // Keep the initial request unfiltered. PicoCrank owns filtering over the
-    // complete local row set, including rows loaded from the offline cache.
+    // Only the optional `where` prop filters on the server. PicoCrank owns any other
+    // filtering over the complete local row set, including rows from the offline cache.
     const response = await client.listItems({ tcName: props.tableId, where: emptyWhere })
     let loaded = Array.isArray(response.items) ? response.items : []
     loaded = await applySourceRelationExtras(loaded)
@@ -518,6 +548,13 @@ watch(
   () => props.items,
   (value, previous) => {
     if (value === undefined && previous !== undefined) void load()
+  },
+)
+
+watch(
+  () => JSON.stringify(props.where ?? {}),
+  (value, previous) => {
+    if (value !== previous && props.items === undefined) void load()
   },
 )
 
@@ -912,16 +949,15 @@ const quickAddFieldDefs = computed(() => applyViewToInsertFieldDefs(
     name: field.name,
     type: field.type,
     required: field.required,
+    displayLabel: field.displayLabel,
   }))),
   tableViews.value,
   quickAddSelectedViewId.value,
 ))
 
 function openQuickAddDialog() {
-  const defaultView = tableViews.value.find(view => view.isDefault)
   quickAddSelectedViewId.value = selectedViewId.value
-    ?? defaultView?.id
-    ?? tableViews.value[0]?.id
+    ?? initialTableView(tableViews.value, userDefaultViewId.value)?.id
     ?? -1
   showQuickAddDialog.value = true
   setTimeout(() => {
@@ -1137,7 +1173,7 @@ onUnmounted(() => {
   <Section
     v-if="useOwnSection"
     :title="sectionTitle"
-    :icon="DatabaseIcon"
+    :icon="sectionIcon ?? DatabaseIcon"
     :padding="false"
   >
     <template v-if="showToolbar" #toolbar>
@@ -1179,6 +1215,10 @@ onUnmounted(() => {
           :show-pagination="showPagination"
           :reset-page-on-sort="false"
           :load-saved-layout="false"
+          view-control-mode="callbackControlled"
+          :view-settings="serverViewSettings"
+          :group-by="groupBy"
+          :column-priorities="columnPriorities"
           :column-options="true"
           :cell-style="cellStyle"
           :selectable="multiSelectEnabled"
@@ -1190,6 +1230,8 @@ onUnmounted(() => {
           @update:sort-dir="sortDir = $event"
           @update:page="page = $event"
           @update:page-size="pageSize = $event"
+          @update:group-by="groupBy = $event"
+          @update:column-priorities="columnPriorities = $event"
           @update:selected-keys="onSelectedKeysUpdate"
           @update:active-cell="onActiveCellUpdate"
         >
@@ -1491,6 +1533,10 @@ onUnmounted(() => {
           :show-pagination="showPagination"
           :reset-page-on-sort="false"
           :load-saved-layout="false"
+          view-control-mode="callbackControlled"
+          :view-settings="serverViewSettings"
+          :group-by="groupBy"
+          :column-priorities="columnPriorities"
           :column-options="true"
           :cell-style="cellStyle"
           :selectable="multiSelectEnabled"
@@ -1502,6 +1548,8 @@ onUnmounted(() => {
           @update:sort-dir="sortDir = $event"
           @update:page="page = $event"
           @update:page-size="pageSize = $event"
+          @update:group-by="groupBy = $event"
+          @update:column-priorities="columnPriorities = $event"
           @update:selected-keys="onSelectedKeysUpdate"
           @update:active-cell="onActiveCellUpdate"
         >
@@ -2043,29 +2091,6 @@ onUnmounted(() => {
   .section-content,
   .table-host {
     max-width: 100%;
-  }
-
-  .ss-large,
-  .quick-add-text {
-    display: none;
-  }
-
-  .insert-button-group {
-    flex-direction: row;
-  }
-
-  .insert-button {
-    padding-right: 0.5rem;
-    border-right: 0;
-    border-top-right-radius: 0;
-    border-bottom-right-radius: 0;
-  }
-
-  .quick-add-button {
-    padding-left: 0.5rem;
-    border-left: 0;
-    border-top-left-radius: 0;
-    border-bottom-left-radius: 0;
   }
 
   .selection-controls {

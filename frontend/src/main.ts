@@ -23,11 +23,8 @@ const authStore = useAuthStore()
 // Call init API first - this is the first API call the app makes
 async function initializeApp() {
   try {
-    console.log('Initializing app...')
     const apiClient = createApiClient()
-    console.log('Calling init API...')
     const initResponse = await apiClient.init(create(InitRequestSchema, {}))
-    console.log('Init API response received:', initResponse)
 
     // Store init response for reuse in App.vue
     authStore.setInitResponse(initResponse)
@@ -54,13 +51,11 @@ async function initializeApp() {
 initializeApp()
   .then(() => {
     // Mount app after initialization completes
-    console.log('Mounting app...')
     app.mount('#app')
   })
   .catch((error) => {
     console.error('Unhandled error during initialization:', error)
     // Still mount the app even if initialization fails completely
-    console.log('Mounting app despite initialization error...')
     app.mount('#app')
   })
 
@@ -70,7 +65,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then((registration) => {
-        console.log('SW registered: ', registration);
 
         // Monitor for service worker errors and updates
         registration.addEventListener('updatefound', () => {
@@ -92,7 +86,7 @@ if ('serviceWorker' in navigator) {
         // Unregister any existing service workers to prevent blank pages
         navigator.serviceWorker.getRegistrations().then((registrations) => {
           registrations.forEach((registration) => {
-            console.log('Unregistering existing service worker due to registration failure');
+            console.warn('Unregistering existing service worker due to registration failure');
             registration.unregister().catch((err) => {
               console.warn('Failed to unregister service worker:', err);
             });

@@ -2,7 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import * as Hugeicons from '@hugeicons/core-free-icons'
+import { Download01Icon, SettingsIcon } from '@hugeicons/core-free-icons'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
@@ -26,7 +26,6 @@ async function loadPreferences() {
   error.value = null
   try {
     // TODO: Implement actual preferences loading from API
-    console.log('Loading user preferences...')
   } catch (e: any) {
     error.value = String(e?.message || e)
   } finally {
@@ -37,7 +36,6 @@ async function loadPreferences() {
 async function savePreferences() {
   try {
     // TODO: Implement actual preferences saving to API
-    console.log('Saving preferences:', preferences.value)
   } catch (e: any) {
     error.value = String(e?.message || e)
   }
@@ -49,7 +47,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Section title="User Preferences" :icon="Hugeicons.SettingsIcon">
+  <Section title="User Preferences" :icon="SettingsIcon">
     <div v-if="loading" class="muted">Loading preferences…</div>
     <template v-else>
       <NotificationBlock v-if="error" type="error" :message="error" />
@@ -95,7 +93,7 @@ onMounted(async () => {
       <h3 class="subsection-title">PWA & Service Worker</h3>
       <p class="section-hint">Manage Progressive Web App installation and service worker status.</p>
       <router-link to="/admin/pwa-installation" class="button inline-icon good">
-        <HugeiconsIcon :icon="Hugeicons.Download01Icon" width="1em" height="1em" />
+        <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" />
         <span>Open PWA Installation & Service Worker</span>
       </router-link>
     </template>

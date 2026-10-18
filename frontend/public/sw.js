@@ -17,6 +17,9 @@ const SCOPE_PATH = (() => {
 
 const CACHE_NAME = `sickrock-${CACHE_VERSION}-${SCOPE_PATH}`;
 const STATIC_CACHE_NAME = `sickrock-static-${CACHE_VERSION}-${SCOPE_PATH}`;
+// Per-icon JSON files (/assets/hugeicons/<version>/<Name>.json). The paths are versioned
+// and never change, so they are served cache-first.
+const HUGEICONS_CACHE_NAME = `sickrock-hugeicons-${CACHE_VERSION}-${SCOPE_PATH}`;
 
 // Routes that should be cached for offline use (table views only)
 const CACHEABLE_ROUTES = [
@@ -45,6 +48,34 @@ const BYPASS_PATHS = [
 function shouldBypass(url) {
   const urlPath = new URL(url).pathname;
   return BYPASS_PATHS.includes(urlPath);
+}
+
+// Icon files only; the picker's catalog.json always comes from the network.
+function isHugeiconFile(url) {
+  const urlPath = new URL(url).pathname;
+  return urlPath.startsWith('/assets/hugeicons/') && urlPath.endsWith('.json') && !urlPath.endsWith('/catalog.json');
+}
+
+// Cache-first for icon files. Network failures are passed through to the page (which
+// shows a default icon and retries later) rather than answered with stand-in data.
+function respondWithHugeicon(request) {
+  return caches.open(HUGEICONS_CACHE_NAME)
+    .then((cache) => cache.match(request).then((cached) => ({ cache, cached })))
+    .catch(() => ({ cache: null, cached: null }))
+    .then(({ cache, cached }) => {
+      if (cached) {
+        return cached;
+      }
+      return fetch(request).then((response) => {
+        const isJson = (response?.headers.get('Content-Type') || '').includes('application/json');
+        if (cache && response && response.status === 200 && response.type === 'basic' && isJson) {
+          cache.put(request, response.clone()).catch(err => {
+            console.warn('Failed to cache icon:', err);
+          });
+        }
+        return response;
+      });
+    });
 }
 
 // Check if a URL should be cached
@@ -129,7 +160,7 @@ self.addEventListener('activate', (event) => {
     .then((cacheNames) => {
       return Promise.allSettled(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME) {
+          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME && cacheName !== HUGEICONS_CACHE_NAME) {
             console.log('Deleting old cache:', cacheName);
             return caches.delete(cacheName).catch(err => {
               console.warn(`Failed to delete cache ${cacheName}:`, err);
@@ -183,6 +214,11 @@ self.addEventListener('fetch', (event) => {
 
   // Don't cache API requests - table data is handled via IndexedDB
   if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  if (isHugeiconFile(event.request.url)) {
+    event.respondWith(respondWithHugeicon(event.request));
     return;
   }
 

@@ -1,6 +1,7 @@
 import { ref, computed, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
+import { initialTableView, tableViewFromProto } from '../utils/serverTableViews'
 
 export type TableView = {
   id: number
@@ -8,6 +9,8 @@ export type TableView = {
   viewName: string
   isDefault: boolean
   viewType: string
+  /** Extra layout state (filters, group-by, page size, column priorities) as JSON; empty when unset. */
+  layoutJson?: string
   columns: Array<{
     columnName: string
     isVisible: boolean
@@ -51,22 +54,10 @@ export function useTableViewManager(tableId: string, onViewChange?: (view: Table
   async function loadTableViews() {
     try {
       const response = await client.getTableViews({ tableName: tableId })
-      tableViews.value = response.views.map(view => ({
-        id: view.id,
-        tableName: view.tableName,
-        viewName: view.viewName,
-        isDefault: view.isDefault,
-        viewType: view.viewType || 'table', // Default to "table" if not set
-        columns: view.columns.map(col => ({
-          columnName: col.columnName,
-          isVisible: col.isVisible,
-          columnOrder: col.columnOrder,
-          sortOrder: col.sortOrder
-        }))
-      }))
+      tableViews.value = response.views.map(tableViewFromProto)
 
-      // Find default view or first view
-      const defaultView = tableViews.value.find(v => v.isDefault) || (tableViews.value.length > 0 ? tableViews.value[0] : null)
+      // The user's own default view, then the table default, then the first view
+      const defaultView = initialTableView(tableViews.value, response.userDefaultViewId)
 
       // Only select default view if no view is currently selected
       // This prevents overriding user's selection when component remounts

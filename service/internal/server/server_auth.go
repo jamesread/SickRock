@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	armlayer "github.com/jamesread/armature-iam/layer"
 	"github.com/google/uuid"
+	armlayer "github.com/jamesread/armature-iam/layer"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/audit"
@@ -34,12 +34,12 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 	user, err := s.auth.Store.GetUserByUsername(ctx, username)
 	if err != nil || user == nil {
 		s.recordAudit(ctx, repo.AuditLogEntry{
-			EventType:    audit.EventLoginFailed,
-			Message:      "invalid credentials",
-			RelatedUser:  username,
-			IPAddress:    ipAddress,
-			UserAgent:    userAgent,
-			Success:      false,
+			EventType:   audit.EventLoginFailed,
+			Message:     "invalid credentials",
+			RelatedUser: username,
+			IPAddress:   ipAddress,
+			UserAgent:   userAgent,
+			Success:     false,
 		})
 		return connect.NewResponse(&sickrockpb.LoginResponse{
 			Success: false,
@@ -50,12 +50,12 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 	ok, err := iam.VerifyPassword(user.PasswordHash, password)
 	if err != nil || !ok {
 		s.recordAudit(ctx, repo.AuditLogEntry{
-			EventType:    audit.EventLoginFailed,
-			Message:      "invalid credentials",
-			RelatedUser:  username,
-			IPAddress:    ipAddress,
-			UserAgent:    userAgent,
-			Success:      false,
+			EventType:   audit.EventLoginFailed,
+			Message:     "invalid credentials",
+			RelatedUser: username,
+			IPAddress:   ipAddress,
+			UserAgent:   userAgent,
+			Success:     false,
 		})
 		return connect.NewResponse(&sickrockpb.LoginResponse{
 			Success: false,

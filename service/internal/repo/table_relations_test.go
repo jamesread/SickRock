@@ -48,6 +48,9 @@ func TestGetForeignKeysFromTableRelations(t *testing.T) {
 			on_delete_action TEXT NOT NULL DEFAULT 'NO ACTION',
 			on_update_action TEXT NOT NULL DEFAULT 'NO ACTION',
 			display_name TEXT,
+			pull_through_json TEXT,
+			absorb_into_item INTEGER NOT NULL DEFAULT 0,
+			absorb_type TEXT,
 			created_at TEXT NOT NULL DEFAULT (datetime('now'))
 		);
 		INSERT INTO table_relations (

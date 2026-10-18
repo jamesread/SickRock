@@ -73,9 +73,11 @@ const emit = defineEmits<{
     <span>Structure</span>
   </router-link>
   <div v-if="showInsert" class="insert-button-group">
+    <!-- Wide screens show "Create <row>"; narrow screens fall back to the compact quick-add button. -->
     <router-link
       :to="insertRoute"
-      class="button inline-icon neutral insert-button"
+      class="button inline-icon good insert-button"
+      :class="{ 'has-quick-add': showQuickAdd }"
       accesskey="n"
       title="Insert row"
     >
@@ -84,13 +86,13 @@ const emit = defineEmits<{
     </router-link>
     <button
       v-if="showQuickAdd"
+      type="button"
       class="button inline-icon good quick-add-button"
       title="Quick Add"
       aria-label="Quick Add"
       @click="emit('open-quick-add')"
     >
       <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
-      <span class="quick-add-text" />
     </button>
   </div>
   <slot name="toolbar-suffix" />
@@ -101,5 +103,19 @@ const emit = defineEmits<{
 .table-component-toolbar {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.quick-add-button {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .insert-button.has-quick-add {
+    display: none;
+  }
+
+  .quick-add-button {
+    display: inline-flex;
+  }
 }
 </style>

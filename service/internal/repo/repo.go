@@ -194,15 +194,15 @@ type TableConfig struct {
 	Name              string
 	Title             string         `db:"title"`
 	Ordinal           int            `db:"ordinal"`
-	Icon              sql.NullString   `db:"icon"`
-	CreateButtonText  sql.NullString   `db:"create_button_text"`
-	CreateDelegate    sql.NullString   `db:"create_delegate"`
-	RowName           sql.NullString   `db:"row_name"`
-	RowNamePlural     sql.NullString   `db:"row_name_plural"`
-	Table             sql.NullString   `db:"table"`
-	Db                sql.NullString   `db:"db"`
-	PrimaryKeyColumn  sql.NullString   `db:"primary_key_column"`
-	DefaultSortColumn sql.NullString   `db:"default_sort_column"`
+	Icon              sql.NullString `db:"icon"`
+	CreateButtonText  sql.NullString `db:"create_button_text"`
+	CreateDelegate    sql.NullString `db:"create_delegate"`
+	RowName           sql.NullString `db:"row_name"`
+	RowNamePlural     sql.NullString `db:"row_name_plural"`
+	Table             sql.NullString `db:"table"`
+	Db                sql.NullString `db:"db"`
+	PrimaryKeyColumn  sql.NullString `db:"primary_key_column"`
+	DefaultSortColumn sql.NullString `db:"default_sort_column"`
 }
 
 func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, error) {
@@ -837,7 +837,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 		columnNames = append(columnNames, col.Name)
 	}
 
-	log.Infof("ListItems columnNames: %v", columnNames)
+	log.Debugf("ListItems columnNames: %v", columnNames)
 
 	sortColumn := tc.SortColumnName(columnNames)
 	pkColumn := tc.PrimaryKeyColumnName()
@@ -862,7 +862,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 	}
 
 	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s`%s ORDER BY `%s` DESC", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, whereClause, sortColumn)
-	log.Infof("ListItems SQL Query: %s db:%v tbl:%v", query, tc.Db, tc.Table)
+	log.Debugf("ListItems SQL Query: %s db:%v tbl:%v", query, tc.Db, tc.Table)
 
 	// Use QueryxContext to get raw rows and manually map them
 	rows, err := r.db.QueryxContext(ctx, query, args...)
@@ -887,7 +887,7 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 		items = append(items, item)
 	}
 
-	log.Infof("ListItems: %d items found", len(items))
+	log.Debugf("ListItems: %d items found", len(items))
 
 	return items, rows.Err()
 }
@@ -968,7 +968,7 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 
 	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)", tc.Db.String, tc.Table.String, strings.Join(insertColumns, ", "), strings.Join(placeholders, ", "))
 	// Log the SQL used (without parameter values)
-	log.WithFields(log.Fields{"table": tc.Table.String}).Infof("CreateItem SQL: %s", query)
+	log.WithFields(log.Fields{"table": tc.Table.String}).Debugf("CreateItem SQL: %s", query)
 
 	res, err := r.db.ExecContext(ctx, query, values...)
 	if err != nil {
@@ -1010,7 +1010,7 @@ func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
 
 	sortColumn := tc.SortColumnName(columnNames)
 	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `%s` DESC LIMIT 1", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, sortColumn)
-	log.Infof("GetLastItem SQL Query: %s db:%v tbl:%v", query, tc.Db.String, tc.Table.String)
+	log.Debugf("GetLastItem SQL Query: %s db:%v tbl:%v", query, tc.Db.String, tc.Table.String)
 	rows, err := r.db.QueryxContext(ctx, query)
 	if err != nil {
 		return Item{}, fmt.Errorf("failed to get last item for table %d: %w", tcID, err)
@@ -1567,7 +1567,7 @@ ON CONFLICT(name) DO UPDATE SET title = excluded.title, db = excluded.db, "table
 func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (*TableConfig, error) {
 	log.WithFields(log.Fields{
 		"tcName": tcName,
-	}).Infof("Getting TableConfiguration")
+	}).Debugf("Getting TableConfiguration")
 
 	// Query table_configurations for this table's metadata
 	var config TableConfig
@@ -1584,7 +1584,7 @@ func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (
 		return nil, err
 	}
 
-	log.Infof("TableConfiguration: %+v", config)
+	log.Debugf("TableConfiguration: %+v", config)
 
 	if !config.Table.Valid || !config.Db.Valid {
 		return nil, fmt.Errorf("table structure is invalid, missing table or db: %+v", config)
@@ -1603,16 +1603,17 @@ type TableViewColumn struct {
 
 // TableView represents a saved table view
 type TableView struct {
-	ID        int               `db:"id"`
-	TableName string            `db:"table_name"`
-	ViewName  string            `db:"view_name"`
-	IsDefault bool              `db:"is_default"`
-	ViewType  string            `db:"view_type"` // "table" or "calendar", defaults to "table"
-	Columns   []TableViewColumn `db:"-"`
+	ID         int               `db:"id"`
+	TableName  string            `db:"table_name"`
+	ViewName   string            `db:"view_name"`
+	IsDefault  bool              `db:"is_default"`
+	ViewType   string            `db:"view_type"`   // "table" or "calendar", defaults to "table"
+	LayoutJSON string            `db:"layout_json"` // Extra layout state (filters, group-by, page size, column priorities) as a JSON object
+	Columns    []TableViewColumn `db:"-"`
 }
 
-// CreateTableView creates a new table view with its column configurations
-func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName, viewType string, columns []TableViewColumn) error {
+// CreateTableView creates a new table view with its column configurations and returns its ID.
+func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName, viewType, layoutJSON string, columns []TableViewColumn) (int, error) {
 	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Default to "table" if viewType is empty
@@ -1623,38 +1624,31 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName, v
 	// Start a transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
 	if err != nil {
-		return err
+		return 0, err
 	}
 	defer tx.Rollback()
 
 	// Insert the table view
-	var viewID int64
-	switch r.db.DriverName() {
-	case "mysql":
-		result, err := tx.ExecContext(ctx,
-			"INSERT INTO table_views (table_name, view_name, is_default, view_type) VALUES (?, ?, ?, ?)",
-			t, viewName, false, viewType)
-		if err != nil {
-			return err
-		}
-		viewID, err = result.LastInsertId()
-		if err != nil {
-			return err
-		}
-	default:
-		result, err := tx.ExecContext(ctx,
-			"INSERT INTO table_views (table_name, view_name, is_default, view_type) VALUES (?, ?, ?, ?)",
-			t, viewName, false, viewType)
-		if err != nil {
-			return err
-		}
-		viewID, err = result.LastInsertId()
-		if err != nil {
-			return err
-		}
+	result, err := tx.ExecContext(ctx,
+		"INSERT INTO table_views (table_name, view_name, is_default, view_type, layout_json) VALUES (?, ?, ?, ?, ?)",
+		t, viewName, false, viewType, nullIfEmpty(layoutJSON))
+	if err != nil {
+		return 0, err
+	}
+	viewID, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
 	}
 
-	// Insert column configurations
+	if err := insertTableViewColumns(ctx, tx, viewID, columns); err != nil {
+		return 0, err
+	}
+
+	return int(viewID), tx.Commit()
+}
+
+// insertTableViewColumns stores a view's column configurations (only visible columns are saved).
+func insertTableViewColumns(ctx context.Context, tx *sqlx.Tx, viewID int64, columns []TableViewColumn) error {
 	for _, col := range columns {
 		if !col.IsVisible {
 			continue // Only save visible columns
@@ -1667,12 +1661,15 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName, v
 			return err
 		}
 	}
+	return nil
+}
 
-	return tx.Commit()
+func nullIfEmpty(value string) sql.NullString {
+	return sql.NullString{String: value, Valid: value != ""}
 }
 
 // UpdateTableView updates an existing table view with its column configurations
-func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName, viewName, viewType string, columns []TableViewColumn) error {
+func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName, viewName, viewType, layoutJSON string, columns []TableViewColumn) error {
 	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Default to "table" if viewType is empty
@@ -1688,11 +1685,14 @@ func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName,
 	defer tx.Rollback()
 
 	// Update the table view
-	_, err = tx.ExecContext(ctx,
-		"UPDATE table_views SET view_name = ?, view_type = ? WHERE id = ? AND table_name = ?",
-		viewName, viewType, viewID, t)
+	result, err := tx.ExecContext(ctx,
+		"UPDATE table_views SET view_name = ?, view_type = ?, layout_json = ? WHERE id = ? AND table_name = ?",
+		viewName, viewType, nullIfEmpty(layoutJSON), viewID, t)
 	if err != nil {
 		return err
+	}
+	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
+		return fmt.Errorf("view with ID %d not found for table %s", viewID, t)
 	}
 
 	// Delete existing column configurations
@@ -1703,18 +1703,8 @@ func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName,
 		return err
 	}
 
-	// Insert new column configurations
-	for _, col := range columns {
-		if !col.IsVisible {
-			continue // Only save visible columns
-		}
-
-		_, err := tx.ExecContext(ctx,
-			"INSERT INTO table_view_columns (view_id, column_name, is_visible, column_order, sort_order) VALUES (?, ?, ?, ?, ?)",
-			viewID, col.ColumnName, col.IsVisible, col.ColumnOrder, col.SortOrder)
-		if err != nil {
-			return err
-		}
+	if err := insertTableViewColumns(ctx, tx, int64(viewID), columns); err != nil {
+		return err
 	}
 
 	return tx.Commit()
@@ -1726,7 +1716,7 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 
 	// Get all views for the table
 	rows, err := r.db.QueryxContext(ctx,
-		"SELECT id, table_name, view_name, is_default, COALESCE(view_type, 'table') as view_type FROM table_views WHERE table_name = ? ORDER BY view_name",
+		"SELECT id, table_name, view_name, is_default, COALESCE(view_type, 'table') as view_type, COALESCE(layout_json, '') as layout_json FROM table_views WHERE table_name = ? ORDER BY view_name",
 		t)
 	if err != nil {
 		return nil, err
@@ -1736,7 +1726,7 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 	var views []TableView
 	for rows.Next() {
 		var view TableView
-		err := rows.Scan(&view.ID, &view.TableName, &view.ViewName, &view.IsDefault, &view.ViewType)
+		err := rows.Scan(&view.ID, &view.TableName, &view.ViewName, &view.IsDefault, &view.ViewType, &view.LayoutJSON)
 		if err != nil {
 			return nil, err
 		}
@@ -1768,6 +1758,58 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 	return views, rows.Err()
 }
 
+// GetTableViewTableName returns the table a view belongs to.
+func (r *Repository) GetTableViewTableName(ctx context.Context, viewID int) (string, error) {
+	var tableName string
+	err := r.db.GetContext(ctx, &tableName, "SELECT table_name FROM table_views WHERE id = ?", viewID)
+	if err == sql.ErrNoRows {
+		return "", fmt.Errorf("view with ID %d not found", viewID)
+	}
+	return tableName, err
+}
+
+// GetUserDefaultTableView returns the user's own default view for a table, or 0 when unset.
+func (r *Repository) GetUserDefaultTableView(ctx context.Context, userID int, tableName string) (int, error) {
+	var viewID int
+	err := r.db.GetContext(ctx, &viewID,
+		"SELECT view_id FROM table_view_user_defaults WHERE user_id = ? AND table_name = ?",
+		userID, sanitizeDatabaseIdentifier(tableName))
+	if err == sql.ErrNoRows {
+		return 0, nil
+	}
+	return viewID, err
+}
+
+// SetUserDefaultTableView sets the user's own default view for a table; viewID 0 clears it.
+func (r *Repository) SetUserDefaultTableView(ctx context.Context, userID int, tableName string, viewID int) error {
+	t := sanitizeDatabaseIdentifier(tableName)
+	if viewID <= 0 {
+		_, err := r.db.ExecContext(ctx,
+			"DELETE FROM table_view_user_defaults WHERE user_id = ? AND table_name = ?", userID, t)
+		return err
+	}
+
+	viewTable, err := r.GetTableViewTableName(ctx, viewID)
+	if err != nil {
+		return err
+	}
+	if viewTable != t {
+		return fmt.Errorf("view %d does not belong to table %s", viewID, t)
+	}
+
+	switch r.db.DriverName() {
+	case "mysql":
+		_, err = r.db.ExecContext(ctx, `
+			INSERT INTO table_view_user_defaults (user_id, table_name, view_id) VALUES (?, ?, ?)
+			ON DUPLICATE KEY UPDATE view_id = VALUES(view_id)`, userID, t, viewID)
+	default:
+		_, err = r.db.ExecContext(ctx, `
+			INSERT INTO table_view_user_defaults (user_id, table_name, view_id) VALUES (?, ?, ?)
+			ON CONFLICT(user_id, table_name) DO UPDATE SET view_id = excluded.view_id`, userID, t, viewID)
+	}
+	return err
+}
+
 // DeleteTableView deletes a table view and its associated columns
 func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 	// Start a transaction to ensure atomicity
@@ -1779,6 +1821,12 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 
 	// Delete the view columns first (due to foreign key constraint)
 	_, err = tx.ExecContext(ctx, "DELETE FROM table_view_columns WHERE view_id = ?", viewID)
+	if err != nil {
+		return err
+	}
+
+	// Users who chose this view as their default fall back to the table default.
+	_, err = tx.ExecContext(ctx, "DELETE FROM table_view_user_defaults WHERE view_id = ?", viewID)
 	if err != nil {
 		return err
 	}
@@ -1805,18 +1853,21 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 
 // ForeignKey represents a foreign key constraint
 type ForeignKey struct {
-	RelationID       int    `db:"-"`
-	ConstraintName   string `db:"constraint_name"`
-	TableSchema      string `db:"table_schema"`
-	TableName        string `db:"table_name"`
-	ColumnName       string `db:"column_name"`
-	ReferencedSchema string `db:"referenced_schema"`
-	ReferencedTable  string `db:"referenced_table"`
-	ReferencedColumn string `db:"referenced_column"`
-	OnDeleteAction   string `db:"on_delete_action"`
-	OnUpdateAction   string `db:"on_update_action"`
-	DisplayName       string                   `db:"display_name"`
+	RelationID        int                        `db:"-"`
+	ConstraintName    string                     `db:"constraint_name"`
+	TableSchema       string                     `db:"table_schema"`
+	TableName         string                     `db:"table_name"`
+	ColumnName        string                     `db:"column_name"`
+	ReferencedSchema  string                     `db:"referenced_schema"`
+	ReferencedTable   string                     `db:"referenced_table"`
+	ReferencedColumn  string                     `db:"referenced_column"`
+	OnDeleteAction    string                     `db:"on_delete_action"`
+	OnUpdateAction    string                     `db:"on_update_action"`
+	DisplayName       string                     `db:"display_name"`
 	PullThroughFields []RelationPullThroughField `db:"-"`
+	// AbsorbIntoItem shows the related rows inside the item view instead of as their own section.
+	AbsorbIntoItem bool   `db:"-"`
+	AbsorbType     string `db:"-"` // RelationAbsorbFirstRow
 }
 
 // CreateForeignKey records a relation in table_relations and applies a database FK when supported.
@@ -2171,7 +2222,7 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 			tw.name as workflow_name,
 			tn.name as title
 		FROM table_user_bookmarks ub
-		LEFT JOIN table_navigation tn ON ub.navigation_item = tn.id
+		INNER JOIN table_navigation tn ON ub.navigation_item = tn.id
 		LEFT JOIN table_configurations tc ON tn.table_configuration = tc.id
 		LEFT JOIN table_dashboards td ON tn.dashboard_id = td.id
 		LEFT JOIN table_workflows tw ON tn.workflow_id = tw.id

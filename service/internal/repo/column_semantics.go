@@ -9,6 +9,8 @@ import (
 const (
 	SemanticTypeUserRef  = "user_ref"
 	SemanticTypeDatetime = "datetime"
+	// SemanticTypeIcon marks a column holding a Hugeicons icon name; the frontend edits it with an icon picker.
+	SemanticTypeIcon = "icon"
 )
 
 func IsDatetimeTypeName(typeName string) bool {

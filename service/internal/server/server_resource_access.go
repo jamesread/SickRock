@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	armlayer "github.com/jamesread/armature-iam/layer"
-	"github.com/jamesread/armature-iam/rbac"
+	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/audit"
 	"github.com/jamesread/SickRock/internal/iam/systemroles"
 	"github.com/jamesread/SickRock/internal/repo"
-	sickrockpb "github.com/jamesread/SickRock/gen/proto"
+	armlayer "github.com/jamesread/armature-iam/layer"
+	"github.com/jamesread/armature-iam/rbac"
 )
 
 func (s *SickRockServer) authUserRBAC(ctx context.Context) *armlayer.AuthenticatedUser {

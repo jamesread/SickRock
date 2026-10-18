@@ -189,10 +189,10 @@ func (s *SickRockServer) RefreshRssCalendarFeed(ctx context.Context, req *connec
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&sickrockpb.RefreshRssCalendarFeedResponse{
-		Feed:          pb,
-		Message:       result.Message,
-		ItemsCreated:  int32(result.Created),
-		ItemsUpdated:  int32(result.Updated),
+		Feed:         pb,
+		Message:      result.Message,
+		ItemsCreated: int32(result.Created),
+		ItemsUpdated: int32(result.Updated),
 	}), nil
 }
 

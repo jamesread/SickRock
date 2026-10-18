@@ -2,6 +2,8 @@ export type InsertFieldDef = {
   name: string
   type: string
   required: boolean
+  /** Column label from table_column_display, shown instead of the column name when set. */
+  displayLabel?: string
 }
 
 export type InsertViewColumn = {
@@ -16,7 +18,7 @@ export type InsertViewForFields = {
 }
 
 export function fieldDefsForInsertForm(
-  fields: Array<{ name: string; type: string; required?: boolean }>,
+  fields: Array<{ name: string; type: string; required?: boolean; displayLabel?: string }>,
 ): InsertFieldDef[] {
   return fields
     .filter(field => field.name !== 'sr_created' && field.name !== 'sr_updated')
@@ -24,6 +26,7 @@ export function fieldDefsForInsertForm(
       name: field.name,
       type: field.type,
       required: !!field.required,
+      displayLabel: field.displayLabel ?? '',
     }))
 }
 

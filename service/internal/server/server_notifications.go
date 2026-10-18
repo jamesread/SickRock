@@ -47,13 +47,13 @@ func (s *SickRockServer) GetUserNotificationChannels(ctx context.Context, req *c
 	var pbChannels []*sickrockpb.UserNotificationChannel
 	for _, channel := range channels {
 		pbChannel := &sickrockpb.UserNotificationChannel{
-			Id:          int32(channel.ID),
-			UserId:      int32(channel.User),
-			ChannelType: channel.ChannelType,
+			Id:           int32(channel.ID),
+			UserId:       int32(channel.User),
+			ChannelType:  channel.ChannelType,
 			ChannelValue: channel.ChannelValue,
-			IsActive:    channel.IsActive,
-			SrCreated:   channel.SrCreated.Unix(),
-			SrUpdated:   channel.SrUpdated.Unix(),
+			IsActive:     channel.IsActive,
+			SrCreated:    channel.SrCreated.Unix(),
+			SrUpdated:    channel.SrUpdated.Unix(),
 		}
 		if channel.ChannelName != nil {
 			pbChannel.ChannelName = *channel.ChannelName
@@ -112,13 +112,13 @@ func (s *SickRockServer) CreateUserNotificationChannel(ctx context.Context, req 
 	}
 
 	pbChannel := &sickrockpb.UserNotificationChannel{
-		Id:          int32(channel.ID),
-		UserId:      int32(channel.User),
-		ChannelType: channel.ChannelType,
+		Id:           int32(channel.ID),
+		UserId:       int32(channel.User),
+		ChannelType:  channel.ChannelType,
 		ChannelValue: channel.ChannelValue,
-		IsActive:    channel.IsActive,
-		SrCreated:   channel.SrCreated.Unix(),
-		SrUpdated:   channel.SrUpdated.Unix(),
+		IsActive:     channel.IsActive,
+		SrCreated:    channel.SrCreated.Unix(),
+		SrUpdated:    channel.SrUpdated.Unix(),
 	}
 	if channel.ChannelName != nil {
 		pbChannel.ChannelName = *channel.ChannelName
@@ -280,13 +280,13 @@ func (s *SickRockServer) GetUserNotificationSubscriptions(ctx context.Context, r
 		// Add channel details
 		if channel, ok := channelMap[sub.ChannelID]; ok {
 			pbChannel := &sickrockpb.UserNotificationChannel{
-				Id:          int32(channel.ID),
-				UserId:      int32(channel.User),
-				ChannelType: channel.ChannelType,
+				Id:           int32(channel.ID),
+				UserId:       int32(channel.User),
+				ChannelType:  channel.ChannelType,
 				ChannelValue: channel.ChannelValue,
-				IsActive:    channel.IsActive,
-				SrCreated:   channel.SrCreated.Unix(),
-				SrUpdated:   channel.SrUpdated.Unix(),
+				IsActive:     channel.IsActive,
+				SrCreated:    channel.SrCreated.Unix(),
+				SrUpdated:    channel.SrUpdated.Unix(),
 			}
 			if channel.ChannelName != nil {
 				pbChannel.ChannelName = *channel.ChannelName
@@ -376,13 +376,13 @@ func (s *SickRockServer) CreateUserNotificationSubscription(ctx context.Context,
 	}
 
 	pbChannel := &sickrockpb.UserNotificationChannel{
-		Id:          int32(channel.ID),
-		UserId:      int32(channel.User),
-		ChannelType: channel.ChannelType,
+		Id:           int32(channel.ID),
+		UserId:       int32(channel.User),
+		ChannelType:  channel.ChannelType,
 		ChannelValue: channel.ChannelValue,
-		IsActive:    channel.IsActive,
-		SrCreated:   channel.SrCreated.Unix(),
-		SrUpdated:   channel.SrUpdated.Unix(),
+		IsActive:     channel.IsActive,
+		SrCreated:    channel.SrCreated.Unix(),
+		SrUpdated:    channel.SrUpdated.Unix(),
 	}
 	if channel.ChannelName != nil {
 		pbChannel.ChannelName = *channel.ChannelName

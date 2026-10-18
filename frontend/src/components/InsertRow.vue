@@ -5,7 +5,8 @@ import { createApiClient } from '../stores/api'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { SickRock } from '../gen/sickrock_pb'
 import { useIamUsers } from '../composables/useIamUsers'
-import { isUserRefFieldType } from '../utils/fieldTypes'
+import { isIconFieldType, isUserRefFieldType } from '../utils/fieldTypes'
+import IconPickerField from './IconPickerField.vue'
 import { fieldDisplayLabel } from '../utils/fieldColumnDisplay'
 import UserRefChip from './UserRefChip.vue'
 import type { Field, IamUser, ItemFieldGroup } from '../gen/sickrock_pb'
@@ -728,8 +729,16 @@ function cancel() {
             <h3 v-if="heading" class="field-group-heading">{{ heading }}</h3>
             <label :for="'field-' + f.name">{{ fieldLabel(f) }}<span v-if="f.required" aria-label="required" title="required">*</span></label>
 
+            <!-- Icon picker -->
+            <IconPickerField
+              v-if="isIconFieldType(f.type)"
+              :id="'field-' + f.name"
+              v-model="form[f.name]"
+              :clearable="!f.required"
+            />
+
             <!-- User reference picker -->
-            <div v-if="isUserRefField(f.name)" class="foreign-key-dropdown user-ref-dropdown">
+            <div v-else-if="isUserRefField(f.name)" class="foreign-key-dropdown user-ref-dropdown">
               <div v-if="form[f.name]" class="user-ref-selected">
                 <UserRefChip :label="displayUserLabel(form[f.name])" />
                 <button

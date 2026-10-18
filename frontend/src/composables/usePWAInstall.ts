@@ -21,14 +21,12 @@ export function usePWAInstall() {
     installPrompt.value = e as BeforeInstallPromptEvent
     isInstallable.value = true
 
-    console.log('[PWA] Install prompt available')
   }
 
   const handleAppInstalled = () => {
     isInstalled.value = true
     isInstallable.value = false
     installPrompt.value = null
-    console.log('[PWA] App installed')
   }
 
   const promptInstall = async (): Promise<boolean> => {
@@ -45,12 +43,10 @@ export function usePWAInstall() {
       const choiceResult = await installPrompt.value.userChoice
 
       if (choiceResult.outcome === 'accepted') {
-        console.log('[PWA] User accepted install prompt')
         isInstallable.value = false
         installPrompt.value = null
         return true
       } else {
-        console.log('[PWA] User dismissed install prompt')
         return false
       }
     } catch (error) {

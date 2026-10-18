@@ -12,6 +12,11 @@
   .date {
     font-size: 0.8em;
   }
+
+  /* Secondary toolbar controls shown only when there is room ("small screen: large only"). */
+  .ss-large {
+    display: none;
+  }
 }
 
 /* Controls that exist only while design mode is on. */

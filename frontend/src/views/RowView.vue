@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, inject, provide, nextTick, watch } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, computed, inject, provide, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import type { Field, ForeignKey, GetTableStructureResponse, Item } from '../gen/sickrock_pb'
@@ -33,7 +33,7 @@ import {
   isUserRefFieldType,
 } from '../utils/fieldTypes'
 import { appTitle, formatDocumentTitle } from '../appTitle'
-import { rowEditActionLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
+import { rowEditActionLabel, rowNamePluralLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
 import { getItemNameFieldValue, itemViewSectionTitle } from '../utils/itemViewSectionTitle'
 import { clearRowViewPageLabel, rowViewPageLabel } from '../utils/rowViewPageTitle'
 import {
@@ -61,6 +61,8 @@ import { useDesignMode } from '../composables/useDesignMode'
 const { designModeEnabled } = useDesignMode()
 import { Accordion, AccordionItem } from '../components/accordion'
 import RowViewFieldEntries from './RowViewFieldEntries.vue'
+import AbsorbedRelationFields from './AbsorbedRelationFields.vue'
+import { whenHugeiconAvailable, type IconData } from '../utils/hugeicons'
 import { rowViewFieldUiKey } from './rowViewFieldUi'
 
 type FieldEntry = {
@@ -141,6 +143,8 @@ const foreignKeys = ref<Array<{
   tableTcName?: string
   referencedTableTcName?: string
   pullThroughFields: RelationPullThroughField[]
+  absorbIntoItem: boolean
+  absorbType: string
 }>>([])
 const relatedChildStructures = ref<Record<string, GetTableStructureResponse>>({})
 const relatedPullThroughExtraFields = ref<Record<string, Field[]>>({})
@@ -148,6 +152,8 @@ const fkReferencedItems = ref<Record<string, Item[]>>({})
 const relationDialog = ref<HTMLDialogElement | null>(null)
 const managingConstraintName = ref('')
 const relationDisplayNameDraft = ref('')
+const relationAbsorbDraft = ref(false)
+const relationAbsorbTypeDraft = ref('first_row')
 const relationPullThroughDraft = ref<Array<{ fkColumn: string; field: string }>>([])
 const relationCalculatedDraft = ref<CalculatedColumnSpec[]>([])
 const relationChildForeignKeys = ref<ForeignKey[]>([])
@@ -158,6 +164,26 @@ const savingRelation = ref(false)
 const relationSaveError = ref<string | null>(null)
 const relatedRows = ref<Record<string, any[]>>({})
 const relatedTableRowNames = ref<Record<string, string>>({})
+// Loaded icons of related table configurations (by tc name); missing until loaded or when unset.
+const relatedTableIcons = shallowRef<Record<string, IconData>>({})
+let relatedTableIconNames: Promise<Map<string, string>> | null = null
+
+/** Loads each related table configuration's icon on demand (falls back to the default icon). */
+async function loadRelatedTableIcons(tcNames: string[]) {
+  relatedTableIconNames ??= client!.getTableConfigurations({})
+    .then(res => new Map((res.pages ?? []).map(page => [page.id, page.icon])))
+    .catch(() => {
+      relatedTableIconNames = null
+      return new Map<string, string>()
+    })
+  const iconNames = await relatedTableIconNames
+  for (const tcName of tcNames) {
+    if (relatedTableIcons.value[tcName]) continue
+    whenHugeiconAvailable(iconNames.get(tcName), (icon) => {
+      relatedTableIcons.value = { ...relatedTableIcons.value, [tcName]: icon }
+    })
+  }
+}
 const loadingRelated = ref(false)
 
 // Quick FK map: columnName -> { referencedTable, referencedColumn }
@@ -414,6 +440,8 @@ async function loadTableStructure() {
       tableTcName: fk.tableTcName,
       referencedTableTcName: fk.referencedTableTcName,
       pullThroughFields: (fk.pullThroughFields ?? []).map(pt => ({ ...pt })),
+      absorbIntoItem: fk.absorbIntoItem,
+      absorbType: fk.absorbType,
     }))
     if (response.fields?.some(field => isUserRefColumn(field.name))) {
       void loadUsers()
@@ -455,15 +483,12 @@ async function loadFkReferencedItems() {
 // Load related rows based on foreign key relationships (bidirectional)
 async function loadRelatedRows() {
   if (!item.value || foreignKeys.value.length === 0) {
-    console.log('No item or foreign keys:', { item: item.value, foreignKeys: foreignKeys.value })
     return
   }
 
   loadingRelated.value = true
   try {
     const relatedData: Record<string, any[]> = {}
-    console.log('Loading related rows for item:', item.value)
-    console.log('Item value keys:', Object.keys(item.value))
 
     for (const fk of foreignKeys.value) {
       if (!shouldShowRelatedRelationPanel(tableName, fk)) {
@@ -569,7 +594,6 @@ async function loadRelatedRows() {
       }
     }
 
-    console.log('Final related data:', relatedData)
     relatedRows.value = relatedData
 
     const relatedTableNames = [
@@ -579,6 +603,7 @@ async function loadRelatedRows() {
           .map(fk => relationSourceTableTcName(fk)),
       ),
     ]
+    loadRelatedTableIcons(relatedTableNames)
     await Promise.all(
       relatedTableNames.map(async (tcName) => {
         if (relatedTableRowNames.value[tcName] !== undefined) {
@@ -861,6 +886,8 @@ const relatedTables = computed(() => {
     constraintName: string
     displayName: string
     pullThroughExtraFields?: Field[]
+    absorbIntoItem: boolean
+    absorbType: string
   }> = []
 
   for (const [key, rows] of Object.entries(relatedRows.value)) {
@@ -901,18 +928,56 @@ const relatedTables = computed(() => {
       constraintName: fk?.constraintName ?? '',
       displayName,
       pullThroughExtraFields: relatedPullThroughExtraFields.value[key],
+      absorbIntoItem: !!fk.absorbIntoItem,
+      absorbType: fk.absorbType || '',
     })
   }
 
   return tables
 })
 
+// Relations absorbed into the item ("first row") are shown in the main section, not as panels.
+const panelRelations = computed(() => relatedTables.value.filter(entry => !entry.absorbIntoItem))
+const absorbedRelations = computed(() => relatedTables.value.filter(entry => entry.absorbIntoItem))
+
+const absorbedSections = computed(() => absorbedRelations.value.map(entry => {
+  const structure = relatedChildStructures.value[entry.tableName]
+  return {
+    entry,
+    key: entry.constraintName || `${entry.tableName}.${entry.columnName}`,
+    title: entry.title,
+    tableName: entry.tableName,
+    row: entry.rows[0] ?? null,
+    fields: structure?.fields ?? [],
+    hiddenColumns: [entry.filterColumn],
+    icon: relatedTableIcons.value[entry.tableName],
+    viewAllTo: {
+      path: `/table/${entry.tableName}`,
+      query: entry.filterValue ? { where: JSON.stringify({ [entry.filterColumn]: entry.filterValue }) } : {},
+    },
+    viewAllLabel: `View all related ${rowNamePluralLabel(structure?.rowNamePlural, structure?.rowName)}`,
+  }
+}))
+
+watch(absorbedRelations, (entries) => {
+  for (const entry of entries) {
+    ensureChildTableStructure(entry.tableName).catch(err => {
+      console.warn(`Failed to load structure for absorbed relation ${entry.tableName}:`, err)
+    })
+  }
+})
+
+function visibleTabs<T extends { constraintName: string }>(tabs: T[]): T[] {
+  const absorbed = new Set(absorbedRelations.value.map(entry => entry.constraintName))
+  return tabs.filter(tab => !absorbed.has(tab.constraintName))
+}
+
 type ItemLayoutBlock =
   | { kind: 'quick_jump'; sectionTitle: string }
   | { kind: 'relation'; constraintName: string }
   | { kind: 'relation_tabs'; sectionTitle: string; tabs: Array<{ constraintName: string; label: string }> }
 
-type ItemLayoutJumpLink = { anchorId: string; label: string }
+type ItemLayoutJumpLink = { anchorId: string; label: string; icon: IconData }
 
 function itemLayoutAnchorId(blockIndex: number): string {
   return `item-layout-${blockIndex}`
@@ -980,7 +1045,7 @@ const placedConstraintNames = computed(() => {
 
 const relatedByConstraint = computed(() => {
   const map = new Map<string, RelatedTableEntry>()
-  for (const entry of relatedTables.value) {
+  for (const entry of panelRelations.value) {
     if (entry.constraintName) {
       map.set(entry.constraintName, entry)
     }
@@ -989,7 +1054,7 @@ const relatedByConstraint = computed(() => {
 })
 
 const unplacedRelations = computed(() =>
-  relatedTables.value.filter(
+  panelRelations.value.filter(
     entry => !entry.constraintName || !placedConstraintNames.value.has(entry.constraintName),
   ),
 )
@@ -1026,13 +1091,20 @@ function quickJumpLinksAfter(blockIndex: number): ItemLayoutJumpLink[] {
     }
     const label = layoutBlockJumpLabel(block)
     if (!label) continue
-    links.push({ anchorId: itemLayoutAnchorId(i), label })
+    // Same icon as the section: the related table's for a relation, DatabaseIcon for tab groups.
+    const entry = block.kind === 'relation' ? relatedEntry(block.constraintName) : undefined
+    links.push({
+      anchorId: itemLayoutAnchorId(i),
+      label,
+      icon: (entry && relatedTableIcons.value[entry.tableName]) || DatabaseIcon,
+    })
   }
   for (const table of unplacedRelations.value) {
     const key = table.constraintName || `${table.tableName}.${table.columnName}`
     links.push({
       anchorId: itemLayoutUnplacedAnchor(key),
       label: table.displayName?.trim() || table.title,
+      icon: relatedTableIcons.value[table.tableName] || DatabaseIcon,
     })
   }
   return links
@@ -1120,6 +1192,8 @@ function openManageRelation(constraintName: string, displayName?: string) {
   managingConstraintName.value = constraintName
   relationDisplayNameDraft.value = displayName ?? ''
   const fk = foreignKeys.value.find(entry => entry.constraintName === constraintName)
+  relationAbsorbDraft.value = !!fk?.absorbIntoItem
+  relationAbsorbTypeDraft.value = fk?.absorbType || 'first_row'
   const columns = fk?.pullThroughFields ?? []
   relationPullThroughDraft.value = columns
     .filter(pt => !pt.expr?.trim())
@@ -1141,6 +1215,8 @@ function closeManageRelation() {
   relationDialog.value?.close()
   managingConstraintName.value = ''
   relationDisplayNameDraft.value = ''
+  relationAbsorbDraft.value = false
+  relationAbsorbTypeDraft.value = 'first_row'
   relationPullThroughDraft.value = []
   relationCalculatedDraft.value = []
   relationChildForeignKeys.value = []
@@ -1176,6 +1252,8 @@ async function saveRelationDisplayName() {
       constraintName: managingConstraintName.value,
       displayName: relationDisplayNameDraft.value.trim(),
       pullThroughFields,
+      absorbIntoItem: relationAbsorbDraft.value,
+      absorbType: relationAbsorbDraft.value ? relationAbsorbTypeDraft.value : '',
     })
     if (!res.success) {
       throw new Error(res.message || 'Failed to update relation')
@@ -1320,7 +1398,12 @@ function cancelDelete() {
       <div v-if="error">{{ error }}</div>
       <LoadingArea v-else-if="loading" message="Loading…" min-height="8rem" />
       <div v-else-if="fieldError" class="field-save-error">{{ fieldError }}</div>
-      <template v-if="!loading && !error && entries.length > 0">
+      <div
+        v-if="!loading && !error && entries.length > 0"
+        class="row-main-layout"
+        :class="{ 'has-absorbed': absorbedSections.length > 0 }"
+      >
+       <div class="row-main-fields">
         <Accordion
           v-if="showFieldGroupAccordion"
           :default-open-ids="fieldGroupAccordionDefaultOpen"
@@ -1339,7 +1422,25 @@ function cancelDelete() {
           :entries="ungroupedFieldSection.entries"
         />
         <RowViewFieldEntries v-else-if="!showFieldGroupAccordion" :entries="entries" />
-      </template>
+       </div>
+       <!-- Absorbed relations: a right-hand column that wraps below the fields when narrow -->
+       <div v-if="absorbedSections.length > 0" class="row-main-absorbed">
+        <AbsorbedRelationFields
+          v-for="section in absorbedSections"
+          :key="section.key"
+          :title="section.title"
+          :table-name="section.tableName"
+          :row="section.row"
+          :fields="section.fields"
+          :hidden-columns="section.hiddenColumns"
+          :icon="section.icon"
+          :can-manage="designModeEnabled && tableAccess.canEdit && !!section.entry.constraintName"
+          :view-all-to="section.viewAllTo"
+          :view-all-label="section.viewAllLabel"
+          @manage="openManageRelation(section.entry.constraintName, section.entry.displayName)"
+        />
+       </div>
+      </div>
       <div v-else-if="!loading && !error" class="no-data">
         <p>No data available for this row.</p>
       </div>
@@ -1356,7 +1457,10 @@ function cancelDelete() {
           <nav class="item-layout-quick-jump" aria-label="Jump to sections on this page">
             <template v-for="(link, linkIndex) in quickJumpLinksAfter(blockIndex)" :key="link.anchorId">
               <span v-if="linkIndex > 0" class="item-layout-quick-jump-sep" aria-hidden="true"> · </span>
-              <a href="#" @click.prevent="scrollToLayoutAnchor(link.anchorId)">{{ link.label }}</a>
+              <a href="#" class="item-layout-quick-jump-link" @click.prevent="scrollToLayoutAnchor(link.anchorId)">
+                <HugeiconsIcon :icon="link.icon" width="1em" height="1em" aria-hidden="true" />
+                <span>{{ link.label }}</span>
+              </a>
             </template>
           </nav>
         </Section>
@@ -1372,6 +1476,7 @@ function cancelDelete() {
             :parent-row-label="parentRowLabel"
             :loading-related="loadingRelated"
             :related-row-name="relatedTableRowNames[relatedEntry(block.constraintName)!.tableName] ?? ''"
+            :icon="relatedTableIcons[relatedEntry(block.constraintName)!.tableName]"
             :can-edit-relation="tableAccess.canEdit"
             @rows-updated="loadRelatedRows"
             @row-deleted="(id) => onRelatedRowDeleted(relatedEntry(block.constraintName)!, id)"
@@ -1379,7 +1484,7 @@ function cancelDelete() {
           />
         </div>
         <div
-          v-else-if="block.kind === 'relation_tabs'"
+          v-else-if="block.kind === 'relation_tabs' && visibleTabs(block.tabs).length > 0"
           :id="itemLayoutAnchorId(blockIndex)"
           class="item-layout-anchor"
         >
@@ -1389,14 +1494,15 @@ function cancelDelete() {
             :padding="false"
           >
             <Tabs
-              :tabs="block.tabs.map(tab => ({
+              :tabs="visibleTabs(block.tabs).map(tab => ({
                 id: tab.constraintName,
                 label: tabLabelFor(tab.constraintName, tab.label),
+                icon: relatedTableIcons[relatedEntry(tab.constraintName)?.tableName ?? ''],
               }))"
               :padding="false"
             >
               <template
-                v-for="tab in block.tabs"
+                v-for="tab in visibleTabs(block.tabs)"
                 :key="tab.constraintName"
                 #[`tab-${tab.constraintName}`]
               >
@@ -1433,6 +1539,7 @@ function cancelDelete() {
           :parent-row-label="parentRowLabel"
           :loading-related="loadingRelated"
           :related-row-name="relatedTableRowNames[table.tableName] ?? ''"
+          :icon="relatedTableIcons[table.tableName]"
           :can-edit-relation="tableAccess.canEdit"
           @rows-updated="loadRelatedRows"
           @row-deleted="(id) => onRelatedRowDeleted(table, id)"
@@ -1525,6 +1632,27 @@ function cancelDelete() {
           autocomplete="off"
           :disabled="savingRelation"
         />
+      </FormField>
+      <h3 class="relation-dialog-subheading">Absorb into item</h3>
+      <p class="muted">
+        Show the related row inside this item's main section, as if its fields were part of the item, instead of as a separate section.
+      </p>
+      <FormField label="Absorb into item" for="relation-absorb" :disabled="savingRelation">
+        <input
+          id="relation-absorb"
+          v-model="relationAbsorbDraft"
+          type="checkbox"
+          :disabled="savingRelation"
+        />
+      </FormField>
+      <FormField label="Absorb type" for="relation-absorb-type" :disabled="savingRelation || !relationAbsorbDraft">
+        <select
+          id="relation-absorb-type"
+          v-model="relationAbsorbTypeDraft"
+          :disabled="savingRelation || !relationAbsorbDraft"
+        >
+          <option value="first_row">First row</option>
+        </select>
       </FormField>
       <h3 class="relation-dialog-subheading">Pull-through columns</h3>
       <p class="muted">
@@ -1664,8 +1792,36 @@ function cancelDelete() {
 </template>
 
 <style scoped>
+.row-main-layout.has-absorbed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: 1.5rem;
+}
+
+.row-main-layout.has-absorbed .row-main-fields {
+  flex: 2 1 32rem;
+  min-width: 0;
+}
+
+.row-main-absorbed {
+  flex: 1 1 22rem;
+  min-width: 0;
+}
+
+/* Line the first subsection up with the first field row (femtocrank dt/dd padding). */
+.row-main-absorbed > :first-child {
+  margin-top: 0.6em;
+}
+
 .item-layout-quick-jump {
   line-height: 1.5;
+}
+
+.item-layout-quick-jump-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
 }
 
 .item-layout-anchor {

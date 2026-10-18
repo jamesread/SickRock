@@ -115,20 +115,26 @@ function populateExportsNavigation() {
   }
 }
 
+// Bumped on every grid rebuild so an icon that loads late never re-adds a stale link.
+let navigationGeneration = 0
+
 function populateWorkflowNavigation() {
   const nav = workflowNavigation.value
   if (!nav) return
   nav.clearNavigationLinks()
+  const generation = navigationGeneration
   for (const wf of workflows.value) {
-    nav.addCallback(wf.name, () => startWorkflow(wf), {
+    const options = {
       name: `home-workflow-${wf.id}`,
-      icon: resolveNavigationIcon({
-        icon: wf.icon,
-        workflowId: wf.id,
-        path: `/workflow/${wf.id}`,
-      }),
       description: 'Start workflow (pins to header)',
-    })
+    }
+    const icon = resolveNavigationIcon(
+      { icon: wf.icon, workflowId: wf.id, path: `/workflow/${wf.id}` },
+      (loaded) => {
+        if (generation === navigationGeneration) nav.addCallback(wf.name, () => startWorkflow(wf), { ...options, icon: loaded })
+      },
+    )
+    nav.addCallback(wf.name, () => startWorkflow(wf), { ...options, icon })
   }
 }
 
@@ -137,28 +143,35 @@ function populateRecentNavigation() {
     const nav = recentNavByGroup.get(group.name)
     if (!nav) continue
     nav.clearNavigationLinks()
-    const tableIcon = resolveNavigationIcon({
-      icon: group.icon,
-      path: `/table/${group.name}`,
-    })
-    for (const item of group.items) {
+    const generation = navigationGeneration
+    const links = group.items.map((item) => {
       const linkName = `home-recent-${group.name}-${item.table_id}`
-      nav.addNavigationLink({
+      return {
         id: linkName,
         name: linkName,
         title: item.item_name || `Row ${item.table_id}`,
         path: `/table/${item.name}/${item.table_id}`,
         to: `/table/${item.name}/${item.table_id}`,
-        icon: tableIcon,
         type: 'route',
         description: `${formatTime(item.updated_at_unix)} · ID ${item.table_id}`,
-      })
+      }
+    })
+    const tableIcon = resolveNavigationIcon(
+      { icon: group.icon, path: `/table/${group.name}` },
+      (loaded) => {
+        if (generation !== navigationGeneration) return
+        for (const link of links) nav.addNavigationLink({ ...link, icon: loaded })
+      },
+    )
+    for (const link of links) {
+      nav.addNavigationLink({ ...link, icon: tableIcon })
     }
   }
 }
 
 function refreshNavigationGrids() {
   nextTick(() => {
+    navigationGeneration++
     populateExportsNavigation()
     populateWorkflowNavigation()
     populateRecentNavigation()

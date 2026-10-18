@@ -22,6 +22,24 @@ const { access: tableAccess } = useTableAccess(tableId)
 const { hasPermission } = useRbac()
 const showStructure = computed(() => hasPermission('system.settings'))
 
+// Optional ?where={"column":"value"} (same format as export links), e.g. from
+// "view all related …" links. Invalid values are ignored.
+const whereFilter = computed<Record<string, string> | undefined>(() => {
+  const raw = route.query.where
+  if (typeof raw !== 'string' || !raw.trim()) return undefined
+  try {
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+    const entries = Object.entries(parsed).map(([column, value]) => [column, String(value)])
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined
+  } catch {
+    return undefined
+  }
+})
+const whereDescription = computed(() => Object.entries(whereFilter.value ?? {})
+  .map(([column, value]) => `${column} = ${value}`)
+  .join(', '))
+
 // Transport handled by authenticated client
 const client = createApiClient()
 
@@ -54,10 +72,8 @@ const tableSectionTitle = computed(() =>
 )
 
 function handleViewChanged(viewType: string) {
-  console.log('[TableView] View changed to:', viewType)
   currentViewType.value = viewType
   viewTypeInitialized.value = true // Mark as initialized by user interaction
-  console.log('[TableView] currentViewType is now:', currentViewType.value)
 }
 
 onMounted(async () => {
@@ -101,9 +117,14 @@ onMounted(async () => {
           <span>{{ tableSectionTitle }}</span>
         </span>
       </template>
+      <p v-if="whereFilter" class="section-content padding table-where-notice">
+        Showing only rows where <code>{{ whereDescription }}</code>.
+        <router-link :to="{ path: route.path }">Show all</router-link>
+      </p>
       <TableComponent
         :table-id="tableId"
         :table-structure="tableStructure"
+        :where="whereFilter"
         :wrap-in-section="false"
         toolbar-teleport=".table-list-section [role='toolbar']"
         :show-toolbar="true"

@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/knadh/koanf/v2"
 	"github.com/knadh/koanf/parsers/yaml"
 	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
+	"github.com/knadh/koanf/v2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -22,6 +22,8 @@ type Config struct {
 	LogLevel  string
 	LogFormat string
 	ConfigDir string
+	// HealthCheckInterval is how often health checks run, as a Go duration (e.g. "15m").
+	HealthCheckInterval string
 }
 
 // Load builds configuration from -configdir, config file, and environment.
@@ -66,6 +68,10 @@ func Load() (*Config, error) {
 			{`koanf key "log_format" (SICKROCK_LOG_FORMAT env and/or config.yaml, env loaded before file)`, k.String("log_format")},
 			{"LOG_FORMAT env", os.Getenv("LOG_FORMAT")},
 			{"default", "text"},
+		}),
+		HealthCheckInterval: coalesceString("health_check_interval", []stringCandidate{
+			{`koanf key "health_check_interval" (SICKROCK_HEALTH_CHECK_INTERVAL env and/or config.yaml, env loaded before file)`, k.String("health_check_interval")},
+			{"default", "15m"},
 		}),
 		ConfigDir: dir,
 	}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
@@ -27,6 +27,12 @@ import {
   Add01Icon,
   RefreshIcon,
   LayoutIcon,
+  DatabaseSettingIcon,
+  Link01Icon,
+  TextIcon,
+  GridIcon,
+  Share08Icon,
+  PaintBrushIcon,
 } from '@hugeicons/core-free-icons'
 
 const iconStrokeWidth = 2.5
@@ -54,6 +60,9 @@ const dropping = ref(false)
 const createColumnDialog = ref<HTMLDialogElement | null>(null)
 const createColumnName = ref<string | undefined>()
 const createColumnType = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | undefined>()
+
+// Row id of this table's entry in table_configurations (for the edit link); null if not visible to the user.
+const tableConfigurationRowId = ref<string | null>(null)
 
 // Rename column state
 const renamingColumn = ref<string | null>(null)
@@ -390,10 +399,53 @@ async function onColumnAdded() {
 }
 
 // Lifecycle
+async function loadTableConfigurationRowId() {
+  try {
+    const res = await client.listItems({ tcName: 'table_configurations', where: { name: tableId } })
+    tableConfigurationRowId.value = res.items?.[0]?.id || null
+  } catch {
+    tableConfigurationRowId.value = null
+  }
+}
+
+// "On this page" links. Sections are wrapped in anchor divs; a link is shown only while its
+// section is rendered (several decide that themselves, e.g. Share or pull-through columns).
+// Icons match each section's own title icon.
+const QUICK_JUMP_SECTIONS = [
+  { id: 'table-configuration', label: 'Table configuration', icon: DatabaseSettingIcon },
+  { id: 'pull-through', label: 'Pull-through columns', icon: Link01Icon },
+  { id: 'row-labels', label: 'Row labels', icon: TextIcon },
+  { id: 'column-display', label: 'Column labels & formatting', icon: Edit03Icon },
+  { id: 'field-grouping', label: 'Field grouping', icon: GridIcon },
+  { id: 'standard-fields', label: 'Standard fields', icon: AddCircleIcon },
+  { id: 'share', label: 'Share', icon: Share08Icon },
+  { id: 'conditional-formatting', label: 'Conditional formatting', icon: PaintBrushIcon },
+]
+const quickJumpLinks = ref<typeof QUICK_JUMP_SECTIONS>([])
+let quickJumpObserver: MutationObserver | null = null
+
+function refreshQuickJumpLinks() {
+  quickJumpLinks.value = QUICK_JUMP_SECTIONS.filter(
+    section => document.getElementById(section.id)?.firstElementChild,
+  )
+}
+
+onMounted(() => {
+  refreshQuickJumpLinks()
+  const container = document.getElementById(QUICK_JUMP_SECTIONS[0].id)?.parentElement
+  if (container) {
+    quickJumpObserver = new MutationObserver(refreshQuickJumpLinks)
+    quickJumpObserver.observe(container, { childList: true, subtree: true })
+  }
+})
+
+onBeforeUnmount(() => quickJumpObserver?.disconnect())
+
 onMounted(async () => {
   await Promise.all([
     loadColumns(),
     loadForeignKeys(),
+    loadTableConfigurationRowId(),
   ])
 })
 </script>
@@ -414,6 +466,18 @@ onMounted(async () => {
       <button type="button" class="neutral" @click="closeCreateColumn">Cancel</button>
     </div>
   </dialog>
+
+  <Section v-if="quickJumpLinks.length > 0" title="On this page" :icon="Link01Icon">
+    <nav class="quick-jump" aria-label="Jump to sections on this page">
+      <template v-for="(link, index) in quickJumpLinks" :key="link.id">
+        <span v-if="index > 0" aria-hidden="true"> · </span>
+        <a :href="`#${link.id}`" class="quick-jump-link">
+          <HugeiconsIcon :icon="link.icon" width="1em" height="1em" aria-hidden="true" />
+          <span>{{ link.label }}</span>
+        </a>
+      </template>
+    </nav>
+  </Section>
 
   <Section
     :padding="false"
@@ -647,36 +711,63 @@ onMounted(async () => {
     </template>
   </Section>
 
-  <TablePullThroughSection
-    v-if="!loading && structureForeignKeys.length > 0"
-    :table-id="tableId"
-    :foreign-keys="structureForeignKeys"
-    :client="client"
-    :design-mode-enabled="designModeEnabled"
-    @saved="loadForeignKeys"
-  />
+  <div id="table-configuration" class="quick-jump-anchor">
+  <Section
+    v-if="tableConfigurationRowId"
+    title="Table configuration"
+    :icon="DatabaseSettingIcon"
+  >
+    <div class="section-content padding">
+      <p>Title, icon, row names, default sort and other settings for this table.</p>
+      <router-link
+        :to="`/table/table_configurations/${tableConfigurationRowId}/edit`"
+        class="button inline-icon neutral"
+      >
+        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Edit table configuration</span>
+      </router-link>
+    </div>
+  </Section>
+  </div>
 
-  <TableRowLabelsEditor
-    v-if="!loading"
-    :table-id="tableId"
-    :client="client"
-    :design-mode-enabled="designModeEnabled"
-    @saved="loadColumns"
-  />
+  <div id="pull-through" class="quick-jump-anchor">
+    <TablePullThroughSection
+      v-if="!loading && structureForeignKeys.length > 0"
+      :table-id="tableId"
+      :foreign-keys="structureForeignKeys"
+      :client="client"
+      :design-mode-enabled="designModeEnabled"
+      @saved="loadForeignKeys"
+    />
+  </div>
 
-  <ColumnDisplayEditor
-    v-if="!loading && columns.length > 0"
-    :table-id="tableId"
-    :column-names="columnNamesForGrouping"
-    :client="client"
-  />
+  <div id="row-labels" class="quick-jump-anchor">
+    <TableRowLabelsEditor
+      v-if="!loading"
+      :table-id="tableId"
+      :client="client"
+      :design-mode-enabled="designModeEnabled"
+      @saved="loadColumns"
+    />
+  </div>
 
-  <FieldGroupingEditor
-    v-if="designModeEnabled && !loading && columns.length > 0"
-    :table-id="tableId"
-    :column-names="columnNamesForGrouping"
-    :client="client"
-  />
+  <div id="column-display" class="quick-jump-anchor">
+    <ColumnDisplayEditor
+      v-if="!loading && columns.length > 0"
+      :table-id="tableId"
+      :column-names="columnNamesForGrouping"
+      :client="client"
+    />
+  </div>
+
+  <div id="field-grouping" class="quick-jump-anchor">
+    <FieldGroupingEditor
+      v-if="designModeEnabled && !loading && columns.length > 0"
+      :table-id="tableId"
+      :column-names="columnNamesForGrouping"
+      :client="client"
+    />
+  </div>
 
   <!-- Drop Column Confirmation Modal -->
   <div v-if="showDropConfirm" class="modal-overlay" @click="showDropConfirm = null">
@@ -702,6 +793,7 @@ onMounted(async () => {
   </div>
 
   <!-- Standard Fields Section -->
+  <div id="standard-fields" class="quick-jump-anchor">
   <Section
     v-if="designModeEnabled && !loading && missingStandardFields.length > 0 && columns.length > 0"
     title="Standard Fields"
@@ -721,11 +813,16 @@ onMounted(async () => {
       </div>
     </div>
   </Section>
+  </div>
 
-  <TableShareSection :table-key="tableId" />
+  <div id="share" class="quick-jump-anchor">
+    <TableShareSection :table-key="tableId" />
+  </div>
 
   <!-- Conditional Formatting Rules Section -->
-  <ConditionalFormattingRules />
+  <div id="conditional-formatting" class="quick-jump-anchor">
+    <ConditionalFormattingRules />
+  </div>
 
   <!-- Drop Foreign Key Confirmation Modal -->
   <div v-if="showDropFkConfirm" class="modal-overlay" @click="showDropFkConfirm = null">
@@ -742,6 +839,20 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.quick-jump {
+  line-height: 1.5;
+}
+
+.quick-jump-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+}
+
+.quick-jump-anchor {
+  scroll-margin-top: 4rem;
+}
+
 .section-title-with-icon {
   display: inline-flex;
   align-items: center;

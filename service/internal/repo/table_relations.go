@@ -12,16 +12,18 @@ import (
 // TableRelation is the authoritative SickRock definition of a foreign-key-style link between tables.
 // Keys are table configuration names (table_configurations.name), not physical table names.
 type TableRelation struct {
-	ID                   int    `db:"id"`
-	ConstraintName       string `db:"constraint_name"`
-	SourceTableKey       string `db:"source_table_key"`
-	SourceColumn         string `db:"source_column"`
-	ReferencedTableKey   string `db:"referenced_table_key"`
-	ReferencedColumn     string `db:"referenced_column"`
-	OnDeleteAction       string         `db:"on_delete_action"`
-	OnUpdateAction       string         `db:"on_update_action"`
-	DisplayName          sql.NullString `db:"display_name"`
-	PullThroughJSON      sql.NullString `db:"pull_through_json"`
+	ID                 int            `db:"id"`
+	ConstraintName     string         `db:"constraint_name"`
+	SourceTableKey     string         `db:"source_table_key"`
+	SourceColumn       string         `db:"source_column"`
+	ReferencedTableKey string         `db:"referenced_table_key"`
+	ReferencedColumn   string         `db:"referenced_column"`
+	OnDeleteAction     string         `db:"on_delete_action"`
+	OnUpdateAction     string         `db:"on_update_action"`
+	DisplayName        sql.NullString `db:"display_name"`
+	PullThroughJSON    sql.NullString `db:"pull_through_json"`
+	AbsorbIntoItem     bool           `db:"absorb_into_item"`
+	AbsorbType         sql.NullString `db:"absorb_type"`
 }
 
 func makeForeignKeyConstraintName(sourceTableKey, sourceColumn, referencedTableKey, referencedColumn string) string {
@@ -73,7 +75,8 @@ func (r *Repository) getTableRelationByConstraintName(ctx context.Context, const
 	var rel TableRelation
 	err := r.db.GetContext(ctx, &rel, `
 		SELECT id, constraint_name, source_table_key, source_column,
-			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json
+			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json,
+			absorb_into_item, absorb_type
 		FROM table_relations WHERE constraint_name = ?`, constraintName)
 	if err != nil {
 		return nil, err
@@ -85,7 +88,8 @@ func (r *Repository) listTableRelationsForConfiguration(ctx context.Context, tab
 	var rows []TableRelation
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, constraint_name, source_table_key, source_column,
-			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json
+			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json,
+			absorb_into_item, absorb_type
 		FROM table_relations
 		WHERE source_table_key = ? OR referenced_table_key = ?
 		ORDER BY constraint_name`, tableConfigName, tableConfigName)
@@ -96,7 +100,8 @@ func (r *Repository) listTableRelationsForSourceConfiguration(ctx context.Contex
 	var rows []TableRelation
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, constraint_name, source_table_key, source_column,
-			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json
+			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json,
+			absorb_into_item, absorb_type
 		FROM table_relations
 		WHERE source_table_key = ?
 		ORDER BY constraint_name`, sourceTableKey)
@@ -133,6 +138,8 @@ func (r *Repository) tableRelationToForeignKey(ctx context.Context, rel TableRel
 		OnUpdateAction:    rel.OnUpdateAction,
 		DisplayName:       displayName,
 		PullThroughFields: pullThrough,
+		AbsorbIntoItem:    rel.AbsorbIntoItem,
+		AbsorbType:        absorbTypeOrDefault(rel.AbsorbIntoItem, rel.AbsorbType.String),
 	}, nil
 }
 
@@ -298,4 +305,44 @@ func (r *Repository) introspectOutgoingPhysicalForeignKeys(ctx context.Context, 
 		}
 		return foreignKeys, nil
 	}
+}
+
+// RelationAbsorbFirstRow shows the first related row's fields inside the item's main section.
+const RelationAbsorbFirstRow = "first_row"
+
+var relationAbsorbTypes = map[string]bool{RelationAbsorbFirstRow: true}
+
+func absorbTypeOrDefault(absorb bool, absorbType string) string {
+	if !absorb {
+		return ""
+	}
+	if relationAbsorbTypes[absorbType] {
+		return absorbType
+	}
+	return RelationAbsorbFirstRow
+}
+
+// SetTableRelationAbsorb sets whether (and how) a relation's rows are absorbed into the item view.
+func (r *Repository) SetTableRelationAbsorb(ctx context.Context, constraintName string, absorb bool, absorbType string) error {
+	absorbType = strings.TrimSpace(absorbType)
+	var typeArg interface{}
+	if absorb {
+		if absorbType == "" {
+			absorbType = RelationAbsorbFirstRow
+		}
+		if !relationAbsorbTypes[absorbType] {
+			return fmt.Errorf("unsupported absorb type %q", absorbType)
+		}
+		typeArg = absorbType
+	}
+	res, err := r.db.ExecContext(ctx,
+		"UPDATE table_relations SET absorb_into_item = ?, absorb_type = ? WHERE constraint_name = ?",
+		absorb, typeArg, strings.TrimSpace(constraintName))
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("table relation not found")
+	}
+	return nil
 }

@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
+	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	armlayer "github.com/jamesread/armature-iam/layer"
 	"github.com/jamesread/armature-iam/store"
-	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	log "github.com/sirupsen/logrus"
 )
 

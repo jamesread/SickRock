@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"connectrpc.com/connect"
-	armlayer "github.com/jamesread/armature-iam/layer"
 	"github.com/jamesread/SickRock/internal/iam"
+	armlayer "github.com/jamesread/armature-iam/layer"
 )
 
 func (s *SickRockServer) authUser(ctx context.Context) *armlayer.AuthenticatedUser {

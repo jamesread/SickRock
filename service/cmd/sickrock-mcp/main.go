@@ -15,10 +15,10 @@ import (
 	"strings"
 
 	"connectrpc.com/connect"
-	"github.com/mark3labs/mcp-go/mcp"
-	"github.com/mark3labs/mcp-go/server"
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
 )
 
 func main() {
@@ -266,7 +266,7 @@ func handleCreateItem(ctx context.Context, client sickrockpbconnect.SickRockClie
 		return mcp.NewToolResultError("invalid additional_fields JSON: " + err.Error()), nil
 	}
 	res, err := client.CreateItem(ctx, connect.NewRequest(&sickrockpb.CreateItemRequest{
-		PageId:          pageID,
+		PageId:           pageID,
 		AdditionalFields: fields,
 	}))
 	if err != nil {
@@ -293,8 +293,8 @@ func handleEditItem(ctx context.Context, client sickrockpbconnect.SickRockClient
 		return mcp.NewToolResultError("invalid additional_fields JSON: " + err.Error()), nil
 	}
 	res, err := client.EditItem(ctx, connect.NewRequest(&sickrockpb.EditItemRequest{
-		PageId:          pageID,
-		Id:              id,
+		PageId:           pageID,
+		Id:               id,
 		AdditionalFields: fields,
 	}))
 	if err != nil {

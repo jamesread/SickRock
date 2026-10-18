@@ -54,8 +54,11 @@ SickRock is a no-code database web application builder that allows users to crea
 **API Endpoints**:
 - `CreateTableView` - Create custom table views
 - `UpdateTableView` - Modify existing views
-- `GetTableViews` - List available views
+- `GetTableViews` - List available views (includes each view's `layoutJson` and the caller's `userDefaultViewId`)
+- `SetUserDefaultTableView` - Set or clear the caller's own default view for a table
 - `GetDashboards` - Manage dashboard components
+
+Table views are stored on the server: column visibility/order/sort in `table_view_columns`, plus filters, group-by, page size and column priorities as a JSON object in `table_views.layout_json`. The frontend passes PicoCrank Table `viewControlMode="callbackControlled"` with server-backed `viewSettings` hooks (`frontend/src/composables/useServerTableViewSettings.ts`), so views saved from PicoCrank's view menu never go to browser localStorage. Each user may pick their own default view (`table_view_user_defaults`); otherwise the table-wide `is_default` view is used.
 
 ### 3. Data Analysis Agent
 **Purpose**: Analyze data patterns and provide insights
@@ -131,6 +134,16 @@ The `ListItems` API automatically includes synthetic fields to enhance data anal
 - `DropColumn` - Remove columns safely
 - `ChangeColumnName` - Rename columns
 - `CreateForeignKey` - Add relationships
+
+## Health checks
+
+SickRock runs **health checks** in the background (shortly after startup, then every `health_check_interval`, default `15m`, set via `SICKROCK_HEALTH_CHECK_INTERVAL` or `config.yaml`) and shows the issues they find to admins (`system.settings`) on **Control Panel → Health** (`/admin/health`), with an issue count on the sidebar's System → Health link. Issues are stored in `health_issues` (check runs in `health_check_runs`). A new warning or error sends the opt-in `health.issue_raised` notification event once.
+
+- **Adding a check:** implement `health.Check` (`ID()`, `Title()`, `Run(ctx) ([]health.Issue, error)`) in a new file in `service/internal/health/`, and add it to `DefaultChecks` in `checks.go`. Put database queries in `service/internal/repo/health_checks.go`.
+- **Issues:** `Key` must be stable for the same problem across runs (e.g. `nav:42`); an issue no longer returned is resolved, and one that recurs later is a new issue. Use `error` for things that break the app or security, `warning` for broken configuration, and `info` for advice; only warnings and errors are notified and counted. Set `Link` to the frontend path where it can be fixed.
+- **Failures:** a check that returns an error (or panics) is recorded as failed and keeps its previous issues.
+- **Logged errors:** a logrus hook (`health.ErrorLog`) groups error-level log lines by fingerprint for the `logs.recent_errors` check.
+- **API:** `ListHealthIssues`, `GetHealthSummary`, `RunHealthChecks`, `AcknowledgeHealthIssue` (all require `system.settings`).
 
 ## MCP Server
 

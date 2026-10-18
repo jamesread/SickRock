@@ -6,6 +6,7 @@ import { DatabaseIcon, Link01Icon } from '@hugeicons/core-free-icons'
 import Table from '../components/TableComponent.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { rowInsertActionLabel } from '../utils/rowInsertLabel'
+import type { IconData } from '../utils/hugeicons'
 
 export type RelatedTableEntry = {
   tableName: string
@@ -19,6 +20,9 @@ export type RelatedTableEntry = {
   constraintName: string
   displayName: string
   pullThroughExtraFields?: Field[]
+  /** Shown inside the item's main section instead of as its own section. */
+  absorbIntoItem?: boolean
+  absorbType?: string
 }
 
 const props = defineProps<{
@@ -31,6 +35,8 @@ const props = defineProps<{
   canEditRelation: boolean
   /** Render table without an outer Section (for tab panel content). */
   embedInTabs?: boolean
+  /** Icon of the related table configuration, for the section title (defaults to DatabaseIcon). */
+  icon?: IconData
 }>()
 
 const relatedInsertRoute = computed(() => ({
@@ -51,7 +57,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <Section v-if="loadingRelated && !embedInTabs" :title="table.title" :icon="DatabaseIcon">
+  <Section v-if="loadingRelated && !embedInTabs" :title="table.title" :icon="icon ?? DatabaseIcon">
     <p class="loading-related">Loading related rows…</p>
   </Section>
   <p v-else-if="loadingRelated && embedInTabs" class="loading-related">Loading related rows…</p>
@@ -72,6 +78,7 @@ const emit = defineEmits<{
     :related-empty-parent-label="parentRowLabel"
     :insert-route-override="relatedInsertRoute"
     :extra-fields="table.pullThroughExtraFields"
+    :section-icon="icon"
     @rows-updated="emit('rowsUpdated')"
     @row-deleted="(id: string) => emit('rowDeleted', id)"
   >
