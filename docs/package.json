@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "@antora/lunr-extension": "^1.0.0-alpha.13",
-    "@cerbos/antora-llm-generator": "^1.1.2",
+    "@cerbos/antora-llm-generator": "^1.2.0",
     "antora": "^3.2.1",
     "asciidoctor-kroki": "^1.0.1"
   },
