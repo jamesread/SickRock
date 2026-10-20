@@ -64,6 +64,7 @@ import RowViewFieldEntries from './RowViewFieldEntries.vue'
 import AbsorbedRelationFields from './AbsorbedRelationFields.vue'
 import { whenHugeiconAvailable, type IconData } from '../utils/hugeicons'
 import { rowViewFieldUiKey } from './rowViewFieldUi'
+import { orderBySchema } from '../utils/schemaFieldOrder'
 
 type FieldEntry = {
   key: string
@@ -699,7 +700,10 @@ const entries = computed(() => {
 
   // Handle additionalFields by flattening them
   if (item.value.additionalFields && typeof item.value.additionalFields === 'object') {
-    for (const [key, value] of Object.entries(item.value.additionalFields)) {
+    const additionalFields = item.value.additionalFields
+    const schemaOrder = (tableStructure.value?.fields ?? []).map(f => f.name)
+    for (const key of orderBySchema(Object.keys(additionalFields), schemaOrder)) {
+      const value = additionalFields[key]
       // Remove internal/system fields
       if (key === '$typeName') continue
       // Skip markdown fields - they're handled by their base field

@@ -1,0 +1,252 @@
+{
+  "apps": [
+    {
+      "title": "Customers",
+      "ordinal": 1
+    },
+    {
+      "title": "Operations",
+      "ordinal": 2
+    }
+  ],
+  "tables": [
+    {
+      "name": "clients",
+      "app": "Customers",
+      "icon": "UserGroupIcon",
+      "rowName": "Client",
+      "rowNamePlural": "Clients",
+      "columns": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "label": "Name"
+        },
+        {
+          "name": "contact",
+          "type": "string",
+          "label": "Contact"
+        },
+        {
+          "name": "email",
+          "type": "string",
+          "label": "Email"
+        },
+        {
+          "name": "city",
+          "type": "string",
+          "label": "City"
+        },
+        {
+          "name": "plan",
+          "type": "string",
+          "label": "Plan"
+        }
+      ],
+      "fieldGroups": [
+        {
+          "title": "Client",
+          "columns": [
+            "name",
+            "plan",
+            "city"
+          ]
+        },
+        {
+          "title": "Contact",
+          "columns": [
+            "contact",
+            "email"
+          ]
+        }
+      ],
+      "views": [
+        {
+          "name": "All clients",
+          "type": "table",
+          "default": true,
+          "columns": [
+            "name",
+            "contact",
+            "email",
+            "city",
+            "plan"
+          ],
+          "sort": {
+            "name": "asc"
+          }
+        }
+      ]
+    },
+    {
+      "name": "jobs",
+      "app": "Operations",
+      "icon": "Plant02Icon",
+      "rowName": "Job",
+      "rowNamePlural": "Jobs",
+      "columns": [
+        {
+          "name": "title",
+          "type": "string",
+          "required": true,
+          "label": "Job"
+        },
+        {
+          "name": "client_id",
+          "type": "int64",
+          "label": "Client"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "label": "Status"
+        },
+        {
+          "name": "crew",
+          "type": "string",
+          "label": "Crew"
+        },
+        {
+          "name": "quote",
+          "type": "int64",
+          "label": "Quote",
+          "prefix": "$"
+        },
+        {
+          "name": "starts",
+          "type": "datetime",
+          "label": "Starts"
+        }
+      ],
+      "fieldGroups": [
+        {
+          "title": "Job",
+          "columns": [
+            "title",
+            "client_id",
+            "status"
+          ]
+        },
+        {
+          "title": "Schedule",
+          "columns": [
+            "starts",
+            "crew",
+            "quote"
+          ]
+        }
+      ],
+      "views": [
+        {
+          "name": "Schedule",
+          "type": "table",
+          "default": true,
+          "columns": [
+            "id",
+            "title",
+            "client_id",
+            "status",
+            "crew",
+            "starts",
+            "quote"
+          ],
+          "sort": {
+            "starts": "asc"
+          }
+        },
+        {
+          "name": "Calendar",
+          "type": "calendar",
+          "columns": [
+            "title",
+            "client_id",
+            "status",
+            "crew",
+            "starts"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "equipment",
+      "icon": "TractorIcon",
+      "rowName": "Equipment item",
+      "rowNamePlural": "Equipment",
+      "columns": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "label": "Name"
+        },
+        {
+          "name": "serial",
+          "type": "string",
+          "label": "Serial"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "label": "Status"
+        },
+        {
+          "name": "hours",
+          "type": "int64",
+          "label": "Engine hours",
+          "suffix": " h"
+        },
+        {
+          "name": "last_serviced",
+          "type": "datetime",
+          "label": "Last serviced"
+        }
+      ],
+      "fieldGroups": [
+        {
+          "title": "Equipment",
+          "columns": [
+            "name",
+            "serial",
+            "status"
+          ]
+        },
+        {
+          "title": "Maintenance",
+          "columns": [
+            "hours",
+            "last_serviced"
+          ]
+        }
+      ],
+      "views": [
+        {
+          "name": "All equipment",
+          "type": "table",
+          "default": true,
+          "columns": [
+            "name",
+            "serial",
+            "status",
+            "hours",
+            "last_serviced"
+          ],
+          "sort": {
+            "name": "asc"
+          }
+        }
+      ],
+      "app": "Operations"
+    }
+  ],
+  "foreignKeys": [
+    {
+      "table": "jobs",
+      "column": "client_id",
+      "references": "clients",
+      "referencedColumn": "id",
+      "displayName": "Jobs"
+    }
+  ],
+  "adminPassword": "fernbrook-demo"
+}

@@ -1,0 +1,8 @@
+[
+  {"name": "Ride-on mower", "serial": "DEMO-RM-0142", "status": "In service", "hours": "612", "last_serviced": "@day-21 09:00"},
+  {"name": "Compact tractor", "serial": "DEMO-CT-0077", "status": "In service", "hours": "1380", "last_serviced": "@day-35 09:00"},
+  {"name": "Hedge cutter (long reach)", "serial": "DEMO-HC-0310", "status": "In service", "hours": "214", "last_serviced": "@day-14 09:00"},
+  {"name": "Mini digger", "serial": "DEMO-MD-0019", "status": "Booked for service", "hours": "2045", "last_serviced": "@day-88 09:00"},
+  {"name": "Leaf blower", "serial": "DEMO-LB-0533", "status": "In service", "hours": "397", "last_serviced": "@day-30 09:00"},
+  {"name": "Pressure washer", "serial": "DEMO-PW-0208", "status": "In service", "hours": "158", "last_serviced": "@day-7 09:00"}
+]

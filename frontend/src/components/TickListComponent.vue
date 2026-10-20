@@ -15,7 +15,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'view-changed': [viewType: string]
+  'view-changed': [viewType: string, viewId?: number]
 }>()
 
 type Item = Record<string, unknown>
@@ -196,8 +196,8 @@ onMounted(() => {
         :table-id="props.tableId"
         :show-view-create="true"
         :show-view-edit="true"
-        @view-changed="(viewType: string) => {
-          emit('view-changed', viewType)
+        @view-changed="(viewType: string, viewId?: number) => {
+          emit('view-changed', viewType, viewId)
           if (viewType === 'ticklist') {
             load()
           }

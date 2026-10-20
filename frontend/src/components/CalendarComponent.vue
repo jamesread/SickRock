@@ -17,6 +17,8 @@ import { useRbac } from '../composables/useRbac'
 const props = defineProps<{
   tableId?: string
   viewName?: string
+  /** View to start on (e.g. the calendar view just picked on the table page). */
+  viewId?: number
   exportSlug?: string
   readOnly?: boolean
   freeBusy?: boolean
@@ -29,7 +31,7 @@ const effectiveTableId = computed(() => props.tableId || exportTableId.value)
 const effectiveFreeBusy = computed(() => props.freeBusy === true || exportFreeBusy.value)
 
 const emit = defineEmits<{
-  'view-changed': [viewType: string]
+  'view-changed': [viewType: string, viewId?: number]
 }>()
 
 const { hasPermission } = useRbac()
@@ -37,7 +39,7 @@ const canManageExports = computed(() => hasPermission('exports.manage'))
 
 const viewManager = props.tableId
   ? useTableViewManager(props.tableId, view => {
-      emit('view-changed', view?.viewType || 'table')
+      emit('view-changed', view?.viewType || 'table', view?.id ?? -1)
     })
   : null
 
@@ -199,7 +201,7 @@ const calendarEventDragEnabled = computed(() => {
 
 // Computed property for the section title
 const sectionTitle = computed(() => {
-  return props.viewName || tableTitle.value || `Table: ${effectiveTableId.value || 'calendar'}`
+  return props.viewName || viewManager?.currentView.value?.viewName || tableTitle.value || `Table: ${effectiveTableId.value || 'calendar'}`
 })
 
 // Transport handled by authenticated client
@@ -393,6 +395,9 @@ async function load() {
   selectedDate.value = `${newYear}-${String(newMonth + 1).padStart(2, '0')}`
 
   if (viewManager) {
+    if (props.viewId != null && viewManager.selectedViewId.value === null) {
+      viewManager.selectedViewId.value = props.viewId
+    }
     await viewManager.loadTableViews()
   }
   await reloadItems()

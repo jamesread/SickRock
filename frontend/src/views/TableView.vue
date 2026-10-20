@@ -71,8 +71,11 @@ const tableSectionTitle = computed(() =>
   ),
 )
 
-function handleViewChanged(viewType: string) {
+function handleViewChanged(viewType: string, viewId?: number) {
   currentViewType.value = viewType
+  if (viewId != null) {
+    viewManager.selectedViewId.value = viewId
+  }
   viewTypeInitialized.value = true // Mark as initialized by user interaction
 }
 
@@ -103,7 +106,7 @@ onMounted(async () => {
 <template>
   <div v-if="loading">Loading...</div>
   <template v-else>
-    <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" :view-name="currentViewName" @view-changed="handleViewChanged" />
+    <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" :view-name="currentViewName" :view-id="viewManager.selectedViewId.value ?? undefined" @view-changed="handleViewChanged" />
     <TickListComponent v-else-if="currentViewType === 'ticklist'" :table-id="tableId" @view-changed="handleViewChanged" />
     <Section
       v-else

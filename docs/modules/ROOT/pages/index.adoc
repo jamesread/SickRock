@@ -9,6 +9,45 @@ SickRock is a Go and Vue reimplementation of the Sicroc LAMP-stack application. 
 
 This documentation site is llm.txt compatible. See https://jamesread.github.io/SickRock/llm.txt[llm.txt] and https://jamesread.github.io/SickRock/llm-full.txt[llm-full.txt].
 
+== Screenshots
+
+.Tables on your own database
+image::marketing/table.png[Tables on your own database]
+
+Browse a real database table as a sortable, filterable list, with friendly column labels, currency formatting and linked records. Saved views let each user choose which columns they see.
+
+.Records with related rows
+image::marketing/row.png[Records with related rows]
+
+Each record gets its own page with fields grouped into sections, inline editing, and the rows that reference it (here, a client's jobs) listed underneath.
+
+.Forms for data entry
+image::marketing/insert-row.png[Forms for data entry]
+
+Add rows through a generated form with date pickers and a searchable picker for linked records, without writing any code.
+
+.Calendar view
+image::marketing/calendar.png[Calendar view]
+
+Any table with a start date can be shown as a calendar, so schedules and bookings can be planned at a glance and shared as a read-only export.
+
+.Home
+image::marketing/home.png[Home]
+
+The home page brings back the records you looked at most recently, and the sidebar groups your tables into apps such as Customers and Operations.
+
+.Control panel
+image::marketing/control-panel.png[Control panel]
+
+Administrators manage tables, navigation, dashboards, users, roles and health checks from one control panel, all inside the browser.
+
+.Dark mode
+image::marketing/table-dark.png[Dark mode]
+
+The whole interface is also available in a dark theme.
+
+Screenshots use fictional data and are regenerated with `make screenshots` (see https://github.com/jamesread/SickRock/tree/main/var/marketing/screenshots[var/marketing/screenshots]).
+
 == Vibe coded project
 
 SickRock is deliberately "vibe coded" as an experiment in AI-assisted development. Most of the code is human reviewed, but it is not human written in the traditional sense. See the https://github.com/jamesread/SickRock[GitHub repository] for the full disclosure in the README.

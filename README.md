@@ -14,6 +14,53 @@
 
 SickRock is a no-code database web application builder. Connect SQLite or MySQL, configure tables and views in the UI, and expose data through the web interface, Connect RPC API, OpenAPI spec, or MCP server. It is a Go and Vue reimplementation of the Sicroc LAMP-stack application.
 
+## Screenshots
+
+### Tables on your own database
+
+![Tables on your own database](var/marketing/screenshots/table.png)
+
+Browse a real database table as a sortable, filterable list, with friendly column labels, currency formatting and linked records. Saved views let each user choose which columns they see.
+
+### Records with related rows
+
+![Records with related rows](var/marketing/screenshots/row.png)
+
+Each record gets its own page with fields grouped into sections, inline editing, and the rows that reference it (here, a client's jobs) listed underneath.
+
+### Forms for data entry
+
+![Forms for data entry](var/marketing/screenshots/insert-row.png)
+
+Add rows through a generated form with date pickers and a searchable picker for linked records, without writing any code.
+
+### Calendar view
+
+![Calendar view](var/marketing/screenshots/calendar.png)
+
+Any table with a start date can be shown as a calendar, so schedules and bookings can be planned at a glance and shared as a read-only export.
+
+### Home
+
+![Home](var/marketing/screenshots/home.png)
+
+The home page brings back the records you looked at most recently, and the sidebar groups your tables into apps such as Customers and Operations.
+
+### Control panel
+
+![Control panel](var/marketing/screenshots/control-panel.png)
+
+Administrators manage tables, navigation, dashboards, users, roles and health checks from one control panel, all inside the browser.
+
+### Dark mode
+
+![Dark mode](var/marketing/screenshots/table-dark.png)
+
+The whole interface is also available in a dark theme.
+
+Screenshots use fictional test data and are regenerated with `make screenshots`
+(see [`var/marketing/screenshots`](var/marketing/screenshots/README.md)).
+
 ## Installation Guide & Documentation
 
 The SickRock docs can all be found here: [Installation Guide & Documentation](https://jamesread.github.io/SickRock/index.html)

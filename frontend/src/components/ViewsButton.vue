@@ -25,7 +25,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  'view-changed': [viewType: string]
+  'view-changed': [viewType: string, viewId?: number]
   'view-selected': [viewId: number]
 }>()
 
@@ -36,7 +36,7 @@ const useExternalState = computed(() => !!props.externalViews)
 const internalManager = useTableViewManager(props.tableId, (view: TableView | null) => {
   if (!useExternalState.value) {
     const viewType = view?.viewType || 'table'
-    emit('view-changed', viewType)
+    emit('view-changed', viewType, view?.id ?? -1)
   }
 })
 

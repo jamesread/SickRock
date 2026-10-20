@@ -60,7 +60,7 @@ export function tableViewFromProto(view: ProtoTableViewLike): TableView {
 }
 
 /** The view to show first: the user's own default, then the table default, then the first view. */
-export function initialTableView(views: TableView[], userDefaultViewId: number): TableView | null {
+export function initialTableView<T extends Pick<TableView, 'id' | 'isDefault'>>(views: T[], userDefaultViewId: number): T | null {
   return views.find(view => userDefaultViewId > 0 && view.id === userDefaultViewId)
     ?? views.find(view => view.isDefault)
     ?? views[0]

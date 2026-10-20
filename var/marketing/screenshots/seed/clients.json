@@ -1,0 +1,10 @@
+[
+  {"name": "Willowmere Primary School", "contact": "Dana Okafor", "email": "grounds@willowmere.example.com", "city": "Ashford", "plan": "Monthly maintenance"},
+  {"name": "Harbourside Hotel", "contact": "Luis Moreno", "email": "facilities@harbourside.example.com", "city": "Port Elden", "plan": "Weekly maintenance"},
+  {"name": "Copperfield Business Park", "contact": "Priya Raman", "email": "estates@copperfield.example.org", "city": "Ashford", "plan": "Monthly maintenance"},
+  {"name": "The Old Mill Tearooms", "contact": "Sam Whitlock", "email": "hello@oldmill.example.com", "city": "Brindle", "plan": "One-off projects"},
+  {"name": "Riverside Allotment Society", "contact": "Grace Lin", "email": "secretary@riverside-allotments.example.org", "city": "Port Elden", "plan": "Seasonal"},
+  {"name": "Maple Court Apartments", "contact": "Tomás Novak", "email": "manager@maplecourt.example.com", "city": "Brindle", "plan": "Weekly maintenance"},
+  {"name": "Kestrel Veterinary Clinic", "contact": "Amira Haddad", "email": "admin@kestrelvets.example.com", "city": "Ashford", "plan": "Seasonal"},
+  {"name": "St Brigid's Community Hall", "contact": "Owen Prescott", "email": "bookings@stbrigids.example.org", "city": "Lowfield", "plan": "One-off projects"}
+]

@@ -14,6 +14,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { rowInsertActionLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
+import { initialTableView } from '../utils/serverTableViews'
 
 const route = useRoute()
 const router = useRouter()
@@ -83,8 +84,7 @@ onMounted(async () => {
         }))
       }))
 
-      const defaultView = tableViews.value.find(v => v.isDefault)
-      selectedViewId.value = defaultView ? defaultView.id : (tableViews.value[0]?.id ?? -1)
+      selectedViewId.value = initialTableView(tableViews.value, viewsRes.userDefaultViewId)?.id ?? -1
     } catch (e) {
       selectedViewId.value = -1
     }

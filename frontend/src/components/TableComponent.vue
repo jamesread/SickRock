@@ -125,7 +125,7 @@ const emit = defineEmits<{
   'view-created': []
   'rows-updated': []
   'row-deleted': [id: string]
-  'view-changed': [viewType: string]
+  'view-changed': [viewType: string, viewId?: number]
 }>()
 
 const client = createApiClient()
@@ -442,7 +442,7 @@ function selectView(viewId: number) {
   selectedViewId.value = viewId
   nextTick(() => {
     const view = tableViews.value.find(candidate => candidate.id === viewId)
-    emit('view-changed', view?.viewType || 'table')
+    emit('view-changed', view?.viewType || 'table', viewId)
   })
 }
 

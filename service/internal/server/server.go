@@ -1982,7 +1982,7 @@ func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect
 			Icon:          item.Icon,
 			UpdatedAtUnix: item.UpdatedAtUnix,
 			ItemName:      item.ItemName,
-			TableTitle:    item.TableTitle,
+			TableTitle:    displayNavigationTitle(item.TableTitle),
 		})
 		if len(pbItems) >= limit {
 			break

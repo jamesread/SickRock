@@ -1,0 +1,4 @@
+# SickRock config for the throwaway marketing stack (see Makefile).
+configVersion: 1
+listen_port: 18480
+log_level: info

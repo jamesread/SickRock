@@ -124,8 +124,11 @@ export function registerMainSidebarNavigation(
     icon: options.homeIcon,
   })
 
-  const ungroupedFromApi = options.ungroupedItems?.length
-    ? pagesFromNavigationItems(options.ungroupedItems)
+  // Fall back to every page only when the server sent no grouping at all; when every
+  // link belongs to an app, ungroupedItems is legitimately empty.
+  const hasAppItems = (options.apps ?? []).some(app => (app.items ?? []).length > 0)
+  const ungroupedFromApi = options.ungroupedItems?.length || hasAppItems
+    ? pagesFromNavigationItems(options.ungroupedItems ?? [])
     : pages
 
   if (ungroupedFromApi.length > 0) {

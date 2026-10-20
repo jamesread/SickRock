@@ -1,4 +1,4 @@
-.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview lint icons icons-clean docs integration-test it
+.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview lint icons icons-clean docs integration-test it screenshots
 
 all: proto-generate frontend-build service-build
 
@@ -79,3 +79,8 @@ integration-test: service-build frontend-build
 	$(MAKE) -wC integration-tests
 
 it: integration-test
+
+# Marketing screenshots: needs podman (or CONTAINER=docker) and repo-helper,
+# so it is not part of `all`.
+screenshots:
+	$(MAKE) -wC var/marketing/screenshots
