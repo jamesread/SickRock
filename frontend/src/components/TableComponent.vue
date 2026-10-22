@@ -133,7 +133,7 @@ const { loadUsers, displayUserLabel } = useIamUsers()
 const tableRef = ref<TableApi | null>(null)
 const tableStructure = ref<GetTableStructureResponse | null>(props.tableStructure ?? null)
 const tableTitle = ref('')
-const items = ref<Item[]>([])
+const loadedItems = ref<Item[]>([])
 const loading = ref(true)
 const error = ref<string | null>(null)
 const relationExtraFields = ref<Field[]>([])
@@ -160,7 +160,7 @@ const fieldDefs = computed<Field[]>(() => {
   return [...base, ...extra.filter(field => !names.has(field.name))]
 })
 
-const sourceItems = computed<Item[]>(() => (props.items ?? items.value) as Item[])
+const sourceItems = computed<Item[]>(() => (props.items ?? loadedItems.value) as Item[])
 const flattenedRows = computed<TableRow[]>(() => {
   const rows = flattenItems(sourceItems.value)
   const primaryKeyColumn = tableStructure.value?.primaryKeyColumn
@@ -511,10 +511,10 @@ async function load() {
     if (!isOnline() && canCacheOffline) {
       const cachedItems = await loadTableData(props.tableId, emptyWhere)
       if (cachedItems !== null) {
-        items.value = await applySourceRelationExtras(cachedItems as Item[])
+        loadedItems.value = await applySourceRelationExtras(cachedItems as Item[])
         return
       }
-      items.value = []
+      loadedItems.value = []
       error.value = 'No offline data available. Please connect to the internet to load table data.'
       return
     }
@@ -524,16 +524,16 @@ async function load() {
     const response = await client.listItems({ tcName: props.tableId, where: emptyWhere })
     let loaded = Array.isArray(response.items) ? response.items : []
     loaded = await applySourceRelationExtras(loaded)
-    items.value = loaded
+    loadedItems.value = loaded
 
     if (canCacheOffline && isOnline()) {
-      await saveTableData(props.tableId, items.value, emptyWhere)
+      await saveTableData(props.tableId, loadedItems.value, emptyWhere)
     }
   } catch (loadError) {
     if (canCacheOffline) {
       const cachedItems = await loadTableData(props.tableId, emptyWhere)
       if (cachedItems !== null) {
-        items.value = await applySourceRelationExtras(cachedItems as Item[])
+        loadedItems.value = await applySourceRelationExtras(cachedItems as Item[])
         error.value = null
         return
       }

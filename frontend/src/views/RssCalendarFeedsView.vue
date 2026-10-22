@@ -54,6 +54,13 @@ function formatLastRefresh(feed: RssCalendarFeed): string {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString()
 }
 
+const maxUrlLength = 60
+
+// Feed URLs can be very long (often with embedded tokens); show the start and keep the full URL in the tooltip.
+function truncateUrl(url: string): string {
+  return url.length > maxUrlLength ? `${url.slice(0, maxUrlLength)}…` : url
+}
+
 onMounted(() => void load())
 </script>
 
@@ -88,7 +95,7 @@ onMounted(() => void load())
         <tr v-for="feed in feeds" :key="feed.id">
           <td>
             <RouterLink :to="`/admin/rss-calendar-feeds/${feed.id}`">{{ feed.name }}</RouterLink>
-            <div class="text-sm subtle">{{ feed.feedUrl }}</div>
+            <div class="text-sm subtle" :title="feed.feedUrl">{{ truncateUrl(feed.feedUrl) }}</div>
           </td>
           <td>
             <RouterLink :to="`/table/${feed.tableConfiguration}`">{{ feed.tableConfiguration }}</RouterLink>

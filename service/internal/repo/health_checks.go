@@ -8,9 +8,9 @@ import (
 
 // BrokenNavigationLink is a table_navigation row whose target is missing.
 type BrokenNavigationLink struct {
-	ID                 int    `db:"id"`
 	Name               string `db:"name"`
 	Title              string `db:"title"`
+	ID                 int    `db:"id"`
 	TableConfiguration int    `db:"table_configuration"`
 	DashboardID        int    `db:"dashboard_id"`
 	WorkflowID         int    `db:"workflow_id"`
@@ -81,10 +81,10 @@ func (r *Repository) FindDuplicateTableConfigurationNames(ctx context.Context) (
 
 // TableConfigurationTarget is where a table configuration's data lives.
 type TableConfigurationTarget struct {
-	ID    int    `db:"id"`
 	Name  string `db:"name"`
 	Db    string `db:"db"`
 	Table string `db:"table_name"`
+	ID    int    `db:"id"`
 }
 
 // ListTableConfigurationTargets returns every table configuration's database and physical table

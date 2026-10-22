@@ -135,6 +135,10 @@ func (s *MySQL) ListRBACRoles(ctx context.Context) ([]store.RBACRoleRow, error) 
 	if err != nil {
 		return nil, fmt.Errorf("list rbac roles: %w", err)
 	}
+	return s.loadRBACRoles(ctx, ids)
+}
+
+func (s *MySQL) loadRBACRoles(ctx context.Context, ids []int) ([]store.RBACRoleRow, error) {
 	out := make([]store.RBACRoleRow, 0, len(ids))
 	for _, id := range ids {
 		role, err := s.loadRBACRole(ctx, id)
@@ -220,18 +224,22 @@ func (s *MySQL) updateRBACRoleTx(ctx context.Context, id int, name, description 
 		return fmt.Errorf("update rbac role begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
-	if err := execTxOp(ctx, tx, "update rbac role",
-		`UPDATE rbac_roles SET name = ?, description = ?, updated_at = NOW(3) WHERE id = ?`,
-		name, description, id); err != nil {
-		return err
-	}
-	if err := maybeSetRolePerms(ctx, s, tx, id, permissionIDs, curName); err != nil {
+	if err := s.applyRBACRoleUpdate(ctx, tx, id, name, description, permissionIDs, curName); err != nil {
 		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("update rbac role commit: %w", err)
 	}
 	return nil
+}
+
+func (s *MySQL) applyRBACRoleUpdate(ctx context.Context, tx *sql.Tx, id int, name, description string, permissionIDs []int, curName string) error {
+	if err := execTxOp(ctx, tx, "update rbac role",
+		`UPDATE rbac_roles SET name = ?, description = ?, updated_at = NOW(3) WHERE id = ?`,
+		name, description, id); err != nil {
+		return err
+	}
+	return maybeSetRolePerms(ctx, s, tx, id, permissionIDs, curName)
 }
 
 func maybeSetRolePerms(ctx context.Context, s *MySQL, tx *sql.Tx, id int, permissionIDs []int, curName string) error {

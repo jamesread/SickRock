@@ -1,4 +1,5 @@
 -- Issues found by health checks (see internal/health). Times are unix seconds.
+-- The two tables mirror github.com/jamesread/armature-health migrate/mysql/health.sql; keep them in step.
 -- At most one open (resolved_at IS NULL) row per (check_id, issue_key); a recurrence after
 -- resolution inserts a new row.
 CREATE TABLE IF NOT EXISTS health_issues (

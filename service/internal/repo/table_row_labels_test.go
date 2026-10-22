@@ -12,9 +12,9 @@ func TestSetTableRowLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if _, err := db.Exec(`
+	if _, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_configurations (
 			name TEXT PRIMARY KEY,
 			db TEXT,
@@ -38,7 +38,7 @@ func TestSetTableRowLabels(t *testing.T) {
 	r := NewRepository(db)
 	ctx := context.Background()
 
-	if err := r.SetTableRowLabels(ctx, "quotes", "quote", "quotes"); err != nil {
+	if err = r.SetTableRowLabels(ctx, "quotes", "quote", "quotes"); err != nil {
 		t.Fatalf("set labels: %v", err)
 	}
 	tc, err := r.GetTableConfiguration(ctx, "quotes")
@@ -52,7 +52,7 @@ func TestSetTableRowLabels(t *testing.T) {
 		t.Fatalf("row name plural = %q, want quotes", tc.DisplayRowNamePlural())
 	}
 
-	if err := r.SetTableRowLabels(ctx, "quotes", "", ""); err != nil {
+	if err = r.SetTableRowLabels(ctx, "quotes", "", ""); err != nil {
 		t.Fatalf("clear labels: %v", err)
 	}
 	tc, err = r.GetTableConfiguration(ctx, "quotes")

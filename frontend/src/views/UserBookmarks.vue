@@ -77,14 +77,11 @@ async function removeBookmark(bookmarkId: number) {
 function navigateToBookmark(bookmark: typeof bookmarks.value[0]) {
   if (!bookmark.navigationItem) return
 
-  let path = ''
-  if (bookmark.navigationItem.dashboardId > 0) {
-    path = `/dashboard/${bookmark.navigationItem.dashboardName}`
-  } else if (bookmark.navigationItem.workflowId && bookmark.navigationItem.workflowId > 0) {
-    path = `/workflow/${bookmark.navigationItem.workflowId}`
-  } else {
-    path = `/table/${bookmark.navigationItem.tableName}`
-  }
+  const path = bookmark.navigationItem.dashboardId > 0
+    ? `/dashboard/${bookmark.navigationItem.dashboardName}`
+    : bookmark.navigationItem.workflowId && bookmark.navigationItem.workflowId > 0
+      ? `/workflow/${bookmark.navigationItem.workflowId}`
+      : `/table/${bookmark.navigationItem.tableName}`
 
   router.push(path)
 }

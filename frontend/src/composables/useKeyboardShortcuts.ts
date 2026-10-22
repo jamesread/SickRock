@@ -31,32 +31,20 @@ export function useKeyboardShortcuts(shortcuts: Ref<KeyboardShortcut[]>) {
       if (isTyping && !isGlobalShortcut && !shortcut.ctrl && !shortcut.meta) {
         continue
       }
-      // Handle "?" key - can be either "?" or "/" with shift
-      let keyMatches = false
-      if (shortcut.key === '?') {
-        // "?" can be reported as either "?" or "/" with shift
-        // Check both the actual key and if it's "/" with shift pressed
-        keyMatches = e.key === '?' || (e.key === '/' && e.shiftKey)
-      } else if (shortcut.key === '/' && shortcut.shift) {
-        // Handle "/" with shift (which produces "?")
-        keyMatches = (e.key === '/' && e.shiftKey) || e.key === '?'
-      } else {
-        keyMatches = shortcut.key.toLowerCase() === e.key.toLowerCase()
-      }
+      const keyMatches = shortcut.key === '?'
+        ? e.key === '?' || (e.key === '/' && e.shiftKey)
+        : shortcut.key === '/' && shortcut.shift
+          ? (e.key === '/' && e.shiftKey) || e.key === '?'
+          : shortcut.key.toLowerCase() === e.key.toLowerCase()
 
       const ctrlMatches = shortcut.ctrl ? (e.ctrlKey || e.metaKey) : !(e.ctrlKey || e.metaKey)
       const metaMatches = shortcut.meta !== undefined
         ? (shortcut.meta ? (e.ctrlKey || e.metaKey) : !(e.ctrlKey || e.metaKey))
         : true
 
-      // Special handling for "?" - it requires shift, so we need to allow shift
-      let shiftMatches = false
-      if (shortcut.key === '?') {
-        // "?" requires shift (it's Shift+/), so shift must be pressed
-        shiftMatches = e.shiftKey
-      } else {
-        shiftMatches = shortcut.shift ? e.shiftKey : !e.shiftKey
-      }
+      const shiftMatches = shortcut.key === '?'
+        ? e.shiftKey
+        : shortcut.shift ? e.shiftKey : !e.shiftKey
 
       const altMatches = shortcut.alt ? e.altKey : !e.altKey
 

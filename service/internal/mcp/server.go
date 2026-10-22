@@ -131,7 +131,7 @@ func handlePing(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToo
 	})
 }
 
-func handleGetNavigation(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleGetNavigation(ctx context.Context, srv *srvpkg.SickRockServer, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	res, err := srv.GetNavigation(ctx, connect.NewRequest(&sickrockpb.GetNavigationRequest{}))
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -144,7 +144,7 @@ func handleGetNavigation(ctx context.Context, srv *srvpkg.SickRockServer, req mc
 	return jsonResult(out)
 }
 
-func handleGetTableConfigurations(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleGetTableConfigurations(ctx context.Context, srv *srvpkg.SickRockServer, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	res, err := srv.GetTableConfigurations(ctx, connect.NewRequest(&sickrockpb.GetTableConfigurationsRequest{}))
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -189,9 +189,9 @@ func handleListItems(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Ca
 	}
 	r := &sickrockpb.ListItemsRequest{TcName: tcName}
 	if w := req.GetString("where", ""); w != "" {
-		var where map[string]string
-		if err := json.Unmarshal([]byte(w), &where); err != nil {
-			return mcp.NewToolResultError("invalid where JSON: " + err.Error()), nil
+		where, errResult, parseErr := stringMapArg(w, "where")
+		if parseErr != nil {
+			return errResult, parseErr
 		}
 		r.Where = where
 	}
@@ -202,16 +202,30 @@ func handleListItems(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Ca
 	if !req.GetBool("include_tick_state", false) {
 		return jsonResult(map[string]any{"items": res.Msg.GetItems()})
 	}
+	return itemsWithTickState(ctx, srv, tcName, res.Msg.GetItems())
+}
+
+// itemsWithTickState returns the items annotated with whether each is ticked off in the table's tick list.
+func itemsWithTickState(ctx context.Context, srv *srvpkg.SickRockServer, tcName string, pbItems []*sickrockpb.Item) (*mcp.CallToolResult, error) {
 	tickRes, err := srv.GetTickListState(ctx, connect.NewRequest(&sickrockpb.GetTickListStateRequest{TcName: tcName}))
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	completedByID := tickRes.Msg.GetCompletedByItemId()
-	items := make([]itemWithTickState, 0, len(res.Msg.GetItems()))
-	for _, item := range res.Msg.GetItems() {
+	items := make([]itemWithTickState, 0, len(pbItems))
+	for _, item := range pbItems {
 		items = append(items, itemWithTickState{Item: item, Completed: completedByID[item.GetId()]})
 	}
 	return jsonResult(map[string]any{"items": items})
+}
+
+// stringMapArg parses a JSON object tool argument. On invalid JSON it also returns the tool error result to send.
+func stringMapArg(raw, name string) (map[string]string, *mcp.CallToolResult, error) {
+	var m map[string]string
+	if err := json.Unmarshal([]byte(raw), &m); err != nil {
+		return nil, mcp.NewToolResultError("invalid " + name + " JSON: " + err.Error()), err
+	}
+	return m, nil, nil
 }
 
 // itemWithTickState is a list item plus its tick list completion state (tick_list_state is keyed by item id).
@@ -237,8 +251,8 @@ func handleGetItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Call
 }
 
 func handleCreateItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
-		return mcp.NewToolResultError("permission denied: read-only API key cannot create items"), nil
+	if result := denyReadOnlyMCP(ctx, "create items"); result != nil {
+		return result, nil
 	}
 	pageID, err := req.RequireString("page_id")
 	if err != nil {
@@ -248,9 +262,9 @@ func handleCreateItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.C
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	var fields map[string]string
-	if err := json.Unmarshal([]byte(fieldsStr), &fields); err != nil {
-		return mcp.NewToolResultError("invalid additional_fields JSON: " + err.Error()), nil
+	fields, errResult, err := stringMapArg(fieldsStr, "additional_fields")
+	if err != nil {
+		return errResult, err
 	}
 	res, err := srv.CreateItem(ctx, connect.NewRequest(&sickrockpb.CreateItemRequest{
 		PageId:           pageID,
@@ -263,14 +277,10 @@ func handleCreateItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.C
 }
 
 func handleEditItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
-		return mcp.NewToolResultError("permission denied: read-only API key cannot edit items"), nil
+	if result := denyReadOnlyMCP(ctx, "edit items"); result != nil {
+		return result, nil
 	}
-	pageID, err := req.RequireString("page_id")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	id, err := req.RequireString("id")
+	pageID, id, err := requirePageAndID(req)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -278,9 +288,9 @@ func handleEditItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Cal
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	var fields map[string]string
-	if err := json.Unmarshal([]byte(fieldsStr), &fields); err != nil {
-		return mcp.NewToolResultError("invalid additional_fields JSON: " + err.Error()), nil
+	fields, errResult, err := stringMapArg(fieldsStr, "additional_fields")
+	if err != nil {
+		return errResult, err
 	}
 	res, err := srv.EditItem(ctx, connect.NewRequest(&sickrockpb.EditItemRequest{
 		PageId:           pageID,
@@ -294,14 +304,10 @@ func handleEditItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Cal
 }
 
 func handleDeleteItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
-		return mcp.NewToolResultError("permission denied: read-only API key cannot delete items"), nil
+	if result := denyReadOnlyMCP(ctx, "delete items"); result != nil {
+		return result, nil
 	}
-	pageID, err := req.RequireString("page_id")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	id, err := req.RequireString("id")
+	pageID, id, err := requirePageAndID(req)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -310,4 +316,23 @@ func handleDeleteItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.C
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	return jsonResult(map[string]any{"deleted": res.Msg.GetDeleted()})
+}
+
+func denyReadOnlyMCP(ctx context.Context, action string) *mcp.CallToolResult {
+	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
+		return mcp.NewToolResultError("permission denied: read-only API key cannot " + action)
+	}
+	return nil
+}
+
+func requirePageAndID(req mcp.CallToolRequest) (string, string, error) {
+	pageID, err := req.RequireString("page_id")
+	if err != nil {
+		return "", "", err
+	}
+	id, err := req.RequireString("id")
+	if err != nil {
+		return "", "", err
+	}
+	return pageID, id, nil
 }

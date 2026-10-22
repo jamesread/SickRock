@@ -12,24 +12,24 @@ func TestCreateForeignKeySQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if err := configureSQLiteDB(db); err != nil {
+	if err = configureSQLiteDB(db); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	_, err = db.Exec(`PRAGMA foreign_keys = ON`)
+	_, err = db.ExecContext(t.Context(), `PRAGMA foreign_keys = ON`)
 	if err != nil {
 		t.Fatalf("pragma: %v", err)
 	}
-	_, err = db.Exec(`CREATE TABLE customers (id INTEGER PRIMARY KEY)`)
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE customers (id INTEGER PRIMARY KEY)`)
 	if err != nil {
 		t.Fatalf("customers: %v", err)
 	}
-	_, err = db.Exec(`CREATE TABLE opportunities (id INTEGER PRIMARY KEY, customer INTEGER)`)
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE opportunities (id INTEGER PRIMARY KEY, customer INTEGER)`)
 	if err != nil {
 		t.Fatalf("opportunities: %v", err)
 	}
-	_, err = db.Exec(`
+	_, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_configurations (
 			id INTEGER PRIMARY KEY,
 			name TEXT NOT NULL,
@@ -48,14 +48,14 @@ func TestCreateForeignKeySQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("table_configurations: %v", err)
 	}
-	_, err = db.Exec(`
+	_, err = db.ExecContext(t.Context(), `
 		INSERT INTO table_configurations (name, "db", "table", title, ordinal) VALUES
 			('customers', 'main', 'customers', 'Customers', 0),
 			('opportunities', 'main', 'opportunities', 'Opportunities', 1)`)
 	if err != nil {
 		t.Fatalf("schema: %v", err)
 	}
-	_, err = db.Exec(`
+	_, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_relations (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			constraint_name TEXT NOT NULL UNIQUE,
@@ -102,19 +102,19 @@ func TestRebuildSQLiteTableAddForeignKey_DatetimeDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
-	if err := configureSQLiteDB(db); err != nil {
+	defer func() { _ = db.Close() }()
+	if err = configureSQLiteDB(db); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	_, err = db.Exec(`PRAGMA foreign_keys = ON`)
+	_, err = db.ExecContext(t.Context(), `PRAGMA foreign_keys = ON`)
 	if err != nil {
 		t.Fatalf("pragma: %v", err)
 	}
-	_, err = db.Exec(`CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT)`)
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE customers (id INTEGER PRIMARY KEY AUTOINCREMENT)`)
 	if err != nil {
 		t.Fatalf("customers: %v", err)
 	}
-	_, err = db.Exec(`CREATE TABLE opportunities (
+	_, err = db.ExecContext(t.Context(), `CREATE TABLE opportunities (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		sr_created TEXT DEFAULT (datetime('now')),
 		sr_updated TEXT DEFAULT (datetime('now')),

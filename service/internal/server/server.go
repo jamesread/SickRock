@@ -1,18 +1,21 @@
 package server
 
 import (
+	"cmp"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
 	"os"
-	"strconv"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
 
 	"connectrpc.com/connect"
 	"github.com/expr-lang/expr"
+	armhealth "github.com/jamesread/armature-health"
 	armpassword "github.com/jamesread/armature-iam/password"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
@@ -21,7 +24,6 @@ import (
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/buildinfo"
-	"github.com/jamesread/SickRock/internal/health"
 	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
@@ -32,7 +34,7 @@ type SickRockServer struct {
 	repo                *repo.Repository
 	notificationService *notifications.NotificationService
 	auth                *iam.AuthLayer
-	health              *health.Service
+	health              *armhealth.Service
 }
 
 // markdownRenderer is a configured goldmark instance for rendering markdown
@@ -83,15 +85,7 @@ func safeInt64ToInt32(value int64) int32 {
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
-	var currentUsername string
-	var rbacPerms []string
-	var rbacSuperuser bool
-
-	if au := s.authUser(ctx); au != nil && au.User != nil {
-		currentUsername, rbacPerms, rbacSuperuser = iamUserToProto(au)
-	} else if sessionUser, err := s.resolveSessionUser(ctx, req); err == nil && sessionUser != nil {
-		currentUsername, rbacPerms, rbacSuperuser = iamUserToProto(sessionUser)
-	}
+	currentUsername, rbacPerms, rbacSuperuser := s.initIdentity(ctx, req)
 
 	res := connect.NewResponse(&sickrockpb.InitResponse{
 		Version:         buildinfo.Version,
@@ -104,6 +98,21 @@ func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrock
 		OauthProviders:  loadOAuthProvidersFromEnv(),
 	})
 	return res, nil
+}
+
+func (s *SickRockServer) initIdentity(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (string, []string, bool) {
+	if au := s.authUser(ctx); au != nil && au.User != nil {
+		return iamUserToProto(au)
+	}
+	return s.initIdentityFromSession(ctx, req)
+}
+
+func (s *SickRockServer) initIdentityFromSession(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (string, []string, bool) {
+	sessionUser, err := s.resolveSessionUser(ctx, req)
+	if err != nil || sessionUser == nil {
+		return "", nil, false
+	}
+	return iamUserToProto(sessionUser)
 }
 
 func (s *SickRockServer) Ping(ctx context.Context, req *connect.Request[sickrockpb.PingRequest]) (*connect.Response[sickrockpb.PingResponse], error) {
@@ -145,7 +154,7 @@ func (s *SickRockServer) GetTableConfigurations(ctx context.Context, req *connec
 			Id:       config.Name,
 			Title:    config.Title,
 			Slug:     config.Name,
-			Ordinal:  int32(config.Ordinal),
+			Ordinal:  toInt32(config.Ordinal),
 			Icon:     config.Icon.String,
 			View:     "table", // Default view type is always "table" for table configurations
 			Database: dbName,
@@ -241,18 +250,21 @@ func (s *SickRockServer) GetDatabaseTables(ctx context.Context, req *connect.Req
 		return nil, err
 	}
 
+	res := connect.NewResponse(&sickrockpb.GetDatabaseTablesResponse{Tables: databaseTablesToProto(tables)})
+	return res, nil
+}
+
+func databaseTablesToProto(tables []repo.DatabaseTableInfo) []*sickrockpb.DatabaseTable {
 	dbTables := make([]*sickrockpb.DatabaseTable, 0, len(tables))
 	for _, table := range tables {
 		dbTables = append(dbTables, &sickrockpb.DatabaseTable{
 			TableName:         table.TableName,
 			HasConfiguration:  table.HasConfiguration,
 			ConfigurationName: table.ConfigurationName.String,
-			View:              "table", // Default view type is always "table"
+			View:              "table",
 		})
 	}
-
-	res := connect.NewResponse(&sickrockpb.GetDatabaseTablesResponse{Tables: dbTables})
-	return res, nil
+	return dbTables
 }
 
 // displayNavigationTitle formats a stored navigation name for display.
@@ -285,11 +297,11 @@ func bookmarkLinkTitle(bookmark repo.UserBookmark) string {
 
 func navigationItemRepoToProto(item repo.NavigationItem, tableView string) *sickrockpb.NavigationItem {
 	return &sickrockpb.NavigationItem{
-		Id:      int32(item.ID),
-		Ordinal: int32(item.Ordinal),
+		Id:      toInt32(item.ID),
+		Ordinal: toInt32(item.Ordinal),
 		TableConfiguration: func() int32 {
 			if item.TableConfiguration.Valid {
-				return int32(item.TableConfiguration.Int64)
+				return toInt32(item.TableConfiguration.Int64)
 			}
 			return 0
 		}(),
@@ -299,7 +311,7 @@ func navigationItemRepoToProto(item repo.NavigationItem, tableView string) *sick
 		TableView:  tableView,
 		DashboardId: func() int32 {
 			if item.DashboardID.Valid {
-				return int32(item.DashboardID.Int64)
+				return toInt32(item.DashboardID.Int64)
 			}
 			return 0
 		}(),
@@ -307,7 +319,7 @@ func navigationItemRepoToProto(item repo.NavigationItem, tableView string) *sick
 		Title:         navigationLinkTitle(item),
 		WorkflowId: func() int32 {
 			if item.WorkflowID.Valid {
-				return int32(item.WorkflowID.Int64)
+				return toInt32(item.WorkflowID.Int64)
 			}
 			return 0
 		}(),
@@ -321,6 +333,20 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 		return nil, err
 	}
 
+	visibleByID, navigationItems := s.visibleNavigationItems(ctx, items)
+
+	res := connect.NewResponse(&sickrockpb.GetNavigationResponse{
+		Items:          navigationItems,
+		Bookmarks:      s.navigationBookmarks(ctx),
+		Workflows:      s.navigationWorkflows(ctx, items),
+		Apps:           s.navigationApps(ctx, visibleByID),
+		UngroupedItems: s.ungroupedNavigationItems(ctx, items, visibleByID),
+	})
+	return res, nil
+}
+
+// visibleNavigationItems filters items to those the caller may view, returning them by ID and as protos.
+func (s *SickRockServer) visibleNavigationItems(ctx context.Context, items []repo.NavigationItem) (map[int]repo.NavigationItem, []*sickrockpb.NavigationItem) {
 	visibleByID := make(map[int]repo.NavigationItem)
 	navigationItems := make([]*sickrockpb.NavigationItem, 0, len(items))
 	for _, item := range items {
@@ -330,148 +356,165 @@ func (s *SickRockServer) GetNavigation(ctx context.Context, req *connect.Request
 		visibleByID[item.ID] = item
 		navigationItems = append(navigationItems, navigationItemRepoToProto(item, ""))
 	}
+	return visibleByID, navigationItems
+}
 
-	var navigationApps []*sickrockpb.NavigationApp
-	assignedNavIDs, errAssigned := s.repo.NavigationItemIDsInApps(ctx)
-	if errAssigned != nil {
-		log.Warnf("Failed to load app navigation assignments: %v", errAssigned)
-		assignedNavIDs = map[int]struct{}{}
+// navigationApps returns sidebar apps that contain at least one visible navigation item.
+func (s *SickRockServer) navigationApps(ctx context.Context, visibleByID map[int]repo.NavigationItem) []*sickrockpb.NavigationApp {
+	navApps, err := s.repo.GetNavigationApps(ctx)
+	if err != nil {
+		log.Warnf("Failed to load navigation apps: %v", err)
+		return nil
 	}
-	navApps, errApps := s.repo.GetNavigationApps(ctx)
-	if errApps != nil {
-		log.Warnf("Failed to load navigation apps: %v", errApps)
-	} else {
-		for _, app := range navApps {
-			members := make([]*sickrockpb.NavigationItem, 0, len(app.MemberIDs))
-			for _, navID := range app.MemberIDs {
-				if item, ok := visibleByID[navID]; ok {
-					members = append(members, navigationItemRepoToProto(item, ""))
-				}
-			}
-			if len(members) == 0 {
-				continue
-			}
-			navigationApps = append(navigationApps, &sickrockpb.NavigationApp{
-				Id:      int32(app.ID),
-				Title:   app.Title,
-				Ordinal: int32(app.Ordinal),
-				Items:   members,
-			})
+	var navigationApps []*sickrockpb.NavigationApp
+	for _, app := range navApps {
+		members := visibleAppMembers(app.MemberIDs, visibleByID)
+		if len(members) == 0 {
+			continue
 		}
+		navigationApps = append(navigationApps, &sickrockpb.NavigationApp{
+			Id:      toInt32(app.ID),
+			Title:   app.Title,
+			Ordinal: toInt32(app.Ordinal),
+			Items:   members,
+		})
+	}
+	return navigationApps
+}
+
+func visibleAppMembers(memberIDs []int, visibleByID map[int]repo.NavigationItem) []*sickrockpb.NavigationItem {
+	members := make([]*sickrockpb.NavigationItem, 0, len(memberIDs))
+	for _, navID := range memberIDs {
+		if item, ok := visibleByID[navID]; ok {
+			members = append(members, navigationItemRepoToProto(item, ""))
+		}
+	}
+	return members
+}
+
+// ungroupedNavigationItems returns visible items that are not assigned to any sidebar app.
+func (s *SickRockServer) ungroupedNavigationItems(ctx context.Context, items []repo.NavigationItem, visibleByID map[int]repo.NavigationItem) []*sickrockpb.NavigationItem {
+	assignedNavIDs, err := s.repo.NavigationItemIDsInApps(ctx)
+	if err != nil {
+		log.Warnf("Failed to load app navigation assignments: %v", err)
+		assignedNavIDs = map[int]struct{}{}
 	}
 	ungroupedItems := make([]*sickrockpb.NavigationItem, 0, len(visibleByID))
 	for _, item := range items {
-		if _, visible := visibleByID[item.ID]; !visible {
-			continue
+		_, visible := visibleByID[item.ID]
+		_, assigned := assignedNavIDs[item.ID]
+		if visible && !assigned {
+			ungroupedItems = append(ungroupedItems, navigationItemRepoToProto(item, ""))
 		}
-		if _, assigned := assignedNavIDs[item.ID]; assigned {
-			continue
-		}
-		ungroupedItems = append(ungroupedItems, navigationItemRepoToProto(item, ""))
 	}
+	return ungroupedItems
+}
 
-	// Get user bookmarks if authenticated
-	var bookmarks []*sickrockpb.UserBookmark
+// navigationBookmarks returns the authenticated caller's bookmarks they may still view.
+func (s *SickRockServer) navigationBookmarks(ctx context.Context) []*sickrockpb.UserBookmark {
 	userID, err := s.getUserIDFromContext(ctx)
-	if err == nil && userID > 0 {
-		// User is authenticated, get their bookmarks
-		userBookmarks, err := s.repo.GetUserBookmarks(ctx, userID)
-		if err != nil {
-			log.Warnf("Failed to load user bookmarks: %v", err)
-		} else {
-			// Convert to protobuf format
-			for _, bookmark := range userBookmarks {
-				if bookmark.NavigationItem != nil && !s.canViewNavigationItem(ctx, *bookmark.NavigationItem) {
-					continue
-				}
-				var navItem *sickrockpb.NavigationItem
-				if bookmark.NavigationItem != nil {
-					navItem = navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
-				}
-
-				bookmarks = append(bookmarks, &sickrockpb.UserBookmark{
-					Id:               int32(bookmark.ID),
-					UserId:           int32(bookmark.UserID),
-					NavigationItemId: int32(bookmark.NavigationItemID),
-					NavigationItem:   navItem,
-					Title:            bookmarkLinkTitle(bookmark),
-				})
-			}
-		}
+	if err != nil || userID <= 0 {
+		return nil
 	}
+	userBookmarks, err := s.repo.GetUserBookmarks(ctx, userID)
+	if err != nil {
+		log.Warnf("Failed to load user bookmarks: %v", err)
+		return nil
+	}
+	var bookmarks []*sickrockpb.UserBookmark
+	for _, bookmark := range userBookmarks {
+		if bookmark.NavigationItem != nil && !s.canViewNavigationItem(ctx, *bookmark.NavigationItem) {
+			continue
+		}
+		bookmarks = append(bookmarks, bookmarkRepoToProto(bookmark))
+	}
+	return bookmarks
+}
 
-	// Get workflows and group navigation items by workflow
+func bookmarkRepoToProto(bookmark repo.UserBookmark) *sickrockpb.UserBookmark {
+	var navItem *sickrockpb.NavigationItem
+	if bookmark.NavigationItem != nil {
+		navItem = navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
+	}
+	return &sickrockpb.UserBookmark{
+		Id:               toInt32(bookmark.ID),
+		UserId:           toInt32(bookmark.UserID),
+		NavigationItemId: toInt32(bookmark.NavigationItemID),
+		NavigationItem:   navItem,
+		Title:            bookmarkLinkTitle(bookmark),
+	}
+}
+
+// navigationWorkflows returns workflows the caller may view that have hub members or a visible hub link.
+func (s *SickRockServer) navigationWorkflows(ctx context.Context, items []repo.NavigationItem) []*sickrockpb.Workflow {
 	workflows, err := s.repo.GetWorkflows(ctx)
 	if err != nil {
 		log.Warnf("Failed to load workflows: %v", err)
 		workflows = []repo.Workflow{}
 	}
 
-	// Workflow hub members (workflow_navigation_members), not table_navigation.workflow_id
-	workflowItemsMap := make(map[int32][]*sickrockpb.NavigationItem)
-	memberGroups, err := s.repo.GetNavigationItemsForWorkflowMembership(ctx)
-	if err != nil {
-		log.Warnf("Failed to load workflow navigation members: %v", err)
-	} else {
-		for workflowID, memberItems := range memberGroups {
-			if s.requireWorkflowAccess(ctx, workflowID, repo.ResourceActionView) != nil {
-				continue
-			}
-			for _, memberItem := range memberItems {
-				if !s.canViewNavigationItem(ctx, memberItem) {
-					continue
-				}
-				workflowItemsMap[int32(workflowID)] = append(workflowItemsMap[int32(workflowID)], navigationItemRepoToProto(memberItem, ""))
-			}
-		}
-	}
+	workflowItemsMap := s.workflowMemberItems(ctx)
 
-	// Convert workflows to protobuf format (only workflows the user may view and use)
 	workflowProtos := make([]*sickrockpb.Workflow, 0, len(workflows))
 	for _, workflow := range workflows {
 		if s.requireWorkflowAccess(ctx, workflow.ID, repo.ResourceActionView) != nil {
 			continue
 		}
-		members := workflowItemsMap[int32(workflow.ID)]
-		if len(members) == 0 {
-			hasHubNavLink := false
-			for _, item := range items {
-				if !item.WorkflowID.Valid || int(item.WorkflowID.Int64) != workflow.ID {
-					continue
-				}
-				if item.TableName.Valid && item.TableName.String != "" {
-					continue
-				}
-				if item.DashboardName.Valid && item.DashboardName.String != "" {
-					continue
-				}
-				if s.canViewNavigationItem(ctx, item) {
-					hasHubNavLink = true
-					break
-				}
-			}
-			if !hasHubNavLink {
-				continue
-			}
+		members := workflowItemsMap[toInt32(workflow.ID)]
+		if len(members) == 0 && !s.hasVisibleWorkflowHubLink(ctx, items, workflow.ID) {
+			continue
 		}
-		workflowProto := &sickrockpb.Workflow{
-			Id:      int32(workflow.ID),
+		workflowProtos = append(workflowProtos, &sickrockpb.Workflow{
+			Id:      toInt32(workflow.ID),
 			Name:    workflow.Name,
-			Ordinal: int32(workflow.Ordinal),
+			Ordinal: toInt32(workflow.Ordinal),
 			Icon:    workflow.Icon.String,
 			Items:   members,
-		}
-		workflowProtos = append(workflowProtos, workflowProto)
+		})
 	}
+	return workflowProtos
+}
 
-	res := connect.NewResponse(&sickrockpb.GetNavigationResponse{
-		Items:          navigationItems,
-		Bookmarks:      bookmarks,
-		Workflows:      workflowProtos,
-		Apps:           navigationApps,
-		UngroupedItems: ungroupedItems,
-	})
-	return res, nil
+// workflowMemberItems groups workflow hub members (workflow_navigation_members, not
+// table_navigation.workflow_id) by workflow, keeping only those the caller may view.
+func (s *SickRockServer) workflowMemberItems(ctx context.Context) map[int32][]*sickrockpb.NavigationItem {
+	workflowItemsMap := make(map[int32][]*sickrockpb.NavigationItem)
+	memberGroups, err := s.repo.GetNavigationItemsForWorkflowMembership(ctx)
+	if err != nil {
+		log.Warnf("Failed to load workflow navigation members: %v", err)
+		return workflowItemsMap
+	}
+	for workflowID, memberItems := range memberGroups {
+		if s.requireWorkflowAccess(ctx, workflowID, repo.ResourceActionView) != nil {
+			continue
+		}
+		for _, memberItem := range memberItems {
+			if s.canViewNavigationItem(ctx, memberItem) {
+				workflowItemsMap[toInt32(workflowID)] = append(workflowItemsMap[toInt32(workflowID)], navigationItemRepoToProto(memberItem, ""))
+			}
+		}
+	}
+	return workflowItemsMap
+}
+
+// hasVisibleWorkflowHubLink reports whether a visible navigation item links to the workflow hub
+// itself (a workflow link with no table or dashboard).
+func (s *SickRockServer) hasVisibleWorkflowHubLink(ctx context.Context, items []repo.NavigationItem, workflowID int) bool {
+	for _, item := range items {
+		if isWorkflowHubLink(item, workflowID) && s.canViewNavigationItem(ctx, item) {
+			return true
+		}
+	}
+	return false
+}
+
+func isWorkflowHubLink(item repo.NavigationItem, workflowID int) bool {
+	if !item.WorkflowID.Valid || int(item.WorkflowID.Int64) != workflowID {
+		return false
+	}
+	hasTable := item.TableName.Valid && item.TableName.String != ""
+	hasDashboard := item.DashboardName.Valid && item.DashboardName.String != ""
+	return !hasTable && !hasDashboard
 }
 
 func (s *SickRockServer) SetWorkflowNavigationMembers(ctx context.Context, req *connect.Request[sickrockpb.SetWorkflowNavigationMembersRequest]) (*connect.Response[sickrockpb.SetWorkflowNavigationMembersResponse], error) {
@@ -483,31 +526,28 @@ func (s *SickRockServer) SetWorkflowNavigationMembers(ctx context.Context, req *
 		}), nil
 	}
 	if err := s.requireWorkflowAccess(ctx, workflowID, repo.ResourceActionStart); err != nil {
-		return connect.NewResponse(&sickrockpb.SetWorkflowNavigationMembersResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
+		return nil, err
 	}
 
-	members := make([]repo.WorkflowNavigationMemberInput, 0, len(req.Msg.GetMembers()))
-	for _, m := range req.Msg.GetMembers() {
-		members = append(members, repo.WorkflowNavigationMemberInput{
-			NavigationItemID: int(m.GetNavigationItemId()),
-			Ordinal:          int(m.GetOrdinal()),
-		})
-	}
-
-	if err := s.repo.SetWorkflowNavigationMembers(ctx, workflowID, members); err != nil {
-		return connect.NewResponse(&sickrockpb.SetWorkflowNavigationMembersResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
+	if err := s.repo.SetWorkflowNavigationMembers(ctx, workflowID, workflowNavigationMembers(req.Msg.GetMembers())); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&sickrockpb.SetWorkflowNavigationMembersResponse{
 		Success: true,
 		Message: "Workflow navigation members updated",
 	}), nil
+}
+
+func workflowNavigationMembers(members []*sickrockpb.WorkflowNavigationMember) []repo.WorkflowNavigationMemberInput {
+	out := make([]repo.WorkflowNavigationMemberInput, 0, len(members))
+	for _, m := range members {
+		out = append(out, repo.WorkflowNavigationMemberInput{
+			NavigationItemID: int(m.GetNavigationItemId()),
+			Ordinal:          int(m.GetOrdinal()),
+		})
+	}
+	return out
 }
 
 func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sickrockpb.ListItemsRequest]) (*connect.Response[sickrockpb.ListItemsResponse], error) {
@@ -520,176 +560,86 @@ func (s *SickRockServer) ListItems(ctx context.Context, req *connect.Request[sic
 		return nil, err
 	}
 
-	// Build where map from request
-	where := map[string]string{}
-	for k, v := range req.Msg.GetWhere() {
-		if k == "" {
-			continue
-		}
-		where[k] = v
-	}
-
-	items, err := s.repo.ListItemsInTable(ctx, table, where)
-
+	items, err := s.repo.ListItemsInTable(ctx, table, nonEmptyKeys(req.Msg.GetWhere()))
 	if err != nil {
 		return nil, err
 	}
 
-	constraintName := strings.TrimSpace(req.Msg.GetRelationConstraintName())
-	if constraintName != "" {
-		rel, relErr := s.repo.GetTableRelationByConstraintName(ctx, constraintName)
-		if relErr != nil {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("relation not found: %w", relErr))
-		}
-		if !strings.EqualFold(strings.TrimSpace(rel.SourceTableKey), strings.TrimSpace(table)) {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("relation %q is not for table %q", constraintName, table))
-		}
-		columns, parseErr := repo.ParseRelationPullThroughJSON(rel.PullThroughJSON)
-		if parseErr != nil {
-			return nil, connect.NewError(connect.CodeInternal, parseErr)
-		}
-		enriched, enrichErr := s.repo.ApplyRelationCalculatedColumns(ctx, rel.SourceTableKey, columns, items)
-		if enrichErr != nil {
-			log.WithError(enrichErr).WithFields(log.Fields{
-				"constraint": constraintName,
-				"table":      table,
-			}).Warn("ListItems: relation calculated columns skipped")
-		} else {
-			items = enriched
-		}
-	} else {
-		enriched, enrichErr := s.repo.ApplyAllSourceRelationCalculatedColumns(ctx, table, items)
-		if enrichErr != nil {
-			log.WithError(enrichErr).WithField("table", table).Warn("ListItems: source relation calculated columns skipped")
-		} else {
-			items = enriched
-		}
+	items, err = s.applyListRelationCalculatedColumns(ctx, table, strings.TrimSpace(req.Msg.GetRelationConstraintName()), items)
+	if err != nil {
+		return nil, err
 	}
 
 	// Get conditional formatting rules once for all items (not per item)
-	var rules []*repo.ConditionalFormattingRule
-	userID, err := s.getUserIDFromContext(ctx)
-	if err == nil {
-		rules, err = s.repo.GetConditionalFormattingRules(ctx, userID, table)
-		if err == nil {
-			log.WithFields(log.Fields{
-				"table":     table,
-				"userID":    userID,
-				"ruleCount": len(rules),
-			}).Info("ListItems: Retrieved conditional formatting rules")
-		} else {
-			log.WithError(err).WithFields(log.Fields{
-				"table":  table,
-				"userID": userID,
-			}).Error("ListItems: Failed to get conditional formatting rules")
-		}
-	} else {
-		log.WithError(err).Error("ListItems: Failed to get user ID from context")
-	}
+	rules := s.conditionalFormattingRules(ctx, table, "ListItems: ")
 
 	out := make([]*sickrockpb.Item, 0, len(items))
 	for _, it := range items {
-		// Convert dynamic fields to string map for protobuf
-		additionalFields := make(map[string]string)
-		for key, value := range it.Fields {
-			if value != nil {
-				// Special handling for time.Time values to ensure consistent formatting
-				if timeVal, ok := value.(time.Time); ok {
-					// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
-					additionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
-				} else {
-					additionalFields[key] = fmt.Sprintf("%v", value)
-				}
-			}
-		}
-
-		// Process markdown formatting rules (using rules fetched once above)
-		if err == nil && rules != nil {
-
-			// Find markdown rules and render markdown for applicable fields
-			for _, rule := range rules {
-				if rule.FormatType == "markdown" && rule.IsActive {
-					// Check if this rule applies to the current item
-					fieldValue := ""
-					if val, exists := it.Fields[rule.ColumnName]; exists && val != nil {
-						fieldValue = fmt.Sprintf("%v", val)
-					}
-
-					shouldApply := false
-					switch rule.ConditionType {
-					case "always":
-						shouldApply = true
-					case "equals":
-						shouldApply = fieldValue == rule.ConditionValue
-					case "contains":
-						shouldApply = strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
-					case "greater_than":
-						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
-							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
-								shouldApply = fieldNum > conditionNum
-							}
-						}
-					case "less_than":
-						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
-							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
-								shouldApply = fieldNum < conditionNum
-							}
-						}
-					}
-
-					if shouldApply {
-						// Prepare markdown content
-						markdownContent := fieldValue
-						if rule.FormatValue != "" {
-							markdownContent = fieldValue + "\n\n" + rule.FormatValue
-						}
-
-						// Render markdown and add to additional fields
-						markdownFieldName := rule.ColumnName + "Markdown"
-						renderedMarkdown := renderMarkdown(markdownContent)
-						additionalFields[markdownFieldName] = renderedMarkdown
-					}
-				}
-			}
-		}
-
-		// Calculate relative time in seconds from now
-		var srCreatedRelative int32
-		if !it.SrCreated.IsZero() {
-			srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
-		}
-
-		var srUpdatedRelative int32
-		if !it.SrUpdated.IsZero() {
-			srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
-		}
-
-		item := &sickrockpb.Item{
-			Id:                it.ID,
-			SrCreated:         it.SrCreated.Unix(),
-			SrCreatedRelative: srCreatedRelative,
-			SrUpdated:         it.SrUpdated.Unix(),
-			SrUpdatedRelative: srUpdatedRelative,
-			AdditionalFields:  additionalFields,
-		}
-
-		out = append(out, item)
+		additionalFields := itemFieldsToStrings(it.Fields, false)
+		applyMarkdownRules(rules, it.Fields, additionalFields)
+		out = append(out, itemRepoToProto(it, additionalFields))
 	}
 	return connect.NewResponse(&sickrockpb.ListItemsResponse{Items: out}), nil
 }
 
+// nonEmptyKeys copies m, dropping entries with an empty key.
+func nonEmptyKeys(m map[string]string) map[string]string {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		if k != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// applyListRelationCalculatedColumns adds relation calculated columns to items: those of the named
+// relation when constraintName is set, otherwise those of every relation sourced from table.
+// Enrichment failures are logged and the items returned unchanged; an invalid relation is an error.
+func (s *SickRockServer) applyListRelationCalculatedColumns(ctx context.Context, table, constraintName string, items []repo.Item) ([]repo.Item, error) {
+	if constraintName == "" {
+		enriched, err := s.repo.ApplyAllSourceRelationCalculatedColumns(ctx, table, items)
+		if err != nil {
+			log.WithError(err).WithField("table", table).Warn("ListItems: source relation calculated columns skipped")
+			return items, nil
+		}
+		return enriched, nil
+	}
+
+	rel, columns, err := s.listRelationPullThrough(ctx, table, constraintName)
+	if err != nil {
+		return nil, err
+	}
+	enriched, err := s.repo.ApplyRelationCalculatedColumns(ctx, rel.SourceTableKey, columns, items)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"constraint": constraintName,
+			"table":      table,
+		}).Warn("ListItems: relation calculated columns skipped")
+		return items, nil
+	}
+	return enriched, nil
+}
+
+// listRelationPullThrough loads the named relation, checks it belongs to table, and parses its pull-through columns.
+func (s *SickRockServer) listRelationPullThrough(ctx context.Context, table, constraintName string) (*repo.TableRelation, []repo.RelationPullThroughField, error) {
+	rel, err := s.repo.GetTableRelationByConstraintName(ctx, constraintName)
+	if err != nil {
+		return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("relation not found: %w", err))
+	}
+	if !strings.EqualFold(strings.TrimSpace(rel.SourceTableKey), strings.TrimSpace(table)) {
+		return nil, nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("relation %q is not for table %q", constraintName, table))
+	}
+	columns, err := repo.ParseRelationPullThroughJSON(rel.PullThroughJSON)
+	if err != nil {
+		return nil, nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return rel, columns, nil
+}
+
 func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[sickrockpb.CreateItemRequest]) (*connect.Response[sickrockpb.CreateItemResponse], error) {
-	table := req.Msg.GetPageId()
-	if table == "" {
-		table = "items"
-	}
-	if err := s.requireExportsManageForTable(ctx, table); err != nil {
-		return nil, err
-	}
-	if err := s.denyAuditLogMutation(ctx, table); err != nil {
-		return nil, err
-	}
-	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionInsert); err != nil {
+	table := cmp.Or(req.Msg.GetPageId(), "items")
+	if err := s.requireItemWriteAccess(ctx, table, repo.ResourceActionInsert); err != nil {
 		return nil, err
 	}
 
@@ -697,42 +647,20 @@ func (s *SickRockServer) CreateItem(ctx context.Context, req *connect.Request[si
 	if err != nil {
 		return nil, err
 	}
-	// Convert dynamic fields to string map for protobuf
-	additionalFields := make(map[string]string)
-	for key, value := range it.Fields {
-		if value != nil {
-			// Special handling for time.Time values to ensure consistent formatting
-			if timeVal, ok := value.(time.Time); ok {
-				// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
-				additionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
-			} else {
-				additionalFields[key] = fmt.Sprintf("%v", value)
-			}
-		} else {
-			// Include null values as empty strings so they appear in JSON output
-			additionalFields[key] = ""
-		}
-	}
+	// Include null values as empty strings so they appear in JSON output
+	return connect.NewResponse(&sickrockpb.CreateItemResponse{Item: itemRepoToProto(it, itemFieldsToStrings(it.Fields, true))}), nil
+}
 
-	// Calculate relative time in seconds from now
-	var srCreatedRelative int32
-	if !it.SrCreated.IsZero() {
-		srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
+// requireItemWriteAccess checks the caller may insert or edit rows in table: exports management for the
+// exports table, never for the append-only audit log, and the matching table grant.
+func (s *SickRockServer) requireItemWriteAccess(ctx context.Context, table string, action repo.ResourceGrantAction) error {
+	if err := s.requireExportsManageForTable(ctx, table); err != nil {
+		return err
 	}
-
-	var srUpdatedRelative int32
-	if !it.SrUpdated.IsZero() {
-		srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
+	if err := s.denyAuditLogMutation(ctx, table); err != nil {
+		return err
 	}
-
-	return connect.NewResponse(&sickrockpb.CreateItemResponse{Item: &sickrockpb.Item{
-		Id:                it.ID,
-		SrCreated:         it.SrCreated.Unix(),
-		SrCreatedRelative: srCreatedRelative,
-		SrUpdated:         it.SrUpdated.Unix(),
-		SrUpdatedRelative: srUpdatedRelative,
-		AdditionalFields:  additionalFields,
-	}}), nil
+	return s.requireDataTableAccess(ctx, table, action)
 }
 
 func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickrockpb.GetItemRequest]) (*connect.Response[sickrockpb.GetItemResponse], error) {
@@ -755,33 +683,10 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 		return nil, err
 	}
 
-	// Track this item as recently viewed for the authenticated user
-	if userID, uerr := s.getUserIDFromContext(ctx); uerr == nil && userID > 0 {
-		if err := s.repo.InsertRecentlyViewed(ctx, userID, table, req.Msg.GetId()); err != nil {
-			// Log the error but don't fail the request
-			log.WithError(err).WithFields(log.Fields{
-				"table": table,
-				"id":    req.Msg.GetId(),
-			}).Warn("Failed to track recently viewed item")
-		}
-	}
+	s.trackRecentlyViewed(ctx, table, req.Msg.GetId())
 
-	// Convert dynamic fields to string map for protobuf
-	additionalFields := make(map[string]string)
-	for key, value := range it.Fields {
-		if value != nil {
-			// Special handling for time.Time values to ensure consistent formatting
-			if timeVal, ok := value.(time.Time); ok {
-				// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
-				additionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
-			} else {
-				additionalFields[key] = fmt.Sprintf("%v", value)
-			}
-		} else {
-			// Include null values as empty strings so they appear in JSON output
-			additionalFields[key] = ""
-		}
-	}
+	// Include null values as empty strings so they appear in JSON output
+	additionalFields := itemFieldsToStrings(it.Fields, true)
 
 	log.WithFields(log.Fields{
 		"table":  table,
@@ -789,102 +694,7 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 		"fields": it.Fields,
 	}).Info("GetItem: Item fields before markdown processing")
 
-	// Process markdown formatting rules
-	userID, err := s.getUserIDFromContext(ctx)
-	if err == nil {
-		// Get conditional formatting rules for this table
-		rules, err := s.repo.GetConditionalFormattingRules(ctx, userID, table)
-		if err == nil {
-			log.WithFields(log.Fields{
-				"table":     table,
-				"userID":    userID,
-				"ruleCount": len(rules),
-			}).Info("Retrieved conditional formatting rules")
-
-			// Find markdown rules and render markdown for applicable fields
-			for _, rule := range rules {
-				log.WithFields(log.Fields{
-					"ruleID":         rule.ID,
-					"tableName":      rule.TableName,
-					"columnName":     rule.ColumnName,
-					"formatType":     rule.FormatType,
-					"isActive":       rule.IsActive,
-					"conditionType":  rule.ConditionType,
-					"conditionValue": rule.ConditionValue,
-				}).Info("Processing conditional formatting rule")
-
-				if rule.FormatType == "markdown" && rule.IsActive {
-					// Check if this rule applies to the current item
-					fieldValue := ""
-					if val, exists := it.Fields[rule.ColumnName]; exists && val != nil {
-						fieldValue = fmt.Sprintf("%v", val)
-					}
-
-					log.WithFields(log.Fields{
-						"ruleID":         rule.ID,
-						"columnName":     rule.ColumnName,
-						"fieldValue":     fieldValue,
-						"conditionType":  rule.ConditionType,
-						"conditionValue": rule.ConditionValue,
-					}).Info("Evaluating markdown rule condition")
-
-					shouldApply := false
-					switch rule.ConditionType {
-					case "always":
-						shouldApply = true
-					case "equals":
-						shouldApply = fieldValue == rule.ConditionValue
-					case "contains":
-						shouldApply = strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
-					case "greater_than":
-						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
-							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
-								shouldApply = fieldNum > conditionNum
-							}
-						}
-					case "less_than":
-						if fieldNum, err := strconv.ParseFloat(fieldValue, 64); err == nil {
-							if conditionNum, err := strconv.ParseFloat(rule.ConditionValue, 64); err == nil {
-								shouldApply = fieldNum < conditionNum
-							}
-						}
-					}
-
-					log.WithFields(log.Fields{
-						"ruleID":      rule.ID,
-						"shouldApply": shouldApply,
-					}).Info("Markdown rule evaluation result")
-
-					if shouldApply {
-						// Prepare markdown content
-						markdownContent := fieldValue
-						if rule.FormatValue != "" {
-							markdownContent = fieldValue + "\n\n" + rule.FormatValue
-						}
-
-						// Render markdown and add to additional fields
-						markdownFieldName := rule.ColumnName + "Markdown"
-						renderedMarkdown := renderMarkdown(markdownContent)
-						additionalFields[markdownFieldName] = renderedMarkdown
-
-						log.WithFields(log.Fields{
-							"ruleID":            rule.ID,
-							"markdownFieldName": markdownFieldName,
-							"markdownContent":   markdownContent,
-							"renderedMarkdown":  renderedMarkdown,
-						}).Info("Added markdown field to additional fields")
-					}
-				}
-			}
-		} else {
-			log.WithError(err).WithFields(log.Fields{
-				"table":  table,
-				"userID": userID,
-			}).Error("Failed to get conditional formatting rules")
-		}
-	} else {
-		log.WithError(err).Error("Failed to get user ID from context")
-	}
+	applyMarkdownRules(s.conditionalFormattingRules(ctx, table, ""), it.Fields, additionalFields)
 
 	log.WithFields(log.Fields{
 		"table":            table,
@@ -892,40 +702,27 @@ func (s *SickRockServer) GetItem(ctx context.Context, req *connect.Request[sickr
 		"additionalFields": additionalFields,
 	}).Info("GetItem: Additional fields after markdown processing")
 
-	// Calculate relative time in seconds from now
-	var srCreatedRelative int32
-	if !it.SrCreated.IsZero() {
-		srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
-	}
+	return connect.NewResponse(&sickrockpb.GetItemResponse{Item: itemRepoToProto(it, additionalFields)}), nil
+}
 
-	var srUpdatedRelative int32
-	if !it.SrUpdated.IsZero() {
-		srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
+// trackRecentlyViewed records the item as recently viewed for the authenticated user; failures are only logged.
+func (s *SickRockServer) trackRecentlyViewed(ctx context.Context, table, id string) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil || userID <= 0 {
+		return
 	}
-
-	return connect.NewResponse(&sickrockpb.GetItemResponse{Item: &sickrockpb.Item{
-		Id:                it.ID,
-		SrCreated:         it.SrCreated.Unix(),
-		SrCreatedRelative: srCreatedRelative,
-		SrUpdated:         it.SrUpdated.Unix(),
-		SrUpdatedRelative: srUpdatedRelative,
-		AdditionalFields:  additionalFields,
-	}}), nil
+	if err := s.repo.InsertRecentlyViewed(ctx, userID, table, id); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"table": table,
+			"id":    id,
+		}).Warn("Failed to track recently viewed item")
+	}
 }
 
 func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sickrockpb.EditItemRequest]) (*connect.Response[sickrockpb.EditItemResponse], error) {
 	// Get table name from the request, default to "items" for backward compatibility
-	table := req.Msg.GetPageId()
-	if table == "" {
-		table = "items"
-	}
-	if err := s.requireExportsManageForTable(ctx, table); err != nil {
-		return nil, err
-	}
-	if err := s.denyAuditLogMutation(ctx, table); err != nil {
-		return nil, err
-	}
-	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionEdit); err != nil {
+	table := cmp.Or(req.Msg.GetPageId(), "items")
+	if err := s.requireItemWriteAccess(ctx, table, repo.ResourceActionEdit); err != nil {
 		return nil, err
 	}
 
@@ -941,53 +738,13 @@ func (s *SickRockServer) EditItem(ctx context.Context, req *connect.Request[sick
 		return nil, err
 	}
 
-	// Convert dynamic fields to string map for protobuf
-	responseAdditionalFields := make(map[string]string)
-	for key, value := range it.Fields {
-		if value != nil {
-			// Special handling for time.Time values to ensure consistent formatting
-			if timeVal, ok := value.(time.Time); ok {
-				// Format as MySQL datetime format (YYYY-MM-DD HH:MM:SS) without timezone
-				responseAdditionalFields[key] = timeVal.Format("2006-01-02 15:04:05")
-			} else {
-				responseAdditionalFields[key] = fmt.Sprintf("%v", value)
-			}
-		} else {
-			// Include null values as empty strings so they appear in JSON output
-			responseAdditionalFields[key] = ""
-		}
-	}
-
-	// Calculate relative time in seconds from now
-	var srCreatedRelative int32
-	if !it.SrCreated.IsZero() {
-		srCreatedRelative = safeInt64ToInt32(int64(time.Since(it.SrCreated).Seconds()))
-	}
-
-	var srUpdatedRelative int32
-	if !it.SrUpdated.IsZero() {
-		srUpdatedRelative = safeInt64ToInt32(int64(time.Since(it.SrUpdated).Seconds()))
-	}
-
-	return connect.NewResponse(&sickrockpb.EditItemResponse{Item: &sickrockpb.Item{
-		Id:                it.ID,
-		SrCreated:         it.SrCreated.Unix(),
-		SrCreatedRelative: srCreatedRelative,
-		SrUpdated:         it.SrUpdated.Unix(),
-		SrUpdatedRelative: srUpdatedRelative,
-		AdditionalFields:  responseAdditionalFields,
-	}}), nil
+	// Include null values as empty strings so they appear in JSON output
+	return connect.NewResponse(&sickrockpb.EditItemResponse{Item: itemRepoToProto(it, itemFieldsToStrings(it.Fields, true))}), nil
 }
 
 func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[sickrockpb.DeleteItemRequest]) (*connect.Response[sickrockpb.DeleteItemResponse], error) {
 	table := req.Msg.GetPageId()
-	if err := s.requireExportsManageForTable(ctx, table); err != nil {
-		return nil, err
-	}
-	if err := s.denyAuditLogMutation(ctx, table); err != nil {
-		return nil, err
-	}
-	if err := s.requireDataTableAccess(ctx, table, repo.ResourceActionDelete); err != nil {
+	if err := s.requireDeleteItemAccess(ctx, table); err != nil {
 		return nil, err
 	}
 
@@ -996,6 +753,16 @@ func (s *SickRockServer) DeleteItem(ctx context.Context, req *connect.Request[si
 		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.DeleteItemResponse{Deleted: ok}), nil
+}
+
+func (s *SickRockServer) requireDeleteItemAccess(ctx context.Context, table string) error {
+	if err := s.requireExportsManageForTable(ctx, table); err != nil {
+		return err
+	}
+	if err := s.denyAuditLogMutation(ctx, table); err != nil {
+		return err
+	}
+	return s.requireDataTableAccess(ctx, table, repo.ResourceActionDelete)
 }
 
 func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Request[sickrockpb.GetTableStructureRequest]) (*connect.Response[sickrockpb.GetTableStructureResponse], error) {
@@ -1012,18 +779,59 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		return nil, err
 	}
 
+	cols := s.tableStructureColumns(ctx, tc, tcName)
+	displayByColumn, displayErr := s.repo.GetColumnDisplaySettings(ctx, tcName)
+	if displayErr != nil {
+		log.WithError(displayErr).Warn("Failed to load column display settings")
+		displayByColumn = map[string]repo.ColumnDisplaySetting{}
+	}
+
+	colNames := make([]string, len(cols))
+	for i, c := range cols {
+		colNames[i] = c.Name
+	}
+
+	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
+		Fields:            fieldSpecsToProto(cols, displayByColumn),
+		CreateButtonText:  nullStringOr(tc.CreateButtonText, "Insert Row"),
+		View:              s.defaultViewType(ctx, tcName),
+		ForeignKeys:       s.tableForeignKeysToProto(ctx, tc, tcName),
+		PrimaryKeyColumn:  tc.PrimaryKeyColumnName(),
+		DefaultSortColumn: tc.SortColumnName(colNames),
+		CreateDelegate:    strings.TrimSpace(tc.CreateDelegate.String),
+		Title:             cmp.Or(tc.Title, tc.Name),
+		RowName:           tc.DisplayRowName(),
+		RowNamePlural:     tc.DisplayRowNamePlural(),
+		ItemPageLayout: &sickrockpb.ItemPageLayout{
+			Blocks: s.itemPageLayoutToProto(ctx, tcName),
+		},
+		ItemFieldGroups: &sickrockpb.ItemFieldGroups{
+			Groups: s.itemFieldGroupsToProto(ctx, tcName),
+		},
+		ColumnDisplaySettings: columnDisplaySettingsToProto(displayByColumn),
+	}), nil
+}
+
+func nullStringOr(ns sql.NullString, fallback string) string {
+	if ns.Valid {
+		return ns.String
+	}
+	return fallback
+}
+
+// tableStructureColumns lists the table's columns with semantics applied; a listing failure is logged
+// and yields no columns.
+func (s *SickRockServer) tableStructureColumns(ctx context.Context, tc *repo.TableConfig, tcName string) []repo.FieldSpec {
 	cols, err := s.repo.ListColumns(ctx, tc)
 	if err != nil {
 		log.Errorf("list columns: %v, table: %s", err, tcName)
 	} else {
 		log.WithField("columnCount", len(cols)).Debugf("list columns for table %s", tcName)
 	}
-	cols = s.repo.ApplyColumnSemantics(ctx, tcName, cols)
-	displayByColumn, displayErr := s.repo.GetColumnDisplaySettings(ctx, tcName)
-	if displayErr != nil {
-		log.WithError(displayErr).Warn("Failed to load column display settings")
-		displayByColumn = map[string]repo.ColumnDisplaySetting{}
-	}
+	return s.repo.ApplyColumnSemantics(ctx, tcName, cols)
+}
+
+func fieldSpecsToProto(cols []repo.FieldSpec, displayByColumn map[string]repo.ColumnDisplaySetting) []*sickrockpb.Field {
 	fields := make([]*sickrockpb.Field, 0, len(cols))
 	for _, c := range cols {
 		pbField := &sickrockpb.Field{
@@ -1033,191 +841,149 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 			DefaultToCurrentTimestamp: false, // This information is not stored in database metadata
 		}
 		if d, ok := repo.LookupColumnDisplay(displayByColumn, c.Name); ok {
-			if d.DisplayLabel.Valid {
-				pbField.DisplayLabel = strings.TrimSpace(d.DisplayLabel.String)
-			}
-			if d.ValuePrefix.Valid {
-				pbField.ValuePrefix = d.ValuePrefix.String
-			}
-			if d.ValueSuffix.Valid {
-				pbField.ValueSuffix = d.ValueSuffix.String
-			}
+			pbField.DisplayLabel, pbField.ValuePrefix, pbField.ValueSuffix = columnDisplayStrings(d)
 		}
 		fields = append(fields, pbField)
 	}
+	return fields
+}
 
-	createButtonText := "Insert Row"
-	if tc.CreateButtonText.Valid {
-		createButtonText = tc.CreateButtonText.String
-	}
-	createDelegate := ""
-	if tc.CreateDelegate.Valid {
-		createDelegate = strings.TrimSpace(tc.CreateDelegate.String)
-	}
+// columnDisplayStrings returns a column's display label (trimmed), value prefix and value suffix.
+func columnDisplayStrings(d repo.ColumnDisplaySetting) (label, prefix, suffix string) {
+	return strings.TrimSpace(d.DisplayLabel.String), d.ValuePrefix.String, d.ValueSuffix.String
+}
 
-	// Get foreign keys for this table
+func columnDisplaySettingsToProto(displayByColumn map[string]repo.ColumnDisplaySetting) []*sickrockpb.ColumnDisplaySettingInput {
+	out := make([]*sickrockpb.ColumnDisplaySettingInput, 0, len(displayByColumn))
+	for columnName, d := range displayByColumn {
+		row := &sickrockpb.ColumnDisplaySettingInput{ColumnName: columnName}
+		row.DisplayLabel, row.ValuePrefix, row.ValueSuffix = columnDisplayStrings(d)
+		out = append(out, row)
+	}
+	return out
+}
+
+// tableForeignKeysToProto returns the table's foreign keys, resolving the table configuration
+// name of each side. A failure to load them is logged and yields an empty list.
+func (s *SickRockServer) tableForeignKeysToProto(ctx context.Context, tc *repo.TableConfig, tcName string) []*sickrockpb.ForeignKey {
 	foreignKeys, err := s.repo.GetForeignKeysForTableConfig(ctx, tc)
-	var pbForeignKeys []*sickrockpb.ForeignKey
 	if err != nil {
 		log.Errorf("Failed to get foreign keys: %v", err)
-		pbForeignKeys = []*sickrockpb.ForeignKey{}
-	} else {
-		log.WithFields(log.Fields{
-			"tcName": tcName,
-			"numFks": len(foreignKeys),
-		}).Debug("Retrieved foreign keys")
-
-		lookupPairs := make([]repo.DbTablePair, 0, len(foreignKeys)*2)
-		for _, fk := range foreignKeys {
-			tableDb := fk.TableSchema
-			if tableDb == "" {
-				tableDb = tc.Db.String
-			}
-			referencedDb := fk.ReferencedSchema
-			if referencedDb == "" {
-				referencedDb = tc.Db.String
-			}
-			lookupPairs = append(lookupPairs,
-				repo.DbTablePair{Db: tableDb, Table: fk.TableName},
-				repo.DbTablePair{Db: referencedDb, Table: fk.ReferencedTable},
-			)
-		}
-		tcNameByDbTable, lookupErr := s.repo.LookupTableConfigNames(ctx, lookupPairs)
-		if lookupErr != nil {
-			log.WithError(lookupErr).Warn("Failed to batch lookup table configuration names for foreign keys")
-			tcNameByDbTable = map[string]string{}
-		}
-
-		// Convert repository foreign keys to protobuf foreign keys
-		pbForeignKeys = make([]*sickrockpb.ForeignKey, 0, len(foreignKeys))
-		for _, fk := range foreignKeys {
-			tableDb := fk.TableSchema
-			if tableDb == "" {
-				tableDb = tc.Db.String
-			}
-			referencedDb := fk.ReferencedSchema
-			if referencedDb == "" {
-				referencedDb = tc.Db.String
-			}
-
-			tableTcName := tcNameByDbTable[repo.DbTableLookupKey(tableDb, fk.TableName)]
-			referencedTcName := tcNameByDbTable[repo.DbTableLookupKey(referencedDb, fk.ReferencedTable)]
-
-			pbForeignKeys = append(pbForeignKeys, &sickrockpb.ForeignKey{
-				RelationId:            int32(fk.RelationID),
-				ConstraintName:        fk.ConstraintName,
-				TableName:             fk.TableName,
-				ColumnName:            fk.ColumnName,
-				ReferencedTable:       fk.ReferencedTable,
-				ReferencedColumn:      fk.ReferencedColumn,
-				OnDeleteAction:        fk.OnDeleteAction,
-				OnUpdateAction:        fk.OnUpdateAction,
-				TableTcName:           tableTcName,
-				ReferencedTableTcName: referencedTcName,
-				DisplayName:           fk.DisplayName,
-				PullThroughFields:     pullThroughFieldsToProto(fk.PullThroughFields),
-				AbsorbIntoItem:        fk.AbsorbIntoItem,
-				AbsorbType:            fk.AbsorbType,
-			})
-		}
+		return []*sickrockpb.ForeignKey{}
 	}
+	log.WithFields(log.Fields{
+		"tcName": tcName,
+		"numFks": len(foreignKeys),
+	}).Debug("Retrieved foreign keys")
 
-	// Get view type from default view if it exists, otherwise default to "table"
-	viewType := "table"
+	tcNameByDbTable := s.foreignKeyTableConfigNames(ctx, foreignKeys, tc.Db.String)
+
+	pbForeignKeys := make([]*sickrockpb.ForeignKey, 0, len(foreignKeys))
+	for _, fk := range foreignKeys {
+		tableDb, referencedDb := foreignKeySchemas(fk, tc.Db.String)
+		pbForeignKeys = append(pbForeignKeys, &sickrockpb.ForeignKey{
+			RelationId:            toInt32(fk.RelationID),
+			ConstraintName:        fk.ConstraintName,
+			TableName:             fk.TableName,
+			ColumnName:            fk.ColumnName,
+			ReferencedTable:       fk.ReferencedTable,
+			ReferencedColumn:      fk.ReferencedColumn,
+			OnDeleteAction:        fk.OnDeleteAction,
+			OnUpdateAction:        fk.OnUpdateAction,
+			TableTcName:           tcNameByDbTable[repo.DbTableLookupKey(tableDb, fk.TableName)],
+			ReferencedTableTcName: tcNameByDbTable[repo.DbTableLookupKey(referencedDb, fk.ReferencedTable)],
+			DisplayName:           fk.DisplayName,
+			PullThroughFields:     pullThroughFieldsToProto(fk.PullThroughFields),
+			AbsorbIntoItem:        fk.AbsorbIntoItem,
+			AbsorbType:            fk.AbsorbType,
+		})
+	}
+	return pbForeignKeys
+}
+
+// foreignKeySchemas returns the databases of a foreign key's table and referenced table,
+// falling back to defaultDb when the key does not name one.
+func foreignKeySchemas(fk repo.ForeignKey, defaultDb string) (tableDb, referencedDb string) {
+	return cmp.Or(fk.TableSchema, defaultDb), cmp.Or(fk.ReferencedSchema, defaultDb)
+}
+
+// foreignKeyTableConfigNames batch-looks up the table configuration names of both sides of each
+// foreign key, keyed by repo.DbTableLookupKey.
+func (s *SickRockServer) foreignKeyTableConfigNames(ctx context.Context, foreignKeys []repo.ForeignKey, defaultDb string) map[string]string {
+	lookupPairs := make([]repo.DbTablePair, 0, len(foreignKeys)*2)
+	for _, fk := range foreignKeys {
+		tableDb, referencedDb := foreignKeySchemas(fk, defaultDb)
+		lookupPairs = append(lookupPairs,
+			repo.DbTablePair{Db: tableDb, Table: fk.TableName},
+			repo.DbTablePair{Db: referencedDb, Table: fk.ReferencedTable},
+		)
+	}
+	tcNameByDbTable, err := s.repo.LookupTableConfigNames(ctx, lookupPairs)
+	if err != nil {
+		log.WithError(err).Warn("Failed to batch lookup table configuration names for foreign keys")
+		return map[string]string{}
+	}
+	return tcNameByDbTable
+}
+
+// defaultViewType returns the view type of the caller's default view for the table, or "table".
+func (s *SickRockServer) defaultViewType(ctx context.Context, tcName string) string {
 	views, err := s.repo.GetTableViews(ctx, tcName)
-	if err == nil && len(views) > 0 {
-		userDefaultID := s.userDefaultTableView(ctx, tcName)
-		defaultView := views[0] // GetTableViews returns views ordered, first is usually default
-		for _, v := range views {
-			if v.IsDefault {
-				defaultView = v
-				break
-			}
-		}
-		for _, v := range views {
-			if userDefaultID > 0 && v.ID == userDefaultID {
-				defaultView = v
-				break
-			}
-		}
-		if defaultView.ViewType != "" {
-			viewType = defaultView.ViewType
-		}
+	if err != nil || len(views) == 0 {
+		return "table"
 	}
+	defaultView := pickDefaultTableView(views, s.userDefaultTableView(ctx, tcName))
+	return cmp.Or(defaultView.ViewType, "table")
+}
 
-	colNames := make([]string, len(cols))
-	for i, c := range cols {
-		colNames[i] = c.Name
+// pickDefaultTableView returns the user's default view when set and present, otherwise the
+// table-wide default, otherwise the first view. views must not be empty.
+func pickDefaultTableView(views []repo.TableView, userDefaultID int) repo.TableView {
+	if userDefaultID > 0 {
+		if i := slices.IndexFunc(views, func(v repo.TableView) bool { return v.ID == userDefaultID }); i >= 0 {
+			return views[i]
+		}
 	}
-	displayTitle := tc.Name
-	if tc.Title != "" {
-		displayTitle = tc.Title
+	if i := slices.IndexFunc(views, func(v repo.TableView) bool { return v.IsDefault }); i >= 0 {
+		return views[i]
 	}
+	return views[0] // GetTableViews returns views ordered, first is usually default
+}
 
-	layoutBlocks, layoutErr := s.repo.GetItemPageLayoutBlocks(ctx, tcName)
-	if layoutErr != nil {
-		log.WithError(layoutErr).Warn("Failed to load item page layout")
+func (s *SickRockServer) itemPageLayoutToProto(ctx context.Context, tcName string) []*sickrockpb.PageLayoutBlock {
+	layoutBlocks, err := s.repo.GetItemPageLayoutBlocks(ctx, tcName)
+	if err != nil {
+		log.WithError(err).Warn("Failed to load item page layout")
 		layoutBlocks = nil
 	}
 	pbLayoutBlocks := make([]*sickrockpb.PageLayoutBlock, 0, len(layoutBlocks))
 	for _, b := range layoutBlocks {
 		pbLayoutBlocks = append(pbLayoutBlocks, &sickrockpb.PageLayoutBlock{
-			Id:         int32(b.ID),
-			Ordinal:    int32(b.Ordinal),
+			Id:         toInt32(b.ID),
+			Ordinal:    toInt32(b.Ordinal),
 			BlockType:  b.BlockType,
 			ConfigJson: b.ConfigJSON,
 		})
 	}
+	return pbLayoutBlocks
+}
 
-	fieldGroups, fgErr := s.repo.GetItemFieldGroups(ctx, tcName)
-	if fgErr != nil {
-		log.WithError(fgErr).Warn("Failed to load item field groups")
+func (s *SickRockServer) itemFieldGroupsToProto(ctx context.Context, tcName string) []*sickrockpb.ItemFieldGroup {
+	fieldGroups, err := s.repo.GetItemFieldGroups(ctx, tcName)
+	if err != nil {
+		log.WithError(err).Warn("Failed to load item field groups")
 		fieldGroups = nil
 	}
 	pbFieldGroups := make([]*sickrockpb.ItemFieldGroup, 0, len(fieldGroups))
 	for i, g := range fieldGroups {
 		pbFieldGroups = append(pbFieldGroups, &sickrockpb.ItemFieldGroup{
-			Id:          int32(i + 1),
-			Ordinal:     int32(g.Ordinal),
+			Id:          toInt32(i + 1),
+			Ordinal:     toInt32(g.Ordinal),
 			Title:       g.Title,
 			ColumnNames: append([]string(nil), g.ColumnNames...),
 		})
 	}
-
-	pbColumnDisplay := make([]*sickrockpb.ColumnDisplaySettingInput, 0, len(displayByColumn))
-	for columnName, d := range displayByColumn {
-		row := &sickrockpb.ColumnDisplaySettingInput{ColumnName: columnName}
-		if d.DisplayLabel.Valid {
-			row.DisplayLabel = strings.TrimSpace(d.DisplayLabel.String)
-		}
-		if d.ValuePrefix.Valid {
-			row.ValuePrefix = d.ValuePrefix.String
-		}
-		if d.ValueSuffix.Valid {
-			row.ValueSuffix = d.ValueSuffix.String
-		}
-		pbColumnDisplay = append(pbColumnDisplay, row)
-	}
-
-	return connect.NewResponse(&sickrockpb.GetTableStructureResponse{
-		Fields:            fields,
-		CreateButtonText:  createButtonText,
-		View:              viewType,
-		ForeignKeys:       pbForeignKeys,
-		PrimaryKeyColumn:  tc.PrimaryKeyColumnName(),
-		DefaultSortColumn: tc.SortColumnName(colNames),
-		CreateDelegate:    createDelegate,
-		Title:             displayTitle,
-		RowName:           tc.DisplayRowName(),
-		RowNamePlural:     tc.DisplayRowNamePlural(),
-		ItemPageLayout: &sickrockpb.ItemPageLayout{
-			Blocks: pbLayoutBlocks,
-		},
-		ItemFieldGroups: &sickrockpb.ItemFieldGroups{
-			Groups: pbFieldGroups,
-		},
-		ColumnDisplaySettings: pbColumnDisplay,
-	}), nil
+	return pbFieldGroups
 }
 
 func (s *SickRockServer) SetItemFieldGroups(ctx context.Context, req *connect.Request[sickrockpb.SetItemFieldGroupsRequest]) (*connect.Response[sickrockpb.SetItemFieldGroupsResponse], error) {
@@ -1244,10 +1010,7 @@ func (s *SickRockServer) SetItemFieldGroups(ctx context.Context, req *connect.Re
 		})
 	}
 	if err := s.repo.SetItemFieldGroups(ctx, tcName, inputs); err != nil {
-		return connect.NewResponse(&sickrockpb.SetItemFieldGroupsResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&sickrockpb.SetItemFieldGroupsResponse{
 		Success: true,
@@ -1266,31 +1029,47 @@ func (s *SickRockServer) SetColumnDisplaySettings(ctx context.Context, req *conn
 	if err := s.requireDataTableAccess(ctx, tcName, repo.ResourceActionEdit); err != nil {
 		return nil, err
 	}
+	allowed, err := s.displaySettingsAllowedColumns(ctx, tcName)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.repo.SetColumnDisplaySettings(ctx, tcName, columnDisplayInputs(req.Msg.GetSettings()), allowed); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
+		Success: true,
+		Message: "Column display settings saved",
+	}), nil
+}
+
+// displaySettingsAllowedColumns returns the columns display settings may target: the table's physical
+// columns plus its relation synthetic columns (skipped, with a warning, when they cannot be listed).
+func (s *SickRockServer) displaySettingsAllowedColumns(ctx context.Context, tcName string) (map[string]struct{}, error) {
 	tc, err := s.repo.GetTableConfiguration(ctx, tcName)
 	if err != nil {
 		return nil, err
 	}
 	cols, err := s.repo.ListColumns(ctx, tc)
 	if err != nil {
-		return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	allowed := make(map[string]struct{}, len(cols))
 	for _, c := range cols {
 		allowed[c.Name] = struct{}{}
 	}
-	syntheticKeys, synErr := s.repo.ListRelationSyntheticColumnKeys(ctx, tcName)
-	if synErr != nil {
-		log.WithError(synErr).Warn("Failed to list relation synthetic columns for display settings")
-	} else {
-		for _, key := range syntheticKeys {
-			allowed[key] = struct{}{}
-		}
+	syntheticKeys, err := s.repo.ListRelationSyntheticColumnKeys(ctx, tcName)
+	if err != nil {
+		log.WithError(err).Warn("Failed to list relation synthetic columns for display settings")
 	}
-	inputs := make([]repo.ColumnDisplayInput, 0, len(req.Msg.GetSettings()))
-	for _, s := range req.Msg.GetSettings() {
+	for _, key := range syntheticKeys {
+		allowed[key] = struct{}{}
+	}
+	return allowed, nil
+}
+
+func columnDisplayInputs(settings []*sickrockpb.ColumnDisplaySettingInput) []repo.ColumnDisplayInput {
+	inputs := make([]repo.ColumnDisplayInput, 0, len(settings))
+	for _, s := range settings {
 		inputs = append(inputs, repo.ColumnDisplayInput{
 			ColumnName:   s.GetColumnName(),
 			DisplayLabel: s.GetDisplayLabel(),
@@ -1298,16 +1077,7 @@ func (s *SickRockServer) SetColumnDisplaySettings(ctx context.Context, req *conn
 			ValueSuffix:  s.GetValueSuffix(),
 		})
 	}
-	if err := s.repo.SetColumnDisplaySettings(ctx, tcName, inputs, allowed); err != nil {
-		return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
-	}
-	return connect.NewResponse(&sickrockpb.SetColumnDisplaySettingsResponse{
-		Success: true,
-		Message: "Column display settings saved",
-	}), nil
+	return inputs
 }
 
 func (s *SickRockServer) SetTableRowLabels(ctx context.Context, req *connect.Request[sickrockpb.SetTableRowLabelsRequest]) (*connect.Response[sickrockpb.SetTableRowLabelsResponse], error) {
@@ -1322,10 +1092,7 @@ func (s *SickRockServer) SetTableRowLabels(ctx context.Context, req *connect.Req
 		return nil, err
 	}
 	if err := s.repo.SetTableRowLabels(ctx, tcName, req.Msg.GetRowName(), req.Msg.GetRowNamePlural()); err != nil {
-		return connect.NewResponse(&sickrockpb.SetTableRowLabelsResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&sickrockpb.SetTableRowLabelsResponse{
 		Success: true,
@@ -1343,29 +1110,32 @@ func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Reques
 	if f == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("field required"))
 	}
-	fieldType := f.GetType()
 	err = s.repo.AddColumn(ctx, tc.Db.String, tc.Table.String, repo.FieldSpec{
 		Name:                      f.GetName(),
-		Type:                      fieldType,
+		Type:                      f.GetType(),
 		Required:                  f.GetRequired(),
 		DefaultToCurrentTimestamp: f.GetDefaultToCurrentTimestamp(),
 	})
 	if err != nil {
 		return nil, err
 	}
-	semantic := ""
-	switch {
-	case fieldType == repo.SemanticTypeUserRef:
-		semantic = repo.SemanticTypeUserRef
-	case repo.IsDatetimeTypeName(fieldType):
-		semantic = repo.SemanticTypeDatetime
-	}
-	if semantic != "" {
+	if semantic := columnSemanticForType(f.GetType()); semantic != "" {
 		if err := s.repo.SetColumnSemantic(ctx, req.Msg.GetPageId(), f.GetName(), semantic); err != nil {
 			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("save column semantic: %w", err))
 		}
 	}
 	return s.GetTableStructure(ctx, &connect.Request[sickrockpb.GetTableStructureRequest]{Msg: &sickrockpb.GetTableStructureRequest{PageId: req.Msg.GetPageId()}})
+}
+
+// columnSemanticForType returns the column semantic recorded for a new column of fieldType, or "".
+func columnSemanticForType(fieldType string) string {
+	switch {
+	case fieldType == repo.SemanticTypeUserRef:
+		return repo.SemanticTypeUserRef
+	case repo.IsDatetimeTypeName(fieldType):
+		return repo.SemanticTypeDatetime
+	}
+	return ""
 }
 
 func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Request[sickrockpb.CreateTableViewRequest]) (*connect.Response[sickrockpb.CreateTableViewResponse], error) {
@@ -1382,24 +1152,9 @@ func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Reque
 		return nil, err
 	}
 
-	// Convert protobuf columns to repository columns
-	var columns []repo.TableViewColumn
-	for _, pbCol := range req.Msg.GetColumns() {
-		columns = append(columns, repo.TableViewColumn{
-			ColumnName:  pbCol.GetColumnName(),
-			IsVisible:   pbCol.GetIsVisible(),
-			ColumnOrder: int(pbCol.GetColumnOrder()),
-			SortOrder:   pbCol.GetSortOrder(),
-		})
-	}
-
-	viewType := req.Msg.GetViewType()
-	if viewType == "" {
-		viewType = "table" // Default to "table"
-	}
-	layoutJSON, err := validateViewLayoutJSON(req.Msg.GetLayoutJson())
+	viewType, layoutJSON, columns, err := tableViewInput(req.Msg.GetViewType(), req.Msg.GetLayoutJson(), req.Msg.GetColumns())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		return nil, err
 	}
 
 	viewID, err := s.repo.CreateTableView(ctx, tableName, viewName, viewType, layoutJSON, columns)
@@ -1414,8 +1169,26 @@ func (s *SickRockServer) CreateTableView(ctx context.Context, req *connect.Reque
 	return connect.NewResponse(&sickrockpb.CreateTableViewResponse{
 		Success: true,
 		Message: "Table view created successfully",
-		ViewId:  int32(viewID),
+		ViewId:  toInt32(viewID),
 	}), nil
+}
+
+// tableViewInput converts a view request's type (default "table"), layout JSON (validated) and columns.
+func tableViewInput(viewType, layoutJSON string, pbColumns []*sickrockpb.TableViewColumn) (string, string, []repo.TableViewColumn, error) {
+	layoutJSON, err := validateViewLayoutJSON(layoutJSON)
+	if err != nil {
+		return "", "", nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	var columns []repo.TableViewColumn
+	for _, pbCol := range pbColumns {
+		columns = append(columns, repo.TableViewColumn{
+			ColumnName:  pbCol.GetColumnName(),
+			IsVisible:   pbCol.GetIsVisible(),
+			ColumnOrder: int(pbCol.GetColumnOrder()),
+			SortOrder:   pbCol.GetSortOrder(),
+		})
+	}
+	return cmp.Or(viewType, "table"), layoutJSON, columns, nil
 }
 
 func (s *SickRockServer) UpdateTableView(ctx context.Context, req *connect.Request[sickrockpb.UpdateTableViewRequest]) (*connect.Response[sickrockpb.UpdateTableViewResponse], error) {
@@ -1433,25 +1206,9 @@ func (s *SickRockServer) UpdateTableView(ctx context.Context, req *connect.Reque
 		return nil, err
 	}
 
-	// Convert protobuf columns to repository columns
-	var columns []repo.TableViewColumn
-	for _, pbCol := range req.Msg.GetColumns() {
-		columns = append(columns, repo.TableViewColumn{
-			ColumnName:  pbCol.GetColumnName(),
-			IsVisible:   pbCol.GetIsVisible(),
-			ColumnOrder: int(pbCol.GetColumnOrder()),
-			SortOrder:   pbCol.GetSortOrder(),
-		})
-	}
-
-	viewType := req.Msg.GetViewType()
-	if viewType == "" {
-		viewType = "table" // Default to "table"
-	}
-
-	layoutJSON, err := validateViewLayoutJSON(req.Msg.GetLayoutJson())
+	viewType, layoutJSON, columns, err := tableViewInput(req.Msg.GetViewType(), req.Msg.GetLayoutJson(), req.Msg.GetColumns())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		return nil, err
 	}
 
 	err = s.repo.UpdateTableView(ctx, viewID, tableName, viewName, viewType, layoutJSON, columns)
@@ -1496,7 +1253,7 @@ func (s *SickRockServer) GetTableViews(ctx context.Context, req *connect.Request
 			pbColumns = append(pbColumns, &sickrockpb.TableViewColumn{
 				ColumnName:  col.ColumnName,
 				IsVisible:   col.IsVisible,
-				ColumnOrder: int32(col.ColumnOrder),
+				ColumnOrder: toInt32(col.ColumnOrder),
 				SortOrder:   col.SortOrder,
 			})
 		}
@@ -1507,7 +1264,7 @@ func (s *SickRockServer) GetTableViews(ctx context.Context, req *connect.Request
 		}
 
 		pbViews = append(pbViews, &sickrockpb.TableView{
-			Id:         int32(view.ID),
+			Id:         toInt32(view.ID),
 			TableName:  view.TableName,
 			ViewName:   view.ViewName,
 			IsDefault:  view.IsDefault,
@@ -1519,7 +1276,7 @@ func (s *SickRockServer) GetTableViews(ctx context.Context, req *connect.Request
 
 	return connect.NewResponse(&sickrockpb.GetTableViewsResponse{
 		Views:             pbViews,
-		UserDefaultViewId: int32(s.userDefaultTableView(ctx, tableName)),
+		UserDefaultViewId: toInt32(s.userDefaultTableView(ctx, tableName)),
 	}), nil
 }
 
@@ -1540,21 +1297,29 @@ func (s *SickRockServer) userDefaultTableView(ctx context.Context, tableName str
 // SetUserDefaultTableView sets (or with view_id 0, clears) the caller's own default view.
 // It is a personal preference, so viewing the table is enough.
 func (s *SickRockServer) SetUserDefaultTableView(ctx context.Context, req *connect.Request[sickrockpb.SetUserDefaultTableViewRequest]) (*connect.Response[sickrockpb.SetUserDefaultTableViewResponse], error) {
-	tableName := strings.TrimSpace(req.Msg.GetTableName())
-	if tableName == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("table_name is required"))
-	}
-	userID, err := s.getUserIDFromContext(ctx)
+	tableName, userID, err := s.userDefaultTableViewAccess(ctx, req.Msg.GetTableName())
 	if err != nil {
-		return nil, err
-	}
-	if err := s.requireDataTableAccess(ctx, tableName, repo.ResourceActionView); err != nil {
 		return nil, err
 	}
 	if err := s.repo.SetUserDefaultTableView(ctx, userID, tableName, int(req.Msg.GetViewId())); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	return connect.NewResponse(&sickrockpb.SetUserDefaultTableViewResponse{}), nil
+}
+
+func (s *SickRockServer) userDefaultTableViewAccess(ctx context.Context, tableName string) (string, int, error) {
+	tableName = strings.TrimSpace(tableName)
+	if tableName == "" {
+		return "", 0, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("table_name is required"))
+	}
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return "", 0, err
+	}
+	if err := s.requireDataTableAccess(ctx, tableName, repo.ResourceActionView); err != nil {
+		return "", 0, err
+	}
+	return tableName, userID, nil
 }
 
 const maxViewLayoutJSONBytes = 64 * 1024
@@ -1586,55 +1351,35 @@ func (s *SickRockServer) DeleteTableView(ctx context.Context, req *connect.Reque
 
 	viewTable, err := s.repo.GetTableViewTableName(ctx, viewID)
 	if err != nil {
-		return connect.NewResponse(&sickrockpb.DeleteTableViewResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	if err := s.requireDataTableAccess(ctx, viewTable, repo.ResourceActionEdit); err != nil {
+	if err = s.requireDataTableAccess(ctx, viewTable, repo.ResourceActionEdit); err != nil {
 		return nil, err
 	}
 
-	err = s.repo.DeleteTableView(ctx, viewID)
+	return deleteTableViewResponse(s.repo.DeleteTableView(ctx, viewID)), nil
+}
+
+func deleteTableViewResponse(err error) *connect.Response[sickrockpb.DeleteTableViewResponse] {
 	if err != nil {
 		log.Errorf("Failed to delete table view: %v", err)
 		return connect.NewResponse(&sickrockpb.DeleteTableViewResponse{
 			Success: false,
 			Message: fmt.Sprintf("Failed to delete view: %v", err),
-		}), nil
+		})
 	}
-
 	return connect.NewResponse(&sickrockpb.DeleteTableViewResponse{
 		Success: true,
 		Message: "Table view deleted successfully",
-	}), nil
+	})
 }
 
 func (s *SickRockServer) CreateForeignKey(ctx context.Context, req *connect.Request[sickrockpb.CreateForeignKeyRequest]) (*connect.Response[sickrockpb.CreateForeignKeyResponse], error) {
-	tableName := req.Msg.GetTableName()
-	columnName := req.Msg.GetColumnName()
-	referencedTable := req.Msg.GetReferencedTable()
-	referencedColumn := req.Msg.GetReferencedColumn()
-	onDeleteAction := req.Msg.GetOnDeleteAction()
-	onUpdateAction := req.Msg.GetOnUpdateAction()
-
-	if tableName == "" || columnName == "" || referencedTable == "" || referencedColumn == "" {
-		return connect.NewResponse(&sickrockpb.CreateForeignKeyResponse{
-			Success: false,
-			Message: "Table name, column name, referenced table, and referenced column are required",
-		}), nil
+	if problem := createForeignKeyRequestProblem(req.Msg); problem != "" {
+		return connect.NewResponse(&sickrockpb.CreateForeignKeyResponse{Success: false, Message: problem}), nil
 	}
 
-	// Validate actions
-	validActions := []string{"CASCADE", "SET NULL", "RESTRICT", "NO ACTION"}
-	if !contains(validActions, onDeleteAction) || !contains(validActions, onUpdateAction) {
-		return connect.NewResponse(&sickrockpb.CreateForeignKeyResponse{
-			Success: false,
-			Message: "Invalid action. Must be one of: CASCADE, SET NULL, RESTRICT, NO ACTION",
-		}), nil
-	}
-
-	err := s.repo.CreateForeignKey(ctx, tableName, columnName, referencedTable, referencedColumn, onDeleteAction, onUpdateAction)
+	err := s.repo.CreateForeignKey(ctx, req.Msg.GetTableName(), req.Msg.GetColumnName(), req.Msg.GetReferencedTable(), req.Msg.GetReferencedColumn(), req.Msg.GetOnDeleteAction(), req.Msg.GetOnUpdateAction())
 	if err != nil {
 		log.Errorf("Failed to create foreign key: %v", err)
 		return connect.NewResponse(&sickrockpb.CreateForeignKeyResponse{
@@ -1647,6 +1392,18 @@ func (s *SickRockServer) CreateForeignKey(ctx context.Context, req *connect.Requ
 		Success: true,
 		Message: "Foreign key created successfully",
 	}), nil
+}
+
+// createForeignKeyRequestProblem returns why a create-foreign-key request is invalid, or "".
+func createForeignKeyRequestProblem(msg *sickrockpb.CreateForeignKeyRequest) string {
+	if slices.Contains([]string{msg.GetTableName(), msg.GetColumnName(), msg.GetReferencedTable(), msg.GetReferencedColumn()}, "") {
+		return "Table name, column name, referenced table, and referenced column are required"
+	}
+	validActions := []string{"CASCADE", "SET NULL", "RESTRICT", "NO ACTION"}
+	if !contains(validActions, msg.GetOnDeleteAction()) || !contains(validActions, msg.GetOnUpdateAction()) {
+		return "Invalid action. Must be one of: CASCADE, SET NULL, RESTRICT, NO ACTION"
+	}
+	return ""
 }
 
 func (s *SickRockServer) GetForeignKeys(ctx context.Context, req *connect.Request[sickrockpb.GetForeignKeysRequest]) (*connect.Response[sickrockpb.GetForeignKeysResponse], error) {
@@ -1669,7 +1426,7 @@ func (s *SickRockServer) GetForeignKeys(ctx context.Context, req *connect.Reques
 	var pbForeignKeys []*sickrockpb.ForeignKey
 	for _, fk := range foreignKeys {
 		pbForeignKeys = append(pbForeignKeys, &sickrockpb.ForeignKey{
-			RelationId:       int32(fk.RelationID),
+			RelationId:       toInt32(fk.RelationID),
 			ConstraintName:   fk.ConstraintName,
 			TableName:        fk.TableName,
 			ColumnName:       fk.ColumnName,
@@ -1698,14 +1455,10 @@ func (s *SickRockServer) UpdateTableRelation(ctx context.Context, req *connect.R
 	}
 	rel, err := s.repo.GetTableRelationByConstraintName(ctx, constraintName)
 	if err != nil {
-		return connect.NewResponse(&sickrockpb.UpdateTableRelationResponse{
-			Success: false,
-			Message: "Relation not found",
-		}), nil
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("relation not found"))
 	}
-	if s.requireTableAccess(ctx, rel.SourceTableKey, repo.ResourceActionEdit) != nil &&
-		s.requireTableAccess(ctx, rel.ReferencedTableKey, repo.ResourceActionEdit) != nil {
-		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("table edit access required"))
+	if err := s.requireRelationEditAccess(ctx, rel); err != nil {
+		return nil, err
 	}
 	if req.Msg.AbsorbIntoItem != nil {
 		if err := s.repo.SetTableRelationAbsorb(ctx, constraintName, req.Msg.GetAbsorbIntoItem(), req.Msg.GetAbsorbType()); err != nil {
@@ -1727,6 +1480,15 @@ func (s *SickRockServer) UpdateTableRelation(ctx context.Context, req *connect.R
 		Success: true,
 		Message: "Relation updated",
 	}), nil
+}
+
+// requireRelationEditAccess allows editing a relation to callers who may edit either of its tables.
+func (s *SickRockServer) requireRelationEditAccess(ctx context.Context, rel *repo.TableRelation) error {
+	if s.requireTableAccess(ctx, rel.SourceTableKey, repo.ResourceActionEdit) == nil ||
+		s.requireTableAccess(ctx, rel.ReferencedTableKey, repo.ResourceActionEdit) == nil {
+		return nil
+	}
+	return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("table edit access required"))
 }
 
 func pullThroughFieldsFromProto(in []*sickrockpb.RelationPullThroughField) []repo.RelationPullThroughField {
@@ -1801,10 +1563,7 @@ func (s *SickRockServer) SetItemPageLayout(ctx context.Context, req *connect.Req
 		})
 	}
 	if err := s.repo.SetItemPageLayoutBlocks(ctx, tcName, inputs); err != nil {
-		return connect.NewResponse(&sickrockpb.SetItemPageLayoutResponse{
-			Success: false,
-			Message: err.Error(),
-		}), nil
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&sickrockpb.SetItemPageLayoutResponse{
 		Success: true,
@@ -1838,12 +1597,7 @@ func (s *SickRockServer) DeleteForeignKey(ctx context.Context, req *connect.Requ
 
 // Helper function to check if a string is in a slice
 func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }
 
 func (s *SickRockServer) ChangeColumnType(ctx context.Context, req *connect.Request[sickrockpb.ChangeColumnTypeRequest]) (*connect.Response[sickrockpb.ChangeColumnTypeResponse], error) {
@@ -1894,18 +1648,10 @@ func (s *SickRockServer) DropColumn(ctx context.Context, req *connect.Request[si
 	tableName := req.Msg.GetTableName()
 	columnName := req.Msg.GetColumnName()
 
-	if tableName == "" || columnName == "" {
+	if msg := dropColumnValidation(tableName, columnName); msg != "" {
 		return connect.NewResponse(&sickrockpb.DropColumnResponse{
 			Success: false,
-			Message: "Table name and column name are required",
-		}), nil
-	}
-
-	// Prevent dropping system columns
-	if columnName == "id" {
-		return connect.NewResponse(&sickrockpb.DropColumnResponse{
-			Success: false,
-			Message: "Cannot drop system columns (id)",
+			Message: msg,
 		}), nil
 	}
 
@@ -1924,12 +1670,22 @@ func (s *SickRockServer) DropColumn(ctx context.Context, req *connect.Request[si
 	}), nil
 }
 
+func dropColumnValidation(tableName, columnName string) string {
+	if tableName == "" || columnName == "" {
+		return "Table name and column name are required"
+	}
+	if columnName == "id" {
+		return "Cannot drop system columns (id)"
+	}
+	return ""
+}
+
 func (s *SickRockServer) ChangeColumnName(ctx context.Context, req *connect.Request[sickrockpb.ChangeColumnNameRequest]) (*connect.Response[sickrockpb.ChangeColumnNameResponse], error) {
 	tableName := req.Msg.GetTableName()
 	oldColumnName := req.Msg.GetOldColumnName()
 	newColumnName := req.Msg.GetNewColumnName()
 
-	if tableName == "" || oldColumnName == "" || newColumnName == "" {
+	if missingChangeColumnNameArgs(tableName, oldColumnName, newColumnName) {
 		return connect.NewResponse(&sickrockpb.ChangeColumnNameResponse{
 			Success: false,
 			Message: "Table name, old column name, and new column name are required",
@@ -1950,6 +1706,10 @@ func (s *SickRockServer) ChangeColumnName(ctx context.Context, req *connect.Requ
 	}), nil
 }
 
+func missingChangeColumnNameArgs(tableName, oldColumnName, newColumnName string) bool {
+	return tableName == "" || oldColumnName == "" || newColumnName == ""
+}
+
 func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect.Request[sickrockpb.GetMostRecentlyViewedRequest]) (*connect.Response[sickrockpb.GetMostRecentlyViewedResponse], error) {
 	userID, err := s.getUserIDFromContext(ctx)
 	if err != nil || userID <= 0 {
@@ -1961,18 +1721,24 @@ func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect
 		limit = 10 // Default limit
 	}
 
-	fetchLimit := limit * 5
-	if fetchLimit < limit {
-		fetchLimit = limit
-	}
-
-	items, err := s.repo.GetMostRecentlyViewed(ctx, userID, fetchLimit)
+	// Over-fetch so rows from tables the caller can no longer view can be skipped.
+	items, err := s.repo.GetMostRecentlyViewed(ctx, userID, max(limit*5, limit))
 	if err != nil {
 		return nil, err
 	}
 
+	return connect.NewResponse(&sickrockpb.GetMostRecentlyViewedResponse{
+		Items: s.viewableRecentlyViewed(ctx, items, limit),
+	}), nil
+}
+
+// viewableRecentlyViewed returns up to limit items from tables the caller may view.
+func (s *SickRockServer) viewableRecentlyViewed(ctx context.Context, items []repo.RecentlyViewedItem, limit int) []*sickrockpb.RecentlyViewedItem {
 	pbItems := make([]*sickrockpb.RecentlyViewedItem, 0, limit)
 	for _, item := range items {
+		if len(pbItems) >= limit {
+			break
+		}
 		if s.requireTableAccess(ctx, item.Name, repo.ResourceActionView) != nil {
 			continue
 		}
@@ -1984,14 +1750,8 @@ func (s *SickRockServer) GetMostRecentlyViewed(ctx context.Context, req *connect
 			ItemName:      item.ItemName,
 			TableTitle:    displayNavigationTitle(item.TableTitle),
 		})
-		if len(pbItems) >= limit {
-			break
-		}
 	}
-
-	return connect.NewResponse(&sickrockpb.GetMostRecentlyViewedResponse{
-		Items: pbItems,
-	}), nil
+	return pbItems
 }
 
 func (s *SickRockServer) GetSystemInfo(ctx context.Context, req *connect.Request[sickrockpb.GetSystemInfoRequest]) (*connect.Response[sickrockpb.GetSystemInfoResponse], error) {
@@ -2006,17 +1766,12 @@ func (s *SickRockServer) GetSystemInfo(ctx context.Context, req *connect.Request
 }
 
 func (s *SickRockServer) CreateDashboard(ctx context.Context, req *connect.Request[sickrockpb.CreateDashboardRequest]) (*connect.Response[sickrockpb.CreateDashboardResponse], error) {
-	name := strings.TrimSpace(req.Msg.GetName())
-	if name == "" {
+	name, createNavigation, ok := createDashboardArgs(req.Msg)
+	if !ok {
 		return connect.NewResponse(&sickrockpb.CreateDashboardResponse{
 			Success: false,
 			Message: "Dashboard name is required",
 		}), nil
-	}
-
-	createNavigation := true
-	if req.Msg.CreateNavigationEntry != nil {
-		createNavigation = req.Msg.GetCreateNavigationEntry()
 	}
 
 	dashboardID, err := s.repo.CreateDashboard(ctx, name, createNavigation)
@@ -2034,8 +1789,20 @@ func (s *SickRockServer) CreateDashboard(ctx context.Context, req *connect.Reque
 	return connect.NewResponse(&sickrockpb.CreateDashboardResponse{
 		Success:     true,
 		Message:     "Dashboard created successfully",
-		DashboardId: int32(dashboardID),
+		DashboardId: toInt32(dashboardID),
 	}), nil
+}
+
+func createDashboardArgs(msg *sickrockpb.CreateDashboardRequest) (string, bool, bool) {
+	name := strings.TrimSpace(msg.GetName())
+	if name == "" {
+		return "", false, false
+	}
+	createNavigation := true
+	if msg.CreateNavigationEntry != nil {
+		createNavigation = msg.GetCreateNavigationEntry()
+	}
+	return name, createNavigation, true
 }
 
 func (s *SickRockServer) GetDashboards(ctx context.Context, req *connect.Request[sickrockpb.GetDashboardsRequest]) (*connect.Response[sickrockpb.GetDashboardsResponse], error) {
@@ -2055,106 +1822,96 @@ func (s *SickRockServer) GetDashboards(ctx context.Context, req *connect.Request
 		if err != nil {
 			return nil, err
 		}
-
-		runningEnv := make(map[string]interface{})
-		runningEnv["round1"] = func(in float64) (float64, error) {
-			return math.Round(in*10) / 10, nil
-		}
-
-		pbComps := make([]*sickrockpb.DashboardComponent, 0, len(comps))
-		// Preload rules for each component without returning them to the client
-		for _, c := range comps {
-			data, err := s.getDashboardComponentData(ctx, c, &runningEnv)
-
-			runningEnv[c.Name] = data
-
-			var pbComp *sickrockpb.DashboardComponent
-			if err != nil {
-				// If there's an error getting component data, create a component with error info
-				pbComp = &sickrockpb.DashboardComponent{
-					Id:         int32(c.ID),
-					Name:       c.Name,
-					DataString: "",
-					DataNumber: 0,
-					Error:      err.Error(),
-					Suffix:     "",
-				}
-				log.WithError(err).WithField("component", c.ID).Warn("Failed to load dashboard component data")
-			} else {
-				rules, err := s.repo.GetDashboardComponentRules(ctx, &c.ID)
-
-				if err != nil {
-					log.WithError(err).WithField("component", c.ID).Warn("Failed to load dashboard component rules")
-				}
-
-				pbComp = &sickrockpb.DashboardComponent{
-					Id:         int32(c.ID),
-					Name:       c.Name,
-					DataString: fmt.Sprintf("%v", data),
-					Suffix:     "",
-				}
-
-				s.applyRules(pbComp, rules)
-			}
-
-			pbComps = append(pbComps, pbComp)
-		}
-		out = append(out, &sickrockpb.Dashboard{Id: int32(d.ID), Name: d.Name, Components: pbComps})
+		out = append(out, &sickrockpb.Dashboard{Id: toInt32(d.ID), Name: d.Name, Components: s.dashboardComponentsToProto(ctx, comps)})
 	}
 	return connect.NewResponse(&sickrockpb.GetDashboardsResponse{Dashboards: out}), nil
 }
 
-func (s *SickRockServer) getDashboardComponentData(ctx context.Context, comp repo.DashboardComponent, runningEnv *map[string]interface{}) (any, error) {
-	formula := strings.TrimSpace(comp.Formula.String)
-
-	if formula == "" {
-		return "", nil
+// dashboardComponentsToProto evaluates each component in order; each component's value is exposed by
+// name to the formulas of later components.
+func (s *SickRockServer) dashboardComponentsToProto(ctx context.Context, comps []repo.DashboardComponent) []*sickrockpb.DashboardComponent {
+	runningEnv := make(map[string]any)
+	runningEnv["round1"] = func(in float64) (float64, error) {
+		return math.Round(in*10) / 10, nil
 	}
 
-	// Handle special case for "latest" query type
-	if formula == "latest" {
-		if !comp.TcID.Valid {
-			return "", fmt.Errorf("tc_id is not valid for component %d", comp.ID)
-		}
-		item, err := s.repo.GetLastItem(ctx, int(comp.TcID.Int32))
+	pbComps := make([]*sickrockpb.DashboardComponent, 0, len(comps))
+	for _, c := range comps {
+		data, err := s.getDashboardComponentData(ctx, c, &runningEnv)
+		runningEnv[c.Name] = data
+		pbComps = append(pbComps, s.dashboardComponentToProto(ctx, c, data, err))
+	}
+	return pbComps
+}
 
+// dashboardComponentToProto converts an evaluated component, applying its rules (loaded server side
+// and not returned to the client), or reports dataErr on the component.
+func (s *SickRockServer) dashboardComponentToProto(ctx context.Context, c repo.DashboardComponent, data any, dataErr error) *sickrockpb.DashboardComponent {
+	if dataErr != nil {
+		log.WithError(dataErr).WithField("component", c.ID).Warn("Failed to load dashboard component data")
+		return &sickrockpb.DashboardComponent{
+			Id:    toInt32(c.ID),
+			Name:  c.Name,
+			Error: dataErr.Error(),
+		}
+	}
+	rules, err := s.repo.GetDashboardComponentRules(ctx, &c.ID)
+	if err != nil {
+		log.WithError(err).WithField("component", c.ID).Warn("Failed to load dashboard component rules")
+	}
+	pbComp := &sickrockpb.DashboardComponent{
+		Id:         toInt32(c.ID),
+		Name:       c.Name,
+		DataString: fmt.Sprintf("%v", data),
+	}
+	s.applyRules(pbComp, rules)
+	return pbComp
+}
+
+func (s *SickRockServer) getDashboardComponentData(ctx context.Context, comp repo.DashboardComponent, runningEnv *map[string]any) (any, error) {
+	formula := strings.TrimSpace(comp.Formula.String)
+
+	switch formula {
+	case "":
+		return "", nil
+	case "latest":
+		// Special case: the column's value in the table's latest row
+		fields, err := s.latestComponentRow(ctx, comp)
 		if err != nil {
 			return "", err
 		}
-
-		return item.Fields[comp.ColumnName.String], nil
+		return fields[comp.ColumnName.String], nil
 	}
 
-	// Parse expression using expr-lang/expr
-	if formula != "" {
-		// Create environment with available data
-		env := *runningEnv
-		env["latest"] = func() (map[string]interface{}, error) {
-			if !comp.TcID.Valid {
-				return nil, fmt.Errorf("tc_id is not valid for component %d", comp.ID)
-			}
-			item, err := s.repo.GetLastItem(ctx, int(comp.TcID.Int32))
-			if err != nil {
-				return nil, err
-			}
-			return item.Fields, nil
-		}
-
-		// Compile and evaluate the expression
-		program, err := expr.Compile(formula, expr.Env(env))
-		if err != nil {
-			return "", fmt.Errorf("failed to compile expression '%s': %w", formula, err)
-		}
-
-		result, err := expr.Run(program, env)
-		if err != nil {
-			return "", fmt.Errorf("failed to evaluate expression '%s': %w", formula, err)
-		}
-
-		return result, nil
+	// Evaluate the expression with earlier components' values and latest() available
+	env := *runningEnv
+	env["latest"] = func() (map[string]any, error) {
+		return s.latestComponentRow(ctx, comp)
 	}
 
-	return "", fmt.Errorf("no formula specified for component %d", comp.ID)
+	program, err := expr.Compile(formula, expr.Env(env))
+	if err != nil {
+		return "", fmt.Errorf("failed to compile expression '%s': %w", formula, err)
+	}
+
+	result, err := expr.Run(program, env)
+	if err != nil {
+		return "", fmt.Errorf("failed to evaluate expression '%s': %w", formula, err)
+	}
+
+	return result, nil
+}
+
+// latestComponentRow returns the fields of the latest row in the component's table.
+func (s *SickRockServer) latestComponentRow(ctx context.Context, comp repo.DashboardComponent) (map[string]any, error) {
+	if !comp.TcID.Valid {
+		return nil, fmt.Errorf("tc_id is not valid for component %d", comp.ID)
+	}
+	item, err := s.repo.GetLastItem(ctx, int(comp.TcID.Int32))
+	if err != nil {
+		return nil, err
+	}
+	return item.Fields, nil
 }
 
 func (s *SickRockServer) applyRules(comp *sickrockpb.DashboardComponent, rules []repo.DashboardComponentRule) {
@@ -2164,7 +1921,6 @@ func (s *SickRockServer) applyRules(comp *sickrockpb.DashboardComponent, rules [
 		switch r.Operation {
 		case "suffix":
 			comp.Suffix = r.Operand
-			break
 		default:
 			log.Warnf("Unknown operation %s", r.Operation)
 		}
@@ -2172,26 +1928,33 @@ func (s *SickRockServer) applyRules(comp *sickrockpb.DashboardComponent, rules [
 }
 
 func (s *SickRockServer) GetDashboardComponentRules(ctx context.Context, req *connect.Request[sickrockpb.GetDashboardComponentRulesRequest]) (*connect.Response[sickrockpb.GetDashboardComponentRulesResponse], error) {
-	var compPtr *int
-	if req.Msg != nil && req.Msg.GetComponent() != 0 {
-		v := int(req.Msg.GetComponent())
-		compPtr = &v
-	}
-	rules, err := s.repo.GetDashboardComponentRules(ctx, compPtr)
+	rules, err := s.repo.GetDashboardComponentRules(ctx, dashboardComponentFilter(req.Msg))
 	if err != nil {
 		return nil, err
 	}
+	return connect.NewResponse(&sickrockpb.GetDashboardComponentRulesResponse{Rules: dashboardComponentRulesToProto(rules)}), nil
+}
+
+func dashboardComponentFilter(msg *sickrockpb.GetDashboardComponentRulesRequest) *int {
+	if msg == nil || msg.GetComponent() == 0 {
+		return nil
+	}
+	v := int(msg.GetComponent())
+	return &v
+}
+
+func dashboardComponentRulesToProto(rules []repo.DashboardComponentRule) []*sickrockpb.DashboardComponentRule {
 	out := make([]*sickrockpb.DashboardComponentRule, 0, len(rules))
 	for _, rle := range rules {
 		out = append(out, &sickrockpb.DashboardComponentRule{
-			Id:        int32(rle.ID),
-			Component: int32(rle.Component),
-			Ordinal:   int32(rle.Ordinal),
+			Id:        toInt32(rle.ID),
+			Component: toInt32(rle.Component),
+			Ordinal:   toInt32(rle.Ordinal),
 			Operation: rle.Operation,
 			Operand:   rle.Operand,
 		})
 	}
-	return connect.NewResponse(&sickrockpb.GetDashboardComponentRulesResponse{Rules: out}), nil
+	return out
 }
 
 func (s *SickRockServer) CreateDashboardComponentRule(ctx context.Context, req *connect.Request[sickrockpb.CreateDashboardComponentRuleRequest]) (*connect.Response[sickrockpb.CreateDashboardComponentRuleResponse], error) {
@@ -2207,9 +1970,9 @@ func (s *SickRockServer) CreateDashboardComponentRule(ctx context.Context, req *
 		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.CreateDashboardComponentRuleResponse{Rule: &sickrockpb.DashboardComponentRule{
-		Id:        int32(rule.ID),
-		Component: int32(rule.Component),
-		Ordinal:   int32(rule.Ordinal),
+		Id:        toInt32(rule.ID),
+		Component: toInt32(rule.Component),
+		Ordinal:   toInt32(rule.Ordinal),
 		Operation: rule.Operation,
 		Operand:   rule.Operand,
 	}}), nil
@@ -2227,23 +1990,35 @@ func (s *SickRockServer) GetUserBookmarks(ctx context.Context, req *connect.Requ
 		return nil, err
 	}
 
+	return connect.NewResponse(&sickrockpb.GetUserBookmarksResponse{Bookmarks: userBookmarksToProto(bookmarks)}), nil
+}
+
+func userBookmarksToProto(bookmarks []repo.UserBookmark) []*sickrockpb.UserBookmark {
 	pbBookmarks := make([]*sickrockpb.UserBookmark, 0, len(bookmarks))
 	for _, bookmark := range bookmarks {
-		var navItem *sickrockpb.NavigationItem
-		if bookmark.NavigationItem != nil {
-			navItem = navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
-		}
-
-		pbBookmarks = append(pbBookmarks, &sickrockpb.UserBookmark{
-			Id:               int32(bookmark.ID),
-			UserId:           int32(bookmark.UserID),
-			NavigationItemId: int32(bookmark.NavigationItemID),
-			NavigationItem:   navItem,
-			Title:            bookmarkLinkTitle(bookmark),
-		})
+		pbBookmarks = append(pbBookmarks, userBookmarkToProto(bookmark, true))
 	}
+	return pbBookmarks
+}
 
-	return connect.NewResponse(&sickrockpb.GetUserBookmarksResponse{Bookmarks: pbBookmarks}), nil
+func userBookmarkToProto(bookmark repo.UserBookmark, includeTitle bool) *sickrockpb.UserBookmark {
+	pb := &sickrockpb.UserBookmark{
+		Id:               toInt32(bookmark.ID),
+		UserId:           toInt32(bookmark.UserID),
+		NavigationItemId: toInt32(bookmark.NavigationItemID),
+		NavigationItem:   bookmarkNavigationItem(bookmark),
+	}
+	if includeTitle {
+		pb.Title = bookmarkLinkTitle(bookmark)
+	}
+	return pb
+}
+
+func bookmarkNavigationItem(bookmark repo.UserBookmark) *sickrockpb.NavigationItem {
+	if bookmark.NavigationItem == nil {
+		return nil
+	}
+	return navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
 }
 
 // CreateUserBookmark creates a new bookmark for the authenticated user
@@ -2263,19 +2038,7 @@ func (s *SickRockServer) CreateUserBookmark(ctx context.Context, req *connect.Re
 		return nil, err
 	}
 
-	var navItem *sickrockpb.NavigationItem
-	if bookmark.NavigationItem != nil {
-		navItem = navigationItemRepoToProto(*bookmark.NavigationItem, bookmark.NavigationItem.TableView.String)
-	}
-
-	pbBookmark := &sickrockpb.UserBookmark{
-		Id:               int32(bookmark.ID),
-		UserId:           int32(bookmark.UserID),
-		NavigationItemId: int32(bookmark.NavigationItemID),
-		NavigationItem:   navItem,
-	}
-
-	return connect.NewResponse(&sickrockpb.CreateUserBookmarkResponse{Bookmark: pbBookmark}), nil
+	return connect.NewResponse(&sickrockpb.CreateUserBookmarkResponse{Bookmark: userBookmarkToProto(*bookmark, false)}), nil
 }
 
 // DeleteUserBookmark removes a bookmark for the authenticated user
@@ -2321,15 +2084,23 @@ func (s *SickRockServer) SetTickListCompletion(ctx context.Context, req *connect
 	if _, err := s.getUserIDFromContext(ctx); err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
-	tcName := strings.TrimSpace(req.Msg.GetTcName())
-	itemID := strings.TrimSpace(req.Msg.GetItemId())
-	if tcName == "" || itemID == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("tc_name and item_id are required"))
+	tcName, itemID, err := tickListCompletionArgs(req.Msg)
+	if err != nil {
+		return nil, err
 	}
 	if err := s.repo.SetTickListCompletion(ctx, tcName, itemID, req.Msg.GetCompleted()); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&sickrockpb.SetTickListCompletionResponse{}), nil
+}
+
+func tickListCompletionArgs(msg *sickrockpb.SetTickListCompletionRequest) (string, string, error) {
+	tcName := strings.TrimSpace(msg.GetTcName())
+	itemID := strings.TrimSpace(msg.GetItemId())
+	if tcName == "" || itemID == "" {
+		return "", "", connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("tc_name and item_id are required"))
+	}
+	return tcName, itemID, nil
 }
 
 // ClearTickListState removes all tick list completion state for a table.
@@ -2361,24 +2132,29 @@ func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
 	}
 
-	readOnly := req.Msg.GetReadOnly()
-
-	apiKey, err := armpassword.GenerateAPIKey("sk_")
+	apiKey, keyID, err := s.createStoredAPIKey(ctx, userID, name, req.Msg.GetReadOnly())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to generate API key: %w", err))
-	}
-
-	keyID, err := s.auth.Store.CreateAPIKey(ctx, userID, name, apiKey, readOnly)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create API key: %w", err))
+		return nil, err
 	}
 
 	return connect.NewResponse(&sickrockpb.CreateAPIKeyResponse{
 		Success:  true,
 		Message:  "API key created successfully",
 		ApiKey:   apiKey,
-		ApiKeyId: int32(keyID),
+		ApiKeyId: toInt32(keyID),
 	}), nil
+}
+
+func (s *SickRockServer) createStoredAPIKey(ctx context.Context, userID int, name string, readOnly bool) (string, int, error) {
+	apiKey, err := armpassword.GenerateAPIKey("sk_")
+	if err != nil {
+		return "", 0, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to generate API key: %w", err))
+	}
+	keyID, err := s.auth.Store.CreateAPIKey(ctx, userID, name, apiKey, readOnly)
+	if err != nil {
+		return "", 0, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create API key: %w", err))
+	}
+	return apiKey, keyID, nil
 }
 
 // GetAPIKeys retrieves all API keys for the authenticated user
@@ -2396,8 +2172,8 @@ func (s *SickRockServer) GetAPIKeys(ctx context.Context, req *connect.Request[si
 	var pbAPIKeys []*sickrockpb.APIKey
 	for _, apiKey := range apiKeys {
 		pbAPIKeys = append(pbAPIKeys, &sickrockpb.APIKey{
-			Id:         int32(apiKey.ID),
-			UserId:     int32(apiKey.UserAccountID),
+			Id:         toInt32(apiKey.ID),
+			UserId:     toInt32(apiKey.UserAccountID),
 			Name:       apiKey.Name,
 			CreatedAt:  parseIAMTimestamp(apiKey.CreatedAt),
 			LastUsedAt: parseIAMTimestamp(apiKey.LastUsedAt),
@@ -2481,14 +2257,14 @@ func (s *SickRockServer) GetConditionalFormattingRules(ctx context.Context, req 
 	var pbRules []*sickrockpb.ConditionalFormattingRule
 	for _, rule := range rules {
 		pbRules = append(pbRules, &sickrockpb.ConditionalFormattingRule{
-			Id:             int32(rule.ID),
+			Id:             toInt32(rule.ID),
 			TableName:      rule.TableName,
 			ColumnName:     rule.ColumnName,
 			ConditionType:  rule.ConditionType,
 			ConditionValue: rule.ConditionValue,
 			FormatType:     rule.FormatType,
 			FormatValue:    rule.FormatValue,
-			Priority:       int32(rule.Priority),
+			Priority:       toInt32(rule.Priority),
 			IsActive:       rule.IsActive,
 			SrCreated:      rule.SrCreated.Unix(),
 			UpdatedAtUnix:  rule.UpdatedAtUnix,
@@ -2524,7 +2300,7 @@ func (s *SickRockServer) CreateConditionalFormattingRule(ctx context.Context, re
 	return connect.NewResponse(&sickrockpb.CreateConditionalFormattingRuleResponse{
 		Success: true,
 		Message: "Conditional formatting rule created successfully",
-		RuleId:  int32(ruleID),
+		RuleId:  toInt32(ruleID),
 	}), nil
 }
 

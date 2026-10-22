@@ -26,25 +26,31 @@ func (r *Repository) SetColumnSemantic(ctx context.Context, tableConfiguration, 
 	tableConfiguration = strings.TrimSpace(tableConfiguration)
 	columnName = sanitizeDatabaseIdentifier(columnName)
 	semanticType = strings.TrimSpace(semanticType)
-	if tableConfiguration == "" || columnName == "" || semanticType == "" {
+	if missingColumnSemanticArgs(tableConfiguration, columnName, semanticType) {
 		return fmt.Errorf("table configuration, column name, and semantic type are required")
 	}
 	const q = `
 		INSERT INTO table_column_semantics (table_configuration, column_name, semantic_type)
 		VALUES (?, ?, ?)
 		ON CONFLICT(table_configuration, column_name) DO UPDATE SET semantic_type = excluded.semantic_type`
-	switch r.db.DriverName() {
-	case "mysql":
+	return r.execColumnSemanticUpsert(ctx, tableConfiguration, columnName, semanticType, q)
+}
+
+func missingColumnSemanticArgs(tableConfiguration, columnName, semanticType string) bool {
+	return tableConfiguration == "" || columnName == "" || semanticType == ""
+}
+
+func (r *Repository) execColumnSemanticUpsert(ctx context.Context, tableConfiguration, columnName, semanticType, sqliteQ string) error {
+	if r.db.DriverName() == "mysql" {
 		const mysqlQ = `
 			INSERT INTO table_column_semantics (table_configuration, column_name, semantic_type)
 			VALUES (?, ?, ?)
 			ON DUPLICATE KEY UPDATE semantic_type = VALUES(semantic_type)`
 		_, err := r.db.ExecContext(ctx, mysqlQ, tableConfiguration, columnName, semanticType)
 		return err
-	default:
-		_, err := r.db.ExecContext(ctx, q, tableConfiguration, columnName, semanticType)
-		return err
 	}
+	_, err := r.db.ExecContext(ctx, sqliteQ, tableConfiguration, columnName, semanticType)
+	return err
 }
 
 func (r *Repository) GetColumnSemantics(ctx context.Context, tableConfiguration string) (map[string]string, error) {
@@ -59,7 +65,15 @@ func (r *Repository) GetColumnSemantics(ctx context.Context, tableConfiguration 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+	return scanColumnSemantics(rows, out)
+}
+
+func scanColumnSemantics(rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}, out map[string]string) (map[string]string, error) {
 	for rows.Next() {
 		var columnName, semanticType string
 		if err := rows.Scan(&columnName, &semanticType); err != nil {
@@ -75,6 +89,10 @@ func (r *Repository) ApplyColumnSemantics(ctx context.Context, tableConfiguratio
 	if err != nil || len(semantics) == 0 {
 		return specs
 	}
+	return applySemanticsToSpecs(specs, semantics)
+}
+
+func applySemanticsToSpecs(specs []FieldSpec, semantics map[string]string) []FieldSpec {
 	for i, spec := range specs {
 		if semantic, ok := semantics[spec.Name]; ok && semantic != "" {
 			specs[i].Type = semantic

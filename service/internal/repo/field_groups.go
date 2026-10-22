@@ -4,22 +4,24 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // TableFieldGroup is one titled group of columns on the item view.
 type TableFieldGroup struct {
-	ID         int    `db:"id"`
-	Ordinal    int    `db:"ordinal"`
 	Title      string `db:"title"`
 	ColumnName string `db:"column_name"`
+	ID         int    `db:"id"`
+	Ordinal    int    `db:"ordinal"`
 	ColOrdinal int    `db:"col_ordinal"`
 }
 
 // FieldGroupInput replaces all field groups for a table configuration.
 type FieldGroupInput struct {
-	Ordinal     int
 	Title       string
 	ColumnNames []string
+	Ordinal     int
 }
 
 // GetItemFieldGroups returns field groups with columns ordered for item view.
@@ -38,62 +40,57 @@ func (r *Repository) GetItemFieldGroups(ctx context.Context, tableConfiguration 
 	if err != nil {
 		return nil, err
 	}
-	if len(rows) == 0 {
-		return []FieldGroupInput{}, nil
-	}
-	type groupAcc struct {
-		ordinal int
-		title   string
-		cols    []string
-	}
-	byID := make(map[int]*groupAcc)
-	order := make([]int, 0)
+	return groupFieldGroupRows(rows), nil
+}
+
+// groupFieldGroupRows folds joined group/column rows into groups, keeping row order.
+func groupFieldGroupRows(rows []TableFieldGroup) []FieldGroupInput {
+	out := make([]FieldGroupInput, 0)
+	indexByID := make(map[int]int)
 	for _, row := range rows {
-		acc, ok := byID[row.ID]
+		i, ok := indexByID[row.ID]
 		if !ok {
-			acc = &groupAcc{ordinal: row.Ordinal, title: row.Title}
-			byID[row.ID] = acc
-			order = append(order, row.ID)
+			i = len(out)
+			indexByID[row.ID] = i
+			out = append(out, FieldGroupInput{Ordinal: row.Ordinal, Title: row.Title})
 		}
 		if row.ColumnName != "" {
-			acc.cols = append(acc.cols, row.ColumnName)
+			out[i].ColumnNames = append(out[i].ColumnNames, row.ColumnName)
 		}
 	}
-	out := make([]FieldGroupInput, 0, len(order))
-	for _, id := range order {
-		acc := byID[id]
-		out = append(out, FieldGroupInput{
-			Ordinal:     acc.ordinal,
-			Title:       acc.title,
-			ColumnNames: acc.cols,
-		})
-	}
-	return out, nil
+	return out
 }
 
 func validateFieldGroups(groups []FieldGroupInput, allowedColumns map[string]struct{}) error {
 	seenCol := make(map[string]struct{})
 	for i, g := range groups {
-		title := strings.TrimSpace(g.Title)
-		if title == "" {
+		if strings.TrimSpace(g.Title) == "" {
 			return fmt.Errorf("group %d: title is required", i+1)
 		}
 		if len(g.ColumnNames) == 0 {
 			return fmt.Errorf("group %d: at least one column is required", i+1)
 		}
-		for j, col := range g.ColumnNames {
-			name := strings.TrimSpace(col)
-			if name == "" {
-				return fmt.Errorf("group %d: column %d is empty", i+1, j+1)
-			}
-			if _, ok := allowedColumns[name]; !ok {
-				return fmt.Errorf("group %d: unknown column %q", i+1, name)
-			}
-			if _, dup := seenCol[name]; dup {
-				return fmt.Errorf("column %q appears in more than one group", name)
-			}
-			seenCol[name] = struct{}{}
+		if err := validateFieldGroupColumns(i, g.ColumnNames, allowedColumns, seenCol); err != nil {
+			return err
 		}
+	}
+	return nil
+}
+
+// validateFieldGroupColumns checks group i's columns are set, allowed, and not already in another group.
+func validateFieldGroupColumns(i int, columnNames []string, allowedColumns, seenCol map[string]struct{}) error {
+	for j, col := range columnNames {
+		name := strings.TrimSpace(col)
+		if name == "" {
+			return fmt.Errorf("group %d: column %d is empty", i+1, j+1)
+		}
+		if _, ok := allowedColumns[name]; !ok {
+			return fmt.Errorf("group %d: unknown column %q", i+1, name)
+		}
+		if _, dup := seenCol[name]; dup {
+			return fmt.Errorf("column %q appears in more than one group", name)
+		}
+		seenCol[name] = struct{}{}
 	}
 	return nil
 }
@@ -104,69 +101,80 @@ func (r *Repository) SetItemFieldGroups(ctx context.Context, tableConfiguration 
 	if tableConfiguration == "" {
 		return fmt.Errorf("table configuration is required")
 	}
-	tc, err := r.GetTableConfiguration(ctx, tableConfiguration)
+	allowed, err := r.fieldGroupAllowedColumns(ctx, tableConfiguration)
 	if err != nil {
 		return err
+	}
+	if err = validateFieldGroups(groups, allowed); err != nil {
+		return err
+	}
+
+	return r.inTx(ctx, func(tx *sqlx.Tx) error {
+		if _, err := tx.ExecContext(ctx, `
+			DELETE FROM table_field_groups WHERE table_configuration = ?`, tableConfiguration); err != nil {
+			return err
+		}
+		for i, g := range groups {
+			if err := insertFieldGroup(ctx, tx, tableConfiguration, ordinalOrPosition(g.Ordinal, i), g); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+// fieldGroupAllowedColumns returns the column names a field group may reference: the table's
+// physical columns plus its relation synthetic columns.
+func (r *Repository) fieldGroupAllowedColumns(ctx context.Context, tableConfiguration string) (map[string]struct{}, error) {
+	tc, err := r.GetTableConfiguration(ctx, tableConfiguration)
+	if err != nil {
+		return nil, err
 	}
 	cols, err := r.ListColumns(ctx, tc)
 	if err != nil {
-		return err
-	}
-	allowed := make(map[string]struct{}, len(cols))
-	for _, c := range cols {
-		allowed[c.Name] = struct{}{}
+		return nil, err
 	}
 	syntheticKeys, err := r.ListRelationSyntheticColumnKeys(ctx, tableConfiguration)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	allowed := make(map[string]struct{}, len(cols)+len(syntheticKeys))
+	for _, c := range cols {
+		allowed[c.Name] = struct{}{}
 	}
 	for _, key := range syntheticKeys {
 		allowed[key] = struct{}{}
 	}
-	if err := validateFieldGroups(groups, allowed); err != nil {
-		return err
-	}
+	return allowed, nil
+}
 
-	tx, err := r.db.BeginTxx(ctx, nil)
+func insertFieldGroup(ctx context.Context, tx *sqlx.Tx, tableConfiguration string, ordinal int, g FieldGroupInput) error {
+	res, err := tx.ExecContext(ctx, `
+		INSERT INTO table_field_groups (table_configuration, ordinal, title)
+		VALUES (?, ?, ?)`,
+		tableConfiguration, ordinal, strings.TrimSpace(g.Title))
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, `
-		DELETE FROM table_field_groups WHERE table_configuration = ?`, tableConfiguration); err != nil {
+	groupID, err := res.LastInsertId()
+	if err != nil {
 		return err
 	}
-
-	if len(groups) == 0 {
-		return tx.Commit()
-	}
-
-	for i, g := range groups {
-		ord := g.Ordinal
-		if ord <= 0 {
-			ord = i + 1
-		}
-		res, err := tx.ExecContext(ctx, `
-			INSERT INTO table_field_groups (table_configuration, ordinal, title)
+	for j, col := range g.ColumnNames {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO table_field_group_columns (field_group_id, column_name, ordinal)
 			VALUES (?, ?, ?)`,
-			tableConfiguration, ord, strings.TrimSpace(g.Title))
-		if err != nil {
+			groupID, strings.TrimSpace(col), j+1); err != nil {
 			return err
-		}
-		groupID, err := res.LastInsertId()
-		if err != nil {
-			return err
-		}
-		for j, col := range g.ColumnNames {
-			colOrd := j + 1
-			if _, err := tx.ExecContext(ctx, `
-				INSERT INTO table_field_group_columns (field_group_id, column_name, ordinal)
-				VALUES (?, ?, ?)`,
-				groupID, strings.TrimSpace(col), colOrd); err != nil {
-				return err
-			}
 		}
 	}
-	return tx.Commit()
+	return nil
+}
+
+// ordinalOrPosition returns ordinal when set, otherwise the 1-based position of index i.
+func ordinalOrPosition(ordinal, i int) int {
+	if ordinal <= 0 {
+		return i + 1
+	}
+	return ordinal
 }

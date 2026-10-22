@@ -3,6 +3,7 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -19,20 +20,18 @@ const (
 )
 
 func grantColumn(action ResourceGrantAction) (string, error) {
-	switch action {
-	case ResourceActionView:
-		return "can_view", nil
-	case ResourceActionInsert:
-		return "can_insert", nil
-	case ResourceActionEdit:
-		return "can_edit", nil
-	case ResourceActionDelete:
-		return "can_delete", nil
-	case ResourceActionStart:
-		return "can_start", nil
-	default:
+	cols := map[ResourceGrantAction]string{
+		ResourceActionView:   "can_view",
+		ResourceActionInsert: "can_insert",
+		ResourceActionEdit:   "can_edit",
+		ResourceActionDelete: "can_delete",
+		ResourceActionStart:  "can_start",
+	}
+	col, ok := cols[action]
+	if !ok {
 		return "", fmt.Errorf("unknown grant action")
 	}
+	return col, nil
 }
 
 func (r *Repository) UserHasResourceGrant(ctx context.Context, userID int, resourceType, resourceKey string, action ResourceGrantAction) (bool, error) {
@@ -56,7 +55,7 @@ func (r *Repository) UserHasResourceGrant(ctx context.Context, userID int, resou
 
 	var one int
 	err = r.db.GetContext(ctx, &one, query, userID, resourceType, resourceKey)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {

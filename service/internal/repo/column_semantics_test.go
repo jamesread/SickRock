@@ -12,9 +12,9 @@ func TestApplyColumnSemanticsUserRef(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	_, err = db.Exec(`
+	_, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_column_semantics (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			table_configuration TEXT NOT NULL,
@@ -43,9 +43,9 @@ func TestSQLiteDatetimeColumnDeclaredType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if _, err := db.Exec(`CREATE TABLE events (id INTEGER PRIMARY KEY)`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE events (id INTEGER PRIMARY KEY)`); err != nil {
 		t.Fatalf("schema: %v", err)
 	}
 
@@ -65,7 +65,7 @@ func TestSQLiteDatetimeColumnDeclaredType(t *testing.T) {
 		t.Fatalf("declared type %q, want DATETIME", declared)
 	}
 
-	if _, err := db.Exec(`INSERT INTO events (event_start) VALUES ('2026-01-01 10:00:00')`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `INSERT INTO events (event_start) VALUES ('2026-01-01 10:00:00')`); err != nil {
 		t.Fatalf("insert: %v", err)
 	}
 	var storage string

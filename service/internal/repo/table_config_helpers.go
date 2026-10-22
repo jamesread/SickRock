@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"slices"
@@ -33,24 +34,13 @@ func DbTableLookupKey(db, table string) string {
 
 // LookupTableConfigNames resolves configuration names for many (db, table) pairs in one query.
 func (r *Repository) LookupTableConfigNames(ctx context.Context, pairs []DbTablePair) (map[string]string, error) {
-	out := make(map[string]string)
-	unique := make(map[string]DbTablePair)
-	for _, p := range pairs {
-		if strings.TrimSpace(p.Table) == "" {
-			continue
-		}
-		dbName := p.Db
-		if dbName == "" {
-			dbName = "main"
-		}
-		unique[dbTableLookupKey(dbName, p.Table)] = DbTablePair{Db: dbName, Table: p.Table}
-	}
+	unique := uniqueDbTablePairs(pairs)
 	if len(unique) == 0 {
-		return out, nil
+		return map[string]string{}, nil
 	}
 
 	clauses := make([]string, 0, len(unique))
-	args := make([]interface{}, 0, len(unique)*2)
+	args := make([]any, 0, len(unique)*2)
 	for _, p := range unique {
 		clauses = append(clauses, "(`db` = ? AND `table` = ?)")
 		args = append(args, p.Db, p.Table)
@@ -60,19 +50,30 @@ func (r *Repository) LookupTableConfigNames(ctx context.Context, pairs []DbTable
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
+	out := make(map[string]string)
 	for rows.Next() {
 		var name, dbName, tableName string
 		if err := rows.Scan(&name, &dbName, &tableName); err != nil {
 			return nil, err
 		}
-		if dbName == "" {
-			dbName = "main"
-		}
-		out[dbTableLookupKey(dbName, tableName)] = name
+		out[dbTableLookupKey(cmp.Or(dbName, "main"), tableName)] = name
 	}
 	return out, rows.Err()
+}
+
+// uniqueDbTablePairs de-duplicates pairs with a table name, defaulting an empty database to "main".
+func uniqueDbTablePairs(pairs []DbTablePair) map[string]DbTablePair {
+	unique := make(map[string]DbTablePair)
+	for _, p := range pairs {
+		if strings.TrimSpace(p.Table) == "" {
+			continue
+		}
+		dbName := cmp.Or(p.Db, "main")
+		unique[dbTableLookupKey(dbName, p.Table)] = DbTablePair{Db: dbName, Table: p.Table}
+	}
+	return unique
 }
 
 const defaultTableKeyColumn = "id"
@@ -84,15 +85,20 @@ func (tc *TableConfig) DisplayRowName() string {
 	if tc == nil {
 		return "Row"
 	}
-	if tc.RowName.Valid {
-		if label := strings.TrimSpace(tc.RowName.String); label != "" {
-			return label
-		}
+	if label := trimmedValidString(tc.RowName.Valid, tc.RowName.String); label != "" {
+		return label
 	}
 	if title := strings.TrimSpace(tc.Title); title != "" {
 		return title
 	}
 	return "Row"
+}
+
+func trimmedValidString(valid bool, value string) string {
+	if !valid {
+		return ""
+	}
+	return strings.TrimSpace(value)
 }
 
 // DisplayRowNamePlural returns the plural row label for list empty states (e.g. "Customers").
@@ -106,7 +112,7 @@ func (r *Repository) SetTableRowLabels(ctx context.Context, tableConfiguration, 
 	if _, err := r.GetTableConfiguration(ctx, tcName); err != nil {
 		return err
 	}
-	var rn, rnp interface{}
+	var rn, rnp any
 	if t := strings.TrimSpace(rowName); t != "" {
 		rn = t
 	}
@@ -130,12 +136,13 @@ func (tc *TableConfig) DisplayRowNamePlural() string {
 	if tc == nil {
 		return "items"
 	}
-	if tc.RowNamePlural.Valid {
-		if label := strings.TrimSpace(tc.RowNamePlural.String); label != "" {
-			return label
-		}
+	if label := trimmedValidString(tc.RowNamePlural.Valid, tc.RowNamePlural.String); label != "" {
+		return label
 	}
-	singular := tc.DisplayRowName()
+	return pluralizeRowName(tc.DisplayRowName())
+}
+
+func pluralizeRowName(singular string) string {
 	if singular == "Row" {
 		return "items"
 	}
@@ -187,7 +194,7 @@ func (tc *TableConfig) SortColumnName(columnNames []string) string {
 	return defaultTableKeyColumn
 }
 
-func itemIDFromRowValue(v interface{}) string {
+func itemIDFromRowValue(v any) string {
 	if v == nil {
 		return ""
 	}
@@ -207,38 +214,34 @@ func itemIDFromRowValue(v interface{}) string {
 	}
 }
 
-func scanRowToItem(rowMap map[string]interface{}, pkColumn string) Item {
-	item := Item{Fields: make(map[string]interface{})}
+func scanRowToItem(rowMap map[string]any, pkColumn string) Item {
+	item := Item{
+		Fields:    make(map[string]any),
+		SrCreated: rowTimestamp(rowMap["sr_created"]),
+		SrUpdated: rowTimestamp(rowMap["sr_updated"]),
+	}
 	if pkVal, ok := rowMap[pkColumn]; ok {
 		item.ID = itemIDFromRowValue(pkVal)
-	}
-	if createdAt, ok := rowMap["sr_created"]; ok {
-		if createdAtTime, ok := createdAt.(time.Time); ok {
-			item.SrCreated = createdAtTime
-		} else if createdAtStr, ok := createdAt.(string); ok {
-			if parsedTime, err := time.Parse("2006-01-02 15:04:05", createdAtStr); err == nil {
-				item.SrCreated = parsedTime
-			}
-		}
-	}
-	if updatedAt, ok := rowMap["sr_updated"]; ok {
-		if updatedAtTime, ok := updatedAt.(time.Time); ok {
-			item.SrUpdated = updatedAtTime
-		} else if updatedAtStr, ok := updatedAt.(string); ok {
-			if parsedTime, err := time.Parse("2006-01-02 15:04:05", updatedAtStr); err == nil {
-				item.SrUpdated = parsedTime
-			}
-		}
 	}
 	for colName, value := range rowMap {
 		if colName == pkColumn || colName == "sr_created" || colName == "sr_updated" {
 			continue
 		}
-		if valueBytes, ok := value.([]uint8); ok {
-			item.Fields[colName] = string(valueBytes)
-		} else {
-			item.Fields[colName] = value
-		}
+		item.Fields[colName] = bytesToString(value)
 	}
 	return item
+}
+
+// rowTimestamp converts a scanned timestamp column (time.Time or MySQL datetime string) to a time,
+// returning zero time for missing or unparsable values.
+func rowTimestamp(value any) time.Time {
+	switch v := value.(type) {
+	case time.Time:
+		return v
+	case string:
+		if parsed, err := time.Parse("2006-01-02 15:04:05", v); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
 }

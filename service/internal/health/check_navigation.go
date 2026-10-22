@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/jamesread/SickRock/internal/repo"
+	armhealth "github.com/jamesread/armature-health"
 )
 
 // NavigationBrokenLinksCheck finds navigation links whose table configuration, dashboard or
@@ -17,12 +18,12 @@ type NavigationBrokenLinksCheck struct {
 func (c NavigationBrokenLinksCheck) ID() string    { return "navigation.broken_links" }
 func (c NavigationBrokenLinksCheck) Title() string { return "Broken navigation links" }
 
-func (c NavigationBrokenLinksCheck) Run(ctx context.Context) ([]Issue, error) {
+func (c NavigationBrokenLinksCheck) Run(ctx context.Context) ([]armhealth.Issue, error) {
 	links, err := c.Repo.FindBrokenNavigationLinks(ctx)
 	if err != nil {
 		return nil, err
 	}
-	issues := make([]Issue, 0, len(links))
+	issues := make([]armhealth.Issue, 0, len(links))
 	for _, link := range links {
 		var missing []string
 		if link.MissingTable {
@@ -41,9 +42,9 @@ func (c NavigationBrokenLinksCheck) Run(ctx context.Context) ([]Issue, error) {
 			title = fmt.Sprintf("Navigation link %s does not point to anything", navigationLabel(link))
 			detail = "It has no table configuration, dashboard or workflow set, so it never appears in the sidebar. Set a target, or delete it."
 		}
-		issues = append(issues, Issue{
+		issues = append(issues, armhealth.Issue{
 			Key:      fmt.Sprintf("nav:%d", link.ID),
-			Severity: SeverityWarning,
+			Severity: armhealth.SeverityWarning,
 			Title:    title,
 			Detail:   detail,
 			Link:     fmt.Sprintf("/table/table_navigation/%d/edit", link.ID),
@@ -72,16 +73,16 @@ type BookmarksOrphanedCheck struct {
 func (c BookmarksOrphanedCheck) ID() string    { return "bookmarks.orphaned" }
 func (c BookmarksOrphanedCheck) Title() string { return "Bookmarks to deleted navigation links" }
 
-func (c BookmarksOrphanedCheck) Run(ctx context.Context) ([]Issue, error) {
+func (c BookmarksOrphanedCheck) Run(ctx context.Context) ([]armhealth.Issue, error) {
 	bookmarks, err := c.Repo.FindOrphanedBookmarks(ctx)
 	if err != nil {
 		return nil, err
 	}
-	issues := make([]Issue, 0, len(bookmarks))
+	issues := make([]armhealth.Issue, 0, len(bookmarks))
 	for _, b := range bookmarks {
-		issues = append(issues, Issue{
+		issues = append(issues, armhealth.Issue{
 			Key:      fmt.Sprintf("bookmark:%d", b.ID),
-			Severity: SeverityInfo,
+			Severity: armhealth.SeverityInfo,
 			Title:    fmt.Sprintf("Bookmark #%d (user #%d) points to deleted navigation link #%d", b.ID, b.UserID, b.NavigationItem),
 			Detail:   "The bookmark is no longer shown. Delete the row from table_user_bookmarks to clean up.",
 		})

@@ -46,12 +46,19 @@ func calendarTitle(cal *ics.Calendar) string {
 	if cal == nil {
 		return "iCalendar"
 	}
+	if title := calendarPropertyTitle(cal, "X-WR-CALNAME"); title != "" {
+		return title
+	}
+	return "iCalendar"
+}
+
+func calendarPropertyTitle(cal *ics.Calendar, token string) string {
 	for _, prop := range cal.CalendarProperties {
-		if strings.EqualFold(prop.IANAToken, "X-WR-CALNAME") && strings.TrimSpace(prop.Value) != "" {
+		if strings.EqualFold(prop.IANAToken, token) && strings.TrimSpace(prop.Value) != "" {
 			return unescapeICSText(prop.Value)
 		}
 	}
-	return "iCalendar"
+	return ""
 }
 
 func icalEventToItem(event *ics.VEvent) *gofeed.Item {
@@ -62,10 +69,25 @@ func icalEventToItem(event *ics.VEvent) *gofeed.Item {
 		Link:        strings.TrimSpace(propValue(event, ics.ComponentPropertyUrl)),
 		Custom:      map[string]string{},
 	}
-	if item.Description != "" {
-		item.Content = item.Description
-	}
+	item.Content = item.Description
 
+	setICalEventTimes(item, event)
+
+	if organizer := strings.TrimSpace(propValue(event, ics.ComponentPropertyOrganizer)); organizer != "" {
+		item.Author = &gofeed.Person{Name: organizerDisplay(organizer)}
+	}
+	if location := unescapeICSText(propValue(event, ics.ComponentPropertyLocation)); location != "" {
+		item.Custom["location"] = location
+	}
+	if status := strings.TrimSpace(propValue(event, ics.ComponentPropertyStatus)); status != "" {
+		item.Custom["status"] = status
+	}
+	return item
+}
+
+// setICalEventTimes copies an event's start (as published and startDate), end (endDate) and last
+// modified (updated) times onto item, in UTC. Unparsable times are logged and skipped.
+func setICalEventTimes(item *gofeed.Item, event *ics.VEvent) {
 	if start, err := event.GetStartAt(); err == nil {
 		t := start.UTC()
 		item.PublishedParsed = &t
@@ -84,17 +106,6 @@ func icalEventToItem(event *ics.VEvent) *gofeed.Item {
 		item.UpdatedParsed = &t
 		item.Updated = formatTime(t)
 	}
-
-	if organizer := strings.TrimSpace(propValue(event, ics.ComponentPropertyOrganizer)); organizer != "" {
-		item.Author = &gofeed.Person{Name: organizerDisplay(organizer)}
-	}
-	if location := unescapeICSText(propValue(event, ics.ComponentPropertyLocation)); location != "" {
-		item.Custom["location"] = location
-	}
-	if status := strings.TrimSpace(propValue(event, ics.ComponentPropertyStatus)); status != "" {
-		item.Custom["status"] = status
-	}
-	return item
 }
 
 func propValue(event *ics.VEvent, name ics.ComponentProperty) string {

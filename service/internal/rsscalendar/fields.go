@@ -1,10 +1,12 @@
 package rsscalendar
 
 import (
+	"cmp"
 	"strings"
 	"time"
 
 	"github.com/mmcdole/gofeed"
+	ext "github.com/mmcdole/gofeed/extensions"
 )
 
 // KnownRssFields are suggested source fields for drag-and-drop mapping in the UI.
@@ -29,58 +31,65 @@ func ItemFields(item *gofeed.Item) map[string]string {
 	if item == nil {
 		return out
 	}
-	if item.Title != "" {
-		out["title"] = item.Title
-	}
-	if item.Link != "" {
-		out["link"] = item.Link
-	}
-	if item.Description != "" {
-		out["description"] = item.Description
-	}
-	if item.Content != "" {
-		out["content"] = item.Content
-	}
-	if item.GUID != "" {
-		out["guid"] = item.GUID
-	}
-	if item.PublishedParsed != nil {
-		out["pubDate"] = formatTime(*item.PublishedParsed)
-	} else if item.Published != "" {
-		out["pubDate"] = item.Published
-	}
-	if item.UpdatedParsed != nil {
-		out["updated"] = formatTime(*item.UpdatedParsed)
-	} else if item.Updated != "" {
-		out["updated"] = item.Updated
-	}
-	if item.Author != nil && item.Author.Name != "" {
-		out["author"] = item.Author.Name
-	}
-	for key, value := range item.Custom {
-		if strings.TrimSpace(value) == "" {
-			continue
-		}
-		out[key] = value
-	}
 	start, end := calendarTimesFromItem(item)
-	if start != "" {
-		out["startDate"] = start
+	setIfNotEmpty(out, map[string]string{
+		"title":       item.Title,
+		"link":        item.Link,
+		"description": item.Description,
+		"content":     item.Content,
+		"guid":        item.GUID,
+		"pubDate":     parsedOrRawTime(item.PublishedParsed, item.Published),
+		"updated":     parsedOrRawTime(item.UpdatedParsed, item.Updated),
+		"author":      authorName(item.Author),
+	})
+	for key, value := range item.Custom {
+		if strings.TrimSpace(value) != "" {
+			out[key] = value
+		}
 	}
-	if end != "" {
-		out["endDate"] = end
+	setIfNotEmpty(out, map[string]string{
+		"startDate": start,
+		"endDate":   end,
+	})
+	addExtensionFields(out, item.Extensions)
+	return out
+}
+
+// setIfNotEmpty copies the non-empty values of fields into out.
+func setIfNotEmpty(out, fields map[string]string) {
+	for key, value := range fields {
+		if value != "" {
+			out[key] = value
+		}
 	}
-	for key, values := range item.Extensions {
+}
+
+// parsedOrRawTime formats the parsed time when available, otherwise returns the raw feed value.
+func parsedOrRawTime(parsed *time.Time, raw string) string {
+	if parsed != nil {
+		return formatTime(*parsed)
+	}
+	return raw
+}
+
+func authorName(author *gofeed.Person) string {
+	if author == nil {
+		return ""
+	}
+	return author.Name
+}
+
+// addExtensionFields adds non-blank feed extension values to out as "ext:<namespace>:<name>".
+func addExtensionFields(out map[string]string, extensions ext.Extensions) {
+	for key, values := range extensions {
 		for subKey, subValues := range values {
 			for _, v := range subValues {
-				if strings.TrimSpace(v.Value) == "" {
-					continue
+				if strings.TrimSpace(v.Value) != "" {
+					out["ext:"+key+":"+subKey] = v.Value
 				}
-				out["ext:"+key+":"+subKey] = v.Value
 			}
 		}
 	}
-	return out
 }
 
 func calendarTimesFromItem(item *gofeed.Item) (start string, end string) {
@@ -88,20 +97,12 @@ func calendarTimesFromItem(item *gofeed.Item) (start string, end string) {
 		return "", ""
 	}
 	// Google Calendar RSS uses gcal:timespan with startTime/endTime values.
-	if gcal, ok := item.Extensions["gcal"]; ok {
-		if spans, ok := gcal["timespan"]; ok {
-			for _, span := range spans {
-				if span.Attrs == nil {
-					continue
-				}
-				if start == "" {
-					start = firstAttr(span.Attrs, "startTime", "start")
-				}
-				if end == "" {
-					end = firstAttr(span.Attrs, "endTime", "end")
-				}
-			}
+	for _, span := range item.Extensions["gcal"]["timespan"] {
+		if span.Attrs == nil {
+			continue
 		}
+		start = cmp.Or(start, firstAttr(span.Attrs, "startTime", "start"))
+		end = cmp.Or(end, firstAttr(span.Attrs, "endTime", "end"))
 	}
 	return start, end
 }
@@ -128,13 +129,18 @@ func DiscoverFields(items []*gofeed.Item) []string {
 		out = append(out, name)
 	}
 	for _, item := range items {
-		for key := range ItemFields(item) {
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-			out = append(out, key)
+		out = appendUnseenFields(out, seen, ItemFields(item))
+	}
+	return out
+}
+
+func appendUnseenFields(out []string, seen map[string]bool, fields map[string]string) []string {
+	for key := range fields {
+		if seen[key] {
+			continue
 		}
+		seen[key] = true
+		out = append(out, key)
 	}
 	return out
 }

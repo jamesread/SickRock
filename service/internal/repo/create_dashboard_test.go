@@ -12,9 +12,9 @@ func TestCreateDashboardWithNavigationSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if _, err := db.Exec(`
+	if _, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_dashboards (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);
 		CREATE TABLE table_navigation (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -50,9 +50,9 @@ func TestCreateDashboardSkipsNavigationWhenDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if _, err := db.Exec(`
+	if _, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_dashboards (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);
 		CREATE TABLE table_navigation (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,

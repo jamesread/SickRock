@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jamesread/SickRock/internal/repo"
+	armhealth "github.com/jamesread/armature-health"
 )
 
 // TableConfigurationDuplicateNamesCheck finds table configuration names used more than once
@@ -20,16 +21,16 @@ func (c TableConfigurationDuplicateNamesCheck) Title() string {
 	return "Duplicate table configuration names"
 }
 
-func (c TableConfigurationDuplicateNamesCheck) Run(ctx context.Context) ([]Issue, error) {
+func (c TableConfigurationDuplicateNamesCheck) Run(ctx context.Context) ([]armhealth.Issue, error) {
 	dups, err := c.Repo.FindDuplicateTableConfigurationNames(ctx)
 	if err != nil {
 		return nil, err
 	}
-	issues := make([]Issue, 0, len(dups))
+	issues := make([]armhealth.Issue, 0, len(dups))
 	for _, dup := range dups {
-		issues = append(issues, Issue{
+		issues = append(issues, armhealth.Issue{
 			Key:      "name:" + dup.Name,
-			Severity: SeverityError,
+			Severity: armhealth.SeverityError,
 			Title:    fmt.Sprintf("Table configuration %q exists %d times", dup.Name, dup.Count),
 			Detail: fmt.Sprintf("Only one row is used (normally the lowest id, %d); the others are ignored and may hold stale settings. "+
 				"Remove the extra rows (repointing any navigation links first) and make sure table_configurations.name has a unique index, "+
@@ -52,32 +53,50 @@ func (c TableConfigurationMissingTableCheck) Title() string {
 	return "Table configurations pointing at missing tables"
 }
 
-func (c TableConfigurationMissingTableCheck) Run(ctx context.Context) ([]Issue, error) {
+func (c TableConfigurationMissingTableCheck) Run(ctx context.Context) ([]armhealth.Issue, error) {
 	targets, err := c.Repo.ListTableConfigurationTargets(ctx)
 	if err != nil {
 		return nil, err
 	}
-	var issues []Issue
+	return missingTableConfigurationIssues(ctx, c.Repo, targets)
+}
+
+func missingTableConfigurationIssues(ctx context.Context, repository *repo.Repository, targets []repo.TableConfigurationTarget) ([]armhealth.Issue, error) {
+	var issues []armhealth.Issue
 	for _, target := range targets {
-		columns, err := c.Repo.TableColumnNames(ctx, target.Db, target.Table)
+		issue, err := missingTableConfigurationIssue(ctx, repository, target)
 		if err != nil {
-			return nil, fmt.Errorf("check table %s.%s: %w", target.Db, target.Table, err)
+			return nil, err
 		}
-		if len(columns) > 0 {
-			continue
+		if issue != nil {
+			issues = append(issues, *issue)
 		}
-		where := fmt.Sprintf("table %q", target.Table)
-		if target.Db != "" {
-			where = fmt.Sprintf("table %q in database %q", target.Table, target.Db)
-		}
-		issues = append(issues, Issue{
-			Key:      fmt.Sprintf("tc:%d", target.ID),
-			Severity: SeverityError,
-			Title:    fmt.Sprintf("Table configuration %q points at a missing table", target.Name),
-			Detail: fmt.Sprintf("Configuration #%d uses %s, which does not exist, so the table cannot be listed or edited. "+
-				"Correct its db/table settings, or delete the configuration if the table was removed on purpose.", target.ID, where),
-			Link: fmt.Sprintf("/table/table_configurations/%d/edit", target.ID),
-		})
 	}
 	return issues, nil
+}
+
+func missingTableConfigurationIssue(ctx context.Context, repository *repo.Repository, target repo.TableConfigurationTarget) (*armhealth.Issue, error) {
+	columns, err := repository.TableColumnNames(ctx, target.Db, target.Table)
+	if err != nil {
+		return nil, fmt.Errorf("check table %s.%s: %w", target.Db, target.Table, err)
+	}
+	if len(columns) > 0 {
+		return nil, nil
+	}
+	issue := armhealth.Issue{
+		Key:      fmt.Sprintf("tc:%d", target.ID),
+		Severity: armhealth.SeverityError,
+		Title:    fmt.Sprintf("Table configuration %q points at a missing table", target.Name),
+		Detail: fmt.Sprintf("Configuration #%d uses %s, which does not exist, so the table cannot be listed or edited. "+
+			"Correct its db/table settings, or delete the configuration if the table was removed on purpose.", target.ID, missingTableWhere(target)),
+		Link: fmt.Sprintf("/table/table_configurations/%d/edit", target.ID),
+	}
+	return &issue, nil
+}
+
+func missingTableWhere(target repo.TableConfigurationTarget) string {
+	if target.Db != "" {
+		return fmt.Sprintf("table %q in database %q", target.Table, target.Db)
+	}
+	return fmt.Sprintf("table %q", target.Table)
 }

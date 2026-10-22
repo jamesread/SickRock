@@ -40,17 +40,9 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("loading env config: %w", err)
 	}
 
-	dir := *configDir
-	if dir == "" {
-		dir = os.Getenv(envPrefix + "CONFIGDIR")
-	}
-	if dir != "" {
-		configPath := filepath.Join(dir, "config.yaml")
-		if _, err := os.Stat(configPath); err == nil {
-			if err := k.Load(file.Provider(configPath), yaml.Parser()); err != nil {
-				return nil, fmt.Errorf("loading config file: %w", err)
-			}
-		}
+	dir := resolveConfigDir(*configDir)
+	if err := loadConfigFile(k, dir); err != nil {
+		return nil, err
 	}
 
 	cfg := &Config{
@@ -76,6 +68,32 @@ func Load() (*Config, error) {
 		ConfigDir: dir,
 	}
 	return cfg, nil
+}
+
+func resolveConfigDir(flagDir string) string {
+	if flagDir != "" {
+		return flagDir
+	}
+	return os.Getenv(envPrefix + "CONFIGDIR")
+}
+
+func loadConfigFile(k *koanf.Koanf, dir string) error {
+	if dir == "" {
+		return nil
+	}
+	configPath := filepath.Join(dir, "config.yaml")
+	if !fileExists(configPath) {
+		return nil
+	}
+	if err := k.Load(file.Provider(configPath), yaml.Parser()); err != nil {
+		return fmt.Errorf("loading config file: %w", err)
+	}
+	return nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 type stringCandidate struct {

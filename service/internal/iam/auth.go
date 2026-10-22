@@ -63,18 +63,24 @@ func injectSessionCookieFromHeaders(r *http.Request) *http.Request {
 	}
 	sid := strings.TrimSpace(r.Header.Get("Session-Token"))
 	if sid == "" {
-		if auth := r.Header.Get("Authorization"); strings.HasPrefix(auth, "Bearer ") {
-			token := strings.TrimSpace(strings.TrimPrefix(auth, "Bearer "))
-			// API keys use the sk_ prefix; session SIDs are UUIDs / legacy hashes.
-			if token != "" && !strings.HasPrefix(token, "sk_") {
-				sid = token
-			}
-		}
+		sid = bearerSessionToken(r.Header.Get("Authorization"))
 	}
 	if sid == "" {
 		return r
 	}
 	clone := r.Clone(r.Context())
-	clone.AddCookie(&http.Cookie{Name: CookieName, Value: sid})
+	// Request-side cookie for the auth middleware; Secure/HttpOnly/SameSite are never sent.
+	clone.AddCookie(&http.Cookie{Name: CookieName, Value: sid}) //nolint:gosec // G124: request cookie, not Set-Cookie
 	return clone
+}
+
+// bearerSessionToken returns the bearer token from an Authorization header when it is a session ID.
+// API keys use the sk_ prefix; session SIDs are UUIDs / legacy hashes.
+func bearerSessionToken(authorization string) string {
+	token, ok := strings.CutPrefix(authorization, "Bearer ")
+	token = strings.TrimSpace(token)
+	if !ok || strings.HasPrefix(token, "sk_") {
+		return ""
+	}
+	return token
 }

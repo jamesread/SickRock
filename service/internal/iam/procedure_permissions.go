@@ -54,75 +54,66 @@ var writeProcedures = map[string]bool{
 	sickrockpbconnect.SickRockClearTickListStateProcedure:                 true,
 }
 
+// procedurePermissions maps Connect procedures to the RBAC permission they require. Procedures
+// not listed require app access when they write (writeProcedures) and app read otherwise.
+var procedurePermissions = map[string]string{
+	sickrockpbconnect.SickRockResetUserPasswordProcedure:          rbac.PermissionUsersResetPassword,
+	sickrockpbconnect.SickRockListUsersProcedure:                  rbac.PermissionUsersView,
+	sickrockpbconnect.SickRockGetUserProcedure:                    rbac.PermissionUsersView,
+	sickrockpbconnect.SickRockGetUserEffectiveRoleGrantsProcedure: rbac.PermissionUsersView,
+	sickrockpbconnect.SickRockCreateUserProcedure:                 rbac.PermissionUsersCreate,
+	sickrockpbconnect.SickRockDeleteUserProcedure:                 rbac.PermissionUsersDelete,
+	// Self-service: any authenticated user may inspect their own effective permissions.
+	sickrockpbconnect.SickRockGetMyPermissionsAuditProcedure:         "",
+	sickrockpbconnect.SickRockListRbacPermissionsProcedure:           rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockListRbacRolesProcedure:                 rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockGetUserRbacRolesProcedure:              rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockGetUserGroupRbacRolesProcedure:         rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockListGroupTableRoleGrantsProcedure:      rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockListTableShareGrantsProcedure:          rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockGetRbacRoleUsersProcedure:              rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockGetRbacRoleGroupsProcedure:             rbac.PermissionRbacView,
+	sickrockpbconnect.SickRockCreateRbacRoleProcedure:                rbac.PermissionRbacManage,
+	sickrockpbconnect.SickRockUpdateRbacRoleProcedure:                rbac.PermissionRbacManage,
+	sickrockpbconnect.SickRockDeleteRbacRoleProcedure:                rbac.PermissionRbacManage,
+	sickrockpbconnect.SickRockSetUserGroupRbacRolesProcedure:         rbac.PermissionRbacManage,
+	sickrockpbconnect.SickRockSetGroupTableRoleGrantsProcedure:       rbac.PermissionRbacManage,
+	sickrockpbconnect.SickRockSetTableShareGrantsProcedure:           rbac.PermissionRbacManage,
+	sickrockpbconnect.SickRockGetTableAccessProcedure:                PermissionAppRead,
+	sickrockpbconnect.SickRockListUserGroupsProcedure:                rbac.PermissionUserGroupsView,
+	sickrockpbconnect.SickRockGetUserGroupMembersProcedure:           rbac.PermissionUserGroupsView,
+	sickrockpbconnect.SickRockCreateUserGroupProcedure:               rbac.PermissionUserGroupsManage,
+	sickrockpbconnect.SickRockDeleteUserGroupProcedure:               rbac.PermissionUserGroupsManage,
+	sickrockpbconnect.SickRockSetUserGroupMembersProcedure:           rbac.PermissionUserGroupsManage,
+	sickrockpbconnect.SickRockCreateTableProcedure:                   rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockCreateTableConfigurationProcedure:      rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockCreateDashboardProcedure:               rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockAddTableColumnProcedure:                rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockChangeColumnTypeProcedure:              rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockChangeColumnNameProcedure:              rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockDropColumnProcedure:                    rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockCreateForeignKeyProcedure:              rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockGetDatabaseTablesProcedure:             rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockGetSystemInfoProcedure:                 rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockListHealthIssuesProcedure:              rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockGetHealthSummaryProcedure:              rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockRunHealthChecksProcedure:               rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockAcknowledgeHealthIssueProcedure:        rbac.PermissionSystemSettings,
+	sickrockpbconnect.SickRockGetReadOnlyCalendarExportProcedure:     PermissionExportsView,
+	sickrockpbconnect.SickRockListAccessibleReadOnlyExportsProcedure: PermissionExportsView,
+	sickrockpbconnect.SickRockSetWorkflowNavigationMembersProcedure:  PermissionWorkflowStart,
+	sickrockpbconnect.SickRockGetAPIKeysProcedure:                    PermissionAPIKeysUse,
+	sickrockpbconnect.SickRockCreateAPIKeyProcedure:                  PermissionAPIKeysUse,
+	sickrockpbconnect.SickRockUpdateAPIKeyProcedure:                  PermissionAPIKeysUse,
+	sickrockpbconnect.SickRockDeleteAPIKeyProcedure:                  PermissionAPIKeysUse,
+	sickrockpbconnect.SickRockDeactivateAPIKeyProcedure:              PermissionAPIKeysUse,
+	sickrockpbconnect.SickRockClaimDeviceCodeProcedure:               PermissionDeviceCodeClaim,
+}
+
 // RequiredPermission maps Connect procedures to RBAC permission names.
 func RequiredPermission(procedureName string) string {
-	switch procedureName {
-	case sickrockpbconnect.SickRockResetUserPasswordProcedure:
-		return rbac.PermissionUsersResetPassword
-	case sickrockpbconnect.SickRockListUsersProcedure,
-		sickrockpbconnect.SickRockGetUserProcedure,
-		sickrockpbconnect.SickRockGetUserEffectiveRoleGrantsProcedure:
-		return rbac.PermissionUsersView
-	case sickrockpbconnect.SickRockCreateUserProcedure:
-		return rbac.PermissionUsersCreate
-	case sickrockpbconnect.SickRockDeleteUserProcedure:
-		return rbac.PermissionUsersDelete
-	case sickrockpbconnect.SickRockGetMyPermissionsAuditProcedure:
-		// Self-service: any authenticated user may inspect their own effective permissions.
-		return ""
-	case sickrockpbconnect.SickRockListRbacPermissionsProcedure,
-		sickrockpbconnect.SickRockListRbacRolesProcedure,
-		sickrockpbconnect.SickRockGetUserRbacRolesProcedure,
-		sickrockpbconnect.SickRockGetUserGroupRbacRolesProcedure,
-		sickrockpbconnect.SickRockListGroupTableRoleGrantsProcedure,
-		sickrockpbconnect.SickRockListTableShareGrantsProcedure,
-		sickrockpbconnect.SickRockGetRbacRoleUsersProcedure,
-		sickrockpbconnect.SickRockGetRbacRoleGroupsProcedure:
-		return rbac.PermissionRbacView
-	case sickrockpbconnect.SickRockCreateRbacRoleProcedure,
-		sickrockpbconnect.SickRockUpdateRbacRoleProcedure,
-		sickrockpbconnect.SickRockDeleteRbacRoleProcedure,
-		sickrockpbconnect.SickRockSetUserGroupRbacRolesProcedure,
-		sickrockpbconnect.SickRockSetGroupTableRoleGrantsProcedure,
-		sickrockpbconnect.SickRockSetTableShareGrantsProcedure:
-		return rbac.PermissionRbacManage
-	case sickrockpbconnect.SickRockGetTableAccessProcedure:
-		return PermissionAppRead
-	case sickrockpbconnect.SickRockListUserGroupsProcedure,
-		sickrockpbconnect.SickRockGetUserGroupMembersProcedure:
-		return rbac.PermissionUserGroupsView
-	case sickrockpbconnect.SickRockCreateUserGroupProcedure,
-		sickrockpbconnect.SickRockDeleteUserGroupProcedure,
-		sickrockpbconnect.SickRockSetUserGroupMembersProcedure:
-		return rbac.PermissionUserGroupsManage
-	case sickrockpbconnect.SickRockCreateTableProcedure,
-		sickrockpbconnect.SickRockCreateTableConfigurationProcedure,
-		sickrockpbconnect.SickRockCreateDashboardProcedure,
-		sickrockpbconnect.SickRockAddTableColumnProcedure,
-		sickrockpbconnect.SickRockChangeColumnTypeProcedure,
-		sickrockpbconnect.SickRockChangeColumnNameProcedure,
-		sickrockpbconnect.SickRockDropColumnProcedure,
-		sickrockpbconnect.SickRockCreateForeignKeyProcedure,
-		sickrockpbconnect.SickRockGetDatabaseTablesProcedure,
-		sickrockpbconnect.SickRockGetSystemInfoProcedure,
-		sickrockpbconnect.SickRockListHealthIssuesProcedure,
-		sickrockpbconnect.SickRockGetHealthSummaryProcedure,
-		sickrockpbconnect.SickRockRunHealthChecksProcedure,
-		sickrockpbconnect.SickRockAcknowledgeHealthIssueProcedure:
-		return rbac.PermissionSystemSettings
-	case sickrockpbconnect.SickRockGetReadOnlyCalendarExportProcedure,
-		sickrockpbconnect.SickRockListAccessibleReadOnlyExportsProcedure:
-		return PermissionExportsView
-	case sickrockpbconnect.SickRockSetWorkflowNavigationMembersProcedure:
-		return PermissionWorkflowStart
-	case sickrockpbconnect.SickRockGetAPIKeysProcedure,
-		sickrockpbconnect.SickRockCreateAPIKeyProcedure,
-		sickrockpbconnect.SickRockUpdateAPIKeyProcedure,
-		sickrockpbconnect.SickRockDeleteAPIKeyProcedure,
-		sickrockpbconnect.SickRockDeactivateAPIKeyProcedure:
-		return PermissionAPIKeysUse
-	case sickrockpbconnect.SickRockClaimDeviceCodeProcedure:
-		return PermissionDeviceCodeClaim
+	if permission, ok := procedurePermissions[procedureName]; ok {
+		return permission
 	}
 	if writeProcedures[procedureName] {
 		return rbac.PermissionAppAccess

@@ -98,23 +98,15 @@ const dayEvents = computed(() => {
     const finishes = getItemValue(item, 'finishes')
     const srCreated = getItemValue(item, 'sr_created')
 
-    let eventDate: Date | null = null
-    let startDate: Date | null = null
-    let endDate: Date | null = null
-
     if (calendarDate) {
-      eventDate = parseServerDateTime(calendarDate)
+      const eventDate = parseServerDateTime(calendarDate)
       if (eventDate) {
         eventDate.setHours(0, 0, 0, 0)
         return eventDate.getTime() === targetDate.getTime()
       }
     } else if (starts) {
-      startDate = parseServerDateTime(starts)
-      if (finishes) {
-        endDate = parseServerDateTime(finishes)
-      } else {
-        endDate = startDate
-      }
+      const startDate = parseServerDateTime(starts)
+      const endDate = finishes ? parseServerDateTime(finishes) : startDate
 
       if (startDate && endDate) {
         // Check if the target date falls within the event range
@@ -127,7 +119,7 @@ const dayEvents = computed(() => {
                targetDate.getTime() <= endDateOnly.getTime()
       }
     } else if (srCreated) {
-      eventDate = new Date(Number(srCreated) * 1000)
+      const eventDate = new Date(Number(srCreated) * 1000)
       eventDate.setHours(0, 0, 0, 0)
       return eventDate.getTime() === targetDate.getTime()
     }

@@ -21,6 +21,7 @@ const name = ref('')
 const feedUrl = ref('')
 const tableConfiguration = ref('')
 const uniqueColumn = ref('')
+const feedIdColumn = ref('')
 const refreshIntervalMinutes = ref(60)
 const enabled = ref(true)
 const mappings = ref<RssFieldMapping[]>([])
@@ -96,6 +97,7 @@ async function loadFeed() {
   feedUrl.value = feed.feedUrl
   tableConfiguration.value = feed.tableConfiguration
   uniqueColumn.value = feed.uniqueColumn
+  feedIdColumn.value = feed.feedIdColumn
   refreshIntervalMinutes.value = feed.refreshIntervalMinutes || 60
   enabled.value = feed.enabled
   mappings.value = [...(feed.fieldMappings ?? [])]
@@ -169,6 +171,7 @@ function buildFeedPayload(): RssCalendarFeed {
     tableConfiguration: tableConfiguration.value,
     fieldMappings: mappings.value,
     uniqueColumn: uniqueColumn.value.trim(),
+    feedIdColumn: feedIdColumn.value.trim(),
     refreshIntervalMinutes: refreshIntervalMinutes.value,
     enabled: enabled.value,
   } as RssCalendarFeed
@@ -292,6 +295,14 @@ onMounted(async () => {
           <option v-for="col in tableColumns" :key="col.name" :value="col.name">{{ col.name }}</option>
         </select>
         <span class="text-sm muted">Usually map <code>guid</code> to this column to avoid duplicates.</span>
+      </FormField>
+
+      <FormField label="Feed ID column (for tracing)">
+        <select v-model="feedIdColumn" class="input">
+          <option value="">None</option>
+          <option v-for="col in tableColumns" :key="col.name" :value="col.name">{{ col.name }}</option>
+        </select>
+        <span class="text-sm muted">Each imported event stores this feed's ID here, so events can be traced back to their feed.</span>
       </FormField>
 
       <FormField label="Refresh interval (minutes)">

@@ -18,7 +18,7 @@ func TestSickRockServer_Ping(t *testing.T) {
 	res, err := srv.Ping(ctx, connect.NewRequest(&sickrockpb.PingRequest{Message: "hello"}))
 	require.NoError(t, err)
 	assert.Equal(t, "hello", res.Msg.GetMessage())
-	assert.Greater(t, res.Msg.GetTimestampUnix(), int64(0))
+	assert.Positive(t, res.Msg.GetTimestampUnix())
 }
 
 func TestSickRockServer_Ping_EmptyMessage(t *testing.T) {

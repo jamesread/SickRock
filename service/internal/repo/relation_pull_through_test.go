@@ -12,7 +12,7 @@ func TestUpdateTableRelationPullThrough(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 	ctx := context.Background()
 
 	_, err = db.ExecContext(ctx, `
@@ -60,7 +60,7 @@ func TestUpdateTableRelationPullThrough(t *testing.T) {
 	}
 
 	repo := NewRepository(db)
-	if err := repo.UpdateTableRelation(ctx, "fk_orders_customer_id_customers_id", "Customer orders", []RelationPullThroughField{
+	if err = repo.UpdateTableRelation(ctx, "fk_orders_customer_id_customers_id", "Customer orders", []RelationPullThroughField{
 		{FKColumn: "customer_id", Field: "name"},
 	}); err != nil {
 		t.Fatalf("update: %v", err)

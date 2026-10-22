@@ -10166,6 +10166,11 @@
             "type": "string",
             "title": "unique_column"
           },
+          "feedIdColumn": {
+            "type": "string",
+            "title": "feed_id_column",
+            "description": "Optional table column that each imported event records this feed's id in."
+          },
           "refreshIntervalMinutes": {
             "type": "integer",
             "title": "refresh_interval_minutes",

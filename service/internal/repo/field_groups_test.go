@@ -45,7 +45,7 @@ func TestGetItemFieldGroupsLoad(t *testing.T) {
 		t.Fatalf("insert group: %v", err)
 	}
 	gid, _ := res.LastInsertId()
-	if _, err := db.ExecContext(ctx, `
+	if _, err = db.ExecContext(ctx, `
 		INSERT INTO table_field_group_columns (field_group_id, column_name, ordinal) VALUES (?, 'id', 1), (?, 'name', 2)`,
 		gid, gid); err != nil {
 		t.Fatalf("insert cols: %v", err)

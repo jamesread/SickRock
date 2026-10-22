@@ -85,7 +85,7 @@ function computeCsv() {
   for (const it of items.value) {
     const row: string[] = []
     for (const col of cols) {
-      let value: unknown = ''
+      let value: unknown
       if (col === 'id') {
         value = (it as any).id
       } else if (col === 'sr_created') {
@@ -114,7 +114,7 @@ function computeCsv() {
     for (const it of items.value) {
       if (cols.length === 0) continue
       const firstCol = cols[0]
-      let firstVal: unknown = ''
+      let firstVal: unknown
       if (firstCol === 'id') firstVal = (it as any).id
       else if (firstCol === 'sr_created') {
         const ts = (it as any).srCreated
@@ -128,7 +128,7 @@ function computeCsv() {
       yamlLines.push(`- ${firstCol}: ${makeYamlValue(firstVal)}`)
       for (let i = 1; i < cols.length; i++) {
         const col = cols[i]
-        let value: unknown = ''
+        let value: unknown
         if (col === 'id') value = (it as any).id
         else if (col === 'sr_created') {
           const ts = (it as any).srCreated

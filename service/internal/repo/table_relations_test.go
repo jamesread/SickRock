@@ -12,12 +12,12 @@ func TestGetForeignKeysFromTableRelations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
-	if err := configureSQLiteDB(db); err != nil {
+	defer func() { _ = db.Close() }()
+	if err = configureSQLiteDB(db); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
 
-	_, err = db.Exec(`
+	_, err = db.ExecContext(t.Context(), `
 		CREATE TABLE customers (id INTEGER PRIMARY KEY);
 		CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER);
 		CREATE TABLE table_configurations (

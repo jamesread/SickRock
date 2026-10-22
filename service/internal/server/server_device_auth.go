@@ -7,6 +7,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/google/uuid"
+	armstore "github.com/jamesread/armature-iam/store"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 )
@@ -44,7 +45,7 @@ func (s *SickRockServer) ClaimDeviceCode(ctx context.Context, req *connect.Reque
 	}
 
 	au := s.authUser(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return connect.NewResponse(&sickrockpb.ClaimDeviceCodeResponse{
 			Success: false,
 			Message: "Authentication required to claim device code",
@@ -52,18 +53,12 @@ func (s *SickRockServer) ClaimDeviceCode(ctx context.Context, req *connect.Reque
 	}
 
 	if err := s.repo.ClaimDeviceCode(ctx, code, au.User.Username); err != nil {
-		return connect.NewResponse(&sickrockpb.ClaimDeviceCodeResponse{
-			Success: false,
-			Message: "Device code not found, expired, or already claimed",
-		}), nil
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("device code not found, expired, or already claimed"))
 	}
 
 	sid := uuid.New().String()
 	if err := s.auth.Store.CreateSession(ctx, sid, au.User.ID, nil); err != nil {
-		return connect.NewResponse(&sickrockpb.ClaimDeviceCodeResponse{
-			Success: false,
-			Message: "Failed to create session",
-		}), nil
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&sickrockpb.ClaimDeviceCodeResponse{
@@ -81,24 +76,25 @@ func (s *SickRockServer) CheckDeviceCode(ctx context.Context, req *connect.Reque
 	}
 
 	deviceCode, err := s.repo.GetDeviceCode(ctx, code)
-	if err != nil || deviceCode == nil {
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if deviceCode == nil {
 		return connect.NewResponse(&sickrockpb.CheckDeviceCodeResponse{Valid: false}), nil
 	}
 
-	claimed := deviceCode.ClaimedBy.Valid && deviceCode.ClaimedBy.String != ""
+	claimedBy := nullStringOr(deviceCode.ClaimedBy, "")
 	response := &sickrockpb.CheckDeviceCodeResponse{
 		Valid:     true,
-		Claimed:   claimed,
+		Claimed:   claimedBy != "",
 		ExpiresAt: deviceCode.ExpiresAt.Unix(),
 	}
 
-	if claimed {
-		user, err := s.auth.Store.GetUserByUsername(ctx, deviceCode.ClaimedBy.String)
-		if err == nil && user != nil {
-			if sid, err := s.latestSessionID(ctx, user.ID); err == nil && sid != "" {
-				response.Token = sid
-				response.Username = user.Username
-			}
+	if claimedBy != "" {
+		// Best effort: the polling device picks the session up on a later check if this fails.
+		if user, sid, failure, err := s.claimantSession(ctx, claimedBy); err == nil && failure == "" {
+			response.Token = sid
+			response.Username = user.Username
 		}
 	}
 
@@ -115,33 +111,32 @@ func (s *SickRockServer) GetDeviceCodeSession(ctx context.Context, req *connect.
 	}
 
 	deviceCode, err := s.repo.GetDeviceCode(ctx, code)
-	if err != nil || deviceCode == nil {
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	if deviceCode == nil {
 		return connect.NewResponse(&sickrockpb.GetDeviceCodeSessionResponse{
 			Success: false,
 			Message: "Device code not found or expired",
 		}), nil
 	}
 
-	if !deviceCode.ClaimedBy.Valid || deviceCode.ClaimedBy.String == "" {
+	claimedBy := nullStringOr(deviceCode.ClaimedBy, "")
+	if claimedBy == "" {
 		return connect.NewResponse(&sickrockpb.GetDeviceCodeSessionResponse{
 			Success: false,
 			Message: "Device code not yet claimed",
 		}), nil
 	}
 
-	user, err := s.auth.Store.GetUserByUsername(ctx, deviceCode.ClaimedBy.String)
-	if err != nil || user == nil {
-		return connect.NewResponse(&sickrockpb.GetDeviceCodeSessionResponse{
-			Success: false,
-			Message: "Failed to retrieve user",
-		}), nil
+	user, sid, failure, err := s.claimantSession(ctx, claimedBy)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-
-	sid, err := s.latestSessionID(ctx, user.ID)
-	if err != nil || sid == "" {
+	if failure != "" {
 		return connect.NewResponse(&sickrockpb.GetDeviceCodeSessionResponse{
 			Success: false,
-			Message: "Session not found",
+			Message: failure,
 		}), nil
 	}
 
@@ -152,4 +147,24 @@ func (s *SickRockServer) GetDeviceCodeSession(ctx context.Context, req *connect.
 		ExpiresAt: sessionExpiresAt(),
 		Username:  user.Username,
 	}), nil
+}
+
+// claimantSession returns the user who claimed a device code and their latest session ID, or a
+// user-facing failure message when the user or session cannot be found.
+func (s *SickRockServer) claimantSession(ctx context.Context, username string) (user *armstore.UserAccountRow, sid, failure string, err error) {
+	user, err = s.auth.Store.GetUserByUsername(ctx, username)
+	if err != nil {
+		return nil, "", "", err
+	}
+	if user == nil {
+		return nil, "", "Failed to retrieve user", nil
+	}
+	sid, err = s.latestSessionID(ctx, user.ID)
+	if err != nil {
+		return nil, "", "", err
+	}
+	if sid == "" {
+		return nil, "", "Session not found", nil
+	}
+	return user, sid, "", nil
 }

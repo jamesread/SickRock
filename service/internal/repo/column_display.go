@@ -34,14 +34,8 @@ func normalizeColumnDisplayInput(in ColumnDisplayInput) (ColumnDisplayInput, err
 	label := strings.TrimSpace(in.DisplayLabel)
 	prefix := in.ValuePrefix
 	suffix := in.ValueSuffix
-	if len(label) > maxColumnDisplayLabelLen {
-		return ColumnDisplayInput{}, fmt.Errorf("display label for %q is too long (max %d)", col, maxColumnDisplayLabelLen)
-	}
-	if len(prefix) > maxColumnDisplayAffixLen {
-		return ColumnDisplayInput{}, fmt.Errorf("value prefix for %q is too long (max %d)", col, maxColumnDisplayAffixLen)
-	}
-	if len(suffix) > maxColumnDisplayAffixLen {
-		return ColumnDisplayInput{}, fmt.Errorf("value suffix for %q is too long (max %d)", col, maxColumnDisplayAffixLen)
+	if err := validateColumnDisplayLengths(col, label, prefix, suffix); err != nil {
+		return ColumnDisplayInput{}, err
 	}
 	return ColumnDisplayInput{
 		ColumnName:   col,
@@ -49,6 +43,19 @@ func normalizeColumnDisplayInput(in ColumnDisplayInput) (ColumnDisplayInput, err
 		ValuePrefix:  prefix,
 		ValueSuffix:  suffix,
 	}, nil
+}
+
+func validateColumnDisplayLengths(col, label, prefix, suffix string) error {
+	if len(label) > maxColumnDisplayLabelLen {
+		return fmt.Errorf("display label for %q is too long (max %d)", col, maxColumnDisplayLabelLen)
+	}
+	if len(prefix) > maxColumnDisplayAffixLen {
+		return fmt.Errorf("value prefix for %q is too long (max %d)", col, maxColumnDisplayAffixLen)
+	}
+	if len(suffix) > maxColumnDisplayAffixLen {
+		return fmt.Errorf("value suffix for %q is too long (max %d)", col, maxColumnDisplayAffixLen)
+	}
+	return nil
 }
 
 // LookupColumnDisplay returns display metadata for a physical column (case-insensitive name).
@@ -59,6 +66,10 @@ func LookupColumnDisplay(settings map[string]ColumnDisplaySetting, columnName st
 	if d, ok := settings[columnName]; ok {
 		return d, true
 	}
+	return lookupColumnDisplayCaseInsensitive(settings, columnName)
+}
+
+func lookupColumnDisplayCaseInsensitive(settings map[string]ColumnDisplaySetting, columnName string) (ColumnDisplaySetting, bool) {
 	lower := strings.ToLower(columnName)
 	for key, d := range settings {
 		if strings.ToLower(key) == lower {
@@ -88,6 +99,22 @@ func (r *Repository) GetColumnDisplaySettings(ctx context.Context, tableConfigur
 	return out, nil
 }
 
+const upsertColumnDisplayMySQL = `
+	INSERT INTO table_column_display (table_configuration, column_name, display_label, value_prefix, value_suffix)
+	VALUES (?, ?, ?, ?, ?)
+	ON DUPLICATE KEY UPDATE
+		display_label = VALUES(display_label),
+		value_prefix = VALUES(value_prefix),
+		value_suffix = VALUES(value_suffix)`
+
+const upsertColumnDisplaySQLite = `
+	INSERT INTO table_column_display (table_configuration, column_name, display_label, value_prefix, value_suffix)
+	VALUES (?, ?, ?, ?, ?)
+	ON CONFLICT(table_configuration, column_name) DO UPDATE SET
+		display_label = excluded.display_label,
+		value_prefix = excluded.value_prefix,
+		value_suffix = excluded.value_suffix`
+
 func (r *Repository) upsertColumnDisplay(ctx context.Context, tableConfiguration string, in ColumnDisplayInput) error {
 	if in.DisplayLabel == "" && in.ValuePrefix == "" && in.ValueSuffix == "" {
 		_, err := r.db.ExecContext(ctx,
@@ -95,38 +122,12 @@ func (r *Repository) upsertColumnDisplay(ctx context.Context, tableConfiguration
 			tableConfiguration, in.ColumnName)
 		return err
 	}
-	var label, prefix, suffix interface{}
-	if in.DisplayLabel != "" {
-		label = in.DisplayLabel
+	q := upsertColumnDisplaySQLite
+	if r.db.DriverName() == "mysql" {
+		q = upsertColumnDisplayMySQL
 	}
-	if in.ValuePrefix != "" {
-		prefix = in.ValuePrefix
-	}
-	if in.ValueSuffix != "" {
-		suffix = in.ValueSuffix
-	}
-	switch r.db.DriverName() {
-	case "mysql":
-		const q = `
-			INSERT INTO table_column_display (table_configuration, column_name, display_label, value_prefix, value_suffix)
-			VALUES (?, ?, ?, ?, ?)
-			ON DUPLICATE KEY UPDATE
-				display_label = VALUES(display_label),
-				value_prefix = VALUES(value_prefix),
-				value_suffix = VALUES(value_suffix)`
-		_, err := r.db.ExecContext(ctx, q, tableConfiguration, in.ColumnName, label, prefix, suffix)
-		return err
-	default:
-		const q = `
-			INSERT INTO table_column_display (table_configuration, column_name, display_label, value_prefix, value_suffix)
-			VALUES (?, ?, ?, ?, ?)
-			ON CONFLICT(table_configuration, column_name) DO UPDATE SET
-				display_label = excluded.display_label,
-				value_prefix = excluded.value_prefix,
-				value_suffix = excluded.value_suffix`
-		_, err := r.db.ExecContext(ctx, q, tableConfiguration, in.ColumnName, label, prefix, suffix)
-		return err
-	}
+	_, err := r.db.ExecContext(ctx, q, tableConfiguration, in.ColumnName, nilIfEmpty(in.DisplayLabel), nilIfEmpty(in.ValuePrefix), nilIfEmpty(in.ValueSuffix))
+	return err
 }
 
 // SetColumnDisplaySettings upserts display metadata for the given columns.
@@ -140,24 +141,28 @@ func (r *Repository) SetColumnDisplaySettings(ctx context.Context, tableConfigur
 		if err != nil {
 			return err
 		}
-		if allowedColumns != nil {
-			canonical := ""
-			for col := range allowedColumns {
-				if strings.EqualFold(col, in.ColumnName) {
-					canonical = col
-					break
-				}
-			}
-			if canonical == "" {
-				return fmt.Errorf("unknown column %q", in.ColumnName)
-			}
-			in.ColumnName = canonical
+		if in.ColumnName, err = canonicalAllowedColumn(allowedColumns, in.ColumnName); err != nil {
+			return err
 		}
 		if err := r.upsertColumnDisplay(ctx, tableConfiguration, in); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// canonicalAllowedColumn returns the allowed column matching name case-insensitively. A nil allowlist
+// accepts any name unchanged.
+func canonicalAllowedColumn(allowedColumns map[string]struct{}, name string) (string, error) {
+	if allowedColumns == nil {
+		return name, nil
+	}
+	for col := range allowedColumns {
+		if strings.EqualFold(col, name) {
+			return col, nil
+		}
+	}
+	return "", fmt.Errorf("unknown column %q", name)
 }
 
 func (r *Repository) DeleteColumnDisplay(ctx context.Context, tableConfiguration, columnName string) error {

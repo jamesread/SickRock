@@ -4,23 +4,25 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 )
 
 // ReadOnlyCalendarExport is a configured read-only calendar view at /exports/{slug}.
 type ReadOnlyCalendarExport struct {
-	ID                 int
 	Slug               string
 	Title              string
 	TableConfiguration string
-	TableViewID        sql.NullInt64
 	WhereJSON          string
-	WeekendsOnly       bool
 	DisplayMode        string
-	Enabled            bool
 	AllowedGroupIDs    []int
+	TableViewID        sql.NullInt64
+	ID                 int
+	WeekendsOnly       bool
+	Enabled            bool
 }
 
 func (r *Repository) GetReadOnlyCalendarExportBySlug(ctx context.Context, slug string) (*ReadOnlyCalendarExport, error) {
@@ -30,16 +32,16 @@ func (r *Repository) GetReadOnlyCalendarExportBySlug(ctx context.Context, slug s
 	}
 
 	var row struct {
-		ID                 int           `db:"id"`
 		Slug               string        `db:"slug"`
 		Title              string        `db:"title"`
 		TableConfiguration string        `db:"table_configuration"`
-		TableViewID        sql.NullInt64 `db:"table_view_id"`
 		WhereJSON          string        `db:"where_json"`
-		WeekendsOnly       int           `db:"weekends_only"`
 		DisplayMode        string        `db:"display_mode"`
-		Enabled            int           `db:"enabled"`
 		AllowedGroupIDs    string        `db:"allowed_group_ids"`
+		TableViewID        sql.NullInt64 `db:"table_view_id"`
+		ID                 int           `db:"id"`
+		WeekendsOnly       int           `db:"weekends_only"`
+		Enabled            int           `db:"enabled"`
 	}
 
 	err := r.db.GetContext(ctx, &row, `
@@ -48,10 +50,7 @@ func (r *Repository) GetReadOnlyCalendarExportBySlug(ctx context.Context, slug s
 		FROM read_only_calendar_exports
 		WHERE slug = ?`, slug)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("export not found")
-		}
-		return nil, err
+		return nil, calendarExportLookupError(err)
 	}
 
 	groupIDs, err := parseAllowedGroupIDs(row.AllowedGroupIDs)
@@ -73,6 +72,13 @@ func (r *Repository) GetReadOnlyCalendarExportBySlug(ctx context.Context, slug s
 	}, nil
 }
 
+func calendarExportLookupError(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("export not found")
+	}
+	return err
+}
+
 func (r *Repository) ListEnabledReadOnlyCalendarExports(ctx context.Context) ([]ReadOnlyCalendarExport, error) {
 	rows, err := r.db.QueryxContext(ctx, `
 		SELECT id, slug, title, table_configuration, table_view_id, where_json,
@@ -83,42 +89,62 @@ func (r *Repository) ListEnabledReadOnlyCalendarExports(ctx context.Context) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+	return scanEnabledCalendarExports(rows)
+}
+
+type calendarExportRow struct {
+	Slug               string        `db:"slug"`
+	Title              string        `db:"title"`
+	TableConfiguration string        `db:"table_configuration"`
+	WhereJSON          string        `db:"where_json"`
+	DisplayMode        string        `db:"display_mode"`
+	AllowedGroupIDs    string        `db:"allowed_group_ids"`
+	TableViewID        sql.NullInt64 `db:"table_view_id"`
+	ID                 int           `db:"id"`
+	WeekendsOnly       int           `db:"weekends_only"`
+	Enabled            int           `db:"enabled"`
+}
+
+func scanEnabledCalendarExports(rows interface {
+	Next() bool
+	StructScan(dest any) error
+	Err() error
+}) ([]ReadOnlyCalendarExport, error) {
 	out := make([]ReadOnlyCalendarExport, 0, 8)
 	for rows.Next() {
-		var row struct {
-			ID                 int           `db:"id"`
-			Slug               string        `db:"slug"`
-			Title              string        `db:"title"`
-			TableConfiguration string        `db:"table_configuration"`
-			TableViewID        sql.NullInt64 `db:"table_view_id"`
-			WhereJSON          string        `db:"where_json"`
-			WeekendsOnly       int           `db:"weekends_only"`
-			DisplayMode        string        `db:"display_mode"`
-			Enabled            int           `db:"enabled"`
-			AllowedGroupIDs    string        `db:"allowed_group_ids"`
-		}
-		if err := rows.StructScan(&row); err != nil {
+		export, err := scanCalendarExportRow(rows)
+		if err != nil {
 			return nil, err
 		}
-		groupIDs, err := parseAllowedGroupIDs(row.AllowedGroupIDs)
-		if err != nil {
-			return nil, fmt.Errorf("export %q: invalid allowed_group_ids: %w", row.Slug, err)
-		}
-		out = append(out, ReadOnlyCalendarExport{
-			ID:                 row.ID,
-			Slug:               row.Slug,
-			Title:              row.Title,
-			TableConfiguration: row.TableConfiguration,
-			TableViewID:        row.TableViewID,
-			WhereJSON:          row.WhereJSON,
-			WeekendsOnly:       row.WeekendsOnly != 0,
-			DisplayMode:        row.DisplayMode,
-			Enabled:            row.Enabled != 0,
-			AllowedGroupIDs:    groupIDs,
-		})
+		out = append(out, export)
 	}
 	return out, rows.Err()
+}
+
+func scanCalendarExportRow(rows interface {
+	StructScan(dest any) error
+}) (ReadOnlyCalendarExport, error) {
+	var row calendarExportRow
+	if err := rows.StructScan(&row); err != nil {
+		return ReadOnlyCalendarExport{}, err
+	}
+	groupIDs, err := parseAllowedGroupIDs(row.AllowedGroupIDs)
+	if err != nil {
+		return ReadOnlyCalendarExport{}, fmt.Errorf("export %q: invalid allowed_group_ids: %w", row.Slug, err)
+	}
+	return ReadOnlyCalendarExport{
+		ID:                 row.ID,
+		Slug:               row.Slug,
+		Title:              row.Title,
+		TableConfiguration: row.TableConfiguration,
+		TableViewID:        row.TableViewID,
+		WhereJSON:          row.WhereJSON,
+		WeekendsOnly:       row.WeekendsOnly != 0,
+		DisplayMode:        row.DisplayMode,
+		Enabled:            row.Enabled != 0,
+		AllowedGroupIDs:    groupIDs,
+	}, nil
 }
 
 func parseAllowedGroupIDs(raw string) ([]int, error) {
@@ -150,27 +176,27 @@ func calendarExportColumnAllowlist(freeBusy bool, tableColumns []FieldSpec, pkCo
 	if pkColumn == "" {
 		pkColumn = defaultTableKeyColumn
 	}
-	always := map[string]bool{pkColumn: true, "sr_created": true, "sr_updated": true, "calendar_date": true, "starts": true, "finishes": true}
-	names := make([]string, 0, 8)
-	seen := map[string]bool{}
-	for _, n := range []string{pkColumn, "sr_created", "sr_updated", "calendar_date", "starts", "finishes"} {
-		for _, col := range tableColumns {
-			if col.Name == n && !seen[n] {
-				names = append(names, n)
-				seen[n] = true
-				break
-			}
-		}
-	}
+	// Key and calendar columns come first, in this order, when the table has them.
+	leading := []string{pkColumn, "sr_created", "sr_updated", "calendar_date", "starts", "finishes"}
+	names := presentColumns(leading, tableColumns)
 	if freeBusy {
 		return names
 	}
 	for _, col := range tableColumns {
-		if always[col.Name] || seen[col.Name] {
-			continue
+		if !slices.Contains(leading, col.Name) && !slices.Contains(names, col.Name) {
+			names = append(names, col.Name)
 		}
-		names = append(names, col.Name)
-		seen[col.Name] = true
+	}
+	return names
+}
+
+// presentColumns returns the wanted column names the table has, de-duplicated, in wanted order.
+func presentColumns(wanted []string, tableColumns []FieldSpec) []string {
+	names := make([]string, 0, len(wanted)+2)
+	for _, n := range wanted {
+		if hasColumn(tableColumns, n) && !slices.Contains(names, n) {
+			names = append(names, n)
+		}
 	}
 	return names
 }
@@ -195,50 +221,10 @@ func (r *Repository) ListItemsForReadOnlyExport(ctx context.Context, exp *ReadOn
 		return nil, err
 	}
 
-	freeBusy := exp.DisplayMode == "free_busy"
 	pkColumn := tc.PrimaryKeyColumnName()
-	selectCols := calendarExportColumnAllowlist(freeBusy, columns, pkColumn)
-	if len(selectCols) == 0 {
-		selectCols = []string{pkColumn}
-	}
-
-	sortColumn := tc.SortColumnName(selectCols)
-
-	var whereClause string
-	var args []interface{}
-	if len(where) > 0 {
-		parts := make([]string, 0, len(where))
-		for k, v := range where {
-			col := sanitizeDatabaseIdentifier(k)
-			if strings.Contains(v, "%") {
-				parts = append(parts, fmt.Sprintf("`%s` LIKE ?", col))
-				args = append(args, v)
-			} else {
-				parts = append(parts, fmt.Sprintf("`%s` = ?", col))
-				args = append(args, v)
-			}
-		}
-		whereClause = " WHERE " + strings.Join(parts, " AND ")
-	}
-
-	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s`%s ORDER BY `%s` DESC",
-		strings.Join(selectCols, "`, `"), tc.Db.String, tc.Table.String, whereClause, sortColumn)
-
-	rows, err := r.db.QueryxContext(ctx, query, args...)
+	query, args := readOnlyExportQuery(tc, calendarExportColumnAllowlist(exp.DisplayMode == "free_busy", columns, pkColumn), where)
+	items, err := r.queryItems(ctx, query, args, pkColumn)
 	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var items []Item
-	for rows.Next() {
-		rowMap := make(map[string]interface{})
-		if err := rows.MapScan(rowMap); err != nil {
-			return nil, err
-		}
-		items = append(items, scanRowToItem(rowMap, pkColumn))
-	}
-	if err := rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -248,24 +234,53 @@ func (r *Repository) ListItemsForReadOnlyExport(ctx context.Context, exp *ReadOn
 	return items, nil
 }
 
-func parseTimeField(v interface{}) time.Time {
-	switch t := v.(type) {
-	case time.Time:
-		return t
-	case string:
-		if parsed, err := time.Parse("2006-01-02 15:04:05", t); err == nil {
-			return parsed
-		}
-		if parsed, err := time.Parse("2006-01-02", t); err == nil {
-			return parsed
-		}
-	case []uint8:
-		s := string(t)
-		if parsed, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
-			return parsed
-		}
+// readOnlyExportQuery selects selectCols (or just the key when empty) from the table, filtered by where,
+// newest first.
+func readOnlyExportQuery(tc *TableConfig, selectCols []string, where map[string]string) (string, []any) {
+	if len(selectCols) == 0 {
+		selectCols = []string{tc.PrimaryKeyColumnName()}
 	}
-	return time.Time{}
+	whereClause, args := exportWhereClause(where)
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s`%s ORDER BY `%s` DESC",
+		strings.Join(selectCols, "`, `"), tc.Db.String, tc.Table.String, whereClause, tc.SortColumnName(selectCols))
+	return query, args
+}
+
+// exportWhereClause builds an AND-ed WHERE clause from an export's filters; values containing % use LIKE.
+func exportWhereClause(where map[string]string) (string, []any) {
+	if len(where) == 0 {
+		return "", nil
+	}
+	parts := make([]string, 0, len(where))
+	args := make([]any, 0, len(where))
+	for k, v := range where {
+		op := "="
+		if strings.Contains(v, "%") {
+			op = "LIKE"
+		}
+		parts = append(parts, fmt.Sprintf("`%s` %s ?", sanitizeDatabaseIdentifier(k), op))
+		args = append(args, v)
+	}
+	return " WHERE " + strings.Join(parts, " AND "), args
+}
+
+// queryItems runs query and scans each row into an Item keyed by pkColumn.
+func (r *Repository) queryItems(ctx context.Context, query string, args []any, pkColumn string) ([]Item, error) {
+	rows, err := r.db.QueryxContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var items []Item
+	for rows.Next() {
+		rowMap := make(map[string]any)
+		if err := rows.MapScan(rowMap); err != nil {
+			return nil, err
+		}
+		items = append(items, scanRowToItem(rowMap, pkColumn))
+	}
+	return items, rows.Err()
 }
 
 func filterItemsWeekendsOnly(items []Item) []Item {
@@ -275,12 +290,16 @@ func filterItemsWeekendsOnly(items []Item) []Item {
 		if !ok {
 			continue
 		}
-		wd := dt.Weekday()
-		if wd == time.Saturday || wd == time.Sunday {
+		if isWeekend(dt) {
 			out = append(out, item)
 		}
 	}
 	return out
+}
+
+func isWeekend(dt time.Time) bool {
+	wd := dt.Weekday()
+	return wd == time.Saturday || wd == time.Sunday
 }
 
 func resolveItemCalendarDate(item Item) (time.Time, bool) {

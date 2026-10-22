@@ -72,7 +72,7 @@ func TestSetItemPageLayoutBlocksSaveLoadAndEmpty(t *testing.T) {
 	if len(blocks) != 1 || blocks[0].BlockType != PageBlockTypeRelation {
 		t.Fatalf("blocks: %+v", blocks)
 	}
-	if err := repo.SetItemPageLayoutBlocks(ctx, "orders", nil); err != nil {
+	if err = repo.SetItemPageLayoutBlocks(ctx, "orders", nil); err != nil {
 		t.Fatalf("clear: %v", err)
 	}
 	blocks, err = repo.GetItemPageLayoutBlocks(ctx, "orders")

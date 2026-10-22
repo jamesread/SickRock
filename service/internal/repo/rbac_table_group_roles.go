@@ -3,9 +3,11 @@ package repo
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/jamesread/SickRock/internal/iam/systemroles"
+	"github.com/jmoiron/sqlx"
 )
 
 type GroupTableRoleGrant struct {
@@ -21,18 +23,17 @@ type TableAccess struct {
 }
 
 func tableActionPermission(action ResourceGrantAction) (string, error) {
-	switch action {
-	case ResourceActionView:
-		return systemroles.PermissionTableView, nil
-	case ResourceActionInsert:
-		return systemroles.PermissionTableInsert, nil
-	case ResourceActionEdit:
-		return systemroles.PermissionTableEdit, nil
-	case ResourceActionDelete:
-		return systemroles.PermissionTableDelete, nil
-	default:
+	perms := map[ResourceGrantAction]string{
+		ResourceActionView:   systemroles.PermissionTableView,
+		ResourceActionInsert: systemroles.PermissionTableInsert,
+		ResourceActionEdit:   systemroles.PermissionTableEdit,
+		ResourceActionDelete: systemroles.PermissionTableDelete,
+	}
+	perm, ok := perms[action]
+	if !ok {
 		return "", fmt.Errorf("unknown table action")
 	}
+	return perm, nil
 }
 
 func (r *Repository) UserHasTableGrant(ctx context.Context, userID int, tableConfiguration string, action ResourceGrantAction) (bool, error) {
@@ -55,7 +56,11 @@ func (r *Repository) UserHasTableGrant(ctx context.Context, userID int, tableCon
 		LIMIT 1`
 	var one int
 	err = r.db.GetContext(ctx, &one, q, userID, tableConfiguration, perm)
-	if err == sql.ErrNoRows {
+	return grantLookupResult(err)
+}
+
+func grantLookupResult(err error) (bool, error) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
@@ -70,22 +75,32 @@ func (r *Repository) GetUserTableAccess(ctx context.Context, userID int, tableCo
 		return out, nil
 	}
 	checks := []struct {
-		action ResourceGrantAction
 		dest   *bool
+		action ResourceGrantAction
 	}{
-		{ResourceActionView, &out.CanView},
-		{ResourceActionInsert, &out.CanInsert},
-		{ResourceActionEdit, &out.CanEdit},
-		{ResourceActionDelete, &out.CanDelete},
+		{&out.CanView, ResourceActionView},
+		{&out.CanInsert, ResourceActionInsert},
+		{&out.CanEdit, ResourceActionEdit},
+		{&out.CanDelete, ResourceActionDelete},
 	}
+	if err := r.fillTableAccess(ctx, userID, tableConfiguration, checks); err != nil {
+		return out, err
+	}
+	return out, nil
+}
+
+func (r *Repository) fillTableAccess(ctx context.Context, userID int, tableConfiguration string, checks []struct {
+	dest   *bool
+	action ResourceGrantAction
+}) error {
 	for _, c := range checks {
 		ok, err := r.UserHasTableGrant(ctx, userID, tableConfiguration, c.action)
 		if err != nil {
-			return out, err
+			return err
 		}
 		*c.dest = ok
 	}
-	return out, nil
+	return nil
 }
 
 func (r *Repository) ListGroupTableRoleGrants(ctx context.Context, groupID int) ([]GroupTableRoleGrant, error) {
@@ -97,7 +112,15 @@ func (r *Repository) ListGroupTableRoleGrants(ctx context.Context, groupID int) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+	return scanGroupTableRoleGrants(rows)
+}
+
+func scanGroupTableRoleGrants(rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}) ([]GroupTableRoleGrant, error) {
 	out := make([]GroupTableRoleGrant, 0, 16)
 	for rows.Next() {
 		var g GroupTableRoleGrant
@@ -113,31 +136,28 @@ func (r *Repository) SetGroupTableRoleGrants(ctx context.Context, groupID int, g
 	if groupID <= 0 {
 		return fmt.Errorf("group_id is required")
 	}
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE user_group_id = ?`, groupID); err != nil {
-		return fmt.Errorf("clear table group roles: %w", err)
-	}
-	for _, g := range grants {
-		if g.TableKey == "" || g.RoleID <= 0 {
-			continue
+	return r.inTx(ctx, func(tx *sqlx.Tx) error {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE user_group_id = ?`, groupID); err != nil {
+			return fmt.Errorf("clear table group roles: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
-			groupID, g.TableKey, g.RoleID,
-		); err != nil {
-			return fmt.Errorf("insert table group role: %w", err)
+		for _, g := range grants {
+			if g.TableKey == "" || g.RoleID <= 0 {
+				continue
+			}
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
+				groupID, g.TableKey, g.RoleID,
+			); err != nil {
+				return fmt.Errorf("insert table group role: %w", err)
+			}
 		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }
 
 type TableShareGrant struct {
-	GroupID   int
 	GroupName string
+	GroupID   int
 	RoleID    int
 }
 
@@ -155,7 +175,15 @@ func (r *Repository) ListTableShareGrants(ctx context.Context, tableKey string) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+	return scanTableShareGrants(rows)
+}
+
+func scanTableShareGrants(rows interface {
+	Next() bool
+	Scan(dest ...any) error
+	Err() error
+}) ([]TableShareGrant, error) {
 	out := make([]TableShareGrant, 0, 16)
 	for rows.Next() {
 		var row TableShareGrant
@@ -171,26 +199,23 @@ func (r *Repository) SetTableShareGrants(ctx context.Context, tableKey string, g
 	if tableKey == "" {
 		return fmt.Errorf("table_key is required")
 	}
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE table_key = ?`, tableKey); err != nil {
-		return fmt.Errorf("clear table share grants: %w", err)
-	}
-	for _, g := range grants {
-		if g.GroupID <= 0 || g.RoleID <= 0 {
-			continue
+	return r.inTx(ctx, func(tx *sqlx.Tx) error {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE table_key = ?`, tableKey); err != nil {
+			return fmt.Errorf("clear table share grants: %w", err)
 		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
-			g.GroupID, tableKey, g.RoleID,
-		); err != nil {
-			return fmt.Errorf("insert table share grant: %w", err)
+		for _, g := range grants {
+			if g.GroupID <= 0 || g.RoleID <= 0 {
+				continue
+			}
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
+				g.GroupID, tableKey, g.RoleID,
+			); err != nil {
+				return fmt.Errorf("insert table share grant: %w", err)
+			}
 		}
-	}
-	return tx.Commit()
+		return nil
+	})
 }
 
 func (r *Repository) EnsureEveryoneTableRole(ctx context.Context, tableConfiguration string, roleName string) error {
@@ -200,25 +225,35 @@ func (r *Repository) EnsureEveryoneTableRole(ctx context.Context, tableConfigura
 	if roleName == "" {
 		roleName = systemroles.RoleViewer
 	}
+	groupID, roleID, err := r.everyoneTableRoleIDs(ctx, roleName)
+	if err != nil {
+		return err
+	}
+	return r.upsertEveryoneTableRole(ctx, groupID, tableConfiguration, roleID)
+}
+
+func (r *Repository) everyoneTableRoleIDs(ctx context.Context, roleName string) (int, int, error) {
 	var groupID int
 	if err := r.db.GetContext(ctx, &groupID, `SELECT id FROM user_groups WHERE name = 'Everyone' LIMIT 1`); err != nil {
-		return err
+		return 0, 0, err
 	}
 	var roleID int
 	if err := r.db.GetContext(ctx, &roleID, `SELECT id FROM rbac_roles WHERE name = ? LIMIT 1`, roleName); err != nil {
-		return err
+		return 0, 0, err
 	}
-	switch r.db.DriverName() {
-	case "mysql":
+	return groupID, roleID, nil
+}
+
+func (r *Repository) upsertEveryoneTableRole(ctx context.Context, groupID int, tableConfiguration string, roleID int) error {
+	if r.db.DriverName() == "mysql" {
 		_, err := r.db.ExecContext(ctx, `
 			INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id)
 			VALUES (?, ?, ?)
 			ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)`, groupID, tableConfiguration, roleID)
 		return err
-	default:
-		_, err := r.db.ExecContext(ctx, `
-			INSERT OR REPLACE INTO rbac_table_group_roles (user_group_id, table_key, role_id)
-			VALUES (?, ?, ?)`, groupID, tableConfiguration, roleID)
-		return err
 	}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT OR REPLACE INTO rbac_table_group_roles (user_group_id, table_key, role_id)
+		VALUES (?, ?, ?)`, groupID, tableConfiguration, roleID)
+	return err
 }

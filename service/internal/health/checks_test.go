@@ -2,10 +2,11 @@ package health
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 
+	armhealth "github.com/jamesread/armature-health"
+	"github.com/jamesread/armature-health/errorlog"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/jamesread/SickRock/internal/repo"
@@ -47,25 +48,25 @@ func newBrokenDB(t *testing.T) (*sqlx.DB, *repo.Repository) {
 
 func mustExec(t *testing.T, db *sqlx.DB, query string) {
 	t.Helper()
-	if _, err := db.Exec(query); err != nil {
+	if _, err := db.ExecContext(t.Context(), query); err != nil {
 		t.Fatalf("fixture: %v", err)
 	}
 }
 
-func runCheck(t *testing.T, check Check) map[string]Issue {
+func runCheck(t *testing.T, check armhealth.Check) map[string]armhealth.Issue {
 	t.Helper()
 	issues, err := check.Run(context.Background())
 	if err != nil {
 		t.Fatalf("%s: %v", check.ID(), err)
 	}
-	byKey := map[string]Issue{}
+	byKey := map[string]armhealth.Issue{}
 	for _, issue := range issues {
 		byKey[issue.Key] = issue
 	}
 	return byKey
 }
 
-func expectKeys(t *testing.T, check Check, got map[string]Issue, want ...string) {
+func expectKeys(t *testing.T, check armhealth.Check, got map[string]armhealth.Issue, want ...string) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("%s: got %d issues %v, want keys %v", check.ID(), len(got), got, want)
@@ -129,35 +130,29 @@ func TestDuplicateTableConfigurationNames(t *testing.T) {
 	check := TableConfigurationDuplicateNamesCheck{Repo: repo.NewRepository(db)}
 	got := runCheck(t, check)
 	expectKeys(t, check, got, "name:table_settings")
-	if issue := got["name:table_settings"]; issue.Count < 2 || issue.Severity != SeverityError {
+	if issue := got["name:table_settings"]; issue.Count < 2 || issue.Severity != armhealth.SeverityError {
 		t.Fatalf("duplicate issue %+v", issue)
 	}
 }
 
-func TestSecurityAndConfigChecks(t *testing.T) {
-	admin := DefaultAdminPasswordCheck{UsesDefaultPassword: func(context.Context) (bool, error) { return true, nil }}
-	expectKeys(t, admin, runCheck(t, admin), "admin")
-
-	admin.UsesDefaultPassword = func(context.Context) (bool, error) { return false, nil }
-	expectKeys(t, admin, runCheck(t, admin))
-
-	admin.UsesDefaultPassword = func(context.Context) (bool, error) { return false, errors.New("store down") }
-	if _, err := admin.Run(context.Background()); err == nil {
-		t.Fatal("expected the lookup error to fail the check")
-	}
-
+func TestRiskySettingsWiring(t *testing.T) {
 	env := map[string]string{"SICKROCK_RESET_ADMIN_PASSWORD": "1"}
-	risky := RiskySettingsCheck{Getenv: func(k string) string { return env[k] }, LogLevel: "debug"}
+	var risky armhealth.Check
+	for _, check := range DefaultChecks(Deps{Getenv: func(k string) string { return env[k] }, LogLevel: "debug"}) {
+		if check.ID() == "config.risky_settings" {
+			risky = check
+		}
+	}
+	if risky == nil {
+		t.Fatal("config.risky_settings not registered")
+	}
 	expectKeys(t, risky, runCheck(t, risky), "env:SICKROCK_RESET_ADMIN_PASSWORD", "log-level")
-
-	risky = RiskySettingsCheck{Getenv: func(string) string { return "" }, LogLevel: "info"}
-	expectKeys(t, risky, runCheck(t, risky))
 }
 
 func TestDefaultChecksHaveUniqueIDs(t *testing.T) {
 	checks := DefaultChecks(Deps{
 		Repo:                     repo.NewRepository(testdb.NewMigratedSQLite(t)),
-		ErrorLog:                 NewErrorLog(),
+		ErrorLog:                 errorlog.New(),
 		AdminUsesDefaultPassword: func(context.Context) (bool, error) { return false, nil },
 		Getenv:                   func(string) string { return "" },
 	})

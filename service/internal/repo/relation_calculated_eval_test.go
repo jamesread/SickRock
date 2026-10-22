@@ -3,7 +3,7 @@ package repo
 import "testing"
 
 func TestMapFieldsForExprCaseInsensitiveKeys(t *testing.T) {
-	out := mapFieldsForExpr(map[string]interface{}{
+	out := mapFieldsForExpr(map[string]any{
 		"Quantity": float64(4),
 	})
 	if out["quantity"] != float64(4) {
@@ -12,9 +12,9 @@ func TestMapFieldsForExprCaseInsensitiveKeys(t *testing.T) {
 }
 
 func TestEvaluateRelationCalculatedExprEmptySku(t *testing.T) {
-	env := map[string]interface{}{
-		"skus":        map[string]interface{}{},
-		"quote_lines": map[string]interface{}{"quantity": float64(2)},
+	env := map[string]any{
+		"skus":        map[string]any{},
+		"quote_lines": map[string]any{"quantity": float64(2)},
 	}
 	_, err := evaluateRelationCalculatedExpr("{skus.value} * {quote_lines.quantity}", env)
 	if err == nil {

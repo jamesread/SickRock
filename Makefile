@@ -1,8 +1,10 @@
-.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview lint icons icons-clean docs integration-test it screenshots
+.PHONY: all proto proto-generate proto-lint proto-clean service service-build service-run service-test service-lint service-clean frontend frontend-build frontend-preview frontend-test frontend-lint lint test icons icons-clean docs integration-test it screenshots
 
 all: proto-generate frontend-build service-build
 
-lint: proto-lint service-lint
+lint: proto-lint service-lint frontend-lint
+
+test: service-test frontend-test
 
 proto:
 	$(MAKE) -wC proto
@@ -48,6 +50,12 @@ frontend-build:
 
 frontend-preview:
 	$(MAKE) -wC frontend preview
+
+frontend-test:
+	$(MAKE) -wC frontend test
+
+frontend-lint:
+	$(MAKE) -wC frontend lint
 
 # Icon generation from SVG
 ICON_SIZES = 72 96 128 144 152 192 384 512

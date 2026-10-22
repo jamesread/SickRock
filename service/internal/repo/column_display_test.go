@@ -12,11 +12,11 @@ func TestSetColumnDisplaySettingsUpsertAndClear(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
-	if err := configureSQLiteDB(db); err != nil {
+	defer func() { _ = db.Close() }()
+	if err = configureSQLiteDB(db); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
-	_, err = db.Exec(`
+	_, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_column_display (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			table_configuration TEXT NOT NULL,
@@ -36,7 +36,7 @@ func TestSetColumnDisplaySettingsUpsertAndClear(t *testing.T) {
 	ctx := context.Background()
 	allowed := map[string]struct{}{"amount": {}, "currency": {}}
 
-	if err := r.SetColumnDisplaySettings(ctx, "orders", []ColumnDisplayInput{
+	if err = r.SetColumnDisplaySettings(ctx, "orders", []ColumnDisplayInput{
 		{ColumnName: "amount", DisplayLabel: "Total", ValuePrefix: "{currency} ", ValueSuffix: ""},
 	}, allowed); err != nil {
 		t.Fatalf("set: %v", err)
@@ -49,7 +49,7 @@ func TestSetColumnDisplaySettingsUpsertAndClear(t *testing.T) {
 		t.Fatalf("unexpected row: %+v", m["amount"])
 	}
 
-	if err := r.SetColumnDisplaySettings(ctx, "orders", []ColumnDisplayInput{
+	if err = r.SetColumnDisplaySettings(ctx, "orders", []ColumnDisplayInput{
 		{ColumnName: "amount", DisplayLabel: "", ValuePrefix: "", ValueSuffix: ""},
 	}, allowed); err != nil {
 		t.Fatalf("clear: %v", err)

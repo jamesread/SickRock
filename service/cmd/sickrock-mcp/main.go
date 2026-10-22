@@ -145,6 +145,25 @@ func newSickRockClient(baseURL, apiKey string) sickrockpbconnect.SickRockClient 
 	)
 }
 
+func parseWhereJSON(raw string) (map[string]string, error) {
+	if raw == "" {
+		return nil, nil
+	}
+	var where map[string]string
+	if err := json.Unmarshal([]byte(raw), &where); err != nil {
+		return nil, err
+	}
+	return where, nil
+}
+
+func parseAdditionalFieldsJSON(raw string) (map[string]string, error) {
+	var fields map[string]string
+	if err := json.Unmarshal([]byte(raw), &fields); err != nil {
+		return nil, err
+	}
+	return fields, nil
+}
+
 func jsonResult(v any) (*mcp.CallToolResult, error) {
 	b, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -165,7 +184,7 @@ func handlePing(ctx context.Context, client sickrockpbconnect.SickRockClient, re
 	})
 }
 
-func handleGetNavigation(ctx context.Context, client sickrockpbconnect.SickRockClient, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleGetNavigation(ctx context.Context, client sickrockpbconnect.SickRockClient, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	res, err := client.GetNavigation(ctx, connect.NewRequest(&sickrockpb.GetNavigationRequest{}))
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -178,7 +197,7 @@ func handleGetNavigation(ctx context.Context, client sickrockpbconnect.SickRockC
 	return jsonResult(out)
 }
 
-func handleGetTableConfigurations(ctx context.Context, client sickrockpbconnect.SickRockClient, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func handleGetTableConfigurations(ctx context.Context, client sickrockpbconnect.SickRockClient, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	res, err := client.GetTableConfigurations(ctx, connect.NewRequest(&sickrockpb.GetTableConfigurationsRequest{}))
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -222,13 +241,11 @@ func handleListItems(ctx context.Context, client sickrockpbconnect.SickRockClien
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	r := &sickrockpb.ListItemsRequest{TcName: tcName}
-	if w := req.GetString("where", ""); w != "" {
-		var where map[string]string
-		if err := json.Unmarshal([]byte(w), &where); err != nil {
-			return mcp.NewToolResultError("invalid where JSON: " + err.Error()), nil
-		}
-		r.Where = where
+	where, err := parseWhereJSON(req.GetString("where", ""))
+	if err != nil {
+		return mcp.NewToolResultError("invalid where JSON: " + err.Error()), err
 	}
+	r.Where = where
 	res, err := client.ListItems(ctx, connect.NewRequest(r))
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -253,17 +270,9 @@ func handleGetItem(ctx context.Context, client sickrockpbconnect.SickRockClient,
 }
 
 func handleCreateItem(ctx context.Context, client sickrockpbconnect.SickRockClient, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	pageID, err := req.RequireString("page_id")
+	pageID, fields, err := requireItemFields(req)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	fieldsStr, err := req.RequireString("additional_fields")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	var fields map[string]string
-	if err := json.Unmarshal([]byte(fieldsStr), &fields); err != nil {
-		return mcp.NewToolResultError("invalid additional_fields JSON: " + err.Error()), nil
+		return toolArgError(err)
 	}
 	res, err := client.CreateItem(ctx, connect.NewRequest(&sickrockpb.CreateItemRequest{
 		PageId:           pageID,
@@ -276,21 +285,9 @@ func handleCreateItem(ctx context.Context, client sickrockpbconnect.SickRockClie
 }
 
 func handleEditItem(ctx context.Context, client sickrockpbconnect.SickRockClient, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	pageID, err := req.RequireString("page_id")
+	pageID, id, fields, err := requireEditItemArgs(req)
 	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	id, err := req.RequireString("id")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	fieldsStr, err := req.RequireString("additional_fields")
-	if err != nil {
-		return mcp.NewToolResultError(err.Error()), nil
-	}
-	var fields map[string]string
-	if err := json.Unmarshal([]byte(fieldsStr), &fields); err != nil {
-		return mcp.NewToolResultError("invalid additional_fields JSON: " + err.Error()), nil
+		return toolArgError(err)
 	}
 	res, err := client.EditItem(ctx, connect.NewRequest(&sickrockpb.EditItemRequest{
 		PageId:           pageID,
@@ -301,6 +298,41 @@ func handleEditItem(ctx context.Context, client sickrockpbconnect.SickRockClient
 		return mcp.NewToolResultError(err.Error()), nil
 	}
 	return jsonResult(res.Msg.GetItem())
+}
+
+func toolArgError(err error) (*mcp.CallToolResult, error) {
+	if strings.Contains(err.Error(), "invalid additional_fields") {
+		return mcp.NewToolResultError(err.Error()), err
+	}
+	return mcp.NewToolResultError(err.Error()), nil
+}
+
+func requireItemFields(req mcp.CallToolRequest) (string, map[string]string, error) {
+	pageID, err := req.RequireString("page_id")
+	if err != nil {
+		return "", nil, err
+	}
+	fieldsStr, err := req.RequireString("additional_fields")
+	if err != nil {
+		return "", nil, err
+	}
+	fields, err := parseAdditionalFieldsJSON(fieldsStr)
+	if err != nil {
+		return "", nil, fmt.Errorf("invalid additional_fields JSON: %w", err)
+	}
+	return pageID, fields, nil
+}
+
+func requireEditItemArgs(req mcp.CallToolRequest) (string, string, map[string]string, error) {
+	pageID, fields, err := requireItemFields(req)
+	if err != nil {
+		return "", "", nil, err
+	}
+	id, err := req.RequireString("id")
+	if err != nil {
+		return "", "", nil, err
+	}
+	return pageID, id, fields, nil
 }
 
 func handleDeleteItem(ctx context.Context, client sickrockpbconnect.SickRockClient, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {

@@ -177,6 +177,8 @@ message RssCalendarFeed {
   string table_configuration = 4;
   repeated RssFieldMapping field_mappings = 5;
   string unique_column = 6;
+  // Optional table column that each imported event records this feed's id in.
+  string feed_id_column = 14;
   int32 refresh_interval_minutes = 7;
   bool enabled = 8;
   int64 last_refresh_at = 9;

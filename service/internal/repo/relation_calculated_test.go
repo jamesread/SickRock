@@ -22,11 +22,11 @@ func TestRelationCalcStorageKey(t *testing.T) {
 }
 
 func TestEvaluateRelationCalculatedExpr(t *testing.T) {
-	env := map[string]interface{}{
-		"skus": map[string]interface{}{
+	env := map[string]any{
+		"skus": map[string]any{
 			"value": float64(10),
 		},
-		"quote_lines": map[string]interface{}{
+		"quote_lines": map[string]any{
 			"quantity": float64(3),
 		},
 	}

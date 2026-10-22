@@ -20,9 +20,9 @@ func TestParseAllowedGroupIDs(t *testing.T) {
 }
 
 func TestFilterItemsWeekendsOnly(t *testing.T) {
-	sat := Item{Fields: map[string]interface{}{"calendar_date": "2026-09-26"}}
-	sun := Item{Fields: map[string]interface{}{"calendar_date": "2026-09-27"}}
-	mon := Item{Fields: map[string]interface{}{"calendar_date": "2026-09-28"}}
+	sat := Item{Fields: map[string]any{"calendar_date": "2026-09-26"}}
+	sun := Item{Fields: map[string]any{"calendar_date": "2026-09-27"}}
+	mon := Item{Fields: map[string]any{"calendar_date": "2026-09-28"}}
 	out := filterItemsWeekendsOnly([]Item{sat, sun, mon})
 	if len(out) != 2 {
 		t.Fatalf("expected 2 weekend items, got %d", len(out))

@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -24,7 +26,6 @@ func (r *Repository) ListRelationSyntheticColumnKeys(ctx context.Context, source
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[string]struct{})
 	out := make([]string, 0)
 	for _, rel := range relations {
 		cols, err := parseRelationPullThroughJSON(rel.PullThroughJSON)
@@ -32,24 +33,23 @@ func (r *Repository) ListRelationSyntheticColumnKeys(ctx context.Context, source
 			return nil, err
 		}
 		for index, col := range cols {
-			var key string
-			switch {
-			case col.IsCalculated():
-				key = RelationCalcStorageKey(col.DisplayLabel, index)
-			case col.IsPullThrough():
-				key = PullThroughStorageKey(col.FKColumn, col.Field)
+			if key := relationSyntheticColumnKey(col, index); key != "" && !slices.Contains(out, key) {
+				out = append(out, key)
 			}
-			if key == "" {
-				continue
-			}
-			if _, ok := seen[key]; ok {
-				continue
-			}
-			seen[key] = struct{}{}
-			out = append(out, key)
 		}
 	}
 	return out, nil
+}
+
+// relationSyntheticColumnKey returns the storage key of a calculated or pull-through column, or "".
+func relationSyntheticColumnKey(col RelationPullThroughField, index int) string {
+	switch {
+	case col.IsCalculated():
+		return RelationCalcStorageKey(col.DisplayLabel, index)
+	case col.IsPullThrough():
+		return PullThroughStorageKey(col.FKColumn, col.Field)
+	}
+	return ""
 }
 
 // RelationPullThroughField is a pull-through column or a calculated relation column (stored in pull_through_json).
@@ -80,7 +80,7 @@ func parseRelationPullThroughJSON(raw sql.NullString) ([]RelationPullThroughFiel
 	return out, nil
 }
 
-func marshalRelationPullThroughJSON(fields []RelationPullThroughField) (interface{}, error) {
+func marshalRelationPullThroughJSON(fields []RelationPullThroughField) (any, error) {
 	if len(fields) == 0 {
 		return nil, nil
 	}
@@ -95,66 +95,91 @@ func validateRelationPullThroughFields(ctx context.Context, r *Repository, sourc
 	if len(fields) == 0 {
 		return nil
 	}
-	_, scopes, _, err := buildRelationExprScopes(ctx, r, sourceTableKey)
+	_, scopes, relations, err := buildRelationExprScopes(ctx, r, sourceTableKey)
 	if err != nil {
 		return err
 	}
-	relations, err := r.listTableRelationsForSourceConfiguration(ctx, sourceTableKey)
-	if err != nil {
-		return err
+	v := &relationFieldValidator{
+		r:               r,
+		sourceTableKey:  sourceTableKey,
+		scopes:          scopes,
+		refKeyByColumn:  make(map[string]string, len(relations)),
+		seenPullThrough: make(map[string]struct{}, len(fields)),
+		seenCalculated:  make(map[string]struct{}, len(fields)),
 	}
-	refKeyByColumn := make(map[string]string, len(relations))
 	for _, rel := range relations {
-		refKeyByColumn[strings.ToLower(rel.SourceColumn)] = rel.ReferencedTableKey
+		v.refKeyByColumn[strings.ToLower(rel.SourceColumn)] = rel.ReferencedTableKey
 	}
-	seenPullThrough := make(map[string]struct{}, len(fields))
-	seenCalculated := make(map[string]struct{}, len(fields))
 	for i, pt := range fields {
-		if pt.IsCalculated() {
-			label := strings.TrimSpace(pt.DisplayLabel)
-			expr := strings.TrimSpace(pt.Expr)
-			if label == "" {
-				return fmt.Errorf("calculated entry %d: display_label is required", i+1)
-			}
-			if err := validateCalculatedExpr(expr, scopes); err != nil {
-				return fmt.Errorf("calculated entry %d: %w", i+1, err)
-			}
-			key := strings.ToLower(label) + "\x00" + strings.ToLower(expr)
-			if _, ok := seenCalculated[key]; ok {
-				return fmt.Errorf("duplicate calculated column %q", label)
-			}
-			seenCalculated[key] = struct{}{}
-			continue
+		if err := v.validate(ctx, i, pt); err != nil {
+			return err
 		}
-		if !pt.IsPullThrough() {
-			return fmt.Errorf("entry %d: set fk_column+field or display_label+expr", i+1)
-		}
-		fkCol := strings.TrimSpace(pt.FKColumn)
-		field := strings.TrimSpace(pt.Field)
-		key := strings.ToLower(fkCol) + "\x00" + strings.ToLower(field)
-		if _, ok := seenPullThrough[key]; ok {
-			return fmt.Errorf("duplicate pull-through: %s.%s", fkCol, field)
-		}
-		seenPullThrough[key] = struct{}{}
-		refKey, ok := refKeyByColumn[strings.ToLower(fkCol)]
-		if !ok {
-			return fmt.Errorf("pull-through fk_column %q is not a foreign key on table %q", fkCol, sourceTableKey)
-		}
-		refTC, err := r.GetTableConfiguration(ctx, refKey)
-		if err != nil {
-			return fmt.Errorf("pull-through %s: referenced table: %w", fkCol, err)
-		}
-		cols, err := r.ListColumns(ctx, refTC)
-		if err != nil {
-			return fmt.Errorf("pull-through %s: load referenced columns: %w", fkCol, err)
-		}
-		allowed := make(map[string]struct{})
-		for _, col := range cols {
-			allowed[strings.ToLower(col.Name)] = struct{}{}
-		}
-		if _, ok := allowed[strings.ToLower(field)]; !ok {
-			return fmt.Errorf("pull-through field %q is not on referenced table for %s", field, fkCol)
-		}
+	}
+	return nil
+}
+
+// relationFieldValidator validates a relation's pull-through and calculated entries, tracking duplicates.
+type relationFieldValidator struct {
+	r               *Repository
+	refKeyByColumn  map[string]string
+	seenPullThrough map[string]struct{}
+	seenCalculated  map[string]struct{}
+	sourceTableKey  string
+	scopes          []relationExprScope
+}
+
+func (v *relationFieldValidator) validate(ctx context.Context, i int, pt RelationPullThroughField) error {
+	switch {
+	case pt.IsCalculated():
+		return validateCalculatedEntry(i, pt, v.scopes, v.seenCalculated)
+	case pt.IsPullThrough():
+		return validatePullThroughEntry(ctx, v.r, v.sourceTableKey, pt, v.refKeyByColumn, v.seenPullThrough)
+	}
+	return fmt.Errorf("entry %d: set fk_column+field or display_label+expr", i+1)
+}
+
+// validateCalculatedEntry checks calculated entry i has a label and a valid expression, and is not a duplicate.
+func validateCalculatedEntry(i int, pt RelationPullThroughField, scopes []relationExprScope, seen map[string]struct{}) error {
+	label := strings.TrimSpace(pt.DisplayLabel)
+	expr := strings.TrimSpace(pt.Expr)
+	if label == "" {
+		return fmt.Errorf("calculated entry %d: display_label is required", i+1)
+	}
+	if err := validateCalculatedExpr(expr, scopes); err != nil {
+		return fmt.Errorf("calculated entry %d: %w", i+1, err)
+	}
+	key := strings.ToLower(label) + "\x00" + strings.ToLower(expr)
+	if _, ok := seen[key]; ok {
+		return fmt.Errorf("duplicate calculated column %q", label)
+	}
+	seen[key] = struct{}{}
+	return nil
+}
+
+// validatePullThroughEntry checks a pull-through entry is not a duplicate, its fk_column is a foreign
+// key on the source table, and its field is a column of the referenced table.
+func validatePullThroughEntry(ctx context.Context, r *Repository, sourceTableKey string, pt RelationPullThroughField, refKeyByColumn map[string]string, seen map[string]struct{}) error {
+	fkCol := strings.TrimSpace(pt.FKColumn)
+	field := strings.TrimSpace(pt.Field)
+	key := strings.ToLower(fkCol) + "\x00" + strings.ToLower(field)
+	if _, ok := seen[key]; ok {
+		return fmt.Errorf("duplicate pull-through: %s.%s", fkCol, field)
+	}
+	seen[key] = struct{}{}
+	refKey, ok := refKeyByColumn[strings.ToLower(fkCol)]
+	if !ok {
+		return fmt.Errorf("pull-through fk_column %q is not a foreign key on table %q", fkCol, sourceTableKey)
+	}
+	refTC, err := r.GetTableConfiguration(ctx, refKey)
+	if err != nil {
+		return fmt.Errorf("pull-through %s: referenced table: %w", fkCol, err)
+	}
+	cols, err := r.ListColumns(ctx, refTC)
+	if err != nil {
+		return fmt.Errorf("pull-through %s: load referenced columns: %w", fkCol, err)
+	}
+	if !slices.ContainsFunc(cols, func(c FieldSpec) bool { return strings.EqualFold(c.Name, field) }) {
+		return fmt.Errorf("pull-through field %q is not on referenced table for %s", field, fkCol)
 	}
 	return nil
 }
@@ -169,15 +194,8 @@ func (r *Repository) UpdateTableRelation(ctx context.Context, constraintName, di
 	if err != nil {
 		return err
 	}
-	if err := validateRelationPullThroughFields(ctx, r, rel.SourceTableKey, pullThrough); err != nil {
+	if err = validateRelationPullThroughFields(ctx, r, rel.SourceTableKey, pullThrough); err != nil {
 		return err
-	}
-	displayName = strings.TrimSpace(displayName)
-	var displayArg interface{}
-	if displayName == "" {
-		displayArg = nil
-	} else {
-		displayArg = displayName
 	}
 	pullArg, err := marshalRelationPullThroughJSON(pullThrough)
 	if err != nil {
@@ -185,16 +203,21 @@ func (r *Repository) UpdateTableRelation(ctx context.Context, constraintName, di
 	}
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE table_relations SET display_name = ?, pull_through_json = ? WHERE constraint_name = ?`,
-		displayArg, pullArg, constraintName)
+		nilIfEmpty(strings.TrimSpace(displayName)), pullArg, constraintName)
 	if err != nil {
 		return err
 	}
+	return requireRowsAffected(res, "table relation not found")
+}
+
+// requireRowsAffected fails with notFound when a statement changed no rows.
+func requireRowsAffected(res sql.Result, notFound string) error {
 	n, err := res.RowsAffected()
 	if err != nil {
 		return err
 	}
 	if n == 0 {
-		return fmt.Errorf("table relation not found")
+		return errors.New(notFound)
 	}
 	return nil
 }

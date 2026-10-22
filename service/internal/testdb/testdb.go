@@ -16,26 +16,30 @@ import (
 // NewMigratedSQLite returns a fresh SQLite database with the real migrations applied, so
 // test schemas cannot drift from production. A file (not :memory:) is used because
 // repository code can hold two connections at once.
-func NewMigratedSQLite(t testing.TB) *sqlx.DB {
-	t.Helper()
-	db, err := sqlx.Open("sqlite", "file:"+filepath.Join(t.TempDir(), "test.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
+func NewMigratedSQLite(tb testing.TB) *sqlx.DB {
+	tb.Helper()
+	db, err := sqlx.Open("sqlite", "file:"+filepath.Join(tb.TempDir(), "test.db")+"?_pragma=foreign_keys(1)&_pragma=busy_timeout(5000)")
 	if err != nil {
-		t.Fatalf("open: %v", err)
+		tb.Fatalf("open: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	tb.Cleanup(func() { _ = db.Close() })
+	applySQLiteMigrations(tb, db)
+	return db
+}
 
+func applySQLiteMigrations(tb testing.TB, db *sqlx.DB) {
+	tb.Helper()
 	driver, err := sqlite3.WithInstance(db.DB, &sqlite3.Config{})
 	if err != nil {
-		t.Fatalf("migrate driver: %v", err)
+		tb.Fatalf("migrate driver: %v", err)
 	}
 	m, err := migrate.NewWithDatabaseInstance("file://"+migrationsDir(), "sqlite3", driver)
 	if err != nil {
-		t.Fatalf("migrate: %v", err)
+		tb.Fatalf("migrate: %v", err)
 	}
 	if err := m.Up(); err != nil {
-		t.Fatalf("migrate up: %v", err)
+		tb.Fatalf("migrate up: %v", err)
 	}
-	return db
 }
 
 func migrationsDir() string {

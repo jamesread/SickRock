@@ -12,7 +12,7 @@ func TestConfigureSQLiteDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := configureSQLiteDB(db); err != nil {
 		t.Fatalf("configureSQLiteDB: %v", err)
@@ -37,25 +37,23 @@ func TestConfigureSQLiteDBConcurrentReads(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	if err := configureSQLiteDB(db); err != nil {
 		t.Fatalf("configureSQLiteDB: %v", err)
 	}
-	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY, n TEXT); DELETE FROM t; INSERT INTO t (n) VALUES ('ok');`); err != nil {
+	if _, err := db.ExecContext(t.Context(), `CREATE TABLE IF NOT EXISTS t (id INTEGER PRIMARY KEY, n TEXT); DELETE FROM t; INSERT INTO t (n) VALUES ('ok');`); err != nil {
 		t.Fatalf("schema: %v", err)
 	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < sqliteMaxOpenConns; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range sqliteMaxOpenConns {
+		wg.Go(func() {
 			var n string
 			if err := db.Get(&n, "SELECT n FROM t LIMIT 1"); err != nil {
 				t.Errorf("read: %v", err)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 }

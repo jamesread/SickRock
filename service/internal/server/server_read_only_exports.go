@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -23,7 +24,7 @@ func (s *SickRockServer) requireExportsManageForTable(ctx context.Context, tcNam
 		return nil
 	}
 	au := s.authUser(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
 	if au.RBAC != nil && (au.RBAC.IsSuperuser || au.RBAC.Has(exportsManagePermission)) {
@@ -37,13 +38,11 @@ func (s *SickRockServer) userCanViewReadOnlyCalendarExport(ctx context.Context, 
 		return false, nil
 	}
 	au := s.authUser(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return false, nil
 	}
-	if au.RBAC != nil && au.RBAC.IsSuperuser {
-		return true, nil
-	}
-	if au.RBAC != nil && au.RBAC.Has(exportsManagePermission) {
+	// Has is nil-safe and true for superusers.
+	if au.RBAC.Has(exportsManagePermission) {
 		return true, nil
 	}
 	if len(exp.AllowedGroupIDs) == 0 {
@@ -53,16 +52,7 @@ func (s *SickRockServer) userCanViewReadOnlyCalendarExport(ctx context.Context, 
 	if err != nil {
 		return false, err
 	}
-	allowed := map[int]bool{}
-	for _, id := range exp.AllowedGroupIDs {
-		allowed[id] = true
-	}
-	for _, gid := range groupIDs {
-		if allowed[gid] {
-			return true, nil
-		}
-	}
-	return false, nil
+	return slices.ContainsFunc(groupIDs, func(gid int) bool { return slices.Contains(exp.AllowedGroupIDs, gid) }), nil
 }
 
 func (s *SickRockServer) authorizeReadOnlyCalendarExport(ctx context.Context, exp *repo.ReadOnlyCalendarExport) error {
@@ -70,7 +60,7 @@ func (s *SickRockServer) authorizeReadOnlyCalendarExport(ctx context.Context, ex
 		return connect.NewError(connect.CodeNotFound, fmt.Errorf("export not found"))
 	}
 	au := s.authUser(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
 	ok, err := s.userCanViewReadOnlyCalendarExport(ctx, exp)
@@ -85,7 +75,7 @@ func (s *SickRockServer) authorizeReadOnlyCalendarExport(ctx context.Context, ex
 
 func (s *SickRockServer) ListAccessibleReadOnlyExports(ctx context.Context, _ *connect.Request[sickrockpb.ListAccessibleReadOnlyExportsRequest]) (*connect.Response[sickrockpb.ListAccessibleReadOnlyExportsResponse], error) {
 	au := s.authUser(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
 	all, err := s.repo.ListEnabledReadOnlyCalendarExports(ctx)
@@ -122,18 +112,12 @@ func (s *SickRockServer) GetReadOnlyCalendarExport(ctx context.Context, req *con
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("slug is required"))
 	}
 
-	exp, err := s.repo.GetReadOnlyCalendarExportBySlug(ctx, slug)
+	exp, err := s.enabledReadOnlyCalendarExport(ctx, slug)
 	if err != nil {
-		if strings.Contains(err.Error(), "not found") {
-			return nil, connect.NewError(connect.CodeNotFound, err)
-		}
 		return nil, err
 	}
-	if !exp.Enabled {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("export not found"))
-	}
 
-	if err := s.authorizeReadOnlyCalendarExport(ctx, exp); err != nil {
+	if err = s.authorizeReadOnlyCalendarExport(ctx, exp); err != nil {
 		return nil, err
 	}
 
@@ -160,7 +144,7 @@ func (s *SickRockServer) GetReadOnlyCalendarExport(ctx context.Context, req *con
 
 	var tableViewID int32
 	if exp.TableViewID.Valid {
-		tableViewID = int32(exp.TableViewID.Int64)
+		tableViewID = toInt32(exp.TableViewID.Int64)
 	}
 
 	return connect.NewResponse(&sickrockpb.GetReadOnlyCalendarExportResponse{
@@ -171,6 +155,21 @@ func (s *SickRockServer) GetReadOnlyCalendarExport(ctx context.Context, req *con
 		TableViewId:        tableViewID,
 		Items:              out,
 	}), nil
+}
+
+// enabledReadOnlyCalendarExport loads an export by slug, failing with NotFound when it is missing or disabled.
+func (s *SickRockServer) enabledReadOnlyCalendarExport(ctx context.Context, slug string) (*repo.ReadOnlyCalendarExport, error) {
+	exp, err := s.repo.GetReadOnlyCalendarExportBySlug(ctx, slug)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return nil, connect.NewError(connect.CodeNotFound, err)
+		}
+		return nil, err
+	}
+	if !exp.Enabled {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("export not found"))
+	}
+	return exp, nil
 }
 
 func repoItemToProto(it repo.Item, freeBusy bool) *sickrockpb.Item {

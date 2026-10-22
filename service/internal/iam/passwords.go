@@ -15,11 +15,15 @@ func VerifyPassword(storedHash, password string) (bool, error) {
 	if strings.HasPrefix(storedHash, "$argon2") {
 		return armpassword.Verify(storedHash, password)
 	}
-	if strings.HasPrefix(storedHash, "$2a$") || strings.HasPrefix(storedHash, "$2b$") || strings.HasPrefix(storedHash, "$2y$") {
+	if isBcryptHash(storedHash) {
 		err := bcrypt.CompareHashAndPassword([]byte(storedHash), []byte(password))
 		return err == nil, nil
 	}
 	return armpassword.Verify(storedHash, password)
+}
+
+func isBcryptHash(storedHash string) bool {
+	return strings.HasPrefix(storedHash, "$2a$") || strings.HasPrefix(storedHash, "$2b$") || strings.HasPrefix(storedHash, "$2y$")
 }
 
 // HashPassword stores new passwords with argon2id.

@@ -7,17 +7,17 @@ import (
 )
 
 type AuditLogEntry struct {
+	Details       map[string]string
 	EventType     string
 	Message       string
-	ActorUserID   int
 	ActorUsername string
 	RelatedUser   string
 	RelatedTC     string
 	RelatedRowID  string
 	IPAddress     string
 	UserAgent     string
+	ActorUserID   int
 	Success       bool
-	Details       map[string]string
 }
 
 func (r *Repository) InsertAuditLog(ctx context.Context, e AuditLogEntry) error {

@@ -139,10 +139,11 @@ The `ListItems` API automatically includes synthetic fields to enhance data anal
 
 SickRock runs **health checks** in the background (shortly after startup, then every `health_check_interval`, default `15m`, set via `SICKROCK_HEALTH_CHECK_INTERVAL` or `config.yaml`) and shows the issues they find to admins (`system.settings`) on **Control Panel → Health** (`/admin/health`), with an issue count on the sidebar's System → Health link. Issues are stored in `health_issues` (check runs in `health_check_runs`). A new warning or error sends the opt-in `health.issue_raised` notification event once.
 
-- **Adding a check:** implement `health.Check` (`ID()`, `Title()`, `Run(ctx) ([]health.Issue, error)`) in a new file in `service/internal/health/`, and add it to `DefaultChecks` in `checks.go`. Put database queries in `service/internal/repo/health_checks.go`.
+- **Engine:** the runner, issue store (`store/sqlstore`), logged-error hook (`errorlog`) and the generic checks (default admin password, risky settings) come from [`github.com/jamesread/armature-health`](https://github.com/jamesread/armature-health). `service/internal/health/` only holds SickRock's own checks and `DefaultChecks`; `server_health.go` maps the library's `Service` results to protobuf.
+- **Adding a check:** implement `armhealth.Check` (`ID()`, `Title()`, `Run(ctx) ([]armhealth.Issue, error)`) in a new file in `service/internal/health/`, and add it to `DefaultChecks` in `checks.go`. Put database queries in `service/internal/repo/health_checks.go`. Checks every app needs belong in armature-health instead.
 - **Issues:** `Key` must be stable for the same problem across runs (e.g. `nav:42`); an issue no longer returned is resolved, and one that recurs later is a new issue. Use `error` for things that break the app or security, `warning` for broken configuration, and `info` for advice; only warnings and errors are notified and counted. Set `Link` to the frontend path where it can be fixed.
 - **Failures:** a check that returns an error (or panics) is recorded as failed and keeps its previous issues.
-- **Logged errors:** a logrus hook (`health.ErrorLog`) groups error-level log lines by fingerprint for the `logs.recent_errors` check.
+- **Logged errors:** a logrus hook (`errorlog.ErrorLog` from armature-health) groups error-level log lines by fingerprint for the `logs.recent_errors` check.
 - **API:** `ListHealthIssues`, `GetHealthSummary`, `RunHealthChecks`, `AcknowledgeHealthIssue` (all require `system.settings`).
 
 ## MCP Server

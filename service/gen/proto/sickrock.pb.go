@@ -1688,20 +1688,22 @@ func (x *RssFieldMapping) GetColumn() string {
 }
 
 type RssCalendarFeed struct {
-	state                  protoimpl.MessageState `protogen:"open.v1"`
-	Id                     int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name                   string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	FeedUrl                string                 `protobuf:"bytes,3,opt,name=feed_url,json=feedUrl,proto3" json:"feed_url,omitempty"`
-	TableConfiguration     string                 `protobuf:"bytes,4,opt,name=table_configuration,json=tableConfiguration,proto3" json:"table_configuration,omitempty"`
-	FieldMappings          []*RssFieldMapping     `protobuf:"bytes,5,rep,name=field_mappings,json=fieldMappings,proto3" json:"field_mappings,omitempty"`
-	UniqueColumn           string                 `protobuf:"bytes,6,opt,name=unique_column,json=uniqueColumn,proto3" json:"unique_column,omitempty"`
-	RefreshIntervalMinutes int32                  `protobuf:"varint,7,opt,name=refresh_interval_minutes,json=refreshIntervalMinutes,proto3" json:"refresh_interval_minutes,omitempty"`
-	Enabled                bool                   `protobuf:"varint,8,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	LastRefreshAt          int64                  `protobuf:"varint,9,opt,name=last_refresh_at,json=lastRefreshAt,proto3" json:"last_refresh_at,omitempty"`
-	LastRefreshStatus      string                 `protobuf:"bytes,10,opt,name=last_refresh_status,json=lastRefreshStatus,proto3" json:"last_refresh_status,omitempty"`
-	LastRefreshMessage     string                 `protobuf:"bytes,11,opt,name=last_refresh_message,json=lastRefreshMessage,proto3" json:"last_refresh_message,omitempty"`
-	LastItemsCreated       int32                  `protobuf:"varint,12,opt,name=last_items_created,json=lastItemsCreated,proto3" json:"last_items_created,omitempty"`
-	LastItemsUpdated       int32                  `protobuf:"varint,13,opt,name=last_items_updated,json=lastItemsUpdated,proto3" json:"last_items_updated,omitempty"`
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 int32                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name               string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	FeedUrl            string                 `protobuf:"bytes,3,opt,name=feed_url,json=feedUrl,proto3" json:"feed_url,omitempty"`
+	TableConfiguration string                 `protobuf:"bytes,4,opt,name=table_configuration,json=tableConfiguration,proto3" json:"table_configuration,omitempty"`
+	FieldMappings      []*RssFieldMapping     `protobuf:"bytes,5,rep,name=field_mappings,json=fieldMappings,proto3" json:"field_mappings,omitempty"`
+	UniqueColumn       string                 `protobuf:"bytes,6,opt,name=unique_column,json=uniqueColumn,proto3" json:"unique_column,omitempty"`
+	// Optional table column that each imported event records this feed's id in.
+	FeedIdColumn           string `protobuf:"bytes,14,opt,name=feed_id_column,json=feedIdColumn,proto3" json:"feed_id_column,omitempty"`
+	RefreshIntervalMinutes int32  `protobuf:"varint,7,opt,name=refresh_interval_minutes,json=refreshIntervalMinutes,proto3" json:"refresh_interval_minutes,omitempty"`
+	Enabled                bool   `protobuf:"varint,8,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	LastRefreshAt          int64  `protobuf:"varint,9,opt,name=last_refresh_at,json=lastRefreshAt,proto3" json:"last_refresh_at,omitempty"`
+	LastRefreshStatus      string `protobuf:"bytes,10,opt,name=last_refresh_status,json=lastRefreshStatus,proto3" json:"last_refresh_status,omitempty"`
+	LastRefreshMessage     string `protobuf:"bytes,11,opt,name=last_refresh_message,json=lastRefreshMessage,proto3" json:"last_refresh_message,omitempty"`
+	LastItemsCreated       int32  `protobuf:"varint,12,opt,name=last_items_created,json=lastItemsCreated,proto3" json:"last_items_created,omitempty"`
+	LastItemsUpdated       int32  `protobuf:"varint,13,opt,name=last_items_updated,json=lastItemsUpdated,proto3" json:"last_items_updated,omitempty"`
 	unknownFields          protoimpl.UnknownFields
 	sizeCache              protoimpl.SizeCache
 }
@@ -1774,6 +1776,13 @@ func (x *RssCalendarFeed) GetFieldMappings() []*RssFieldMapping {
 func (x *RssCalendarFeed) GetUniqueColumn() string {
 	if x != nil {
 		return x.UniqueColumn
+	}
+	return ""
+}
+
+func (x *RssCalendarFeed) GetFeedIdColumn() string {
+	if x != nil {
+		return x.FeedIdColumn
 	}
 	return ""
 }
@@ -14327,14 +14336,15 @@ const file_sickrock_proto_rawDesc = "" +
 	"\aexports\x18\x01 \x03(\v2\x1f.sickrock.ReadOnlyExportSummaryR\aexports\"F\n" +
 	"\x0fRssFieldMapping\x12\x1b\n" +
 	"\trss_field\x18\x01 \x01(\tR\brssField\x12\x16\n" +
-	"\x06column\x18\x02 \x01(\tR\x06column\"\xa2\x04\n" +
+	"\x06column\x18\x02 \x01(\tR\x06column\"\xc8\x04\n" +
 	"\x0fRssCalendarFeed\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x05R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x19\n" +
 	"\bfeed_url\x18\x03 \x01(\tR\afeedUrl\x12/\n" +
 	"\x13table_configuration\x18\x04 \x01(\tR\x12tableConfiguration\x12@\n" +
 	"\x0efield_mappings\x18\x05 \x03(\v2\x19.sickrock.RssFieldMappingR\rfieldMappings\x12#\n" +
-	"\runique_column\x18\x06 \x01(\tR\funiqueColumn\x128\n" +
+	"\runique_column\x18\x06 \x01(\tR\funiqueColumn\x12$\n" +
+	"\x0efeed_id_column\x18\x0e \x01(\tR\ffeedIdColumn\x128\n" +
 	"\x18refresh_interval_minutes\x18\a \x01(\x05R\x16refreshIntervalMinutes\x12\x18\n" +
 	"\aenabled\x18\b \x01(\bR\aenabled\x12&\n" +
 	"\x0flast_refresh_at\x18\t \x01(\x03R\rlastRefreshAt\x12.\n" +

@@ -1,13 +1,16 @@
 package repo
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -34,10 +37,10 @@ func sanitizeDatabaseIdentifier(input string) string {
 }
 
 type Item struct {
-	ID        string                 `db:"id"`
-	SrCreated time.Time              `db:"sr_created"`
-	SrUpdated time.Time              `db:"sr_updated"`
-	Fields    map[string]interface{} `db:"-"` // All dynamic fields including name
+	SrCreated time.Time      `db:"sr_created"`
+	SrUpdated time.Time      `db:"sr_updated"`
+	Fields    map[string]any `db:"-"`
+	ID        string         `db:"id"`
 }
 
 type Repository struct {
@@ -51,8 +54,8 @@ func (r *Repository) DB() *sqlx.DB {
 
 // Dashboard represents a row in table_dashboards
 type Dashboard struct {
-	ID   int    `db:"id"`
 	Name string `db:"name"`
+	ID   int    `db:"id"`
 }
 
 // CreateDashboard inserts a dashboard and optionally a navigation entry. Returns the new dashboard id.
@@ -80,15 +83,20 @@ func (r *Repository) CreateDashboard(ctx context.Context, name string, createNav
 	}
 
 	if createNavigation {
-		navQuery := "INSERT INTO table_navigation (ordinal, dashboard_id, name) VALUES (99, ?, ?)"
-		if _, err := r.db.ExecContext(ctx, navQuery, dashboardID, name); err != nil {
-			log.Warnf("Failed to create navigation entry for dashboard %s: %v", name, err)
-		} else {
-			log.Infof("Created navigation entry for dashboard: %s", name)
-		}
+		r.createDashboardNavigation(ctx, dashboardID, name)
 	}
 
 	return int(dashboardID), nil
+}
+
+// createDashboardNavigation adds a sidebar link for a new dashboard; failures are logged, not returned.
+func (r *Repository) createDashboardNavigation(ctx context.Context, dashboardID int64, name string) {
+	navQuery := "INSERT INTO table_navigation (ordinal, dashboard_id, name) VALUES (99, ?, ?)"
+	if _, err := r.db.ExecContext(ctx, navQuery, dashboardID, name); err != nil {
+		log.Warnf("Failed to create navigation entry for dashboard %s: %v", name, err)
+		return
+	}
+	log.Infof("Created navigation entry for dashboard: %s", name)
 }
 
 // ListDashboards returns all dashboards
@@ -97,7 +105,7 @@ func (r *Repository) ListDashboards(ctx context.Context) ([]Dashboard, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	dashboards := make([]Dashboard, 0, 8)
 	for rows.Next() {
@@ -111,12 +119,12 @@ func (r *Repository) ListDashboards(ctx context.Context) ([]Dashboard, error) {
 }
 
 type DashboardComponent struct {
-	ID         int            `db:"id"`
 	Name       string         `db:"name"`
-	TcID       sql.NullInt32  `db:"tc_id"`
 	QueryType  sql.NullString `db:"query_type"`
 	ColumnName sql.NullString `db:"column_name"`
 	Formula    sql.NullString `db:"formula"`
+	ID         int            `db:"id"`
+	TcID       sql.NullInt32  `db:"tc_id"`
 }
 
 // ListDashboardComponents returns components for a given dashboard id
@@ -125,7 +133,7 @@ func (r *Repository) ListDashboardComponents(ctx context.Context, dashboardID in
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make([]DashboardComponent, 0, 8)
 	for rows.Next() {
 		var c DashboardComponent
@@ -139,11 +147,11 @@ func (r *Repository) ListDashboardComponents(ctx context.Context, dashboardID in
 
 // DashboardComponentRule represents a rule for a dashboard component
 type DashboardComponentRule struct {
+	Operation string `db:"operation"`
+	Operand   string `db:"operand"`
 	ID        int    `db:"id"`
 	Component int    `db:"dashboard_component"`
 	Ordinal   int    `db:"ordinal"`
-	Operation string `db:"operation"`
-	Operand   string `db:"operand"`
 }
 
 // GetDashboardComponentRules lists rules, optionally filtered by component id
@@ -160,8 +168,11 @@ func (r *Repository) GetDashboardComponentRules(ctx context.Context, component *
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+	return scanDashboardComponentRules(rows)
+}
 
+func scanDashboardComponentRules(rows *sqlx.Rows) ([]DashboardComponentRule, error) {
 	rules := make([]DashboardComponentRule, 0, 8)
 	for rows.Next() {
 		var rle DashboardComponentRule
@@ -193,7 +204,6 @@ func NewRepository(db *sqlx.DB) *Repository {
 type TableConfig struct {
 	Name              string
 	Title             string         `db:"title"`
-	Ordinal           int            `db:"ordinal"`
 	Icon              sql.NullString `db:"icon"`
 	CreateButtonText  sql.NullString `db:"create_button_text"`
 	CreateDelegate    sql.NullString `db:"create_delegate"`
@@ -203,6 +213,7 @@ type TableConfig struct {
 	Db                sql.NullString `db:"db"`
 	PrimaryKeyColumn  sql.NullString `db:"primary_key_column"`
 	DefaultSortColumn sql.NullString `db:"default_sort_column"`
+	Ordinal           int            `db:"ordinal"`
 }
 
 func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, error) {
@@ -224,7 +235,7 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var configs []TableConfig
 	for rows.Next() {
 		var config TableConfig
@@ -237,19 +248,19 @@ func (r *Repository) ListTableConfigurationsWithDetails(ctx context.Context) ([]
 }
 
 type NavigationItem struct {
-	ID                 int
-	Ordinal            int
-	TableConfiguration sql.NullInt64
+	TableView          sql.NullString
 	TableName          sql.NullString
 	TableTitle         sql.NullString
 	Icon               sql.NullString
-	TableView          sql.NullString
-	DashboardID        sql.NullInt64
 	DashboardName      sql.NullString
 	Navigation         sql.NullString
 	TitleOverride      sql.NullString
-	WorkflowID         sql.NullInt64
 	WorkflowName       sql.NullString
+	TableConfiguration sql.NullInt64
+	DashboardID        sql.NullInt64
+	WorkflowID         sql.NullInt64
+	Ordinal            int
+	ID                 int
 }
 
 func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error) {
@@ -278,7 +289,7 @@ func (r *Repository) GetNavigation(ctx context.Context) ([]NavigationItem, error
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []NavigationItem
 	for rows.Next() {
@@ -342,7 +353,7 @@ func (r *Repository) GetNavigationItemsForWorkflowMembership(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	result := make(map[int][]NavigationItem)
 	for rows.Next() {
@@ -380,40 +391,30 @@ func (r *Repository) SetWorkflowNavigationMembers(ctx context.Context, workflowI
 		return fmt.Errorf("workflow_id is required")
 	}
 
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_navigation_members WHERE workflow_id = ?", workflowID); err != nil {
-		return fmt.Errorf("clear workflow members: %w", err)
-	}
-
-	for _, m := range members {
-		if m.NavigationItemID <= 0 {
-			continue
+	return r.inTx(ctx, func(tx *sqlx.Tx) error {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_navigation_members WHERE workflow_id = ?", workflowID); err != nil {
+			return fmt.Errorf("clear workflow members: %w", err)
 		}
-		ord := m.Ordinal
-		if ord <= 0 {
-			ord = 99
+		for _, m := range members {
+			if m.NavigationItemID <= 0 {
+				continue
+			}
+			if _, err := tx.ExecContext(ctx,
+				"INSERT INTO workflow_navigation_members (workflow_id, navigation_item_id, ordinal) VALUES (?, ?, ?)",
+				workflowID, m.NavigationItemID, cmp.Or(max(m.Ordinal, 0), 99),
+			); err != nil {
+				return fmt.Errorf("insert workflow member: %w", err)
+			}
 		}
-		if _, err := tx.ExecContext(ctx,
-			"INSERT INTO workflow_navigation_members (workflow_id, navigation_item_id, ordinal) VALUES (?, ?, ?)",
-			workflowID, m.NavigationItemID, ord,
-		); err != nil {
-			return fmt.Errorf("insert workflow member: %w", err)
-		}
-	}
-
-	return tx.Commit()
+		return nil
+	})
 }
 
 type Workflow struct {
-	ID      int
 	Name    string
-	Ordinal int
 	Icon    sql.NullString
+	ID      int
+	Ordinal int
 }
 
 func (r *Repository) GetWorkflows(ctx context.Context) ([]Workflow, error) {
@@ -431,7 +432,7 @@ func (r *Repository) GetWorkflows(ctx context.Context) ([]Workflow, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var workflows []Workflow
 	for rows.Next() {
@@ -451,10 +452,10 @@ func (r *Repository) GetWorkflows(ctx context.Context) ([]Workflow, error) {
 }
 
 type User struct {
-	ID           int
 	Username     string
 	Password     string
 	InitialRoute string
+	ID           int
 }
 
 func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*User, error) {
@@ -463,7 +464,7 @@ func (r *Repository) GetUserByUsername(ctx context.Context, username string) (*U
 	var user User
 	err := r.db.QueryRowxContext(ctx, query, username).Scan(&user.ID, &user.Username, &user.Password, &user.InitialRoute)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // User not found
 		}
 		return nil, err
@@ -479,7 +480,7 @@ func (r *Repository) GetUserByID(ctx context.Context, userID int) (*User, error)
 	var user User
 	err := r.db.QueryRowxContext(ctx, query, userID).Scan(&user.ID, &user.Username, &user.Password, &user.InitialRoute)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // User not found
 		}
 		return nil, err
@@ -507,26 +508,22 @@ func (r *Repository) CreateDefaultAdminUser(ctx context.Context) error {
 		return err
 	}
 	if existingUser != nil {
-		// Admin user already exists, nothing to do
 		log.Debug("Admin user already exists, skipping creation")
 		return nil
 	}
+	return r.insertDefaultAdminUser(ctx)
+}
 
+func (r *Repository) insertDefaultAdminUser(ctx context.Context) error {
 	log.Info("Creating default admin user")
-
-	// Hash the password "admin"
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
-
-	// Insert the admin user
 	query := "INSERT INTO table_users (username, password, initial_route) VALUES (?, ?, ?)"
-	_, err = r.db.ExecContext(ctx, query, "admin", string(hashedPassword), "/")
-	if err != nil {
+	if _, err = r.db.ExecContext(ctx, query, "admin", string(hashedPassword), "/"); err != nil {
 		return err
 	}
-
 	log.Info("Default admin user created successfully")
 	return nil
 }
@@ -553,14 +550,14 @@ func (r *Repository) UpdateUserPassword(ctx context.Context, username, newPasswo
 }
 
 type Session struct {
-	ID           int
-	SessionID    string
-	Username     string
 	CreatedAt    time.Time
 	ExpiresAt    time.Time
 	LastAccessed time.Time
+	SessionID    string
+	Username     string
 	UserAgent    sql.NullString
 	IPAddress    sql.NullString
+	ID           int
 }
 
 func (r *Repository) CreateSession(ctx context.Context, sessionID, username string, expiresAt time.Time, userAgent, ipAddress string) error {
@@ -591,7 +588,7 @@ func (r *Repository) GetSession(ctx context.Context, sessionID string) (*Session
 		&session.IPAddress,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // Session not found or expired
 		}
 		return nil, err
@@ -620,7 +617,7 @@ func (r *Repository) GetSessionByUsername(ctx context.Context, username string) 
 		&session.IPAddress,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // Session not found
 		}
 		return nil, err
@@ -669,12 +666,12 @@ func (r *Repository) CleanupExpiredSessions(ctx context.Context) error {
 }
 
 type DeviceCode struct {
-	ID        int
-	Code      string
 	CreatedAt time.Time
 	ExpiresAt time.Time
-	ClaimedBy sql.NullString
 	ClaimedAt sql.NullTime
+	Code      string
+	ClaimedBy sql.NullString
+	ID        int
 }
 
 func (r *Repository) CreateDeviceCode(ctx context.Context, code string, expiresAt time.Time) error {
@@ -700,7 +697,7 @@ func (r *Repository) GetDeviceCode(ctx context.Context, code string) (*DeviceCod
 		&deviceCode.ClaimedAt,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil // Device code not found or expired
 		}
 		return nil, err
@@ -761,38 +758,8 @@ func (r *Repository) GenerateDeviceCode() (string, error) {
 func (r *Repository) AddColumn(ctx context.Context, db, table string, field FieldSpec) error {
 	t := sanitizeDatabaseIdentifier(table)
 	col := sanitizeDatabaseIdentifier(field.Name)
-	typ := "TEXT"
-	defaultClause := ""
-
-	switch field.Type {
-	case "int64", "user_ref":
-		typ = "BIGINT"
-	case "string":
-		typ = "TEXT"
-	case "tinyint":
-		if r.db.DriverName() == "mysql" {
-			typ = "TINYINT(1)"
-		} else {
-			typ = "INTEGER"
-		}
-	case "datetime":
-		// Use native SQL datetime format
-		if r.db.DriverName() == "mysql" {
-			typ = "DATETIME"
-			if field.DefaultToCurrentTimestamp {
-				defaultClause = " DEFAULT CURRENT_TIMESTAMP"
-			}
-		} else {
-			// Declare DATETIME so the column is reported as a datetime.
-			// ISO-8601 values are not integer literals, so SQLite still stores them as text.
-			typ = "DATETIME"
-			if field.DefaultToCurrentTimestamp {
-				defaultClause = " DEFAULT (datetime('now'))"
-			}
-		}
-	default:
-		typ = "TEXT"
-	}
+	isMySQL := r.db.DriverName() == "mysql"
+	typ, defaultClause := addColumnSQLType(field, isMySQL)
 
 	notNull := ""
 	if field.Required {
@@ -800,13 +767,43 @@ func (r *Repository) AddColumn(ctx context.Context, db, table string, field Fiel
 	}
 
 	var query string
-	if r.db.DriverName() == "mysql" {
+	if isMySQL {
 		query = fmt.Sprintf("ALTER TABLE %s.%s ADD COLUMN %s %s%s%s", db, t, col, typ, notNull, defaultClause)
 	} else {
 		query = fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s%s%s", t, col, typ, notNull, defaultClause)
 	}
 	_, err := r.db.ExecContext(ctx, query)
 	return err
+}
+
+// addColumnSQLType returns the SQL column type and DEFAULT clause for a new field.
+func addColumnSQLType(field FieldSpec, isMySQL bool) (typ, defaultClause string) {
+	switch field.Type {
+	case "int64", "user_ref":
+		return "BIGINT", ""
+	case "tinyint":
+		if isMySQL {
+			return "TINYINT(1)", ""
+		}
+		return "INTEGER", ""
+	case "datetime":
+		// Declare DATETIME on SQLite too so the column is reported as a datetime.
+		// ISO-8601 values are not integer literals, so SQLite still stores them as text.
+		return "DATETIME", datetimeDefaultClause(field.DefaultToCurrentTimestamp, isMySQL)
+	default: // including "string"
+		return "TEXT", ""
+	}
+}
+
+func datetimeDefaultClause(defaultToNow, isMySQL bool) string {
+	switch {
+	case !defaultToNow:
+		return ""
+	case isMySQL:
+		return " DEFAULT CURRENT_TIMESTAMP"
+	default:
+		return " DEFAULT (datetime('now'))"
+	}
 }
 
 type FieldSpec struct {
@@ -831,65 +828,31 @@ func (r *Repository) ListItemsInTable(ctx context.Context, tcName string, where 
 		return nil, fmt.Errorf("failed to get columns for table %s: %w", tcName, err)
 	}
 
-	// Build dynamic SELECT query with all columns
-	columnNames := make([]string, 0, len(columns))
-	for _, col := range columns {
-		columnNames = append(columnNames, col.Name)
-	}
-
+	columnNames := fieldSpecNames(columns)
 	log.Debugf("ListItems columnNames: %v", columnNames)
 
-	sortColumn := tc.SortColumnName(columnNames)
-	pkColumn := tc.PrimaryKeyColumnName()
+	// If a filter value contains '%' it is a LIKE pattern for server-assisted contains search.
+	whereClause, args := exportWhereClause(where)
 
-	// Build WHERE clause from provided filters.
-	// If a value contains '%' we treat it as a LIKE pattern for server-assisted contains search.
-	var whereClause string
-	var args []interface{}
-	if len(where) > 0 {
-		parts := make([]string, 0, len(where))
-		for k, v := range where {
-			col := sanitizeDatabaseIdentifier(k)
-			if strings.Contains(v, "%") {
-				parts = append(parts, fmt.Sprintf("`%s` LIKE ?", col))
-				args = append(args, v)
-			} else {
-				parts = append(parts, fmt.Sprintf("`%s` = ?", col))
-				args = append(args, v)
-			}
-		}
-		whereClause = " WHERE " + strings.Join(parts, " AND ")
-	}
-
-	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s`%s ORDER BY `%s` DESC", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, whereClause, sortColumn)
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s`%s ORDER BY `%s` DESC", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, whereClause, tc.SortColumnName(columnNames))
 	log.Debugf("ListItems SQL Query: %s db:%v tbl:%v", query, tc.Db, tc.Table)
 
-	// Use QueryxContext to get raw rows and manually map them
-	rows, err := r.db.QueryxContext(ctx, query, args...)
+	items, err := r.queryItems(ctx, query, args, tc.PrimaryKeyColumnName())
 	if err != nil {
 		log.Errorf("Failed to list items in table %s: %v", tcName, err)
 		return nil, err
 	}
-	defer rows.Close()
-
-	// rows iteration follows
-
-	var items []Item
-	for rows.Next() {
-		// Get the row as a map
-		rowMap := make(map[string]interface{})
-		if err := rows.MapScan(rowMap); err != nil {
-			log.Errorf("Failed to map scan row: %v", err)
-			return nil, err
-		}
-
-		item := scanRowToItem(rowMap, pkColumn)
-		items = append(items, item)
-	}
 
 	log.Debugf("ListItems: %d items found", len(items))
+	return items, nil
+}
 
-	return items, rows.Err()
+func fieldSpecNames(columns []FieldSpec) []string {
+	names := make([]string, 0, len(columns))
+	for _, col := range columns {
+		names = append(names, col.Name)
+	}
+	return names
 }
 
 func (r *Repository) CreateItemInTable(ctx context.Context, table string, additionalFields map[string]string) (Item, error) {
@@ -908,63 +871,7 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
 	}
 
-	hasSrCreated := false
-	hasSrUpdated := false
-	for _, col := range columns {
-		if col.Name == "sr_created" {
-			hasSrCreated = true
-		}
-		if col.Name == "sr_updated" {
-			hasSrUpdated = true
-		}
-	}
-
-	// Build dynamic INSERT query
-	insertColumns := []string{}
-	placeholders := []string{}
-	values := []interface{}{}
-
-	nowExpr := r.sqlCurrentTimestampExpr()
-
-	// Add sr_created if the column exists
-	if hasSrCreated {
-		insertColumns = append(insertColumns, "`sr_created`")
-		placeholders = append(placeholders, nowExpr)
-	}
-
-	// Add sr_updated if the column exists (set to same value as sr_created)
-	if hasSrUpdated {
-		insertColumns = append(insertColumns, "`sr_updated`")
-		placeholders = append(placeholders, nowExpr)
-	}
-
-	// Add additional fields
-	columnByName := make(map[string]FieldSpec, len(columns))
-	for _, col := range columns {
-		columnByName[col.Name] = col
-	}
-	for key, value := range additionalFields {
-		if IsRelationSyntheticColumn(key) {
-			continue
-		}
-		col, ok := columnByName[key]
-		if !ok {
-			for name, spec := range columnByName {
-				if strings.EqualFold(name, key) {
-					col = spec
-					ok = true
-					key = name
-					break
-				}
-			}
-		}
-		if !ok {
-			continue
-		}
-		insertColumns = append(insertColumns, fmt.Sprintf("`%s`", col.Name))
-		placeholders = append(placeholders, "?")
-		values = append(values, value)
-	}
+	insertColumns, placeholders, values := itemInsertColumns(columns, additionalFields, r.sqlCurrentTimestampExpr())
 
 	query := fmt.Sprintf("INSERT INTO %s.%s (%s) VALUES (%s)", tc.Db.String, tc.Table.String, strings.Join(insertColumns, ", "), strings.Join(placeholders, ", "))
 	// Log the SQL used (without parameter values)
@@ -988,6 +895,46 @@ func (r *Repository) CreateItemInTableWithTimestamp(ctx context.Context, table s
 	return createdItem, nil
 }
 
+// itemInsertColumns builds the column list, placeholders and values for inserting an item: sr_created
+// and sr_updated set to nowExpr when those columns exist, plus every additional field naming a real column.
+func itemInsertColumns(columns []FieldSpec, additionalFields map[string]string, nowExpr string) (insertColumns, placeholders []string, values []any) {
+	for _, tsColumn := range []string{"sr_created", "sr_updated"} {
+		if hasColumn(columns, tsColumn) {
+			insertColumns = append(insertColumns, "`"+tsColumn+"`")
+			placeholders = append(placeholders, nowExpr)
+		}
+	}
+	for key, value := range additionalFields {
+		col := writableColumn(columns, key)
+		if col == nil {
+			continue
+		}
+		insertColumns = append(insertColumns, fmt.Sprintf("`%s`", col.Name))
+		placeholders = append(placeholders, "?")
+		values = append(values, value)
+	}
+	return insertColumns, placeholders, values
+}
+
+func hasColumn(columns []FieldSpec, name string) bool {
+	return slices.ContainsFunc(columns, func(c FieldSpec) bool { return c.Name == name })
+}
+
+// writableColumn returns the column a submitted field name refers to (exact match first, then
+// case-insensitive), or nil for relation synthetic columns and unknown names.
+func writableColumn(columns []FieldSpec, fieldName string) *FieldSpec {
+	if IsRelationSyntheticColumn(fieldName) {
+		return nil
+	}
+	if i := slices.IndexFunc(columns, func(c FieldSpec) bool { return c.Name == fieldName }); i >= 0 {
+		return &columns[i]
+	}
+	if i := slices.IndexFunc(columns, func(c FieldSpec) bool { return strings.EqualFold(c.Name, fieldName) }); i >= 0 {
+		return &columns[i]
+	}
+	return nil
+}
+
 func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
 	log.Infof("GetLastItem: %d", tcID)
 	tc, err := r.GetTableConfigurationByID(ctx, tcID)
@@ -1002,43 +949,39 @@ func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
 		return Item{}, fmt.Errorf("failed to get columns for table %d: %w", tcID, err)
 	}
 
-	// Build dynamic SELECT query with all columns
-	columnNames := make([]string, 0, len(columns))
-	for _, col := range columns {
-		columnNames = append(columnNames, col.Name)
-	}
-
-	sortColumn := tc.SortColumnName(columnNames)
-	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `%s` DESC LIMIT 1", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, sortColumn)
+	columnNames := fieldSpecNames(columns)
+	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `%s` DESC LIMIT 1", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, tc.SortColumnName(columnNames))
 	log.Debugf("GetLastItem SQL Query: %s db:%v tbl:%v", query, tc.Db.String, tc.Table.String)
 	rows, err := r.db.QueryxContext(ctx, query)
 	if err != nil {
 		return Item{}, fmt.Errorf("failed to get last item for table %d: %w", tcID, err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if !rows.Next() {
 		return Item{}, fmt.Errorf("no items found for table %d", tcID)
 	}
 
-	item := Item{
-		Fields: make(map[string]interface{}),
-	}
-
-	rowMap := make(map[string]interface{})
+	rowMap := make(map[string]any)
 	if err := rows.MapScan(rowMap); err != nil {
 		return Item{}, fmt.Errorf("failed to scan last item for table %d: %w", tcID, err)
 	}
 
+	// Unlike scanRowToItem, every column (including the key and timestamps) stays in Fields.
+	item := Item{Fields: make(map[string]any, len(rowMap))}
 	for colName, value := range rowMap {
-		if valueBytes, ok := value.([]uint8); ok {
-			item.Fields[colName] = string(valueBytes)
-		} else {
-			item.Fields[colName] = value
-		}
+		item.Fields[colName] = bytesToString(value)
 	}
 
 	return item, rows.Err()
+}
+
+// bytesToString converts a scanned []byte column value to a string, leaving other values unchanged.
+func bytesToString(value any) any {
+	if valueBytes, ok := value.([]uint8); ok {
+		return string(valueBytes)
+	}
+	return value
 }
 
 func (r *Repository) GetItemInTable(ctx context.Context, tc *TableConfig, id string) (Item, error) {
@@ -1062,14 +1005,14 @@ func (r *Repository) GetItemInTable(ctx context.Context, tc *TableConfig, id str
 	if err != nil {
 		return Item{}, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	if !rows.Next() {
 		return Item{}, fmt.Errorf("item not found")
 	}
 
 	// Get the row as a map
-	rowMap := make(map[string]interface{})
+	rowMap := make(map[string]any)
 	if err := rows.MapScan(rowMap); err != nil {
 		return Item{}, err
 	}
@@ -1090,73 +1033,7 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 		return Item{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
 	}
 
-	hasSrUpdated := false
-	hasName := false
-	for _, col := range columns {
-		if col.Name == "sr_updated" {
-			hasSrUpdated = true
-		}
-		if col.Name == "name" {
-			hasName = true
-		}
-	}
-
-	// Build dynamic UPDATE query
-	setParts := []string{}
-	args := []interface{}{}
-
-	// Add name field if the column exists and name is provided
-	if hasName && name != "" {
-		setParts = append(setParts, "`name` = ?")
-		args = append(args, name)
-	}
-
-	// Add sr_updated if the column exists
-	if hasSrUpdated {
-		setParts = append(setParts, fmt.Sprintf("`sr_updated` = %s", r.sqlCurrentTimestampExpr()))
-	}
-
-	for fieldName, fieldValue := range additionalFields {
-		if IsRelationSyntheticColumn(fieldName) {
-			continue
-		}
-
-		var col *FieldSpec
-		for i := range columns {
-			if columns[i].Name == fieldName {
-				col = &columns[i]
-				break
-			}
-			if strings.EqualFold(columns[i].Name, fieldName) {
-				col = &columns[i]
-				break
-			}
-		}
-		if col == nil {
-			continue
-		}
-
-		// Sanitize field name to prevent SQL injection
-		sanitizedFieldName := sanitizeDatabaseIdentifier(fieldName)
-
-		// Check if this field is nullable and if the value is empty or "0"
-		// If so, set it to NULL instead of the empty string
-		shouldSetNull := false
-
-		// Nullable FK ints on navigation (explicit names for reliable clears from the UI)
-		if (fieldName == "workflow_id" || fieldName == "dashboard_id") && (fieldValue == "" || fieldValue == "0") {
-			shouldSetNull = true
-		} else if !col.Required && (fieldValue == "" || fieldValue == "0") {
-			shouldSetNull = true
-		}
-
-		if shouldSetNull {
-			setParts = append(setParts, fmt.Sprintf("`%s` = NULL", sanitizedFieldName))
-		} else {
-			setParts = append(setParts, fmt.Sprintf("`%s` = ?", sanitizedFieldName))
-			args = append(args, fieldValue)
-		}
-	}
+	setParts, args := itemUpdateSet(columns, name, additionalFields, r.sqlCurrentTimestampExpr())
 
 	// Ensure we have at least one field to update
 	if len(setParts) == 0 {
@@ -1175,6 +1052,44 @@ func (r *Repository) EditItemInTableWithFields(ctx context.Context, table string
 	}
 
 	return r.GetItemInTable(ctx, tc, id)
+}
+
+// itemUpdateSet builds the SET clauses and arguments for updating an item: name when that column
+// exists and a name is given, sr_updated set to nowExpr when that column exists, and every additional
+// field naming a real column.
+func itemUpdateSet(columns []FieldSpec, name string, additionalFields map[string]string, nowExpr string) (setParts []string, args []any) {
+	if hasColumn(columns, "name") && name != "" {
+		setParts = append(setParts, "`name` = ?")
+		args = append(args, name)
+	}
+	if hasColumn(columns, "sr_updated") {
+		setParts = append(setParts, fmt.Sprintf("`sr_updated` = %s", nowExpr))
+	}
+	for fieldName, fieldValue := range additionalFields {
+		col := writableColumn(columns, fieldName)
+		if col == nil {
+			continue
+		}
+		// Sanitize field name to prevent SQL injection
+		sanitizedFieldName := sanitizeDatabaseIdentifier(fieldName)
+		if updateClearsToNull(col, fieldName, fieldValue) {
+			setParts = append(setParts, fmt.Sprintf("`%s` = NULL", sanitizedFieldName))
+		} else {
+			setParts = append(setParts, fmt.Sprintf("`%s` = ?", sanitizedFieldName))
+			args = append(args, fieldValue)
+		}
+	}
+	return setParts, args
+}
+
+// updateClearsToNull reports whether an empty or "0" value should be stored as NULL instead: for
+// nullable columns, and always for the navigation workflow_id/dashboard_id FKs (explicit names for
+// reliable clears from the UI).
+func updateClearsToNull(col *FieldSpec, fieldName, fieldValue string) bool {
+	if fieldValue != "" && fieldValue != "0" {
+		return false
+	}
+	return fieldName == "workflow_id" || fieldName == "dashboard_id" || !col.Required
 }
 
 func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id string) (bool, error) {
@@ -1196,24 +1111,8 @@ func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id str
 // ConnectDatabase returns a database connection using MySQL if DB_HOST is set,
 // otherwise falls back to sqlite using the provided defaultSQLiteDSN.
 func ConnectDatabase(defaultSQLiteDSN string) (*sqlx.DB, error) {
-	host := os.Getenv("DB_HOST")
-	if host != "" {
-		port := os.Getenv("DB_PORT")
-		if port == "" {
-			port = "3306"
-		}
-		user := os.Getenv("DB_USER")
-		pass := os.Getenv("DB_PASS")
-		name := os.Getenv("DB_NAME")
-
-		log.Infof("DB_HOST: %s", host)
-		log.Infof("DB_PORT: %s", port)
-		log.Infof("DB_USER: %s", user)
-		log.Infof("DB_PASS: %s", redact.RedactString(pass))
-		log.Infof("DB_NAME: %s", name)
-
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true", user, pass, host, port, name)
-		return sqlx.Open("mysql", dsn)
+	if host := os.Getenv("DB_HOST"); host != "" {
+		return openMySQLFromEnv(host)
 	}
 
 	db, err := sqlx.Open("sqlite", defaultSQLiteDSN)
@@ -1221,10 +1120,27 @@ func ConnectDatabase(defaultSQLiteDSN string) (*sqlx.DB, error) {
 		return nil, err
 	}
 	if err := configureSQLiteDB(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, err
 	}
 	return db, nil
+}
+
+func openMySQLFromEnv(host string) (*sqlx.DB, error) {
+	port := os.Getenv("DB_PORT")
+	if port == "" {
+		port = "3306"
+	}
+	user := os.Getenv("DB_USER")
+	pass := os.Getenv("DB_PASS")
+	name := os.Getenv("DB_NAME")
+	log.Infof("DB_HOST: %s", host)
+	log.Infof("DB_PORT: %s", port)
+	log.Infof("DB_USER: %s", user)
+	log.Infof("DB_PASS: %s", redact.RedactString(pass))
+	log.Infof("DB_NAME: %s", name)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&multiStatements=true", user, pass, host, port, name)
+	return sqlx.Open("mysql", dsn)
 }
 
 // sqliteMaxOpenConns allows concurrent readers under WAL. A pool of one serializes every
@@ -1245,7 +1161,7 @@ func configureSQLiteDB(db *sqlx.DB) error {
 		"PRAGMA synchronous = NORMAL",
 	}
 	for _, pragma := range pragmas {
-		if _, err := db.Exec(pragma); err != nil {
+		if _, err := db.ExecContext(context.Background(), pragma); err != nil {
 			return fmt.Errorf("%s: %w", pragma, err)
 		}
 	}
@@ -1274,11 +1190,11 @@ func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldS
 		}
 	default: // sqlite
 		type srow struct {
-			Cid       int     `db:"cid"`
+			DfltValue *string `db:"dflt_value"`
 			Name      string  `db:"name"`
 			Type      string  `db:"type"`
+			Cid       int     `db:"cid"`
 			NotNull   int     `db:"notnull"`
-			DfltValue *string `db:"dflt_value"`
 			PK        int     `db:"pk"`
 		}
 		var rows []srow
@@ -1310,8 +1226,8 @@ func (r *Repository) GetTableConfigurationByID(ctx context.Context, tcID int) (*
 // DatabaseTableInfo contains information about a table and its configuration status
 type DatabaseTableInfo struct {
 	TableName         string         `db:"table_name"`
-	HasConfiguration  bool           `db:"has_configuration"`
 	ConfigurationName sql.NullString `db:"configuration_name"`
+	HasConfiguration  bool           `db:"has_configuration"`
 }
 
 // GetDatabaseTables returns all tables in the specified database with their configuration status
@@ -1370,9 +1286,7 @@ func (r *Repository) CreateTable(ctx context.Context, database, table string) er
 		"table":    table,
 	}).Infof("Creating physical table")
 
-	if database == "" {
-		database = "main"
-	}
+	database = cmp.Or(database, "main")
 
 	if table == "" {
 		return fmt.Errorf("table name is required")
@@ -1380,45 +1294,47 @@ func (r *Repository) CreateTable(ctx context.Context, database, table string) er
 
 	t := sanitizeDatabaseIdentifier(table)
 
-	// Check if table already exists
-	var exists int
-	var err error
-	if r.db.DriverName() == "mysql" {
-		checkQuery := "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?"
-		err = r.db.GetContext(ctx, &exists, checkQuery, database, t)
-	} else {
-		// SQLite
-		checkQuery := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?"
-		err = r.db.GetContext(ctx, &exists, checkQuery, t)
-	}
+	exists, err := r.physicalTableExists(ctx, database, t)
 	if err != nil {
 		return fmt.Errorf("failed to check if table exists: %w", err)
 	}
-	if exists > 0 {
+	if exists {
 		return fmt.Errorf("table '%s' already exists in database '%s'", t, database)
 	}
 
-	// Create table with id, sr_created, and sr_updated columns
-	var createQuery string
-	if r.db.DriverName() == "mysql" {
-		createQuery = fmt.Sprintf(
-			"CREATE TABLE %s.%s (id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, sr_created DATETIME DEFAULT CURRENT_TIMESTAMP, sr_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
-			database, t)
-	} else {
-		// SQLite - doesn't support database qualifiers in CREATE TABLE
-		createQuery = fmt.Sprintf(
-			"CREATE TABLE %s (id INTEGER PRIMARY KEY AUTOINCREMENT, sr_created TEXT DEFAULT (datetime('now')), sr_updated TEXT DEFAULT (datetime('now')))",
-			t)
-	}
-
-	_, err = r.db.ExecContext(ctx, createQuery)
-	if err != nil {
+	if _, err = r.db.ExecContext(ctx, r.createTableSQL(database, t)); err != nil {
 		log.Errorf("Failed to create table: %v", err)
 		return fmt.Errorf("failed to create table: %w", err)
 	}
 
 	log.Infof("Created physical table: %s.%s", database, t)
 	return nil
+}
+
+func (r *Repository) physicalTableExists(ctx context.Context, database, table string) (bool, error) {
+	var exists int
+	var err error
+	if r.db.DriverName() == "mysql" {
+		checkQuery := "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?"
+		err = r.db.GetContext(ctx, &exists, checkQuery, database, table)
+	} else {
+		checkQuery := "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=?"
+		err = r.db.GetContext(ctx, &exists, checkQuery, table)
+	}
+	return exists > 0, err
+}
+
+// createTableSQL returns the DDL for a new table with id, sr_created and sr_updated columns.
+func (r *Repository) createTableSQL(database, table string) string {
+	if r.db.DriverName() == "mysql" {
+		return fmt.Sprintf(
+			"CREATE TABLE %s.%s (id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY, sr_created DATETIME DEFAULT CURRENT_TIMESTAMP, sr_updated DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)",
+			database, table)
+	}
+	// SQLite - doesn't support database qualifiers in CREATE TABLE
+	return fmt.Sprintf(
+		"CREATE TABLE %s (id INTEGER PRIMARY KEY AUTOINCREMENT, sr_created TEXT DEFAULT (datetime('now')), sr_updated TEXT DEFAULT (datetime('now')))",
+		table)
 }
 
 // CreateTableConfiguration creates a new table configuration entry.
@@ -1462,105 +1378,94 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 	}
 
 	if createNavigation {
-		navQuery := "INSERT INTO table_navigation (ordinal, table_configuration, name) VALUES (99, ?, ?)"
-		navResult, err := r.db.ExecContext(ctx, navQuery, configID, name)
-		if err != nil {
-			log.Warnf("Failed to create navigation entry for table configuration %s: %v", name, err)
-		} else {
-			log.Infof("Created navigation entry for table configuration: %s", name)
-			if navigationAppID > 0 {
-				navID, idErr := navResult.LastInsertId()
-				if idErr != nil {
-					log.Warnf("Failed to get navigation item id for app assignment: %v", idErr)
-				} else if linkErr := r.AssignNavigationItemToApp(ctx, navigationAppID, int(navID), 99); linkErr != nil {
-					log.Warnf("Failed to assign navigation item to app %d: %v", navigationAppID, linkErr)
-				}
-			}
-		}
+		r.createTableConfigurationNavigation(ctx, configID, name, navigationAppID)
 	}
 
 	log.Infof("Created table configuration: %s (db: %s, table: %s, view: table)", name, database, table)
 	return nil
 }
 
-// UpdateSystemTableConfigurations upserts system table configurations (table_settings,
-// table_configurations, table_workflows, table_navigation, table_dashboards) using the database name from
-// DB_NAME env (or "main" if unset). Call after migrations so system configs always use the correct database.
-func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error {
-	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
-	if dbName == "" {
-		dbName = "main"
+// createTableConfigurationNavigation adds a sidebar link for a new table configuration, assigned to
+// the sidebar app when navigationAppID is set. Failures are logged, not returned.
+func (r *Repository) createTableConfigurationNavigation(ctx context.Context, configID int64, name string, navigationAppID int) {
+	navQuery := "INSERT INTO table_navigation (ordinal, table_configuration, name) VALUES (99, ?, ?)"
+	navResult, err := r.db.ExecContext(ctx, navQuery, configID, name)
+	if err != nil {
+		log.Warnf("Failed to create navigation entry for table configuration %s: %v", name, err)
+		return
 	}
-	systemConfigs := []struct {
-		name             string
-		title            string
-		table            string
-		ordinal          int
-		createDelegate   string
-		createButtonText string
-		rowName          string
-	}{
-		{"table_settings", "Settings", "table_settings", 0, "", "Add Setting", "Setting"},
-		{"table_configurations", "Table Configurations", "table_configurations", 1, "/admin/table/create", "Create Table", "Table configuration"},
-		{"table_workflows", "Workflows", "table_workflows", 2, "", "Add Workflow", "Workflow"},
-		{"table_navigation", "Navigation", "table_navigation", 3, "", "Add Navigation Item", "Navigation item"},
-		{"table_apps", "Sidebar apps", "apps", 9, "", "Add app", "App"},
-		{"table_app_navigation_links", "App navigation links", "app_navigation_links", 10, "", "Add link", "App navigation link"},
-		{"table_dashboards", "Dashboards", "table_dashboards", 4, "/admin/dashboard/create", "Create Dashboard", "Dashboard"},
-		{"table_dashboard_components", "Dashboard components", "table_dashboard_components", 8, "", "Add Component", "Dashboard component"},
-		{"table_read_only_exports", "Read-only calendar exports", "read_only_calendar_exports", 5, "", "Add Export", "Calendar export"},
-		{"table_rss_calendar_feeds", "Calendar feeds", "rss_calendar_feeds", 7, "/admin/rss-calendar-feeds/new", "Add feed", "Calendar feed"},
-		{"table_logs", "Audit logs", "audit_logs", 6, "", "Insert Row", "Audit log entry"},
+	log.Infof("Created navigation entry for table configuration: %s", name)
+	if navigationAppID <= 0 {
+		return
 	}
-	switch r.db.DriverName() {
-	case "mysql":
-		for _, c := range systemConfigs {
-			query := `INSERT INTO table_configurations (name, title, ` + "`db`" + `, ` + "`table`" + `, ordinal, create_delegate, create_button_text, row_name)
+	navID, err := navResult.LastInsertId()
+	if err != nil {
+		log.Warnf("Failed to get navigation item id for app assignment: %v", err)
+		return
+	}
+	if err := r.AssignNavigationItemToApp(ctx, navigationAppID, int(navID), 99); err != nil {
+		log.Warnf("Failed to assign navigation item to app %d: %v", navigationAppID, err)
+	}
+}
+
+// systemTableConfig is a built-in table configuration upserted at startup.
+type systemTableConfig struct {
+	name             string
+	title            string
+	table            string
+	createDelegate   string
+	createButtonText string
+	rowName          string
+	ordinal          int
+}
+
+var systemTableConfigs = []systemTableConfig{
+	{name: "table_settings", title: "Settings", table: "table_settings", ordinal: 0, createButtonText: "Add Setting", rowName: "Setting"},
+	{name: "table_configurations", title: "Table Configurations", table: "table_configurations", ordinal: 1, createDelegate: "/admin/table/create", createButtonText: "Create Table", rowName: "Table configuration"},
+	{name: "table_workflows", title: "Workflows", table: "table_workflows", ordinal: 2, createButtonText: "Add Workflow", rowName: "Workflow"},
+	{name: "table_navigation", title: "Navigation", table: "table_navigation", ordinal: 3, createButtonText: "Add Navigation Item", rowName: "Navigation item"},
+	{name: "table_apps", title: "Sidebar apps", table: "apps", ordinal: 9, createButtonText: "Add app", rowName: "App"},
+	{name: "table_app_navigation_links", title: "App navigation links", table: "app_navigation_links", ordinal: 10, createButtonText: "Add link", rowName: "App navigation link"},
+	{name: "table_dashboards", title: "Dashboards", table: "table_dashboards", ordinal: 4, createDelegate: "/admin/dashboard/create", createButtonText: "Create Dashboard", rowName: "Dashboard"},
+	{name: "table_dashboard_components", title: "Dashboard components", table: "table_dashboard_components", ordinal: 8, createButtonText: "Add Component", rowName: "Dashboard component"},
+	{name: "table_read_only_exports", title: "Read-only calendar exports", table: "read_only_calendar_exports", ordinal: 5, createButtonText: "Add Export", rowName: "Calendar export"},
+	{name: "table_rss_calendar_feeds", title: "Calendar feeds", table: "rss_calendar_feeds", ordinal: 7, createDelegate: "/admin/rss-calendar-feeds/new", createButtonText: "Add feed", rowName: "Calendar feed"},
+	{name: "table_logs", title: "Audit logs", table: "audit_logs", ordinal: 6, createButtonText: "Insert Row", rowName: "Audit log entry"},
+}
+
+const upsertSystemTableConfigMySQL = `INSERT INTO table_configurations (name, title, ` + "`db`" + `, ` + "`table`" + `, ordinal, create_delegate, create_button_text, row_name)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON DUPLICATE KEY UPDATE title = VALUES(title), ` + "`db`" + ` = VALUES(` + "`db`" + `), ` + "`table`" + ` = VALUES(` + "`table`" + `), ordinal = VALUES(ordinal), create_delegate = COALESCE(NULLIF(VALUES(create_delegate), ''), create_delegate), create_button_text = COALESCE(NULLIF(VALUES(create_button_text), ''), create_button_text), row_name = COALESCE(NULLIF(VALUES(row_name), ''), row_name)`
-			var createDelegate interface{}
-			if c.createDelegate != "" {
-				createDelegate = c.createDelegate
-			}
-			var createButtonText interface{}
-			if c.createButtonText != "" {
-				createButtonText = c.createButtonText
-			}
-			var rowName interface{}
-			if c.rowName != "" {
-				rowName = c.rowName
-			}
-			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal, createDelegate, createButtonText, rowName)
-			if err != nil {
-				return fmt.Errorf("upsert system table config %s: %w", c.name, err)
-			}
-			log.Infof("Updated system table config: %s (db: %s)", c.name, dbName)
-		}
-	default: // sqlite
-		for _, c := range systemConfigs {
-			query := `INSERT INTO table_configurations (name, title, db, "table", ordinal, create_delegate, create_button_text, row_name)
+
+const upsertSystemTableConfigSQLite = `INSERT INTO table_configurations (name, title, db, "table", ordinal, create_delegate, create_button_text, row_name)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(name) DO UPDATE SET title = excluded.title, db = excluded.db, "table" = excluded."table", ordinal = excluded.ordinal, create_delegate = COALESCE(NULLIF(excluded.create_delegate, ''), table_configurations.create_delegate), create_button_text = COALESCE(NULLIF(excluded.create_button_text, ''), table_configurations.create_button_text), row_name = COALESCE(NULLIF(excluded.row_name, ''), table_configurations.row_name)`
-			var createDelegate interface{}
-			if c.createDelegate != "" {
-				createDelegate = c.createDelegate
-			}
-			var createButtonText interface{}
-			if c.createButtonText != "" {
-				createButtonText = c.createButtonText
-			}
-			var rowName interface{}
-			if c.rowName != "" {
-				rowName = c.rowName
-			}
-			_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal, createDelegate, createButtonText, rowName)
-			if err != nil {
-				return fmt.Errorf("upsert system table config %s: %w", c.name, err)
-			}
-			log.Infof("Updated system table config: %s (db: %s)", c.name, dbName)
+
+// UpdateSystemTableConfigurations upserts system table configurations (systemTableConfigs) using the
+// database name from DB_NAME env (or "main" if unset). Call after migrations so system configs always
+// use the correct database.
+func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error {
+	dbName := cmp.Or(strings.TrimSpace(os.Getenv("DB_NAME")), "main")
+	query := upsertSystemTableConfigSQLite
+	if r.db.DriverName() == "mysql" {
+		query = upsertSystemTableConfigMySQL
+	}
+	for _, c := range systemTableConfigs {
+		_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal, nilIfEmpty(c.createDelegate), nilIfEmpty(c.createButtonText), nilIfEmpty(c.rowName))
+		if err != nil {
+			return fmt.Errorf("upsert system table config %s: %w", c.name, err)
 		}
+		log.Infof("Updated system table config: %s (db: %s)", c.name, dbName)
 	}
 	return nil
+}
+
+// nilIfEmpty returns nil (SQL NULL) for an empty string, otherwise the string.
+func nilIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 // GetTableConfiguration returns the structure information for a table
@@ -1575,13 +1480,7 @@ func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (
 	err := r.db.GetContext(ctx, &config, query, tcName)
 
 	if err != nil {
-		log.Errorf("Failed to get table configuration for table %s: %v", tcName, err)
-
-		if err == sql.ErrNoRows {
-			// Table not found in configurations, return default structure
-			return nil, fmt.Errorf("table not found in configurations")
-		}
-		return nil, err
+		return nil, tableConfigurationLookupError(tcName, err)
 	}
 
 	log.Debugf("TableConfiguration: %+v", config)
@@ -1593,23 +1492,31 @@ func (r *Repository) GetTableConfiguration(ctx context.Context, tcName string) (
 	return &config, nil
 }
 
+func tableConfigurationLookupError(tcName string, err error) error {
+	log.Errorf("Failed to get table configuration for table %s: %v", tcName, err)
+	if errors.Is(err, sql.ErrNoRows) {
+		return fmt.Errorf("table not found in configurations")
+	}
+	return err
+}
+
 // TableViewColumn represents a column configuration in a table view
 type TableViewColumn struct {
 	ColumnName  string `db:"column_name"`
-	IsVisible   bool   `db:"is_visible"`
-	ColumnOrder int    `db:"column_order"`
 	SortOrder   string `db:"sort_order"`
+	ColumnOrder int    `db:"column_order"`
+	IsVisible   bool   `db:"is_visible"`
 }
 
 // TableView represents a saved table view
 type TableView struct {
-	ID         int               `db:"id"`
 	TableName  string            `db:"table_name"`
 	ViewName   string            `db:"view_name"`
-	IsDefault  bool              `db:"is_default"`
-	ViewType   string            `db:"view_type"`   // "table" or "calendar", defaults to "table"
-	LayoutJSON string            `db:"layout_json"` // Extra layout state (filters, group-by, page size, column priorities) as a JSON object
+	ViewType   string            `db:"view_type"`
+	LayoutJSON string            `db:"layout_json"`
 	Columns    []TableViewColumn `db:"-"`
+	ID         int               `db:"id"`
+	IsDefault  bool              `db:"is_default"`
 }
 
 // CreateTableView creates a new table view with its column configurations and returns its ID.
@@ -1626,7 +1533,7 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName, v
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Insert the table view
 	result, err := tx.ExecContext(ctx,
@@ -1673,41 +1580,25 @@ func (r *Repository) UpdateTableView(ctx context.Context, viewID int, tableName,
 	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Default to "table" if viewType is empty
-	if viewType == "" {
-		viewType = "table"
-	}
+	viewType = cmp.Or(viewType, "table")
 
-	// Start a transaction
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
+	return r.inTx(ctx, func(tx *sqlx.Tx) error {
+		result, err := tx.ExecContext(ctx,
+			"UPDATE table_views SET view_name = ?, view_type = ?, layout_json = ? WHERE id = ? AND table_name = ?",
+			viewName, viewType, nullIfEmpty(layoutJSON), viewID, t)
+		if err != nil {
+			return err
+		}
+		if affected, rowsErr := result.RowsAffected(); rowsErr == nil && affected == 0 {
+			return fmt.Errorf("view with ID %d not found for table %s", viewID, t)
+		}
 
-	// Update the table view
-	result, err := tx.ExecContext(ctx,
-		"UPDATE table_views SET view_name = ?, view_type = ?, layout_json = ? WHERE id = ? AND table_name = ?",
-		viewName, viewType, nullIfEmpty(layoutJSON), viewID, t)
-	if err != nil {
-		return err
-	}
-	if affected, err := result.RowsAffected(); err == nil && affected == 0 {
-		return fmt.Errorf("view with ID %d not found for table %s", viewID, t)
-	}
-
-	// Delete existing column configurations
-	_, err = tx.ExecContext(ctx,
-		"DELETE FROM table_view_columns WHERE view_id = ?",
-		viewID)
-	if err != nil {
-		return err
-	}
-
-	if err := insertTableViewColumns(ctx, tx, int64(viewID), columns); err != nil {
-		return err
-	}
-
-	return tx.Commit()
+		// Replace the column configurations
+		if _, err = tx.ExecContext(ctx, "DELETE FROM table_view_columns WHERE view_id = ?", viewID); err != nil {
+			return err
+		}
+		return insertTableViewColumns(ctx, tx, int64(viewID), columns)
+	})
 }
 
 // GetTableViews retrieves all views for a given table
@@ -1721,7 +1612,7 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var views []TableView
 	for rows.Next() {
@@ -1744,13 +1635,12 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 			var col TableViewColumn
 			err := columnRows.Scan(&col.ColumnName, &col.IsVisible, &col.ColumnOrder, &col.SortOrder)
 			if err != nil {
-				columnRows.Close()
+				_ = columnRows.Close()
 				return nil, err
 			}
 			columns = append(columns, col)
 		}
-		columnRows.Close()
-
+		_ = columnRows.Close()
 		view.Columns = columns
 		views = append(views, view)
 	}
@@ -1762,7 +1652,7 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 func (r *Repository) GetTableViewTableName(ctx context.Context, viewID int) (string, error) {
 	var tableName string
 	err := r.db.GetContext(ctx, &tableName, "SELECT table_name FROM table_views WHERE id = ?", viewID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", fmt.Errorf("view with ID %d not found", viewID)
 	}
 	return tableName, err
@@ -1774,7 +1664,7 @@ func (r *Repository) GetUserDefaultTableView(ctx context.Context, userID int, ta
 	err := r.db.GetContext(ctx, &viewID,
 		"SELECT view_id FROM table_view_user_defaults WHERE user_id = ? AND table_name = ?",
 		userID, sanitizeDatabaseIdentifier(tableName))
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return 0, nil
 	}
 	return viewID, err
@@ -1789,24 +1679,33 @@ func (r *Repository) SetUserDefaultTableView(ctx context.Context, userID int, ta
 		return err
 	}
 
+	if err := r.validateUserDefaultTableView(ctx, t, viewID); err != nil {
+		return err
+	}
+	return r.upsertUserDefaultTableView(ctx, userID, t, viewID)
+}
+
+func (r *Repository) validateUserDefaultTableView(ctx context.Context, tableName string, viewID int) error {
 	viewTable, err := r.GetTableViewTableName(ctx, viewID)
 	if err != nil {
 		return err
 	}
-	if viewTable != t {
-		return fmt.Errorf("view %d does not belong to table %s", viewID, t)
+	if viewTable != tableName {
+		return fmt.Errorf("view %d does not belong to table %s", viewID, tableName)
 	}
+	return nil
+}
 
-	switch r.db.DriverName() {
-	case "mysql":
-		_, err = r.db.ExecContext(ctx, `
+func (r *Repository) upsertUserDefaultTableView(ctx context.Context, userID int, tableName string, viewID int) error {
+	if r.db.DriverName() == "mysql" {
+		_, err := r.db.ExecContext(ctx, `
 			INSERT INTO table_view_user_defaults (user_id, table_name, view_id) VALUES (?, ?, ?)
-			ON DUPLICATE KEY UPDATE view_id = VALUES(view_id)`, userID, t, viewID)
-	default:
-		_, err = r.db.ExecContext(ctx, `
-			INSERT INTO table_view_user_defaults (user_id, table_name, view_id) VALUES (?, ?, ?)
-			ON CONFLICT(user_id, table_name) DO UPDATE SET view_id = excluded.view_id`, userID, t, viewID)
+			ON DUPLICATE KEY UPDATE view_id = VALUES(view_id)`, userID, tableName, viewID)
+		return err
 	}
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO table_view_user_defaults (user_id, table_name, view_id) VALUES (?, ?, ?)
+		ON CONFLICT(user_id, table_name) DO UPDATE SET view_id = excluded.view_id`, userID, tableName, viewID)
 	return err
 }
 
@@ -1817,7 +1716,7 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete the view columns first (due to foreign key constraint)
 	_, err = tx.ExecContext(ctx, "DELETE FROM table_view_columns WHERE view_id = ?", viewID)
@@ -1853,21 +1752,20 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 
 // ForeignKey represents a foreign key constraint
 type ForeignKey struct {
-	RelationID        int                        `db:"-"`
-	ConstraintName    string                     `db:"constraint_name"`
+	ReferencedTable   string                     `db:"referenced_table"`
+	DisplayName       string                     `db:"display_name"`
 	TableSchema       string                     `db:"table_schema"`
 	TableName         string                     `db:"table_name"`
 	ColumnName        string                     `db:"column_name"`
 	ReferencedSchema  string                     `db:"referenced_schema"`
-	ReferencedTable   string                     `db:"referenced_table"`
-	ReferencedColumn  string                     `db:"referenced_column"`
 	OnDeleteAction    string                     `db:"on_delete_action"`
+	AbsorbType        string                     `db:"-"`
+	ConstraintName    string                     `db:"constraint_name"`
 	OnUpdateAction    string                     `db:"on_update_action"`
-	DisplayName       string                     `db:"display_name"`
+	ReferencedColumn  string                     `db:"referenced_column"`
 	PullThroughFields []RelationPullThroughField `db:"-"`
-	// AbsorbIntoItem shows the related rows inside the item view instead of as their own section.
-	AbsorbIntoItem bool   `db:"-"`
-	AbsorbType     string `db:"-"` // RelationAbsorbFirstRow
+	RelationID        int                        `db:"-"`
+	AbsorbIntoItem    bool                       `db:"-"`
 }
 
 // CreateForeignKey records a relation in table_relations and applies a database FK when supported.
@@ -1875,12 +1773,7 @@ func (r *Repository) CreateForeignKey(ctx context.Context, tableName, columnName
 	col := sanitizeDatabaseIdentifier(columnName)
 	refCol := sanitizeDatabaseIdentifier(referencedColumn)
 
-	tc, err := r.GetTableConfiguration(ctx, tableName)
-	if err != nil {
-		return err
-	}
-
-	tcRef, err := r.GetTableConfiguration(ctx, referencedTable)
+	tc, tcRef, err := r.foreignKeyTableConfigs(ctx, tableName, referencedTable)
 	if err != nil {
 		return err
 	}
@@ -1903,6 +1796,18 @@ func (r *Repository) CreateForeignKey(ctx context.Context, tableName, columnName
 		log.WithError(err).Warn("database foreign key not applied; relation saved in table_relations")
 	}
 	return nil
+}
+
+func (r *Repository) foreignKeyTableConfigs(ctx context.Context, tableName, referencedTable string) (*TableConfig, *TableConfig, error) {
+	tc, err := r.GetTableConfiguration(ctx, tableName)
+	if err != nil {
+		return nil, nil, err
+	}
+	tcRef, err := r.GetTableConfiguration(ctx, referencedTable)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tc, tcRef, nil
 }
 
 // GetForeignKeys lists relations involving a table configuration (source or referenced).
@@ -2040,47 +1945,41 @@ func (r *Repository) InsertRecentlyViewed(ctx context.Context, userID int, table
 	if userID <= 0 || tableName == "" || itemID == "" {
 		return nil
 	}
+	isMySQL := r.db.DriverName() == "mysql"
+
 	// First, try to update existing record if it exists
-	var updateQuery string
-	switch r.db.DriverName() {
-	case "mysql":
-		updateQuery = `UPDATE table_recently_viewed
+	result, err := r.db.ExecContext(ctx, recentlyViewedUpdateSQL(isMySQL), userID, tableName, itemID)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected > 0 {
+		return err
+	}
+
+	// No existing record, so insert one
+	_, err = r.db.ExecContext(ctx, recentlyViewedInsertSQL(isMySQL), userID, tableName, itemID)
+	return err
+}
+
+func recentlyViewedUpdateSQL(isMySQL bool) string {
+	if isMySQL {
+		return `UPDATE table_recently_viewed
 			SET updated_at_unix = UNIX_TIMESTAMP()
 			WHERE user_account_id = ? AND name = ? AND table_id = ?`
-	default: // SQLite
-		updateQuery = `UPDATE table_recently_viewed
+	}
+	return `UPDATE table_recently_viewed
 			SET updated_at_unix = strftime('%s', 'now')
 			WHERE user_account_id = ? AND name = ? AND table_id = ?`
-	}
+}
 
-	result, err := r.db.ExecContext(ctx, updateQuery, userID, tableName, itemID)
-	if err != nil {
-		return err
-	}
-
-	// Check if any rows were updated
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-
-	// If no rows were updated, insert a new record
-	if rowsAffected == 0 {
-		var insertQuery string
-		switch r.db.DriverName() {
-		case "mysql":
-			insertQuery = `INSERT INTO table_recently_viewed (user_account_id, name, table_id, sr_created, updated_at_unix)
+func recentlyViewedInsertSQL(isMySQL bool) string {
+	if isMySQL {
+		return `INSERT INTO table_recently_viewed (user_account_id, name, table_id, sr_created, updated_at_unix)
 				VALUES (?, ?, ?, NOW(), UNIX_TIMESTAMP())`
-		default: // SQLite
-			insertQuery = `INSERT INTO table_recently_viewed (user_account_id, name, table_id, sr_created, updated_at_unix)
-				VALUES (?, ?, ?, datetime('now'), strftime('%s', 'now'))`
-		}
-
-		_, err = r.db.ExecContext(ctx, insertQuery, userID, tableName, itemID)
-		return err
 	}
-
-	return nil
+	return `INSERT INTO table_recently_viewed (user_account_id, name, table_id, sr_created, updated_at_unix)
+				VALUES (?, ?, ?, datetime('now'), strftime('%s', 'now'))`
 }
 
 // RecentlyViewedItem represents a recently viewed item with table configuration
@@ -2088,9 +1987,9 @@ type RecentlyViewedItem struct {
 	Name          string `db:"name"`
 	TableID       string `db:"table_id"`
 	Icon          string `db:"icon"`
-	UpdatedAtUnix int64  `db:"updated_at_unix"`
-	ItemName      string // The actual name/title of the item from the table
+	ItemName      string
 	TableTitle    string `db:"title"`
+	UpdatedAtUnix int64  `db:"updated_at_unix"`
 }
 
 // GetMostRecentlyViewed returns the most recently viewed items for a user with table configuration details.
@@ -2194,11 +2093,11 @@ func (r *Repository) GetApproxTotalRows(ctx context.Context) (int64, error) {
 
 // UserBookmark represents a user bookmark
 type UserBookmark struct {
+	NavigationItem   *NavigationItem
+	Title            sql.NullString
 	ID               int
 	UserID           int
 	NavigationItemID int
-	NavigationItem   *NavigationItem
-	Title            sql.NullString
 }
 
 // GetUserBookmarks retrieves all bookmarks for a specific user
@@ -2234,7 +2133,7 @@ func (r *Repository) GetUserBookmarks(ctx context.Context, userID int) ([]UserBo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var bookmarks []UserBookmark
 	for rows.Next() {
@@ -2295,18 +2194,18 @@ func (r *Repository) CreateUserBookmark(ctx context.Context, userID, navigationI
 		return nil, err
 	}
 
-	// Get the created bookmark with navigation item details
+	return r.userBookmarkByID(ctx, userID, int(bookmarkID))
+}
+
+// userBookmarkByID returns one of the user's bookmarks with its navigation item details.
+func (r *Repository) userBookmarkByID(ctx context.Context, userID, bookmarkID int) (*UserBookmark, error) {
 	bookmarks, err := r.GetUserBookmarks(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-
-	for _, bookmark := range bookmarks {
-		if bookmark.ID == int(bookmarkID) {
-			return &bookmark, nil
-		}
+	if i := slices.IndexFunc(bookmarks, func(b UserBookmark) bool { return b.ID == bookmarkID }); i >= 0 {
+		return &bookmarks[i], nil
 	}
-
 	return nil, fmt.Errorf("failed to retrieve created bookmark")
 }
 
@@ -2340,7 +2239,7 @@ func (r *Repository) GetTickListState(ctx context.Context, tcName string) (map[s
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	out := make(map[string]bool)
 	for rows.Next() {
 		var itemID string
@@ -2383,29 +2282,29 @@ func (r *Repository) ClearTickListState(ctx context.Context, tcName string) erro
 // API Key related methods
 
 type APIKey struct {
-	ID         int
-	UserID     int
-	Name       string
-	KeyHash    string
 	CreatedAt  time.Time
 	LastUsedAt *time.Time
 	ExpiresAt  *time.Time
+	Name       string
+	KeyHash    string
+	ID         int
+	UserID     int
 	IsActive   bool
 	ReadOnly   bool
 }
 
 type ConditionalFormattingRule struct {
-	ID             int
+	SrCreated      time.Time
 	TableName      string
 	ColumnName     string
 	ConditionType  string
 	ConditionValue string
 	FormatType     string
 	FormatValue    string
+	ID             int
 	Priority       int
-	IsActive       bool
-	SrCreated      time.Time
 	UpdatedAtUnix  int64
+	IsActive       bool
 }
 
 // CreateAPIKey creates a new API key for a user
@@ -2455,7 +2354,7 @@ func (r *Repository) GetAPIKeyByID(ctx context.Context, id int) (*APIKey, error)
 	)
 	apiKey.ReadOnly = readOnlyInt != 0
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -2487,18 +2386,24 @@ func (r *Repository) GetAPIKeyByHash(ctx context.Context, keyHash string) (*APIK
 	)
 	apiKey.ReadOnly = readOnlyInt != 0
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
+		return nil, apiKeyLookupError(err)
 	}
-
-	// Check if the key has expired
-	if apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now()) {
-		return nil, nil // Treat expired keys as not found
+	if apiKeyExpired(apiKey) {
+		return nil, nil
 	}
 
 	return &apiKey, nil
+}
+
+func apiKeyLookupError(err error) error {
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	return err
+}
+
+func apiKeyExpired(apiKey APIKey) bool {
+	return apiKey.ExpiresAt != nil && apiKey.ExpiresAt.Before(time.Now())
 }
 
 // GetUserAPIKeys retrieves all API keys for a user
@@ -2514,7 +2419,7 @@ func (r *Repository) GetUserAPIKeys(ctx context.Context, userID int) ([]APIKey, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var apiKeys []APIKey
 	for rows.Next() {
@@ -2543,25 +2448,7 @@ func (r *Repository) GetUserAPIKeys(ctx context.Context, userID int) ([]APIKey, 
 
 // UpdateAPIKey updates an API key's name, expires_at, and/or read_only. Pass nil for fields to leave unchanged.
 func (r *Repository) UpdateAPIKey(ctx context.Context, userID, apiKeyID int, name *string, expiresAt *time.Time, readOnly *bool) error {
-	updates := []string{}
-	args := []any{}
-
-	if name != nil {
-		updates = append(updates, "name = ?")
-		args = append(args, *name)
-	}
-	if expiresAt != nil {
-		updates = append(updates, "expires_at = ?")
-		args = append(args, *expiresAt)
-	}
-	if readOnly != nil {
-		readOnlyInt := 0
-		if *readOnly {
-			readOnlyInt = 1
-		}
-		updates = append(updates, "read_only = ?")
-		args = append(args, readOnlyInt)
-	}
+	updates, args := apiKeyUpdateSet(name, expiresAt, readOnly)
 	if len(updates) == 0 {
 		return nil
 	}
@@ -2576,6 +2463,23 @@ func (r *Repository) UpdateAPIKey(ctx context.Context, userID, apiKeyID int, nam
 		return fmt.Errorf("API key not found or not owned by user")
 	}
 	return nil
+}
+
+// apiKeyUpdateSet builds SET clauses for the API key fields that are being changed (non-nil).
+func apiKeyUpdateSet(name *string, expiresAt *time.Time, readOnly *bool) (updates []string, args []any) {
+	if name != nil {
+		updates = append(updates, "name = ?")
+		args = append(args, *name)
+	}
+	if expiresAt != nil {
+		updates = append(updates, "expires_at = ?")
+		args = append(args, *expiresAt)
+	}
+	if readOnly != nil {
+		updates = append(updates, "read_only = ?")
+		args = append(args, boolToInt(*readOnly))
+	}
+	return updates, args
 }
 
 // UpdateAPIKeyLastUsed updates the last used timestamp for an API key
@@ -2640,8 +2544,30 @@ func (r *Repository) DeleteAPIKey(ctx context.Context, userID, apiKeyID int) err
 
 // GetConditionalFormattingRules retrieves conditional formatting rules
 func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID int, tableName string) ([]*ConditionalFormattingRule, error) {
-	// First check if sr_created column exists in table_conditional_formatting_rules
-	hasSrCreated := false
+	hasSrCreated := r.conditionalFormattingHasSrCreated(ctx)
+	query, args := conditionalFormattingRulesQuery(hasSrCreated, tableName)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var rules []*ConditionalFormattingRule
+	for rows.Next() {
+		rule, err := scanConditionalFormattingRule(rows, hasSrCreated)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, rule)
+	}
+
+	return rules, nil
+}
+
+// conditionalFormattingHasSrCreated reports whether table_conditional_formatting_rules has the
+// sr_created column (absent on older schema versions).
+func (r *Repository) conditionalFormattingHasSrCreated(ctx context.Context) bool {
 	if r.db.DriverName() == "mysql" {
 		var count int
 		checkQuery := `SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -2649,143 +2575,80 @@ func (r *Repository) GetConditionalFormattingRules(ctx context.Context, userID i
 			AND TABLE_NAME = 'table_conditional_formatting_rules'
 			AND COLUMN_NAME = 'sr_created'`
 		err := r.db.GetContext(ctx, &count, checkQuery)
-		if err == nil && count > 0 {
-			hasSrCreated = true
-		}
-	} else {
-		// SQLite - check using PRAGMA
-		type colInfo struct {
-			Cid  int    `db:"cid"`
-			Name string `db:"name"`
-			Type string `db:"type"`
-		}
-		var cols []colInfo
-		err := r.db.SelectContext(ctx, &cols, "PRAGMA table_info(table_conditional_formatting_rules)")
-		if err == nil {
-			for _, col := range cols {
-				if col.Name == "sr_created" {
-					hasSrCreated = true
-					break
-				}
-			}
-		}
+		return err == nil && count > 0
 	}
 
-	var query string
-	var args []interface{}
+	// SQLite - check using PRAGMA
+	type colInfo struct {
+		Name string `db:"name"`
+		Type string `db:"type"`
+		Cid  int    `db:"cid"`
+	}
+	var cols []colInfo
+	if err := r.db.SelectContext(ctx, &cols, "PRAGMA table_info(table_conditional_formatting_rules)"); err != nil {
+		return false
+	}
+	return slices.ContainsFunc(cols, func(c colInfo) bool { return c.Name == "sr_created" })
+}
 
+// conditionalFormattingRulesQuery returns the rules query for one table, or for all tables when
+// tableName is empty, selecting sr_created only when the column exists.
+func conditionalFormattingRulesQuery(hasSrCreated bool, tableName string) (string, []any) {
+	columns := "id, table_name, column_name, condition_type, condition_value, format_type, format_value, priority, is_active, "
 	if hasSrCreated {
-		// Query with sr_created column
-		if tableName != "" {
-			query = `
-				SELECT id, table_name, column_name, condition_type, condition_value,
-				       format_type, format_value, priority, is_active, sr_created, updated_at_unix
-				FROM table_conditional_formatting_rules
-				WHERE table_name = ?
-				ORDER BY priority ASC, id ASC
-			`
-			args = []interface{}{tableName}
-		} else {
-			query = `
-				SELECT id, table_name, column_name, condition_type, condition_value,
-				       format_type, format_value, priority, is_active, sr_created, updated_at_unix
-				FROM table_conditional_formatting_rules
-				ORDER BY table_name ASC, priority ASC, id ASC
-			`
-			args = []interface{}{}
-		}
-	} else {
-		// Query without sr_created column (for older schema versions)
-		if tableName != "" {
-			query = `
-				SELECT id, table_name, column_name, condition_type, condition_value,
-				       format_type, format_value, priority, is_active, updated_at_unix
-				FROM table_conditional_formatting_rules
-				WHERE table_name = ?
-				ORDER BY priority ASC, id ASC
-			`
-			args = []interface{}{tableName}
-		} else {
-			query = `
-				SELECT id, table_name, column_name, condition_type, condition_value,
-				       format_type, format_value, priority, is_active, updated_at_unix
-				FROM table_conditional_formatting_rules
-				ORDER BY table_name ASC, priority ASC, id ASC
-			`
-			args = []interface{}{}
-		}
+		columns += "sr_created, "
 	}
+	columns += "updated_at_unix"
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
-	if err != nil {
+	if tableName != "" {
+		return "SELECT " + columns + " FROM table_conditional_formatting_rules WHERE table_name = ? ORDER BY priority ASC, id ASC", []any{tableName}
+	}
+	return "SELECT " + columns + " FROM table_conditional_formatting_rules ORDER BY table_name ASC, priority ASC, id ASC", []any{}
+}
+
+func scanConditionalFormattingRule(rows *sql.Rows, hasSrCreated bool) (*ConditionalFormattingRule, error) {
+	var rule ConditionalFormattingRule
+	var srCreatedStr string
+	dest := []any{
+		&rule.ID,
+		&rule.TableName,
+		&rule.ColumnName,
+		&rule.ConditionType,
+		&rule.ConditionValue,
+		&rule.FormatType,
+		&rule.FormatValue,
+		&rule.Priority,
+		&rule.IsActive,
+	}
+	if hasSrCreated {
+		dest = append(dest, &srCreatedStr)
+	}
+	dest = append(dest, &rule.UpdatedAtUnix)
+	if err := rows.Scan(dest...); err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-
-	var rules []*ConditionalFormattingRule
-	for rows.Next() {
-		var rule ConditionalFormattingRule
-		var srCreatedStr string
-
-		if hasSrCreated {
-			err := rows.Scan(
-				&rule.ID,
-				&rule.TableName,
-				&rule.ColumnName,
-				&rule.ConditionType,
-				&rule.ConditionValue,
-				&rule.FormatType,
-				&rule.FormatValue,
-				&rule.Priority,
-				&rule.IsActive,
-				&srCreatedStr,
-				&rule.UpdatedAtUnix,
-			)
-			if err != nil {
-				return nil, err
-			}
-
-			// Parse sr_created timestamp - try multiple formats
-			if srCreatedStr != "" {
-				// Try ISO 8601 format first (RFC3339) - used by SQLite
-				rule.SrCreated, err = time.Parse(time.RFC3339, srCreatedStr)
-				if err != nil {
-					// Fallback to MySQL datetime format
-					rule.SrCreated, err = time.Parse("2006-01-02 15:04:05", srCreatedStr)
-					if err != nil {
-						// Try ISO 8601 without timezone
-						rule.SrCreated, err = time.Parse("2006-01-02T15:04:05", srCreatedStr)
-						if err != nil {
-							// Don't fail if parsing fails, just log and continue with zero time
-							log.Warnf("Failed to parse sr_created timestamp '%s': %v", srCreatedStr, err)
-						}
-					}
-				}
-			}
-		} else {
-			// Scan without sr_created
-			err := rows.Scan(
-				&rule.ID,
-				&rule.TableName,
-				&rule.ColumnName,
-				&rule.ConditionType,
-				&rule.ConditionValue,
-				&rule.FormatType,
-				&rule.FormatValue,
-				&rule.Priority,
-				&rule.IsActive,
-				&rule.UpdatedAtUnix,
-			)
-			if err != nil {
-				return nil, err
-			}
-			// sr_created will remain as zero time
-		}
-
-		rules = append(rules, &rule)
+	// sr_created remains zero time when the column is absent or empty
+	if srCreatedStr != "" {
+		rule.SrCreated = parseRuleTimestamp(srCreatedStr)
 	}
+	return &rule, nil
+}
 
-	return rules, nil
+// ruleTimestampLayouts are tried in order: RFC3339 (SQLite), MySQL datetime, ISO 8601 without timezone.
+var ruleTimestampLayouts = []string{time.RFC3339, "2006-01-02 15:04:05", "2006-01-02T15:04:05"}
+
+// parseRuleTimestamp parses a stored sr_created value, logging and returning zero time when no layout matches.
+func parseRuleTimestamp(value string) time.Time {
+	var err error
+	for _, layout := range ruleTimestampLayouts {
+		var t time.Time
+		if t, err = time.Parse(layout, value); err == nil {
+			return t
+		}
+	}
+	// Don't fail if parsing fails, just log and continue with zero time
+	log.Warnf("Failed to parse sr_created timestamp '%s': %v", value, err)
+	return time.Time{}
 }
 
 // CreateConditionalFormattingRule creates a new conditional formatting rule
@@ -2878,30 +2741,30 @@ func (r *Repository) UpdateConditionalFormattingRule(ctx context.Context, userID
 // Notification System Types and Methods
 
 type NotificationEvent struct {
-	ID          int
+	SrCreated   time.Time
 	EventCode   string
 	EventName   string
 	Description string
-	SrCreated   time.Time
+	ID          int
 }
 
 type UserNotificationChannel struct {
-	ID           int
-	User         int
-	ChannelType  string // 'email', 'telegram', 'webhook'
-	ChannelValue string
-	ChannelName  *string
-	IsActive     bool
 	SrCreated    time.Time
 	SrUpdated    time.Time
+	ChannelName  *string
+	ChannelType  string
+	ChannelValue string
+	ID           int
+	User         int
+	IsActive     bool
 }
 
 type UserNotificationSubscription struct {
+	SrCreated time.Time
 	ID        int
 	User      int
 	EventID   int
 	ChannelID int
-	SrCreated time.Time
 }
 
 // GetNotificationEvents retrieves all available notification events
@@ -2916,7 +2779,7 @@ func (r *Repository) GetNotificationEvents(ctx context.Context) ([]NotificationE
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []NotificationEvent
 	for rows.Next() {
@@ -2954,7 +2817,7 @@ func (r *Repository) GetNotificationEventByCode(ctx context.Context, eventCode s
 		&event.SrCreated,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -2976,32 +2839,42 @@ func (r *Repository) GetUserNotificationChannels(ctx context.Context, userID int
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+	return scanUserNotificationChannels(rows)
+}
 
+func scanUserNotificationChannels(rows *sqlx.Rows) ([]UserNotificationChannel, error) {
 	var channels []UserNotificationChannel
 	for rows.Next() {
-		var channel UserNotificationChannel
-		var channelName sql.NullString
-		err := rows.Scan(
-			&channel.ID,
-			&channel.User,
-			&channel.ChannelType,
-			&channel.ChannelValue,
-			&channelName,
-			&channel.IsActive,
-			&channel.SrCreated,
-			&channel.SrUpdated,
-		)
+		channel, err := scanUserNotificationChannel(rows)
 		if err != nil {
 			return nil, err
 		}
-		if channelName.Valid {
-			channel.ChannelName = &channelName.String
-		}
 		channels = append(channels, channel)
 	}
-
 	return channels, nil
+}
+
+func scanUserNotificationChannel(rows *sqlx.Rows) (UserNotificationChannel, error) {
+	var channel UserNotificationChannel
+	var channelName sql.NullString
+	err := rows.Scan(
+		&channel.ID,
+		&channel.User,
+		&channel.ChannelType,
+		&channel.ChannelValue,
+		&channelName,
+		&channel.IsActive,
+		&channel.SrCreated,
+		&channel.SrUpdated,
+	)
+	if err != nil {
+		return UserNotificationChannel{}, err
+	}
+	if channelName.Valid {
+		channel.ChannelName = &channelName.String
+	}
+	return channel, nil
 }
 
 // CreateUserNotificationChannel creates a new notification channel for a user
@@ -3044,7 +2917,7 @@ func (r *Repository) GetUserNotificationChannelByID(ctx context.Context, id int)
 		&channel.SrUpdated,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -3113,7 +2986,7 @@ func (r *Repository) GetUserNotificationSubscriptions(ctx context.Context, userI
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var subscriptions []UserNotificationSubscription
 	for rows.Next() {
@@ -3170,7 +3043,7 @@ func (r *Repository) GetUserNotificationSubscriptionByID(ctx context.Context, id
 		&sub.SrCreated,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
@@ -3200,11 +3073,7 @@ func (r *Repository) DeleteUserNotificationSubscription(ctx context.Context, sub
 }
 
 // GetSubscriptionsForEvent retrieves all subscriptions for a specific event code
-func (r *Repository) GetSubscriptionsForEvent(ctx context.Context, eventCode string) ([]struct {
-	Subscription UserNotificationSubscription
-	Channel      UserNotificationChannel
-	Event        NotificationEvent
-}, error) {
+func (r *Repository) GetSubscriptionsForEvent(ctx context.Context, eventCode string) ([]eventSubscription, error) {
 	query := `
 		SELECT
 			uns.id, uns.user, uns.event_id, uns.channel_id, uns.sr_created,
@@ -3220,50 +3089,69 @@ func (r *Repository) GetSubscriptionsForEvent(ctx context.Context, eventCode str
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
+	return scanSubscriptionsForEvent(rows)
+}
 
-	var results []struct {
-		Subscription UserNotificationSubscription
-		Channel      UserNotificationChannel
-		Event        NotificationEvent
-	}
+type eventSubscription struct {
+	Channel      UserNotificationChannel
+	Event        NotificationEvent
+	Subscription UserNotificationSubscription
+}
 
+func scanSubscriptionsForEvent(rows *sqlx.Rows) ([]eventSubscription, error) {
+	var results []eventSubscription
 	for rows.Next() {
-		var result struct {
-			Subscription UserNotificationSubscription
-			Channel      UserNotificationChannel
-			Event        NotificationEvent
-		}
-		var channelName sql.NullString
-
-		err := rows.Scan(
-			&result.Subscription.ID,
-			&result.Subscription.User,
-			&result.Subscription.EventID,
-			&result.Subscription.ChannelID,
-			&result.Subscription.SrCreated,
-			&result.Channel.ID,
-			&result.Channel.User,
-			&result.Channel.ChannelType,
-			&result.Channel.ChannelValue,
-			&channelName,
-			&result.Channel.IsActive,
-			&result.Channel.SrCreated,
-			&result.Channel.SrUpdated,
-			&result.Event.ID,
-			&result.Event.EventCode,
-			&result.Event.EventName,
-			&result.Event.Description,
-			&result.Event.SrCreated,
-		)
+		result, err := scanEventSubscription(rows)
 		if err != nil {
 			return nil, err
 		}
-		if channelName.Valid {
-			result.Channel.ChannelName = &channelName.String
-		}
 		results = append(results, result)
 	}
-
 	return results, nil
+}
+
+func scanEventSubscription(rows *sqlx.Rows) (eventSubscription, error) {
+	var result eventSubscription
+	var channelName sql.NullString
+	err := rows.Scan(
+		&result.Subscription.ID,
+		&result.Subscription.User,
+		&result.Subscription.EventID,
+		&result.Subscription.ChannelID,
+		&result.Subscription.SrCreated,
+		&result.Channel.ID,
+		&result.Channel.User,
+		&result.Channel.ChannelType,
+		&result.Channel.ChannelValue,
+		&channelName,
+		&result.Channel.IsActive,
+		&result.Channel.SrCreated,
+		&result.Channel.SrUpdated,
+		&result.Event.ID,
+		&result.Event.EventCode,
+		&result.Event.EventName,
+		&result.Event.Description,
+		&result.Event.SrCreated,
+	)
+	if err != nil {
+		return eventSubscription{}, err
+	}
+	if channelName.Valid {
+		result.Channel.ChannelName = &channelName.String
+	}
+	return result, nil
+}
+
+// inTx runs fn in a transaction, committing when it returns nil and rolling back otherwise.
+func (r *Repository) inTx(ctx context.Context, fn func(tx *sqlx.Tx) error) error {
+	tx, err := r.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := fn(tx); err != nil {
+		return err
+	}
+	return tx.Commit()
 }

@@ -12,10 +12,10 @@ func TestGetNavigationAppsOrdersMembers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, `
+	if _, err = db.ExecContext(ctx, `
 		CREATE TABLE table_navigation (id INTEGER PRIMARY KEY, ordinal INTEGER);
 		INSERT INTO table_navigation (id, ordinal) VALUES (1, 1), (2, 2), (3, 3);
 

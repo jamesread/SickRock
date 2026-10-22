@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	_ "embed"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -32,6 +33,9 @@ import (
 	"github.com/jamesread/SickRock/internal/mcp"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
+	armhealth "github.com/jamesread/armature-health"
+	"github.com/jamesread/armature-health/errorlog"
+	"github.com/jamesread/armature-health/store/sqlstore"
 	armstore "github.com/jamesread/armature-iam/store"
 )
 
@@ -58,32 +62,34 @@ func loadEnvFile(cfg *config.Config) {
 		searchDirs = append([]string{cfg.ConfigDir}, searchDirs...)
 	}
 	envFile, err := dirs.GetFirstExistingFileFromDirs("env", searchDirs, "SickRock.env")
-
 	if err != nil {
 		log.Warnf("Could not find env file: %v", err)
 		return
-	} else {
-		log.Infof("Using env file: %s", envFile)
 	}
+	log.Infof("Using env file: %s", envFile)
 
 	if _, err := os.Stat(envFile); err == nil {
-		file, err := os.Open(envFile)
-		if err != nil {
-			log.Warnf("Could not open .env file: %v", err)
-			return
-		}
-		defer file.Close()
+		applyEnvFile(envFile)
+	}
+}
 
-		scanner := bufio.NewScanner(file)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" || strings.HasPrefix(line, "#") {
-				continue
-			}
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				os.Setenv(parts[0], parts[1])
-			}
+// applyEnvFile sets environment variables from KEY=value lines, skipping blanks and # comments.
+func applyEnvFile(envFile string) {
+	file, err := os.Open(filepath.Clean(envFile))
+	if err != nil {
+		log.Warnf("Could not open .env file: %v", err)
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		if key, value, ok := strings.Cut(line, "="); ok {
+			_ = os.Setenv(key, value)
 		}
 	}
 }
@@ -133,43 +139,51 @@ func bootstrapIAM(ctx context.Context, iamStore armstore.Store) error {
 	}
 
 	if os.Getenv("SICKROCK_RESET_ADMIN_PASSWORD") != "" {
-		log.Info("SICKROCK_RESET_ADMIN_PASSWORD is set, resetting admin password to 'admin'")
-		user, err := iamStore.GetUserByUsername(ctx, "admin")
-		if err != nil {
+		if err := resetAdminPassword(ctx, iamStore); err != nil {
 			return err
-		}
-		if user != nil {
-			hash, err := iam.HashPassword("admin")
-			if err != nil {
-				return err
-			}
-			if err := iamStore.UpdateUserPassword(ctx, user.ID, hash); err != nil {
-				log.Warnf("Failed to reset admin password: %v", err)
-			} else {
-				log.Info("Admin password has been reset to 'admin'")
-			}
 		}
 	}
 
-	count, err := iamStore.CountUserAccounts(ctx)
+	return ensureDefaultAdmin(ctx, iamStore)
+}
+
+// resetAdminPassword sets the admin user's password back to "admin", if that user exists.
+func resetAdminPassword(ctx context.Context, iamStore armstore.Store) error {
+	log.Info("SICKROCK_RESET_ADMIN_PASSWORD is set, resetting admin password to 'admin'")
+	user, err := iamStore.GetUserByUsername(ctx, "admin")
+	if err != nil || user == nil {
+		return err
+	}
+	hash, err := iam.HashPassword("admin")
 	if err != nil {
 		return err
 	}
-	if count == 0 {
-		log.Info("No users found, creating default admin user")
-		hash, err := iam.HashPassword("admin")
-		if err != nil {
-			return err
-		}
-		if _, err := iamStore.CreateUserAccount(ctx, "admin", hash, armstore.UserCreatedByAdmin); err != nil {
-			return err
-		}
-		if err := iamStore.EnsureRBACBootstrap(ctx); err != nil {
-			return err
-		}
-		log.Info("Default admin user created (username: admin, password: admin)")
+	if err := iamStore.UpdateUserPassword(ctx, user.ID, hash); err != nil {
+		log.Warnf("Failed to reset admin password: %v", err)
+	} else {
+		log.Info("Admin password has been reset to 'admin'")
 	}
+	return nil
+}
 
+// ensureDefaultAdmin creates an admin/admin user when there are no user accounts at all.
+func ensureDefaultAdmin(ctx context.Context, iamStore armstore.Store) error {
+	count, err := iamStore.CountUserAccounts(ctx)
+	if err != nil || count > 0 {
+		return err
+	}
+	log.Info("No users found, creating default admin user")
+	hash, err := iam.HashPassword("admin")
+	if err != nil {
+		return err
+	}
+	if _, err := iamStore.CreateUserAccount(ctx, "admin", hash, armstore.UserCreatedByAdmin); err != nil {
+		return err
+	}
+	if err := iamStore.EnsureRBACBootstrap(ctx); err != nil {
+		return err
+	}
+	log.Info("Default admin user created (username: admin, password: admin)")
 	return nil
 }
 
@@ -190,40 +204,13 @@ func main() {
 	configureLogging(cfg)
 
 	// Capture logged errors for the logs.recent_errors health check.
-	errorLog := health.NewErrorLog()
+	errorLog := errorlog.New()
 	log.AddHook(errorLog)
 
-	db, err := repo.ConnectDatabase("file:../tmp/sickrock.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)")
-	if err != nil {
-		log.Fatalf("open db: %v", err)
-	}
-
-	if err := db.Ping(); err != nil {
-		log.Fatalf("ping db: %v", err)
-	}
-
-	log.Infof("Connected to database: %s", db.DriverName())
-
-	repository := repo.NewRepository(db)
-
-	logDatabaseEngineVersion(db)
-
-	if err := runMigrations(db); err != nil {
-		log.Fatalf("migrations failed: %v", err)
-	}
-
-	if err := repository.UpdateSystemTableConfigurations(context.Background()); err != nil {
-		log.Fatalf("update system table configurations: %v", err)
-	}
-
-	if err := repository.BackfillTableRelationsFromPhysicalFKs(context.Background()); err != nil {
-		log.Fatalf("backfill table_relations: %v", err)
-	}
-
-	logDatabaseEngineVersion(db)
+	db, repository := openDatabase()
 
 	iamStore := iam.NewStore(db)
-	if err := bootstrapIAM(context.Background(), iamStore); err != nil {
+	if err = bootstrapIAM(context.Background(), iamStore); err != nil {
 		log.Fatalf("IAM bootstrap failed: %v", err)
 	}
 
@@ -238,6 +225,51 @@ func main() {
 	go startRssCalendarFeedRefreshJob(srv)
 	startHealthCheckJob(cfg, repository, iamStore, srv, errorLog)
 
+	router := newRouter(srv, authLayer)
+
+	addr := ":" + cfg.Port
+	logListenPort(cfg.Port)
+	if err := router.Run(addr); err != nil {
+		log.WithError(err).WithField("addr", addr).Errorf("failed to listen or serve HTTP: %v", err)
+		os.Exit(1)
+	}
+}
+
+// openDatabase connects to the database, applies migrations and refreshes system metadata, exiting on failure.
+func openDatabase() (*sqlx.DB, *repo.Repository) {
+	db, err := repo.ConnectDatabase("file:../tmp/sickrock.db?_pragma=foreign_keys(1)&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)")
+	if err != nil {
+		log.Fatalf("open db: %v", err)
+	}
+
+	if err = db.Ping(); err != nil {
+		log.Fatalf("ping db: %v", err)
+	}
+
+	log.Infof("Connected to database: %s", db.DriverName())
+
+	repository := repo.NewRepository(db)
+
+	logDatabaseEngineVersion(db)
+
+	if err = runMigrations(db); err != nil {
+		log.Fatalf("migrations failed: %v", err)
+	}
+
+	if err = repository.UpdateSystemTableConfigurations(context.Background()); err != nil {
+		log.Fatalf("update system table configurations: %v", err)
+	}
+
+	if err = repository.BackfillTableRelationsFromPhysicalFKs(context.Background()); err != nil {
+		log.Fatalf("backfill table_relations: %v", err)
+	}
+
+	logDatabaseEngineVersion(db)
+	return db, repository
+}
+
+// newRouter serves the Connect API under /api, the AI discovery endpoints, MCP, metrics and the frontend.
+func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer) *gin.Engine {
 	jsonOpt := connectproto.WithJSON(
 		protojson.MarshalOptions{
 			EmitUnpopulated:   true,
@@ -258,21 +290,7 @@ func main() {
 	router := gin.New()
 	router.Use(ginLogrusLogger())
 	router.Use(gin.Recovery())
-	router.Use(func(c *gin.Context) {
-		headers := c.Writer.Header()
-		headers.Set("Access-Control-Allow-Origin", "*")
-		headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-		headers.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With, Accept, connect-protocol-version, Session-Token")
-		headers.Set("Access-Control-Allow-Credentials", "true")
-		headers.Set("Access-Control-Max-Age", "86400")
-
-		if c.Request.Method == http.MethodOptions {
-			c.AbortWithStatus(http.StatusNoContent)
-			return
-		}
-
-		c.Next()
-	})
+	router.Use(corsMiddleware)
 	router.Any("/api/*any", gin.WrapH(http.StripPrefix("/api", mux)))
 
 	router.GET("/openapi", func(c *gin.Context) {
@@ -285,11 +303,34 @@ func main() {
 		c.Data(http.StatusOK, "text/plain; charset=utf-8", llmsTxt)
 	})
 
+	router.GET("/metrics", gin.WrapH(metricsHandler()))
+
 	mcpHandler := mcp.NewHandler(srv)
 	router.Any("/mcp", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
 	router.Any("/mcp/*path", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
 
-	frontendDir := findFrontendDir()
+	registerFrontendRoutes(router, findFrontendDir())
+	return router
+}
+
+func corsMiddleware(c *gin.Context) {
+	headers := c.Writer.Header()
+	headers.Set("Access-Control-Allow-Origin", "*")
+	headers.Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+	headers.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With, Accept, connect-protocol-version, Session-Token")
+	headers.Set("Access-Control-Allow-Credentials", "true")
+	headers.Set("Access-Control-Max-Age", "86400")
+
+	if c.Request.Method == http.MethodOptions {
+		c.AbortWithStatus(http.StatusNoContent)
+		return
+	}
+
+	c.Next()
+}
+
+// registerFrontendRoutes serves the built SPA from frontendDir, falling back to index.html for client routes.
+func registerFrontendRoutes(router *gin.Engine, frontendDir string) {
 	router.Static("/assets", filepath.Join(frontendDir, "assets"))
 	router.Static("/css", filepath.Join(frontendDir, "css"))
 	router.Static("/js", filepath.Join(frontendDir, "js"))
@@ -322,42 +363,13 @@ func main() {
 		}
 		c.File(filepath.Join(frontendDir, "index.html"))
 	})
-
-	addr := ":" + cfg.Port
-	logListenPort(cfg.Port)
-	if err := router.Run(addr); err != nil {
-		log.WithError(err).WithField("addr", addr).Errorf("failed to listen or serve HTTP: %v", err)
-		os.Exit(1)
-	}
 }
 
 func runMigrations(db *sqlx.DB) error {
-	sqlDB := db.DB
-	driverName := db.DriverName()
-
 	cwd, _ := os.Getwd()
-	var migDir string
-	var databaseName string
-	var d database.Driver
-
-	switch driverName {
-	case "mysql":
-		migDir = filepath.Join(cwd, "migrations", "mysql")
-		log.Infof("MySQL detected - migrations dir: %s", migDir)
-		databaseName = "mysql"
-		md, err := mysql.WithInstance(sqlDB, &mysql.Config{})
-		if err != nil {
-			return err
-		}
-		d = md
-	default:
-		migDir = filepath.Join(cwd, "migrations", "sqlite")
-		databaseName = "sqlite3"
-		sd, err := sqlite3.WithInstance(sqlDB, &sqlite3.Config{})
-		if err != nil {
-			return err
-		}
-		d = sd
+	migDir, databaseName, d, err := migrationDriver(db, cwd)
+	if err != nil {
+		return err
 	}
 
 	srcURL := "file://" + migDir
@@ -366,32 +378,40 @@ func runMigrations(db *sqlx.DB) error {
 		return err
 	}
 
-	beforeVer, beforeDirty, verr := m.Version()
-	if verr == migrate.ErrNilVersion {
-		beforeVer, beforeDirty = 0, false
-		log.Infof("Migration version before: none (version=0), dirty=%v", beforeDirty)
-	} else if verr != nil {
-		log.Warnf("Could not get migration version before: %v", verr)
-	} else {
-		log.Infof("Migration version before: %d, dirty=%v", beforeVer, beforeDirty)
-	}
+	logMigrationVersion(m, "before")
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err
 	}
 
-	afterVer, afterDirty, aerr := m.Version()
-	if aerr == migrate.ErrNilVersion {
-		afterVer, afterDirty = 0, false
-		log.Infof("Migration version after: none (version=0), dirty=%v", afterDirty)
-	} else if aerr != nil {
-		log.Warnf("Could not get migration version after: %v", aerr)
-	} else {
-		log.Infof("Migration version after: %d, dirty=%v", afterVer, afterDirty)
-	}
+	logMigrationVersion(m, "after")
 
 	log.Infof("Database migrations applied from %s", srcURL)
 	return nil
+}
+
+// migrationDriver returns the migrations directory, migrate database name and driver for db's engine.
+func migrationDriver(db *sqlx.DB, cwd string) (migDir, databaseName string, d database.Driver, err error) {
+	if db.DriverName() == "mysql" {
+		migDir = filepath.Join(cwd, "migrations", "mysql")
+		log.Infof("MySQL detected - migrations dir: %s", migDir)
+		d, err = mysql.WithInstance(db.DB, &mysql.Config{})
+		return migDir, "mysql", d, err
+	}
+	d, err = sqlite3.WithInstance(db.DB, &sqlite3.Config{})
+	return filepath.Join(cwd, "migrations", "sqlite"), "sqlite3", d, err
+}
+
+func logMigrationVersion(m *migrate.Migrate, when string) {
+	ver, dirty, err := m.Version()
+	switch {
+	case errors.Is(err, migrate.ErrNilVersion):
+		log.Infof("Migration version %s: none (version=0), dirty=%v", when, dirty)
+	case err != nil:
+		log.Warnf("Could not get migration version %s: %v", when, err)
+	default:
+		log.Infof("Migration version %s: %d, dirty=%v", when, ver, dirty)
+	}
 }
 
 func logDatabaseEngineVersion(db *sqlx.DB) {
@@ -438,29 +458,42 @@ func cleanupDeviceCodes(repository *repo.Repository) {
 
 // startHealthCheckJob creates the health check service, attaches it to the server and runs it
 // in the background (shortly after startup, then every cfg.HealthCheckInterval).
-func startHealthCheckJob(cfg *config.Config, repository *repo.Repository, iamStore armstore.Store, srv *srvpkg.SickRockServer, errorLog *health.ErrorLog) {
-	interval, err := time.ParseDuration(cfg.HealthCheckInterval)
-	if err != nil || interval < time.Minute {
-		log.Warnf("Invalid health_check_interval %q (minimum 1m), using 15m", cfg.HealthCheckInterval)
-		interval = 15 * time.Minute
-	}
+func startHealthCheckJob(cfg *config.Config, repository *repo.Repository, iamStore armstore.Store, srv *srvpkg.SickRockServer, errorLog *errorlog.ErrorLog) {
+	interval := healthCheckInterval(cfg.HealthCheckInterval)
 
 	checks := health.DefaultChecks(health.Deps{
 		Repo:     repository,
 		ErrorLog: errorLog,
 		AdminUsesDefaultPassword: func(ctx context.Context) (bool, error) {
-			user, err := iamStore.GetUserByUsername(ctx, "admin")
-			if err != nil || user == nil {
-				return false, nil
-			}
-			return iam.VerifyPassword(user.PasswordHash, "admin")
+			return adminUsesDefaultPassword(ctx, iamStore)
 		},
 		Getenv:   os.Getenv,
 		LogLevel: cfg.LogLevel,
 	})
-	svc := health.NewService(repository, checks, srv.NotificationService())
+	db := repository.DB()
+	svc := armhealth.NewService(sqlstore.New(db.DB, db.DriverName()), checks, srv.NotificationService(), armhealth.Options{})
 	srv.SetHealthService(svc)
-	go svc.RunPeriodically(time.Minute, interval)
+	go svc.RunPeriodically(context.Background(), time.Minute, interval)
+}
+
+func healthCheckInterval(raw string) time.Duration {
+	interval, err := time.ParseDuration(raw)
+	if err != nil || interval < time.Minute {
+		log.Warnf("Invalid health_check_interval %q (minimum 1m), using 15m", raw)
+		return 15 * time.Minute
+	}
+	return interval
+}
+
+func adminUsesDefaultPassword(ctx context.Context, iamStore armstore.Store) (bool, error) {
+	user, err := iamStore.GetUserByUsername(ctx, "admin")
+	if err != nil {
+		return false, err
+	}
+	if user == nil {
+		return false, nil
+	}
+	return iam.VerifyPassword(user.PasswordHash, "admin")
 }
 
 func startRssCalendarFeedRefreshJob(srv *srvpkg.SickRockServer) {

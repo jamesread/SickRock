@@ -3,6 +3,9 @@ import vue from '@vitejs/plugin-vue'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import hugeicons from './vite-plugin-hugeicons.js'
 
+const backendPort = process.env.PORT || '8080'
+const backendTarget = `http://localhost:${backendPort}`
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -21,7 +24,12 @@ export default defineConfig({
     allowedHosts: ['mindstorm', '0.0.0.0', "baneling.teratan.net"],
     proxy: {
       '/api': {
-        target: 'http://localhost:8080',
+        target: backendTarget,
+        changeOrigin: true,
+        secure: false,
+      },
+      '/metrics': {
+        target: backendTarget,
         changeOrigin: true,
         secure: false,
       },

@@ -13,9 +13,9 @@ func TestListColumnsSQLiteScansPrimaryKeyMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if _, err := db.Exec(`
+	if _, err = db.ExecContext(t.Context(), `
 		CREATE TABLE configured_items (
 			item_key TEXT PRIMARY KEY,
 			name TEXT NOT NULL,

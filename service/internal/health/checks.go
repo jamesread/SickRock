@@ -1,7 +1,16 @@
+// Package health holds SickRock's health checks. The engine that runs them, stores their
+// issues and sends notifications is github.com/jamesread/armature-health.
+//
+// To add a check: implement armhealth.Check in a new file in this package and add it to
+// DefaultChecks below.
 package health
 
 import (
 	"context"
+
+	armhealth "github.com/jamesread/armature-health"
+	"github.com/jamesread/armature-health/checks"
+	"github.com/jamesread/armature-health/errorlog"
 
 	"github.com/jamesread/SickRock/internal/repo"
 )
@@ -10,7 +19,7 @@ import (
 type Deps struct {
 	Repo *repo.Repository
 	// ErrorLog is the logrus hook capturing recent errors (nil disables logs.recent_errors).
-	ErrorLog *ErrorLog
+	ErrorLog *errorlog.ErrorLog
 	// AdminUsesDefaultPassword reports whether the "admin" user still has the default password
 	// (nil disables security.default_admin_password).
 	AdminUsesDefaultPassword func(ctx context.Context) (bool, error)
@@ -21,8 +30,8 @@ type Deps struct {
 }
 
 // DefaultChecks returns every check, in the order they run and are listed. Add new checks here.
-func DefaultChecks(deps Deps) []Check {
-	checks := []Check{
+func DefaultChecks(deps Deps) []armhealth.Check {
+	checkList := []armhealth.Check{
 		TableConfigurationDuplicateNamesCheck{Repo: deps.Repo},
 		TableConfigurationMissingTableCheck{Repo: deps.Repo},
 		NavigationBrokenLinksCheck{Repo: deps.Repo},
@@ -31,13 +40,25 @@ func DefaultChecks(deps Deps) []Check {
 		CalendarFeedsFailingCheck{Repo: deps.Repo},
 	}
 	if deps.AdminUsesDefaultPassword != nil {
-		checks = append(checks, DefaultAdminPasswordCheck{UsesDefaultPassword: deps.AdminUsesDefaultPassword})
+		checkList = append(checkList, checks.DefaultPassword{
+			Product:             "SickRock",
+			Link:                "/admin/iam/users",
+			UsesDefaultPassword: deps.AdminUsesDefaultPassword,
+		})
 	}
 	if deps.Getenv != nil {
-		checks = append(checks, RiskySettingsCheck{Getenv: deps.Getenv, LogLevel: deps.LogLevel})
+		checkList = append(checkList, checks.RiskySettings{
+			Getenv:          deps.Getenv,
+			LogLevel:        deps.LogLevel,
+			LogLevelSetting: "SICKROCK_LOG_LEVEL / log_level",
+			EnvVars: []checks.RiskyEnvVar{{
+				Name:   "SICKROCK_RESET_ADMIN_PASSWORD",
+				Detail: `The admin password is reset to "admin" every time SickRock starts. Unset the environment variable once you have regained access.`,
+			}},
+		})
 	}
 	if deps.ErrorLog != nil {
-		checks = append(checks, RecentErrorsCheck{Log: deps.ErrorLog})
+		checkList = append(checkList, errorlog.RecentErrorsCheck{Log: deps.ErrorLog})
 	}
-	return checks
+	return checkList
 }

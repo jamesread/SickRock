@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -53,23 +54,23 @@ func (r *Repository) createForeignKeySQLite(
 }
 
 type sqliteTableInfoRow struct {
-	Cid       int     `db:"cid"`
+	DfltValue *string `db:"dflt_value"`
 	Name      string  `db:"name"`
 	Type      string  `db:"type"`
+	Cid       int     `db:"cid"`
 	NotNull   int     `db:"notnull"`
-	DfltValue *string `db:"dflt_value"`
 	Pk        int     `db:"pk"`
 }
 
 type sqliteForeignKeyRow struct {
-	ID       int    `db:"id"`
-	Seq      int    `db:"seq"`
 	Table    string `db:"table"`
 	From     string `db:"from"`
 	To       string `db:"to"`
 	OnUpdate string `db:"on_update"`
 	OnDelete string `db:"on_delete"`
 	Match    string `db:"match"`
+	ID       int    `db:"id"`
+	Seq      int    `db:"seq"`
 }
 
 func sqliteColumnDefinition(col sqliteTableInfoRow, tableDDL string) string {
@@ -121,7 +122,7 @@ func (r *Repository) sqliteForeignKeyList(ctx context.Context, physicalTable str
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []sqliteForeignKeyRow
 	for rows.Next() {
@@ -139,6 +140,15 @@ func groupSQLiteForeignKeys(rows []sqliteForeignKeyRow) []sqliteForeignKeyRow {
 	if len(rows) == 0 {
 		return rows
 	}
+	byID, order := indexSQLiteForeignKeys(rows)
+	out := make([]sqliteForeignKeyRow, 0, len(order))
+	for _, id := range order {
+		out = append(out, byID[id])
+	}
+	return out
+}
+
+func indexSQLiteForeignKeys(rows []sqliteForeignKeyRow) (map[int]sqliteForeignKeyRow, []int) {
 	byID := make(map[int]sqliteForeignKeyRow)
 	order := make([]int, 0, len(rows))
 	for _, row := range rows {
@@ -147,11 +157,7 @@ func groupSQLiteForeignKeys(rows []sqliteForeignKeyRow) []sqliteForeignKeyRow {
 		}
 		byID[row.ID] = row
 	}
-	out := make([]sqliteForeignKeyRow, 0, len(order))
-	for _, id := range order {
-		out = append(out, byID[id])
-	}
-	return out
+	return byID, order
 }
 
 func normalizeSQLiteFKAction(action string) string {
@@ -164,11 +170,15 @@ func normalizeSQLiteFKAction(action string) string {
 
 func sqliteForeignKeyExists(fks []sqliteForeignKeyRow, fromCol, refTable, refCol string) bool {
 	for _, fk := range fks {
-		if fk.From == fromCol && fk.Table == refTable && fk.To == refCol {
+		if sqliteForeignKeyMatches(fk, fromCol, refTable, refCol) {
 			return true
 		}
 	}
 	return false
+}
+
+func sqliteForeignKeyMatches(fk sqliteForeignKeyRow, fromCol, refTable, refCol string) bool {
+	return fk.From == fromCol && fk.Table == refTable && fk.To == refCol
 }
 
 func (r *Repository) rebuildSQLiteTableAddForeignKey(
@@ -176,21 +186,9 @@ func (r *Repository) rebuildSQLiteTableAddForeignKey(
 	physicalTable, columnName, referencedPhysicalTable, referencedColumn,
 	onDelete, onUpdate string,
 ) error {
-	var tableDDL string
-	if err := r.db.GetContext(ctx, &tableDDL,
-		"SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", physicalTable); err != nil {
-		return fmt.Errorf("load table ddl: %w", err)
-	}
-	if tableDDL == "" {
-		return fmt.Errorf("table %q not found", physicalTable)
-	}
-
-	var columns []sqliteTableInfoRow
-	if err := r.db.SelectContext(ctx, &columns, fmt.Sprintf("PRAGMA table_info(%s)", physicalTable)); err != nil {
-		return fmt.Errorf("table_info: %w", err)
-	}
-	if len(columns) == 0 {
-		return fmt.Errorf("table %q has no columns", physicalTable)
+	snapshot, err := r.loadSQLiteTableSnapshot(ctx, physicalTable)
+	if err != nil {
+		return err
 	}
 
 	existingFKs, err := r.sqliteForeignKeyList(ctx, physicalTable)
@@ -201,53 +199,90 @@ func (r *Repository) rebuildSQLiteTableAddForeignKey(
 		return nil
 	}
 
-	type indexRow struct {
-		Name string `db:"name"`
-		SQL  string `db:"sql"`
-	}
-	var indexes []indexRow
-	if err := r.db.SelectContext(ctx, &indexes,
-		"SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL",
-		physicalTable); err != nil {
-		return fmt.Errorf("list indexes: %w", err)
-	}
-
-	tempTable := "_sr_fk_" + physicalTable
-	colDefs := make([]string, 0, len(columns)+len(existingFKs)+1)
-	for _, col := range columns {
-		colDefs = append(colDefs, sqliteColumnDefinition(col, tableDDL))
-	}
+	fkClauses := make([]string, 0, len(existingFKs)+1)
 	for _, fk := range groupSQLiteForeignKeys(existingFKs) {
-		colDefs = append(colDefs, sqliteForeignKeyClause(
+		fkClauses = append(fkClauses, sqliteForeignKeyClause(
 			fk.From, fk.Table, fk.To, normalizeSQLiteFKAction(fk.OnDelete), normalizeSQLiteFKAction(fk.OnUpdate)))
 	}
-	colDefs = append(colDefs, sqliteForeignKeyClause(columnName, referencedPhysicalTable, referencedColumn, onDelete, onUpdate))
+	fkClauses = append(fkClauses, sqliteForeignKeyClause(columnName, referencedPhysicalTable, referencedColumn, onDelete, onUpdate))
 
-	createSQL := fmt.Sprintf("CREATE TABLE %s (%s)", quoteSQLiteIdent(tempTable), strings.Join(colDefs, ", "))
-	log.Debugf("sqlite rebuild create: %s", createSQL)
+	return r.rebuildSQLiteTable(ctx, physicalTable, snapshot, fkClauses)
+}
+
+type sqliteIndexRow struct {
+	Name string `db:"name"`
+	SQL  string `db:"sql"`
+}
+
+// sqliteTableSnapshot is what is needed to recreate a SQLite table: its DDL, columns and indexes.
+type sqliteTableSnapshot struct {
+	ddl     string
+	columns []sqliteTableInfoRow
+	indexes []sqliteIndexRow
+}
+
+func (r *Repository) loadSQLiteTableSnapshot(ctx context.Context, physicalTable string) (*sqliteTableSnapshot, error) {
+	snapshot := &sqliteTableSnapshot{}
+	if err := r.db.GetContext(ctx, &snapshot.ddl,
+		"SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", physicalTable); err != nil {
+		return nil, fmt.Errorf("load table ddl: %w", err)
+	}
+	if snapshot.ddl == "" {
+		return nil, fmt.Errorf("table %q not found", physicalTable)
+	}
+
+	if err := r.db.SelectContext(ctx, &snapshot.columns, fmt.Sprintf("PRAGMA table_info(%s)", physicalTable)); err != nil {
+		return nil, fmt.Errorf("table_info: %w", err)
+	}
+	if len(snapshot.columns) == 0 {
+		return nil, fmt.Errorf("table %q has no columns", physicalTable)
+	}
+
+	if err := r.db.SelectContext(ctx, &snapshot.indexes,
+		"SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name = ? AND sql IS NOT NULL",
+		physicalTable); err != nil {
+		return nil, fmt.Errorf("list indexes: %w", err)
+	}
+	return snapshot, nil
+}
+
+// rebuildSQLiteTable recreates physicalTable with its existing columns and exactly the given foreign
+// key clauses (SQLite cannot alter constraints in place), copying the data and recreating its indexes.
+func (r *Repository) rebuildSQLiteTable(ctx context.Context, physicalTable string, snapshot *sqliteTableSnapshot, fkClauses []string) error {
+	steps := sqliteRebuildSteps(physicalTable, snapshot, fkClauses)
 
 	if _, err := r.db.ExecContext(ctx, "PRAGMA foreign_keys=OFF"); err != nil {
 		return err
 	}
 	defer func() { _, _ = r.db.ExecContext(ctx, "PRAGMA foreign_keys=ON") }()
 
-	tx, err := r.db.BeginTxx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
+	return r.inTx(ctx, func(tx *sqlx.Tx) error {
+		for _, step := range steps {
+			if _, err := tx.ExecContext(ctx, step.sql); err != nil {
+				return wrapErrIf(step.errPrefix, err)
+			}
+		}
+		return nil
+	})
+}
 
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", quoteSQLiteIdent(tempTable))); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, createSQL); err != nil {
-		return fmt.Errorf("create rebuild table: %w", err)
-	}
+// sqlStep is one statement of a multi-statement change; errPrefix (optional) labels its failure.
+type sqlStep struct{ sql, errPrefix string }
 
-	colNames := make([]string, len(columns))
-	for i, col := range columns {
+// sqliteRebuildSteps returns the statements that recreate physicalTable through a temporary table
+// with its columns plus fkClauses, copying its data and recreating its indexes.
+func sqliteRebuildSteps(physicalTable string, snapshot *sqliteTableSnapshot, fkClauses []string) []sqlStep {
+	tempTable := "_sr_fk_" + physicalTable
+	colDefs := make([]string, 0, len(snapshot.columns)+len(fkClauses))
+	colNames := make([]string, len(snapshot.columns))
+	for i, col := range snapshot.columns {
+		colDefs = append(colDefs, sqliteColumnDefinition(col, snapshot.ddl))
 		colNames[i] = quoteSQLiteIdent(col.Name)
 	}
+	colDefs = append(colDefs, fkClauses...)
+
+	createSQL := fmt.Sprintf("CREATE TABLE %s (%s)", quoteSQLiteIdent(tempTable), strings.Join(colDefs, ", "))
+	log.Debugf("sqlite rebuild create: %s", createSQL)
 	copySQL := fmt.Sprintf(
 		"INSERT INTO %s (%s) SELECT %s FROM %s",
 		quoteSQLiteIdent(tempTable),
@@ -255,23 +290,26 @@ func (r *Repository) rebuildSQLiteTableAddForeignKey(
 		strings.Join(colNames, ", "),
 		quoteSQLiteIdent(physicalTable),
 	)
-	if _, err := tx.ExecContext(ctx, copySQL); err != nil {
-		return fmt.Errorf("copy table data: %w", err)
-	}
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s", quoteSQLiteIdent(physicalTable))); err != nil {
-		return err
-	}
-	if _, err := tx.ExecContext(ctx, fmt.Sprintf("ALTER TABLE %s RENAME TO %s", quoteSQLiteIdent(tempTable), quoteSQLiteIdent(physicalTable))); err != nil {
-		return err
-	}
-	for _, idx := range indexes {
-		if idx.SQL == "" {
-			continue
-		}
-		if _, err := tx.ExecContext(ctx, idx.SQL); err != nil {
-			return fmt.Errorf("recreate index %s: %w", idx.Name, err)
-		}
-	}
 
-	return tx.Commit()
+	steps := []sqlStep{
+		{fmt.Sprintf("DROP TABLE IF EXISTS %s", quoteSQLiteIdent(tempTable)), ""},
+		{createSQL, "create rebuild table"},
+		{copySQL, "copy table data"},
+		{fmt.Sprintf("DROP TABLE %s", quoteSQLiteIdent(physicalTable)), ""},
+		{fmt.Sprintf("ALTER TABLE %s RENAME TO %s", quoteSQLiteIdent(tempTable), quoteSQLiteIdent(physicalTable)), ""},
+	}
+	for _, idx := range snapshot.indexes {
+		if idx.SQL != "" {
+			steps = append(steps, sqlStep{idx.SQL, "recreate index " + idx.Name})
+		}
+	}
+	return steps
+}
+
+// wrapErrIf prefixes err with prefix, or returns it unchanged when prefix is empty.
+func wrapErrIf(prefix string, err error) error {
+	if prefix == "" {
+		return err
+	}
+	return fmt.Errorf("%s: %w", prefix, err)
 }

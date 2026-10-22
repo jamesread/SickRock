@@ -12,10 +12,10 @@ func TestUpdateTableRelationDisplayName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	ctx := context.Background()
-	if _, err := db.ExecContext(ctx, `
+	if _, err = db.ExecContext(ctx, `
 		CREATE TABLE table_relations (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			constraint_name TEXT NOT NULL UNIQUE,
@@ -39,7 +39,7 @@ func TestUpdateTableRelationDisplayName(t *testing.T) {
 	}
 
 	repo := NewRepository(db)
-	if err := repo.UpdateTableRelation(ctx, "fk_test", "Customer orders", nil); err != nil {
+	if err = repo.UpdateTableRelation(ctx, "fk_test", "Customer orders", nil); err != nil {
 		t.Fatalf("update: %v", err)
 	}
 	rel, err := repo.GetTableRelationByConstraintName(ctx, "fk_test")

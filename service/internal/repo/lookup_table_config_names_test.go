@@ -12,13 +12,13 @@ func TestLookupTableConfigNames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if err := configureSQLiteDB(db); err != nil {
+	if err = configureSQLiteDB(db); err != nil {
 		t.Fatalf("configure: %v", err)
 	}
 
-	_, err = db.Exec(`
+	_, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_configurations (
 			id INTEGER PRIMARY KEY,
 			name TEXT NOT NULL,

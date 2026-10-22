@@ -709,7 +709,7 @@ const entries = computed(() => {
       // Skip markdown fields - they're handled by their base field
       if (key.endsWith('Markdown')) continue
 
-      let displayValue = value
+      let displayValue
       let valueClass = ''
 
       // Check if there's a corresponding markdown field
@@ -913,12 +913,9 @@ const relatedTables = computed(() => {
     const displayName = fk?.displayName?.trim() ?? ''
     const title = displayName || `${relatedTableTc} (${columnName})`
 
-    // Determine filter column (on the related table) and value (from the current item)
-    let filterColumn = columnName
-    let filterValue = ''
-    filterColumn = fk.columnName
+    const filterColumn = fk.columnName
     const parentKey = resolveRawFieldValue(fk.referencedColumn) ?? resolveRawFieldValue(primaryKeyColumn.value)
-    filterValue = parentKey == null ? '' : String(parentKey)
+    const filterValue = parentKey == null ? '' : String(parentKey)
 
     tables.push({
       tableName: relatedTableTc,

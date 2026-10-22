@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -21,19 +22,27 @@ func sessionIDFromRequest(req connect.AnyRequest) string {
 	if h := req.Header().Get("Session-Token"); h != "" {
 		return h
 	}
-	if auth := req.Header().Get("Authorization"); auth != "" {
-		parts := strings.SplitN(auth, " ", 2)
-		if len(parts) == 2 && parts[0] == "Bearer" && parts[1] != "" && strings.HasPrefix(parts[1], "sk_") == false {
-			return parts[1]
-		}
+	if sid := bearerSessionID(req.Header().Get("Authorization")); sid != "" {
+		return sid
 	}
-	if cookieHeader := req.Header().Get("Cookie"); cookieHeader != "" {
-		prefix := iam.CookieName + "="
-		for _, part := range strings.Split(cookieHeader, ";") {
-			part = strings.TrimSpace(part)
-			if strings.HasPrefix(part, prefix) {
-				return strings.TrimPrefix(part, prefix)
-			}
+	return cookieSessionID(req.Header().Get("Cookie"))
+}
+
+// bearerSessionID returns a bearer token that is a session ID (API keys, prefixed sk_, are not).
+func bearerSessionID(authorization string) string {
+	parts := strings.SplitN(authorization, " ", 2)
+	if len(parts) == 2 && parts[0] == "Bearer" && parts[1] != "" && !strings.HasPrefix(parts[1], "sk_") {
+		return parts[1]
+	}
+	return ""
+}
+
+// cookieSessionID returns the session cookie's value from a Cookie header, or "".
+func cookieSessionID(cookieHeader string) string {
+	prefix := iam.CookieName + "="
+	for part := range strings.SplitSeq(cookieHeader, ";") {
+		if after, ok := strings.CutPrefix(strings.TrimSpace(part), prefix); ok {
+			return after
 		}
 	}
 	return ""
@@ -63,7 +72,7 @@ func (s *SickRockServer) latestSessionID(ctx context.Context, userID int) (strin
 	var sid string
 	err := s.repo.DB().GetContext(ctx, &sid,
 		`SELECT sid FROM sessions WHERE user_account_id = ? ORDER BY id DESC LIMIT 1`, userID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	return sid, err
@@ -93,7 +102,7 @@ func rbacPermissionNames(au *armlayer.AuthenticatedUser) []string {
 
 func (s *SickRockServer) getUserIDFromContext(ctx context.Context) (int, error) {
 	au := s.authUser(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return 0, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
 	return au.User.ID, nil
@@ -103,9 +112,6 @@ func (s *SickRockServer) getInitialRoute(ctx context.Context, userID int) string
 	var route string
 	err := s.repo.DB().GetContext(ctx, &route, `SELECT initial_route FROM user_accounts WHERE id = ?`, userID)
 	if err != nil || route == "" {
-		if err != nil && err != sql.ErrNoRows {
-			return "/"
-		}
 		return "/"
 	}
 	return route

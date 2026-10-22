@@ -27,10 +27,10 @@ func isSystemSettingsTableConfiguration(tcName string) bool {
 
 func (s *SickRockServer) requireSystemSettings(ctx context.Context) error {
 	au := s.authUserRBAC(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
-	if au.RBAC != nil && au.RBAC.IsSuperuser {
+	if isSuperuser(au) {
 		return nil
 	}
 	if au.RBAC != nil && au.RBAC.Has(rbac.PermissionSystemSettings) {
@@ -39,28 +39,15 @@ func (s *SickRockServer) requireSystemSettings(ctx context.Context) error {
 	return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("missing permission %s", rbac.PermissionSystemSettings))
 }
 
-func (s *SickRockServer) requireSystemSettingsForTable(ctx context.Context, tcName string) error {
-	if tcName == "" || !isSystemSettingsTableConfiguration(tcName) {
-		return nil
-	}
-	return s.requireSystemSettings(ctx)
-}
-
 func (s *SickRockServer) canDiscoverTableConfiguration(ctx context.Context, tcName string) bool {
-	if tcName == audit.TableConfiguration {
+	switch {
+	case tcName == audit.TableConfiguration:
 		return s.requireAuditView(ctx) == nil
-	}
-	if tcName == tableReadOnlyExportsTCName {
+	case tcName == tableReadOnlyExportsTCName:
 		au := s.authUser(ctx)
-		if au == nil || au.User == nil {
-			return false
-		}
-		if au.RBAC != nil && (au.RBAC.IsSuperuser || au.RBAC.Has(exportsManagePermission)) {
-			return true
-		}
-		return false
-	}
-	if isSystemSettingsTableConfiguration(tcName) {
+		// Has is nil-safe and true for superusers.
+		return isAuthenticated(au) && au.RBAC.Has(exportsManagePermission)
+	case isSystemSettingsTableConfiguration(tcName):
 		return s.requireSystemSettings(ctx) == nil
 	}
 	return true

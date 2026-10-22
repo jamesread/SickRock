@@ -3,6 +3,7 @@ package rolegrants
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
@@ -10,10 +11,10 @@ import (
 
 // Row is one effective role granted to a user via a specific group membership.
 type Row struct {
-	RoleID    int
 	RoleName  string
-	GroupID   int
 	GroupName string
+	RoleID    int
+	GroupID   int
 }
 
 func ListForUser(ctx context.Context, db *sqlx.DB, userID int) ([]Row, error) {
@@ -33,8 +34,12 @@ func ListForUser(ctx context.Context, db *sqlx.DB, userID int) ([]Row, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list user role grants: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
+	return scanRoleGrantRows(rows)
+}
+
+func scanRoleGrantRows(rows *sqlx.Rows) ([]Row, error) {
 	out := make([]Row, 0, 8)
 	for rows.Next() {
 		var row Row
@@ -58,7 +63,7 @@ func UserIsSuperuser(ctx context.Context, db *sqlx.DB, userID int) (bool, error)
 		INNER JOIN user_group_memberships ugm ON ugm.user_group_id = gr.user_group_id
 		WHERE ugm.user_account_id = ? AND r.name = 'superuser'
 		LIMIT 1`, userID)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {

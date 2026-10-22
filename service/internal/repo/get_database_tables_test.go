@@ -12,9 +12,9 @@ func TestGetDatabaseTablesSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if _, err := db.Exec(`
+	if _, err = db.ExecContext(t.Context(), `
 		CREATE TABLE table_configurations (
 			name TEXT PRIMARY KEY,
 			db TEXT,

@@ -12,17 +12,22 @@ import (
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/repo"
 	"github.com/jamesread/SickRock/internal/rsscalendar"
+	armlayer "github.com/jamesread/armature-iam/layer"
 )
 
 func (s *SickRockServer) requireExportsManage(ctx context.Context) error {
 	au := s.authUser(ctx)
-	if au == nil || au.User == nil {
+	if !isAuthenticated(au) {
 		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
-	if au.RBAC != nil && (au.RBAC.IsSuperuser || au.RBAC.Has(exportsManagePermission)) {
+	if canManageExports(au) {
 		return nil
 	}
 	return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("exports.manage permission required"))
+}
+
+func canManageExports(au *armlayer.AuthenticatedUser) bool {
+	return au.RBAC != nil && (au.RBAC.IsSuperuser || au.RBAC.Has(exportsManagePermission))
 }
 
 func rssFeedToProto(feed *repo.RssCalendarFeed) (*sickrockpb.RssCalendarFeed, error) {
@@ -33,31 +38,37 @@ func rssFeedToProto(feed *repo.RssCalendarFeed) (*sickrockpb.RssCalendarFeed, er
 	if err != nil {
 		return nil, err
 	}
-	mappings := make([]*sickrockpb.RssFieldMapping, 0, len(cfg.Mappings))
-	for _, m := range cfg.Mappings {
-		mappings = append(mappings, &sickrockpb.RssFieldMapping{
-			RssField: m.RssField,
-			Column:   m.Column,
-		})
-	}
+	mappings := rssFieldMappingsToProto(cfg.Mappings)
 	out := &sickrockpb.RssCalendarFeed{
-		Id:                     int32(feed.ID),
+		Id:                     toInt32(feed.ID),
 		Name:                   feed.Name,
 		FeedUrl:                feed.FeedURL,
 		TableConfiguration:     feed.TableConfiguration,
 		FieldMappings:          mappings,
 		UniqueColumn:           feed.UniqueColumn,
-		RefreshIntervalMinutes: int32(feed.RefreshIntervalMinutes),
+		FeedIdColumn:           feed.FeedIDColumn,
+		RefreshIntervalMinutes: toInt32(feed.RefreshIntervalMinutes),
 		Enabled:                feed.Enabled,
 		LastRefreshStatus:      feed.LastRefreshStatus,
 		LastRefreshMessage:     feed.LastRefreshMessage,
-		LastItemsCreated:       int32(feed.LastItemsCreated),
-		LastItemsUpdated:       int32(feed.LastItemsUpdated),
+		LastItemsCreated:       toInt32(feed.LastItemsCreated),
+		LastItemsUpdated:       toInt32(feed.LastItemsUpdated),
 	}
 	if feed.LastRefreshAt.Valid {
 		out.LastRefreshAt = feed.LastRefreshAt.Time.Unix()
 	}
 	return out, nil
+}
+
+func rssFieldMappingsToProto(mappings []rsscalendar.FieldMapping) []*sickrockpb.RssFieldMapping {
+	out := make([]*sickrockpb.RssFieldMapping, 0, len(mappings))
+	for _, m := range mappings {
+		out = append(out, &sickrockpb.RssFieldMapping{
+			RssField: m.RssField,
+			Column:   m.Column,
+		})
+	}
+	return out
 }
 
 func rssFeedFromProto(msg *sickrockpb.RssCalendarFeed) (*repo.RssCalendarFeed, string, error) {
@@ -90,6 +101,7 @@ func rssFeedFromProto(msg *sickrockpb.RssCalendarFeed) (*repo.RssCalendarFeed, s
 		TableConfiguration:     strings.TrimSpace(msg.GetTableConfiguration()),
 		FieldMappingJSON:       encoded,
 		UniqueColumn:           strings.TrimSpace(msg.GetUniqueColumn()),
+		FeedIDColumn:           strings.TrimSpace(msg.GetFeedIdColumn()),
 		RefreshIntervalMinutes: interval,
 		Enabled:                msg.GetEnabled(),
 	}
@@ -104,6 +116,14 @@ func (s *SickRockServer) ListRssCalendarFeeds(ctx context.Context, _ *connect.Re
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
+	out, err := rssFeedsToProto(rows)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&sickrockpb.ListRssCalendarFeedsResponse{Feeds: out}), nil
+}
+
+func rssFeedsToProto(rows []repo.RssCalendarFeed) ([]*sickrockpb.RssCalendarFeed, error) {
 	out := make([]*sickrockpb.RssCalendarFeed, 0, len(rows))
 	for _, row := range rows {
 		pb, err := rssFeedToProto(&row)
@@ -112,7 +132,19 @@ func (s *SickRockServer) ListRssCalendarFeeds(ctx context.Context, _ *connect.Re
 		}
 		out = append(out, pb)
 	}
-	return connect.NewResponse(&sickrockpb.ListRssCalendarFeedsResponse{Feeds: out}), nil
+	return out, nil
+}
+
+func (s *SickRockServer) rssFeedProtoByID(ctx context.Context, id int) (*sickrockpb.RssCalendarFeed, error) {
+	feed, err := s.repo.GetRssCalendarFeedByID(ctx, id)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	pb, err := rssFeedToProto(feed)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return pb, nil
 }
 
 func (s *SickRockServer) GetRssCalendarFeed(ctx context.Context, req *connect.Request[sickrockpb.GetRssCalendarFeedRequest]) (*connect.Response[sickrockpb.GetRssCalendarFeedResponse], error) {
@@ -138,16 +170,8 @@ func (s *SickRockServer) SaveRssCalendarFeed(ctx context.Context, req *connect.R
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
-	if feed.ID > 0 {
-		if err := s.repo.UpdateRssCalendarFeed(ctx, feed); err != nil {
-			return nil, connect.NewError(connect.CodeInternal, err)
-		}
-	} else {
-		id, err := s.repo.CreateRssCalendarFeed(ctx, feed)
-		if err != nil {
-			return nil, connect.NewError(connect.CodeInternal, err)
-		}
-		feed.ID = id
+	if err = s.upsertRssCalendarFeed(ctx, feed); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	saved, err := s.repo.GetRssCalendarFeedByID(ctx, feed.ID)
 	if err != nil {
@@ -158,6 +182,16 @@ func (s *SickRockServer) SaveRssCalendarFeed(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&sickrockpb.SaveRssCalendarFeedResponse{Feed: pb}), nil
+}
+
+// upsertRssCalendarFeed updates the feed when it has an ID, otherwise creates it and sets feed.ID.
+func (s *SickRockServer) upsertRssCalendarFeed(ctx context.Context, feed *repo.RssCalendarFeed) error {
+	if feed.ID > 0 {
+		return s.repo.UpdateRssCalendarFeed(ctx, feed)
+	}
+	id, err := s.repo.CreateRssCalendarFeed(ctx, feed)
+	feed.ID = id
+	return err
 }
 
 func (s *SickRockServer) DeleteRssCalendarFeed(ctx context.Context, req *connect.Request[sickrockpb.DeleteRssCalendarFeedRequest]) (*connect.Response[sickrockpb.DeleteRssCalendarFeedResponse], error) {
@@ -180,19 +214,15 @@ func (s *SickRockServer) RefreshRssCalendarFeed(ctx context.Context, req *connec
 		log.WithError(err).WithField("feedID", feedID).Warn("RSS calendar: manual refresh failed")
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	feed, err := s.repo.GetRssCalendarFeedByID(ctx, int(req.Msg.GetId()))
+	pb, err := s.rssFeedProtoByID(ctx, int(req.Msg.GetId()))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-	pb, err := rssFeedToProto(feed)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.RefreshRssCalendarFeedResponse{
 		Feed:         pb,
 		Message:      result.Message,
-		ItemsCreated: int32(result.Created),
-		ItemsUpdated: int32(result.Updated),
+		ItemsCreated: toInt32(result.Created),
+		ItemsUpdated: toInt32(result.Updated),
 	}), nil
 }
 

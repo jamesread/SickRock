@@ -13,9 +13,9 @@ func TestGetRssCalendarFeedScansSQLiteTimestampString(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
-	if _, err := db.Exec(`
+	if _, err = db.ExecContext(t.Context(), `
 		CREATE TABLE rss_calendar_feeds (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			name TEXT NOT NULL,
@@ -23,6 +23,7 @@ func TestGetRssCalendarFeedScansSQLiteTimestampString(t *testing.T) {
 			table_configuration TEXT NOT NULL,
 			field_mapping_json TEXT NOT NULL DEFAULT '{}',
 			unique_column TEXT NOT NULL DEFAULT '',
+			feed_id_column TEXT NOT NULL DEFAULT '',
 			refresh_interval_minutes INTEGER NOT NULL DEFAULT 60,
 			enabled INTEGER NOT NULL DEFAULT 1,
 			last_refresh_at TEXT,

@@ -34,7 +34,7 @@ func getTelegramBotToken() string {
 }
 
 // SendNotification sends a notification for a specific event
-func (ns *NotificationService) SendNotification(ctx context.Context, eventCode string, data map[string]interface{}) error {
+func (ns *NotificationService) SendNotification(ctx context.Context, eventCode string, data map[string]any) error {
 	// Get all subscriptions for this event
 	subscriptions, err := ns.repo.GetSubscriptionsForEvent(ctx, eventCode)
 	if err != nil {
@@ -49,53 +49,54 @@ func (ns *NotificationService) SendNotification(ctx context.Context, eventCode s
 	// Build notification message
 	message := ns.buildMessage(eventCode, data)
 
-	// Send notifications to each subscription
 	for _, sub := range subscriptions {
-		err := ns.sendToChannel(ctx, sub.Channel, message, data)
-		if err != nil {
-			log.WithError(err).WithFields(log.Fields{
-				"event_code":   eventCode,
-				"channel_id":   sub.Channel.ID,
-				"channel_type": sub.Channel.ChannelType,
-			}).Error("Failed to send notification")
-			// Continue with other channels even if one fails
-		}
+		ns.sendOneSubscription(ctx, eventCode, message, data, sub.Channel)
 	}
-
 	return nil
 }
 
+func (ns *NotificationService) sendOneSubscription(ctx context.Context, eventCode, message string, data map[string]any, channel repo.UserNotificationChannel) {
+	if err := ns.sendToChannel(ctx, channel, message, data); err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"event_code":   eventCode,
+			"channel_id":   channel.ID,
+			"channel_type": channel.ChannelType,
+		}).Error("Failed to send notification")
+	}
+}
+
 // buildMessage creates a human-readable message from event code and data
-func (ns *NotificationService) buildMessage(eventCode string, data map[string]interface{}) string {
+func (ns *NotificationService) buildMessage(eventCode string, data map[string]any) string {
 	switch eventCode {
 	case "user.logged_in":
-		username := "unknown"
-		if u, ok := data["username"].(string); ok {
-			username = u
-		}
-		return fmt.Sprintf("User %s logged in successfully", username)
+		return fmt.Sprintf("User %s logged in successfully", stringOr(data, "username", "unknown"))
 	case "password.reset_reminder":
-		username := "unknown"
-		if u, ok := data["username"].(string); ok {
-			username = u
-		}
-		return fmt.Sprintf("Password reset reminder for user %s", username)
+		return fmt.Sprintf("Password reset reminder for user %s", stringOr(data, "username", "unknown"))
 	case "health.issue_raised":
-		severity, _ := data["severity"].(string)
-		title, _ := data["title"].(string)
-		check, _ := data["check"].(string)
-		message := fmt.Sprintf("SickRock health %s: %s (%s)", severity, title, check)
-		if link, ok := data["link"].(string); ok && link != "" {
-			message += " — fix at " + link
-		}
-		return message
+		return healthIssueMessage(data)
 	default:
 		return fmt.Sprintf("Notification for event: %s", eventCode)
 	}
 }
 
+// stringOr returns data[key] when it is a string, otherwise fallback.
+func stringOr(data map[string]any, key, fallback string) string {
+	if v, ok := data[key].(string); ok {
+		return v
+	}
+	return fallback
+}
+
+func healthIssueMessage(data map[string]any) string {
+	message := fmt.Sprintf("SickRock health %s: %s (%s)", stringOr(data, "severity", ""), stringOr(data, "title", ""), stringOr(data, "check", ""))
+	if link := stringOr(data, "link", ""); link != "" {
+		message += " — fix at " + link
+	}
+	return message
+}
+
 // sendToChannel sends a notification to a specific channel
-func (ns *NotificationService) sendToChannel(ctx context.Context, channel repo.UserNotificationChannel, message string, data map[string]interface{}) error {
+func (ns *NotificationService) sendToChannel(ctx context.Context, channel repo.UserNotificationChannel, message string, data map[string]any) error {
 	switch channel.ChannelType {
 	case "telegram":
 		return ns.sendTelegram(ctx, channel.ChannelValue, message)
@@ -116,28 +117,16 @@ func (ns *NotificationService) sendTelegram(ctx context.Context, telegramID stri
 
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", ns.telegramBotToken)
 
-	payload := map[string]interface{}{
+	payload := map[string]any{
 		"chat_id": telegramID,
 		"text":    message,
 	}
 
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal telegram payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to create telegram request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := postJSON(ctx, url, payload)
 	if err != nil {
 		return fmt.Errorf("failed to send telegram message: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("telegram API returned status %d", resp.StatusCode)
@@ -151,33 +140,39 @@ func (ns *NotificationService) sendTelegram(ctx context.Context, telegramID stri
 	return nil
 }
 
+func postJSON(ctx context.Context, url string, payload map[string]any) (*http.Response, error) {
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal payload: %w", err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 10 * time.Second}
+	return client.Do(req)
+}
+
+func isHTTPSuccess(status int) bool {
+	return status >= 200 && status < 300
+}
+
 // sendWebhook sends a notification via HTTP webhook
-func (ns *NotificationService) sendWebhook(ctx context.Context, webhookURL string, message string, data map[string]interface{}) error {
-	payload := map[string]interface{}{
+func (ns *NotificationService) sendWebhook(ctx context.Context, webhookURL string, message string, data map[string]any) error {
+	payload := map[string]any{
 		"message":   message,
 		"timestamp": time.Now().Unix(),
 		"data":      data,
 	}
 
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal webhook payload: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to create webhook request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := postJSON(ctx, webhookURL, payload)
 	if err != nil {
 		return fmt.Errorf("failed to send webhook: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if !isHTTPSuccess(resp.StatusCode) {
 		return fmt.Errorf("webhook returned status %d", resp.StatusCode)
 	}
 
@@ -190,7 +185,7 @@ func (ns *NotificationService) sendWebhook(ctx context.Context, webhookURL strin
 }
 
 // sendEmail sends a notification via email (placeholder - to be implemented later)
-func (ns *NotificationService) sendEmail(ctx context.Context, emailAddress string, message string, data map[string]interface{}) error {
+func (ns *NotificationService) sendEmail(_ context.Context, emailAddress string, message string, _ map[string]any) error {
 	// TODO: Implement email sending
 	// For now, just log that email would be sent
 	log.WithFields(log.Fields{
