@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
+import type { Item } from '../gen/sickrock_pb'
 import {
   MAX_CARD_DETAILS,
+  cardDetails,
+  chooseCardsView,
   defaultCardsConfig,
   filterByText,
   parseCardsConfig,
@@ -76,5 +79,35 @@ describe('filterByText', () => {
 
   it('does not match a word split across two texts', () => {
     expect(filterByText([['Fish', 'tacos']], 'fishtacos', r => r)).toEqual([])
+  })
+})
+
+describe('chooseCardsView', () => {
+  const views = [
+    { id: 1, viewType: 'table', isDefault: true },
+    { id: 2, viewType: 'cards', isDefault: false },
+    { id: 3, viewType: 'cards', isDefault: true },
+  ]
+
+  it("prefers the caller's default Cards view, then the table's, then the first", () => {
+    expect(chooseCardsView(views, 2)?.id).toBe(2)
+    expect(chooseCardsView(views, 1)?.id).toBe(3)
+    expect(chooseCardsView(views.slice(0, 2))?.id).toBe(2)
+  })
+
+  it('finds nothing when the table has no Cards view', () => {
+    expect(chooseCardsView(views.slice(0, 1))).toBeUndefined()
+  })
+})
+
+describe('cardDetails', () => {
+  const row = { id: '7', srCreated: 0n, srUpdated: 0n, additionalFields: { type: 'Dinner', keywords: '  ', cook_time: '20' } } as unknown as Item
+
+  it('labels the columns and leaves out empty values', () => {
+    expect(cardDetails(row, ['type', 'keywords', 'cook_time', 'id'])).toEqual([
+      { column: 'type', label: 'Type', value: 'Dinner' },
+      { column: 'cook_time', label: 'Cook time', value: '20' },
+      { column: 'id', label: 'Id', value: '7' },
+    ])
   })
 })

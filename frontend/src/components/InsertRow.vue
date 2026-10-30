@@ -11,7 +11,7 @@ import ImageField from './ImageField.vue'
 import { fieldDisplayLabel } from '../utils/fieldColumnDisplay'
 import { toSqlDateTime } from '../utils/dateFormatting'
 import UserRefChip from './UserRefChip.vue'
-import type { Field, IamUser, ItemFieldGroup } from '../gen/sickrock_pb'
+import type { Field, IamUser, Item, ItemFieldGroup } from '../gen/sickrock_pb'
 
 type InsertFieldDef = { name: string; type: string; required: boolean; displayLabel?: string }
 
@@ -25,9 +25,11 @@ const props = defineProps<{
   itemId?: string,
   existingItem?: Record<string, unknown> | null,
   initialValues?: Record<string, string> | null
+  // Show Cancel when creating too (e.g. a form inside a dialog)
+  cancellable?: boolean
 }>()
 const emit = defineEmits<{
-  created: [],
+  created: [item?: Item],
   updated: [],
   cancelled: []
 }>()
@@ -694,9 +696,9 @@ async function submit() {
         pageId: props.tableId,
         additionalFields: payload
       }
-      await client.createItem(createRequest)
+      const created = await client.createItem(createRequest)
       form.value = {}
-      emit('created')
+      emit('created', created.item)
     }
   } catch (e) {
     error.value = String(e)
@@ -904,7 +906,7 @@ function cancel() {
 
       <div class="form-actions grid-span-32">
         <button
-          v-if="isEditMode"
+          v-if="isEditMode || cancellable"
           type="button"
           class="neutral"
           @click="cancel"

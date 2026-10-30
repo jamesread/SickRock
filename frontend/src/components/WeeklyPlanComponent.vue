@@ -17,6 +17,9 @@ import RowPickerDialog from './RowPickerDialog.vue'
 import ContextMenu from './ContextMenu.vue'
 import type { ForeignKey, Item } from '../gen/sickrock_pb'
 import { getItemNameFieldValue } from '../utils/itemViewSectionTitle'
+import { fieldDefsForInsertForm, type InsertFieldDef } from '../utils/insertRowViewFields'
+import { rowInsertActionLabel } from '../utils/rowInsertLabel'
+import { cardDetails, chooseCardsView, parseCardsConfig } from '../utils/cardsView'
 import { hasImageValue, isImageFieldType } from '../utils/fieldTypes'
 import {
   WEEKLY_PLAN_VIEW_TYPE,
@@ -54,6 +57,11 @@ const itemForeignKey = ref<ForeignKey | null>(null)
 const referencedRows = ref<Item[]>([])
 const referencedImageColumn = ref('')
 const tableColumns = ref<string[]>([])
+const referencedFieldDefs = ref<InsertFieldDef[]>([])
+const referencedCreateLabel = ref('')
+// Extra fields on the picker's tiles: the detail columns of the referenced table's Cards view.
+const referencedDetailColumns = ref<string[]>([])
+const referencedFieldTypes = ref<Record<string, string>>({})
 const loading = ref(true)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -72,11 +80,17 @@ const problems = computed(() => weeklyPlanConfigProblems(config.value))
 const days = computed(() => daysOfWeek(weekStart.value))
 const todayKey = dayKey(new Date())
 const referencedTable = computed(() => itemForeignKey.value?.referencedTableTcName || itemForeignKey.value?.referencedTable || '')
+const { access: referencedAccess } = useTableAccess(referencedTable)
 const cells = computed(() => groupIntoCells(config.value, weekStart.value, rows.value, columnValue))
 const plannedCount = computed(() => [...cells.value.values()].reduce((total, cell) => total + cell.length, 0))
 const referencedById = computed(() => new Map(referencedRows.value.map(row => [String(row.id), row])))
 const pickerOptions = computed<WeeklyPlanPickerOption[]>(() => referencedRows.value
-  .map(row => ({ value: String(row.id), label: referencedLabel(row), imageId: referencedImageId(row) }))
+  .map(row => ({
+    value: String(row.id),
+    label: referencedLabel(row),
+    imageId: referencedImageId(row),
+    details: cardDetails(row, referencedDetailColumns.value, referencedFieldTypes.value),
+  }))
   .sort((a, b) => a.label.localeCompare(b.label)))
 const pickerTitle = computed(() => {
   const target = pickingFor.value
@@ -134,18 +148,30 @@ async function loadReferencedTable() {
   itemForeignKey.value = null
   referencedRows.value = []
   referencedImageColumn.value = ''
+  referencedFieldDefs.value = []
+  referencedCreateLabel.value = ''
+  referencedDetailColumns.value = []
   const structure = await client.getTableStructure({ pageId: props.tableId })
   tableColumns.value = (structure.fields ?? []).map(field => field.name)
   const fk = structure.foreignKeys?.find(f => f.columnName === config.value.itemColumn) ?? null
   itemForeignKey.value = fk
   const refTable = fk ? (fk.referencedTableTcName || fk.referencedTable) : ''
   if (!refTable) return
-  const [refStructure, refItems] = await Promise.all([
+  const [refStructure, refItems, refViews] = await Promise.all([
     client.getTableStructure({ pageId: refTable }),
     client.listItems({ tcName: refTable }),
+    client.getTableViews({ tableName: refTable }),
   ])
-  referencedImageColumn.value = refStructure.fields?.find(f => isImageFieldType(f.type))?.name ?? ''
+  const cardsView = chooseCardsView(refViews.views, refViews.userDefaultViewId)
+  const cards = cardsView ? parseCardsConfig(cardsView.layoutJson) : null
+  referencedDetailColumns.value = cards?.detailColumns ?? []
+  referencedFieldTypes.value = Object.fromEntries((refStructure.fields ?? []).map(field => [field.name, field.type]))
+  referencedImageColumn.value = cards?.imageColumn
+    || (refStructure.fields?.find(f => isImageFieldType(f.type))?.name ?? '')
   referencedRows.value = refItems.items ?? []
+  referencedFieldDefs.value = fieldDefsForInsertForm(refStructure.fields ?? [])
+  // A table with a create_delegate has its own create page, which a dialog can't stand in for.
+  referencedCreateLabel.value = refStructure.createDelegate ? '' : rowInsertActionLabel(refStructure.rowName)
 }
 
 async function loadRows() {
@@ -185,7 +211,7 @@ async function change(action: () => Promise<unknown>) {
 function startAdding(day: Date, slotIndex: number) {
   if (referencedTable.value) {
     pickingFor.value = { day, slotIndex }
-    picker.value?.open()
+    picker.value?.open(config.value.slots[slotIndex]?.keywords ?? '')
     return
   }
   addingCell.value = cellKey(day, slotIndex)
@@ -204,6 +230,19 @@ async function addEntry(day: Date, slotIndex: number, value = addValue.value.tri
     pageId: props.tableId,
     additionalFields: { ...placementFields(config.value, day, slotIndex), [config.value.itemColumn]: value },
   }))
+}
+
+/** A row created from the picker goes straight into the slot it was opened for. */
+async function onPickerCreated(item: Item | undefined) {
+  const target = pickingFor.value
+  pickingFor.value = null
+  try {
+    const refItems = await client.listItems({ tcName: referencedTable.value })
+    referencedRows.value = refItems.items ?? []
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : String(e)
+  }
+  if (target && item) await addEntry(target.day, target.slotIndex, String(item.id))
 }
 
 async function onPicked(option: WeeklyPlanPickerOption) {
@@ -432,7 +471,16 @@ onMounted(load)
           </li>
         </template>
       </ContextMenu>
-      <RowPickerDialog ref="picker" :title="pickerTitle" :options="pickerOptions" @pick="onPicked" />
+      <RowPickerDialog
+        ref="picker"
+        :title="pickerTitle"
+        :options="pickerOptions"
+        :create-label="referencedAccess.canInsert ? referencedCreateLabel : ''"
+        :create-table-id="referencedTable"
+        :create-field-defs="referencedFieldDefs"
+        @pick="onPicked"
+        @created="onPickerCreated"
+      />
     </template>
   </Section>
 </template>

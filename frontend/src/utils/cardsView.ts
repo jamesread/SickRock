@@ -3,6 +3,8 @@
  * image column), a title and a few detail columns. Settings live in the view's layout_json under
  * "cards".
  */
+import type { Item } from '../gen/sickrock_pb'
+import { formatMySQLDateTime, formatUnixTimestamp } from './dateFormatting'
 import { isImageFieldType } from './fieldTypes'
 
 export const CARDS_VIEW_TYPE = 'cards'
@@ -88,4 +90,42 @@ export function filterByText<T>(rows: T[], query: string, textsOf: (row: T) => s
     const text = fold(textsOf(row).join('\n'))
     return words.every(word => text.includes(word))
   })
+}
+
+/** The table's Cards view to take card settings from: the caller's default, the table's, or the first. */
+export function chooseCardsView<T extends { id: number; viewType: string; isDefault: boolean }>(
+  views: T[],
+  userDefaultViewId?: number,
+): T | undefined {
+  const cards = views.filter(view => view.viewType === CARDS_VIEW_TYPE)
+  return cards.find(view => view.id === userDefaultViewId)
+    ?? cards.find(view => view.isDefault)
+    ?? cards[0]
+}
+
+export type CardDetail = { column: string; label: string; value: string }
+
+/** "sr_created" → "Created", "cook_time" → "Cook time". */
+export function cardDetailLabel(column: string): string {
+  const words = column.replace(/^sr_/, '').replace(/_/g, ' ').trim()
+  return words.charAt(0).toUpperCase() + words.slice(1)
+}
+
+/** A row's value for a detail column, formatted for display; empty when it has none. */
+export function cardDetailValue(row: Item, column: string, fieldType = ''): string {
+  // id and the sr_ timestamps are fields of the item itself, not additionalFields.
+  if (column === 'id') return String(row.id)
+  if (column === 'sr_created') return formatUnixTimestamp(row.srCreated)
+  if (column === 'sr_updated') return formatUnixTimestamp(row.srUpdated)
+  const value = (row.additionalFields?.[column] ?? '').trim()
+  if (!value) return ''
+  if (/date|time/i.test(fieldType)) return formatMySQLDateTime(value) || value
+  return value
+}
+
+/** The details a card shows for a row: the detail columns that have a value. */
+export function cardDetails(row: Item, columns: string[], fieldTypes: Record<string, string> = {}): CardDetail[] {
+  return columns
+    .map(column => ({ column, label: cardDetailLabel(column), value: cardDetailValue(row, column, fieldTypes[column]) }))
+    .filter(detail => detail.value !== '')
 }

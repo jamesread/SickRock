@@ -15,6 +15,8 @@ export type WeeklyPlanSlot = {
   label: string
   /** Time of day, "HH:MM". New entries are dated at it; without a slot column it places rows. */
   time: string
+  /** Search text the picker starts with when adding to this slot (e.g. "breakfast"). */
+  keywords?: string
 }
 
 export type WeeklyPlanConfig = {
@@ -35,6 +37,15 @@ export const DEFAULT_WEEKLY_PLAN_SLOTS: WeeklyPlanSlot[] = [
 ]
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+/** A slot with a trimmed label, a valid time (else none), and keywords only when there are some. */
+function cleanSlot(slot: WeeklyPlanSlot): WeeklyPlanSlot {
+  const time = slot.time.trim()
+  const cleaned: WeeklyPlanSlot = { label: slot.label.trim(), time: TIME_PATTERN.test(time) ? time : '' }
+  const keywords = slot.keywords?.trim().replace(/\s+/g, ' ')
+  if (keywords) cleaned.keywords = keywords
+  return cleaned
+}
 
 export function defaultWeeklyPlanConfig(): WeeklyPlanConfig {
   return {
@@ -59,7 +70,7 @@ export function parseWeeklyPlanConfig(layoutJson: string | undefined): WeeklyPla
   if (Array.isArray(stored.slots)) {
     const slots = stored.slots
       .filter((slot): slot is Record<string, unknown> => !!slot && typeof slot === 'object')
-      .map(slot => ({ label: text(slot.label), time: TIME_PATTERN.test(text(slot.time)) ? text(slot.time) : '' }))
+      .map(slot => cleanSlot({ label: text(slot.label), time: text(slot.time), keywords: text(slot.keywords) }))
       .filter(slot => slot.label !== '')
     if (slots.length > 0) config.slots = slots
   }
@@ -78,7 +89,7 @@ export function withWeeklyPlanConfig(layoutJson: string | undefined, config: Wee
     slotColumn: config.slotColumn,
     itemColumn: config.itemColumn,
     slots: config.slots
-      .map(slot => ({ label: slot.label.trim(), time: TIME_PATTERN.test(slot.time) ? slot.time : '' }))
+      .map(cleanSlot)
       .filter(slot => slot.label !== ''),
     weekStartsOn: config.weekStartsOn,
   }
@@ -214,12 +225,17 @@ export type WeeklyPlanPickerOption = {
   value: string
   label: string
   imageId: string
+  /** Extra fields shown on the tile, from the referenced table's Cards view. */
+  details?: Array<{ label: string; value: string }>
 }
 
 /**
- * Picker options whose label (the referenced row's name) contains every word of query, ignoring
- * case and accents.
+ * Picker options whose label (the referenced row's name) and details together contain every word
+ * of query, ignoring case and accents.
  */
-export function filterPickerOptions<T extends { label: string }>(options: T[], query: string): T[] {
-  return filterByText(options, query, option => [option.label])
+export function filterPickerOptions<T extends { label: string; details?: Array<{ value: string }> }>(
+  options: T[],
+  query: string,
+): T[] {
+  return filterByText(options, query, option => [option.label, ...(option.details ?? []).map(detail => detail.value)])
 }

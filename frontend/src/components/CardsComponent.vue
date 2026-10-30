@@ -14,8 +14,15 @@ import ImageThumb from './ImageThumb.vue'
 import type { Item } from '../gen/sickrock_pb'
 import { getItemNameFieldValue } from '../utils/itemViewSectionTitle'
 import { hasImageValue } from '../utils/fieldTypes'
-import { formatMySQLDateTime, formatUnixTimestamp } from '../utils/dateFormatting'
-import { CARDS_VIEW_TYPE, filterByText, parseCardsConfig, type CardsConfig } from '../utils/cardsView'
+import {
+  CARDS_VIEW_TYPE,
+  cardDetailLabel,
+  cardDetails,
+  filterByText,
+  parseCardsConfig,
+  type CardDetail,
+  type CardsConfig,
+} from '../utils/cardsView'
 
 const props = defineProps<{
   tableId: string
@@ -42,16 +49,14 @@ type Card = {
   id: string
   title: string
   imageId: string
-  details: Array<{ column: string; label: string; value: string }>
+  details: CardDetail[]
 }
 
 const cards = computed<Card[]>(() => rows.value.map(row => ({
   id: String(row.id),
   title: titleOf(row),
   imageId: imageOf(row),
-  details: config.value.detailColumns
-    .map(column => ({ column, label: detailLabel(column), value: detailValue(row, column) }))
-    .filter(detail => detail.value !== ''),
+  details: cardDetails(row, config.value.detailColumns, fieldTypes.value),
 })))
 // The search covers everything shown on a card: its title and its details.
 const shownCards = computed(() => filterByText(cards.value, query.value, card => [
@@ -59,7 +64,7 @@ const shownCards = computed(() => filterByText(cards.value, query.value, card =>
   ...card.details.map(detail => detail.value),
 ]))
 const searchPlaceholder = computed(() => {
-  const fields = ['name', ...config.value.detailColumns.map(column => detailLabel(column).toLowerCase())]
+  const fields = ['name', ...config.value.detailColumns.map(column => cardDetailLabel(column).toLowerCase())]
   return `Search ${fields.join(', ')}…`
 })
 
@@ -75,23 +80,6 @@ function titleOf(row: Item): string {
 function imageOf(row: Item): string {
   const value = config.value.imageColumn ? row.additionalFields?.[config.value.imageColumn] : ''
   return hasImageValue(value) ? String(value) : ''
-}
-
-/** "sr_created" → "Created", "cook_time" → "Cook time". */
-function detailLabel(column: string): string {
-  const words = column.replace(/^sr_/, '').replace(/_/g, ' ').trim()
-  return words.charAt(0).toUpperCase() + words.slice(1)
-}
-
-function detailValue(row: Item, column: string): string {
-  // id and the sr_ timestamps are fields of the item itself, not additionalFields.
-  if (column === 'id') return String(row.id)
-  if (column === 'sr_created') return formatUnixTimestamp(row.srCreated)
-  if (column === 'sr_updated') return formatUnixTimestamp(row.srUpdated)
-  const value = (row.additionalFields?.[column] ?? '').trim()
-  if (!value) return ''
-  if (/date|time/i.test(fieldTypes.value[column] ?? '')) return formatMySQLDateTime(value) || value
-  return value
 }
 
 /** First letter of the title, for cards without an image. */

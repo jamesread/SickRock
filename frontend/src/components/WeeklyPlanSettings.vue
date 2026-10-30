@@ -5,7 +5,7 @@ import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowDown01Icon, ArrowUp01Icon, Delete02Icon } from '@hugeicons/core-free-icons'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import type { ForeignKey } from '../gen/sickrock_pb'
-import { weeklyPlanConfigProblems, type WeeklyPlanConfig } from '../utils/weeklyPlan'
+import { weeklyPlanConfigProblems, type WeeklyPlanConfig, type WeeklyPlanSlot } from '../utils/weeklyPlan'
 
 const props = defineProps<{
   fields: Array<{ name: string; type: string }>
@@ -31,7 +31,7 @@ function update(patch: Partial<WeeklyPlanConfig>) {
   config.value = { ...config.value, ...patch }
 }
 
-function updateSlot(index: number, patch: Partial<{ label: string; time: string }>) {
+function updateSlot(index: number, patch: Partial<WeeklyPlanSlot>) {
   update({ slots: config.value.slots.map((slot, i) => (i === index ? { ...slot, ...patch } : slot)) })
 }
 
@@ -97,6 +97,14 @@ function addSlot() {
           :aria-label="`Slot ${index + 1} time`"
           @input="updateSlot(index, { time: ($event.target as HTMLInputElement).value })"
         />
+        <input
+          :value="slot.keywords ?? ''"
+          type="text"
+          placeholder="Initial keywords"
+          :aria-label="`Slot ${index + 1} initial keywords`"
+          title="Search text the picker starts with when adding to this slot"
+          @input="updateSlot(index, { keywords: ($event.target as HTMLInputElement).value })"
+        />
         <button type="button" class="button neutral" title="Move up" :disabled="index === 0" @click="moveSlot(index, -1)">
           <HugeiconsIcon :icon="ArrowUp01Icon" width="1em" height="1em" aria-hidden="true" />
         </button>
@@ -111,6 +119,7 @@ function addSlot() {
         <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Add slot</span>
       </button>
+      <small>Each slot has a name, a time and optional initial keywords, which fill in the picker's search when adding to that slot (e.g. "breakfast").</small>
     </div>
 
     <label for="wp-week-start">Week starts on</label>
@@ -149,10 +158,10 @@ function addSlot() {
   gap: 0.4rem;
 }
 
-/* Name, time, then the three icon buttons, on one line. */
+/* Name, time, initial keywords, then the three icon buttons, on one line. */
 .weekly-plan-slot-row {
   display: grid;
-  grid-template-columns: minmax(5rem, 9rem) auto auto auto auto;
+  grid-template-columns: minmax(5rem, 9rem) 7.5rem minmax(6rem, 12rem) auto auto auto;
   align-items: center;
   gap: 0.3rem;
 }

@@ -43,6 +43,17 @@ describe('weeklyPlan config', () => {
     expect(parseWeeklyPlanConfig('not json').slots).toHaveLength(3)
   })
 
+  it('keeps slot keywords, tidied, and leaves them out when blank', () => {
+    const saved = withWeeklyPlanConfig('', mealConfig({
+      slots: [{ label: 'Breakfast', time: '08:00', keywords: '  breakfast   cereal ' }, { label: 'Lunch', time: '12:30', keywords: ' ' }],
+    }))
+    expect(JSON.parse(saved).weeklyPlan.slots).toEqual([
+      { label: 'Breakfast', time: '08:00', keywords: 'breakfast cereal' },
+      { label: 'Lunch', time: '12:30' },
+    ])
+    expect(parseWeeklyPlanConfig(saved).slots[0].keywords).toBe('breakfast cereal')
+  })
+
   it('reports missing settings', () => {
     expect(weeklyPlanConfigProblems(mealConfig())).toEqual([])
     expect(weeklyPlanConfigProblems(defaultWeeklyPlanConfig())).toHaveLength(2)
@@ -132,5 +143,14 @@ describe('filterPickerOptions', () => {
 
   it('ignores accents', () => {
     expect(filterPickerOptions(options, 'creme brulee')).toEqual([{ label: 'Crème brûlée' }])
+  })
+
+  it('matches the details shown on the tiles too', () => {
+    const withDetails = [
+      { label: 'Spag Bol', details: [{ value: 'Dinner' }, { value: 'italian beef tomato' }] },
+      { label: 'Cornflakes', details: [{ value: 'Breakfast' }] },
+    ]
+    expect(filterPickerOptions(withDetails, 'italian bol')).toEqual([withDetails[0]])
+    expect(filterPickerOptions(withDetails, 'breakfast')).toEqual([withDetails[1]])
   })
 })
