@@ -5,7 +5,9 @@ import { Edit03Icon, FileEditIcon, QuestionIcon, SquareLock01Icon } from '@hugei
 import UserRefChip from '../components/UserRefChip.vue'
 import HugeIcon from '../components/HugeIcon.vue'
 import IconPickerField from '../components/IconPickerField.vue'
-import { isIconFieldType } from '../utils/fieldTypes'
+import ImageField from '../components/ImageField.vue'
+import ImageThumb from '../components/ImageThumb.vue'
+import { hasImageValue, isIconFieldType, isImageFieldType } from '../utils/fieldTypes'
 import { rowViewFieldUiKey, type RowViewFieldUi } from './rowViewFieldUi'
 
 export type FieldEntry = {
@@ -44,6 +46,20 @@ const { editingField, editingValue, savingField, users } = ui
             }"
             @cancel="ui.cancelEdit"
           />
+          <template v-else-if="isImageFieldType(ui.getFieldDef(entry.key)?.type)">
+            <ImageField
+              :model-value="editingValue"
+              :table-id="ui.tableId"
+              :column-name="entry.key"
+              :disabled="savingField"
+              :clearable="!ui.getFieldDef(entry.key)?.required"
+              @update:model-value="value => {
+                editingValue = value
+                ui.saveField()
+              }"
+            />
+            <button type="button" class="button neutral" :disabled="savingField" @click="ui.cancelEdit">Done</button>
+          </template>
           <input
             v-else-if="ui.isTinyintColumn(entry.key)"
             type="checkbox"
@@ -113,6 +129,15 @@ const { editingField, editingValue, savingField, users } = ui
                 ? undefined
                 : `/admin/iam/users/${ui.resolveRawFieldValue(entry.key)}`"
             />
+          </template>
+          <template v-else-if="isImageFieldType(ui.getFieldDef(entry.key)?.type)">
+            <ImageThumb
+              v-if="hasImageValue(ui.resolveRawFieldValue(entry.key))"
+              :image-id="String(ui.resolveRawFieldValue(entry.key))"
+              :alt="ui.displayFieldLabel(entry.key)"
+              size="full"
+            />
+            <span v-else class="subtle">No image</span>
           </template>
           <template v-else-if="isIconFieldType(ui.getFieldDef(entry.key)?.type) && entry.displayValue">
             <span class="inline-icon">

@@ -36,11 +36,12 @@ import {
   fieldDefsForInsertForm,
 } from '../utils/insertRowViewFields'
 import { useIamUsers } from '../composables/useIamUsers'
-import { isUserRefColumn as columnIsUserRef, isUserRefFieldType } from '../utils/fieldTypes'
+import { hasImageValue, isImageFieldType, isUserRefColumn as columnIsUserRef, isUserRefFieldType } from '../utils/fieldTypes'
 import InsertRow from './InsertRow.vue'
 import RowActionsDropdown from './RowActionsDropdown.vue'
 import TableComponentToolbar from './TableComponentToolbar.vue'
 import UserRefChip from './UserRefChip.vue'
+import ImageThumb from './ImageThumb.vue'
 import { useDesignMode } from '../composables/useDesignMode'
 import {
   applyFieldValueAffixes,
@@ -208,9 +209,19 @@ const insertRoute = computed(() => {
   return `/table/${props.tableId}/insert-row`
 })
 
-const effectiveInsertRoute = computed(
-  () => props.insertRouteOverride ?? insertRoute.value,
-)
+// A related-panel override keeps its query (parent row context) but still goes to the
+// table's create delegate when it has one.
+const effectiveInsertRoute = computed(() => {
+  const override = props.insertRouteOverride
+  if (override == null) {
+    return insertRoute.value
+  }
+  const delegate = tableStructure.value?.createDelegate?.trim()
+  if (delegate && typeof override === 'object') {
+    return { ...override, path: delegate }
+  }
+  return override
+})
 
 const isRelatedEmptyState = computed(
   () => props.relatedEmptyParentLabel != null && props.relatedEmptyParentLabel !== '',
@@ -257,6 +268,7 @@ const tableToolbarBindings = computed(() => ({
   showStructure: showStructure.value,
   showInsert: showInsert.value,
   showQuickAdd: showQuickAdd.value,
+  showBulkEntry: showInsert.value && tableStructure.value?.bulkEntry != null,
   insertRoute: insertRoute.value,
   insertButtonText: insertButtonText.value,
   tableViews: tableViews.value,
@@ -779,6 +791,10 @@ function isDatetimeColumn(column: string): boolean {
 
 function isUserRefColumn(column: string): boolean {
   return columnIsUserRef(column, fieldDefs.value, foreignKeys.value)
+}
+
+function isImageColumn(column: string): boolean {
+  return isImageFieldType(fieldType(column))
 }
 
 function getBooleanValue(item: Item, column: string): boolean {
@@ -1322,6 +1338,11 @@ onUnmounted(() => {
               >
                 {{ cellValue(row, header.key) }}
               </router-link>
+              <ImageThumb
+                v-else-if="isImageColumn(header.key) && hasImageValue(cellValue(row, header.key))"
+                :image-id="String(cellValue(row, header.key))"
+                size="thumb"
+              />
               <UserRefChip
                 v-else-if="isUserRefColumn(header.key) && cellValue(row, header.key) != null"
                 :to="`/admin/iam/users/${cellValue(row, header.key)}`"
@@ -1640,6 +1661,11 @@ onUnmounted(() => {
               >
                 {{ cellValue(row, header.key) }}
               </router-link>
+              <ImageThumb
+                v-else-if="isImageColumn(header.key) && hasImageValue(cellValue(row, header.key))"
+                :image-id="String(cellValue(row, header.key))"
+                size="thumb"
+              />
               <UserRefChip
                 v-else-if="isUserRefColumn(header.key) && cellValue(row, header.key) != null"
                 :to="`/admin/iam/users/${cellValue(row, header.key)}`"

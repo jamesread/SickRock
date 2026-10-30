@@ -30,6 +30,7 @@ import (
 	"github.com/jamesread/SickRock/internal/config"
 	"github.com/jamesread/SickRock/internal/health"
 	"github.com/jamesread/SickRock/internal/iam"
+	"github.com/jamesread/SickRock/internal/images"
 	"github.com/jamesread/SickRock/internal/mcp"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
@@ -220,6 +221,7 @@ func main() {
 	}
 
 	srv := srvpkg.NewSickRockServer(repository, authLayer)
+	configureImageStore(cfg, srv)
 
 	go startDeviceCodeCleanupJob(repository)
 	go startRssCalendarFeedRefreshJob(srv)
@@ -264,6 +266,10 @@ func openDatabase() (*sqlx.DB, *repo.Repository) {
 		log.Fatalf("backfill table_relations: %v", err)
 	}
 
+	if err = repository.EnsureSystemTableRelations(context.Background()); err != nil {
+		log.Fatalf("ensure system table relations: %v", err)
+	}
+
 	logDatabaseEngineVersion(db)
 	return db, repository
 }
@@ -285,6 +291,7 @@ func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer) *gin.Engine
 
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
+	mux.Handle(srvpkg.ImagesPathPrefix, authLayer.WrapHandler(srv.ImageHandler()))
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -311,6 +318,18 @@ func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer) *gin.Engine
 
 	registerFrontendRoutes(router, findFrontendDir())
 	return router
+}
+
+// configureImageStore keeps uploaded images in cfg.ImagesDir. When the directory cannot be created,
+// image uploads are refused and everything else still works.
+func configureImageStore(cfg *config.Config, srv *srvpkg.SickRockServer) {
+	store, err := images.NewStore(cfg.ImagesDir)
+	if err != nil {
+		log.WithError(err).Error("Image uploads are disabled")
+		return
+	}
+	log.Infof("Storing uploaded images in %s", cfg.ImagesDir)
+	srv.SetImageStore(store)
 }
 
 func corsMiddleware(c *gin.Context) {

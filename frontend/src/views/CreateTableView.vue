@@ -9,6 +9,15 @@ import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, ViewIcon } from '@hugeicons/core-free-icons'
 import { tableListLinkLabel } from '../utils/rowInsertLabel'
 import TablePullThroughSection from '../components/TablePullThroughSection.vue'
+import WeeklyPlanSettings from '../components/WeeklyPlanSettings.vue'
+import CardsSettings from '../components/CardsSettings.vue'
+import { parseCardsConfig, suggestedCardsConfig, withCardsConfig } from '../utils/cardsView'
+import {
+  defaultWeeklyPlanConfig,
+  parseWeeklyPlanConfig,
+  weeklyPlanConfigProblems,
+  withWeeklyPlanConfig,
+} from '../utils/weeklyPlan'
 import { useDesignMode } from '../composables/useDesignMode'
 import type { ColumnDisplaySettingInput, ForeignKey, TableViewColumn } from '../gen/sickrock_pb'
 import { columnDisplaySettingsByName } from '../utils/fieldColumnDisplay'
@@ -27,7 +36,13 @@ const client = createApiClient()
 const { designModeEnabled } = useDesignMode()
 
 const viewName = ref('')
-const viewType = ref<'table' | 'calendar' | 'ticklist'>('table')
+type ViewType = 'table' | 'calendar' | 'ticklist' | 'weeklyplan' | 'cards'
+const viewType = ref<ViewType>('table')
+// The view's layout_json as loaded, so saving here keeps settings made elsewhere (filters, grouping).
+const existingLayoutJson = ref('')
+const weeklyPlanConfig = ref(defaultWeeklyPlanConfig())
+const cardsConfig = ref(parseCardsConfig(''))
+const structureFields = ref<Array<{ name: string; type: string }>>([])
 type CatalogColumn = { name: string; type: string; synthetic: boolean; label: string }
 
 const availableColumns = ref<CatalogColumn[]>([])
@@ -170,7 +185,16 @@ async function loadStructureAndColumns() {
     name: field.name,
     type: field.type,
   })) ?? []
+  structureFields.value = fields
   availableColumns.value = buildColumnCatalog(fields, structureForeignKeys.value)
+  if (!isEditMode.value) {
+    weeklyPlanConfig.value = {
+      ...weeklyPlanConfig.value,
+      dateColumn: fields.find(field => /date|time/i.test(field.type) && !field.name.startsWith('sr_'))?.name ?? '',
+      itemColumn: structureForeignKeys.value[0]?.columnName ?? '',
+    }
+    cardsConfig.value = suggestedCardsConfig(fields)
+  }
 }
 
 async function onPullThroughSaved() {
@@ -210,7 +234,10 @@ async function loadExistingView() {
 
     if (view) {
       viewName.value = view.viewName
-      viewType.value = (view.viewType as 'table' | 'calendar' | 'ticklist') || 'table'
+      viewType.value = (view.viewType as ViewType) || 'table'
+      existingLayoutJson.value = view.layoutJson ?? ''
+      weeklyPlanConfig.value = parseWeeklyPlanConfig(view.layoutJson)
+      cardsConfig.value = parseCardsConfig(view.layoutJson)
       selectedColumns.value = selectedColumnsFromView(
         availableColumns.value,
         view.columns,
@@ -257,6 +284,17 @@ async function saveTableView() {
     return
   }
 
+  if (viewType.value === 'weeklyplan') {
+    const problems = weeklyPlanConfigProblems(weeklyPlanConfig.value)
+    if (problems.length > 0) {
+      error.value = problems.join(' ')
+      return
+    }
+  }
+  let layoutJson = existingLayoutJson.value
+  if (viewType.value === 'weeklyplan') layoutJson = withWeeklyPlanConfig(layoutJson, weeklyPlanConfig.value)
+  if (viewType.value === 'cards') layoutJson = withCardsConfig(layoutJson, cardsConfig.value)
+
   loading.value = true
   error.value = null
 
@@ -279,7 +317,8 @@ async function saveTableView() {
             columnOrder: col.columnOrder,
             sortOrder: col.sortOrder
           })),
-          viewType: viewType.value
+          viewType: viewType.value,
+          layoutJson,
         })
       } else {
       // Create new view
@@ -292,7 +331,8 @@ async function saveTableView() {
           columnOrder: col.columnOrder,
           sortOrder: col.sortOrder
         })),
-        viewType: viewType.value
+        viewType: viewType.value,
+          layoutJson,
       })
       }
     } else {
@@ -304,14 +344,16 @@ async function saveTableView() {
           tableName: tableId,
           viewName: viewName.value,
           columns: [], // No columns for calendar/ticklist views
-          viewType: viewType.value
+          viewType: viewType.value,
+          layoutJson,
         })
       } else {
         response = await client.createTableView({
           tableName: tableId,
           viewName: viewName.value,
           columns: [], // No columns for calendar/ticklist views
-          viewType: viewType.value
+          viewType: viewType.value,
+          layoutJson,
         })
       }
     }
@@ -394,12 +436,24 @@ async function deleteTableView() {
           <option value="table">Table</option>
           <option value="calendar">Calendar</option>
           <option value="ticklist">Tick List</option>
+          <option value="weeklyplan">Weekly Plan</option>
+          <option value="cards">Cards</option>
         </select>
         <small class="view-type-help">
           <span v-if="viewType === 'table'">Table view displays data in rows and columns with sorting and filtering.</span>
           <span v-else-if="viewType === 'calendar'">Calendar view displays data as events on a calendar based on date fields.</span>
           <span v-else-if="viewType === 'ticklist'">Tick List view displays items as large tiles that can be checked off as completed.</span>
+          <span v-else-if="viewType === 'weeklyplan'">Weekly Plan view shows a week of days, each split into slots you define (e.g. Breakfast, Lunch, Dinner), and lets you fill them.</span>
+          <span v-else-if="viewType === 'cards'">Cards view shows each row as a card with an image, a title and a few details.</span>
         </small>
+
+        <WeeklyPlanSettings
+          v-if="viewType === 'weeklyplan'"
+          v-model="weeklyPlanConfig"
+          :fields="structureFields"
+          :foreign-keys="structureForeignKeys"
+        />
+        <CardsSettings v-if="viewType === 'cards'" v-model="cardsConfig" :fields="structureFields" />
 
         <div v-if="viewType === 'table'">
           <label>Column Configuration</label>
@@ -493,7 +547,7 @@ async function deleteTableView() {
             @saved="onPullThroughSaved"
           />
         </div>
-        <div v-else class="calendar-view-info">
+        <div v-else-if="viewType === 'calendar' || viewType === 'ticklist'" class="calendar-view-info">
           <p>Calendar views display data as events on a calendar. The calendar automatically detects date fields (calendar_date, starts, finishes, or sr_created) to display events.</p>
           <p>No column configuration is needed for calendar views.</p>
         </div>

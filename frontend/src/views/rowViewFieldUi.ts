@@ -3,6 +3,8 @@ import type { Field } from '../gen/sickrock_pb'
 import type { IamUser } from '../gen/sickrock_pb'
 
 export type RowViewFieldUi = {
+  /** Table configuration of the row (image uploads are made against it). */
+  tableId: string
   editingField: Ref<string | null>
   editingValue: Ref<string>
   savingField: Ref<boolean>

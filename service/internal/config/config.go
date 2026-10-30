@@ -24,6 +24,8 @@ type Config struct {
 	ConfigDir string
 	// HealthCheckInterval is how often health checks run, as a Go duration (e.g. "15m").
 	HealthCheckInterval string
+	// ImagesDir is where uploaded image files are stored.
+	ImagesDir string
 }
 
 // Load builds configuration from -configdir, config file, and environment.
@@ -65,9 +67,30 @@ func Load() (*Config, error) {
 			{`koanf key "health_check_interval" (SICKROCK_HEALTH_CHECK_INTERVAL env and/or config.yaml, env loaded before file)`, k.String("health_check_interval")},
 			{"default", "15m"},
 		}),
+		ImagesDir: coalesceString("images_dir", []stringCandidate{
+			{`koanf key "images_dir" (SICKROCK_IMAGES_DIR env and/or config.yaml, env loaded before file)`, k.String("images_dir")},
+			{"default", defaultImagesDir(dir)},
+		}),
 		ConfigDir: dir,
 	}
 	return cfg, nil
+}
+
+// defaultImagesDir keeps images in the config directory (the /config volume in the container), or
+// beside the default SQLite database when there is none.
+func defaultImagesDir(configDir string) string {
+	if configDir == "" && dirExists("/config") {
+		configDir = "/config"
+	}
+	if configDir == "" {
+		return filepath.Join("..", "tmp", "images")
+	}
+	return filepath.Join(configDir, "images")
+}
+
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
 }
 
 func resolveConfigDir(flagDir string) string {

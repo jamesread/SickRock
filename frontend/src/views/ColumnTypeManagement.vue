@@ -59,7 +59,7 @@ const showDropConfirm = ref<string | null>(null)
 const dropping = ref(false)
 const createColumnDialog = ref<HTMLDialogElement | null>(null)
 const createColumnName = ref<string | undefined>()
-const createColumnType = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | undefined>()
+const createColumnType = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image' | undefined>()
 
 // Row id of this table's entry in table_configurations (for the edit link); null if not visible to the user.
 const tableConfigurationRowId = ref<string | null>(null)
@@ -375,7 +375,7 @@ async function dropForeignKey(constraintName: string) {
 }
 
 
-function openCreateColumn(name?: string, type?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref') {
+function openCreateColumn(name?: string, type?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image') {
   createColumnName.value = name
   createColumnType.value = type
   nextTick(() => createColumnDialog.value?.showModal())

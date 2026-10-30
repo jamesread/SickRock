@@ -213,6 +213,8 @@ type TableConfig struct {
 	Db                sql.NullString `db:"db"`
 	PrimaryKeyColumn  sql.NullString `db:"primary_key_column"`
 	DefaultSortColumn sql.NullString `db:"default_sort_column"`
+	RowActions        sql.NullString `db:"row_actions"`
+	BulkEntry         sql.NullString `db:"bulk_entry_json"`
 	Ordinal           int            `db:"ordinal"`
 }
 
@@ -779,7 +781,7 @@ func (r *Repository) AddColumn(ctx context.Context, db, table string, field Fiel
 // addColumnSQLType returns the SQL column type and DEFAULT clause for a new field.
 func addColumnSQLType(field FieldSpec, isMySQL bool) (typ, defaultClause string) {
 	switch field.Type {
-	case "int64", "user_ref":
+	case "int64", "user_ref", SemanticTypeImage:
 		return "BIGINT", ""
 	case "tinyint":
 		if isMySQL {
@@ -1416,30 +1418,35 @@ type systemTableConfig struct {
 	createDelegate   string
 	createButtonText string
 	rowName          string
+	rowActions       string
 	ordinal          int
 }
+
+// appRowActions links an app's item page to creating a table configuration in that app.
+const appRowActions = `[{"label":"Create table in this app","path":"/admin/table/create","query":{"navigationAppId":"{id}"},"icon":"Add01Icon"}]`
 
 var systemTableConfigs = []systemTableConfig{
 	{name: "table_settings", title: "Settings", table: "table_settings", ordinal: 0, createButtonText: "Add Setting", rowName: "Setting"},
 	{name: "table_configurations", title: "Table Configurations", table: "table_configurations", ordinal: 1, createDelegate: "/admin/table/create", createButtonText: "Create Table", rowName: "Table configuration"},
 	{name: "table_workflows", title: "Workflows", table: "table_workflows", ordinal: 2, createButtonText: "Add Workflow", rowName: "Workflow"},
 	{name: "table_navigation", title: "Navigation", table: "table_navigation", ordinal: 3, createButtonText: "Add Navigation Item", rowName: "Navigation item"},
-	{name: "table_apps", title: "Sidebar apps", table: "apps", ordinal: 9, createButtonText: "Add app", rowName: "App"},
+	{name: "table_apps", title: "Sidebar apps", table: "apps", ordinal: 9, createButtonText: "Add app", rowName: "App", rowActions: appRowActions},
 	{name: "table_app_navigation_links", title: "App navigation links", table: "app_navigation_links", ordinal: 10, createButtonText: "Add link", rowName: "App navigation link"},
 	{name: "table_dashboards", title: "Dashboards", table: "table_dashboards", ordinal: 4, createDelegate: "/admin/dashboard/create", createButtonText: "Create Dashboard", rowName: "Dashboard"},
 	{name: "table_dashboard_components", title: "Dashboard components", table: "table_dashboard_components", ordinal: 8, createButtonText: "Add Component", rowName: "Dashboard component"},
 	{name: "table_read_only_exports", title: "Read-only calendar exports", table: "read_only_calendar_exports", ordinal: 5, createButtonText: "Add Export", rowName: "Calendar export"},
 	{name: "table_rss_calendar_feeds", title: "Calendar feeds", table: "rss_calendar_feeds", ordinal: 7, createDelegate: "/admin/rss-calendar-feeds/new", createButtonText: "Add feed", rowName: "Calendar feed"},
+	{name: "table_images", title: "Images", table: "images", ordinal: 11, createButtonText: "Add image", rowName: "Image"},
 	{name: "table_logs", title: "Audit logs", table: "audit_logs", ordinal: 6, createButtonText: "Insert Row", rowName: "Audit log entry"},
 }
 
-const upsertSystemTableConfigMySQL = `INSERT INTO table_configurations (name, title, ` + "`db`" + `, ` + "`table`" + `, ordinal, create_delegate, create_button_text, row_name)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON DUPLICATE KEY UPDATE title = VALUES(title), ` + "`db`" + ` = VALUES(` + "`db`" + `), ` + "`table`" + ` = VALUES(` + "`table`" + `), ordinal = VALUES(ordinal), create_delegate = COALESCE(NULLIF(VALUES(create_delegate), ''), create_delegate), create_button_text = COALESCE(NULLIF(VALUES(create_button_text), ''), create_button_text), row_name = COALESCE(NULLIF(VALUES(row_name), ''), row_name)`
+const upsertSystemTableConfigMySQL = `INSERT INTO table_configurations (name, title, ` + "`db`" + `, ` + "`table`" + `, ordinal, create_delegate, create_button_text, row_name, row_actions)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON DUPLICATE KEY UPDATE title = VALUES(title), ` + "`db`" + ` = VALUES(` + "`db`" + `), ` + "`table`" + ` = VALUES(` + "`table`" + `), ordinal = VALUES(ordinal), create_delegate = COALESCE(NULLIF(VALUES(create_delegate), ''), create_delegate), create_button_text = COALESCE(NULLIF(VALUES(create_button_text), ''), create_button_text), row_name = COALESCE(NULLIF(VALUES(row_name), ''), row_name), row_actions = COALESCE(row_actions, VALUES(row_actions))`
 
-const upsertSystemTableConfigSQLite = `INSERT INTO table_configurations (name, title, db, "table", ordinal, create_delegate, create_button_text, row_name)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(name) DO UPDATE SET title = excluded.title, db = excluded.db, "table" = excluded."table", ordinal = excluded.ordinal, create_delegate = COALESCE(NULLIF(excluded.create_delegate, ''), table_configurations.create_delegate), create_button_text = COALESCE(NULLIF(excluded.create_button_text, ''), table_configurations.create_button_text), row_name = COALESCE(NULLIF(excluded.row_name, ''), table_configurations.row_name)`
+const upsertSystemTableConfigSQLite = `INSERT INTO table_configurations (name, title, db, "table", ordinal, create_delegate, create_button_text, row_name, row_actions)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(name) DO UPDATE SET title = excluded.title, db = excluded.db, "table" = excluded."table", ordinal = excluded.ordinal, create_delegate = COALESCE(NULLIF(excluded.create_delegate, ''), table_configurations.create_delegate), create_button_text = COALESCE(NULLIF(excluded.create_button_text, ''), table_configurations.create_button_text), row_name = COALESCE(NULLIF(excluded.row_name, ''), table_configurations.row_name), row_actions = COALESCE(table_configurations.row_actions, excluded.row_actions)`
 
 // UpdateSystemTableConfigurations upserts system table configurations (systemTableConfigs) using the
 // database name from DB_NAME env (or "main" if unset). Call after migrations so system configs always
@@ -1451,7 +1458,7 @@ func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error 
 		query = upsertSystemTableConfigMySQL
 	}
 	for _, c := range systemTableConfigs {
-		_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal, nilIfEmpty(c.createDelegate), nilIfEmpty(c.createButtonText), nilIfEmpty(c.rowName))
+		_, err := r.db.ExecContext(ctx, query, c.name, c.title, dbName, c.table, c.ordinal, nilIfEmpty(c.createDelegate), nilIfEmpty(c.createButtonText), nilIfEmpty(c.rowName), nilIfEmpty(c.rowActions))
 		if err != nil {
 			return fmt.Errorf("upsert system table config %s: %w", c.name, err)
 		}

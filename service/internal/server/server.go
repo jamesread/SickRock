@@ -25,6 +25,7 @@ import (
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/buildinfo"
 	"github.com/jamesread/SickRock/internal/iam"
+	"github.com/jamesread/SickRock/internal/images"
 	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	log "github.com/sirupsen/logrus"
@@ -35,6 +36,7 @@ type SickRockServer struct {
 	notificationService *notifications.NotificationService
 	auth                *iam.AuthLayer
 	health              *armhealth.Service
+	images              *images.Store
 }
 
 // markdownRenderer is a configured goldmark instance for rendering markdown
@@ -809,6 +811,8 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 			Groups: s.itemFieldGroupsToProto(ctx, tcName),
 		},
 		ColumnDisplaySettings: columnDisplaySettingsToProto(displayByColumn),
+		RowActions:            rowActionsToProto(tcName, tc.RowActions.String),
+		BulkEntry:             bulkEntryToProto(tcName, tc.BulkEntry.String, colNames),
 	}), nil
 }
 
@@ -1132,6 +1136,8 @@ func columnSemanticForType(fieldType string) string {
 	switch {
 	case fieldType == repo.SemanticTypeUserRef:
 		return repo.SemanticTypeUserRef
+	case fieldType == repo.SemanticTypeImage:
+		return repo.SemanticTypeImage
 	case repo.IsDatetimeTypeName(fieldType):
 		return repo.SemanticTypeDatetime
 	}

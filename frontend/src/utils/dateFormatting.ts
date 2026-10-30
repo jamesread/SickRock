@@ -131,6 +131,21 @@ export function formatMySQLDateTime(
 }
 
 /**
+ * Format a date input value as a MySQL/SQLite datetime (YYYY-MM-DD HH:MM:SS, local time).
+ * A date-only value ("2027-03-01") becomes midnight. Returns null for an unparseable value.
+ */
+export function toSqlDateTime(value: string | number | Date): string | null {
+  const dateOnly = typeof value === 'string' ? value.match(/^(\d{4})-(\d{2})-(\d{2})$/) : null
+  const date = dateOnly
+    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    : new Date(value)
+  if (isNaN(date.getTime())) return null
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+/**
  * Get a relative time string (e.g., "2 hours ago", "3 days ago")
  * @param timestamp Unix timestamp in seconds
  * @returns Relative time string

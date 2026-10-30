@@ -14,7 +14,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowLeft01Icon } from '@hugeicons/core-free-icons'
 import { rowInsertActionLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
-import { initialTableView } from '../utils/serverTableViews'
+import { useInsertFormViews } from '../composables/useInsertFormViews'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,21 +32,7 @@ const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.va
 const client = createApiClient()
 
 // Views state for controlling insert form ordering/visibility
-const tableViews = ref<Array<{ id: number; tableName: string; viewName: string; isDefault: boolean; columns: Array<{ columnName: string; isVisible: boolean; columnOrder: number; sortOrder: string }> }>>([])
-const selectedViewId = ref<number | null>(null)
-const viewOptions = computed(() => {
-  const options = [...tableViews.value]
-  if (options.length === 0 || !options.some(v => v.isDefault)) {
-    options.unshift({
-      id: -1,
-      tableName: tableId,
-      viewName: 'All Columns',
-      isDefault: true,
-      columns: []
-    })
-  }
-  return options
-})
+const { tableViews, selectedViewId, viewOptions, loadViews } = useInsertFormViews(tableId)
 
 function applyViewToFields() {
   displayFieldDefs.value = applyViewToInsertFieldDefs(
@@ -69,25 +55,7 @@ onMounted(async () => {
     }))
 
     // Load views for selector and initialize selection
-    try {
-      const viewsRes = await client.getTableViews({ tableName: tableId })
-      tableViews.value = (viewsRes.views || []).map(view => ({
-        id: view.id,
-        tableName: view.tableName,
-        viewName: view.viewName,
-        isDefault: view.isDefault,
-        columns: view.columns.map(col => ({
-          columnName: col.columnName,
-          isVisible: col.isVisible,
-          columnOrder: col.columnOrder,
-          sortOrder: col.sortOrder
-        }))
-      }))
-
-      selectedViewId.value = initialTableView(tableViews.value, viewsRes.userDefaultViewId)?.id ?? -1
-    } catch (e) {
-      selectedViewId.value = -1
-    }
+    await loadViews()
 
     applyViewToFields()
 

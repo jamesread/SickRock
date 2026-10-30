@@ -12,6 +12,7 @@ import RowView from './views/RowView.vue'
 const RowEditView = () => import('./views/RowEditView.vue')
 const AddColumnView = () => import('./views/AddColumnView.vue')
 const InsertRowView = () => import('./views/InsertRowView.vue')
+const BulkEntryView = () => import('./views/BulkEntryView.vue')
 const AfterInsertView = () => import('./views/AfterInsertView.vue')
 const CreateTableView = () => import('./views/CreateTableView.vue')
 const ForeignKeyManagement = () => import('./views/ForeignKeyManagement.vue')
@@ -277,6 +278,19 @@ const router = createRouter({
         breadcrumbs: (route: any) => [
           { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
           { name: 'Insert Row' },
+        ],
+      },
+    },
+    {
+      path: '/table/:tableName/bulk-entry',
+      name: 'bulk-entry',
+      component: BulkEntryView,
+      props: true,
+      meta: {
+        requiresAuth: true,
+        breadcrumbs: (route: any) => [
+          { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
+          { name: 'Bulk entry' },
         ],
       },
     },

@@ -23,6 +23,8 @@ var writeProcedures = map[string]bool{
 	sickrockpbconnect.SickRockCreateTableConfigurationProcedure:           true,
 	sickrockpbconnect.SickRockCreateDashboardProcedure:                    true,
 	sickrockpbconnect.SickRockCreateItemProcedure:                         true,
+	sickrockpbconnect.SickRockAddItemQuantityProcedure:                    true,
+	sickrockpbconnect.SickRockUploadImageProcedure:                        true,
 	sickrockpbconnect.SickRockEditItemProcedure:                           true,
 	sickrockpbconnect.SickRockDeleteItemProcedure:                         true,
 	sickrockpbconnect.SickRockAddTableColumnProcedure:                     true,

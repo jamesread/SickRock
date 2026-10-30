@@ -13,6 +13,7 @@ import {
   Link01Icon,
   LayoutIcon,
   GridIcon,
+  ArrowRight01Icon,
 } from '@hugeicons/core-free-icons'
 import FieldGroupingEditor from '../components/FieldGroupingEditor.vue'
 import { syntheticColumnNamesForSourceTable } from '../utils/relationPullThrough'
@@ -29,6 +30,7 @@ import { useIamUsers } from '../composables/useIamUsers'
 import {
   findFieldDef,
   hasStoredUserRefValue,
+  isImageFieldType,
   isUserRefColumn as columnIsUserRef,
   isUserRefFieldType,
 } from '../utils/fieldTypes'
@@ -65,6 +67,8 @@ import AbsorbedRelationFields from './AbsorbedRelationFields.vue'
 import { whenHugeiconAvailable, type IconData } from '../utils/hugeicons'
 import { rowViewFieldUiKey } from './rowViewFieldUi'
 import { orderBySchema } from '../utils/schemaFieldOrder'
+import { resolveRowActionRoute } from '../utils/rowActions'
+import HugeIcon from '../components/HugeIcon.vue'
 
 type FieldEntry = {
   key: string
@@ -389,7 +393,7 @@ async function saveField() {
       newValue = mysqlDatetime(editingValue.value)
     } else if (
       editingValue.value === ''
-      && (isUserRefColumn(column) || isIntegerLikeFieldType(fieldType(column)))
+      && (isUserRefColumn(column) || isImageFieldType(fieldType(column)) || isIntegerLikeFieldType(fieldType(column)))
       && !getFieldDef(column)?.required
     ) {
       newValue = '0'
@@ -1300,6 +1304,16 @@ const editButtonText = computed(() =>
   rowEditActionLabel(tableStructure.value?.rowName),
 )
 
+// Links declared in the table configuration's row_actions, filled in from this row.
+const rowActionLinks = computed(() => {
+  const fields = (item.value?.additionalFields ?? {}) as Record<string, unknown>
+  return (tableStructure.value?.rowActions ?? []).map(action => ({
+    label: action.label,
+    icon: action.icon,
+    to: resolveRowActionRoute(action, fields, tableName, rowId),
+  }))
+})
+
 const backToTableLabel = computed(() =>
   tableListLinkLabel(tableStructure.value?.rowNamePlural, tableStructure.value?.rowName),
 )
@@ -1309,6 +1323,7 @@ function displayFieldLabel(key: string): string {
 }
 
 provide(rowViewFieldUiKey, {
+  tableId: tableName,
   editingField,
   editingValue,
   savingField,
@@ -1376,6 +1391,15 @@ function cancelDelete() {
           class="button inline-icon good"
         >
           <span>{{ editButtonText }}</span>
+        </router-link>
+        <router-link
+          v-for="action in rowActionLinks"
+          :key="action.label"
+          :to="action.to"
+          class="button inline-icon neutral"
+        >
+          <HugeIcon :name="action.icon" :fallback="ArrowRight01Icon" width="1em" height="1em" aria-hidden="true" />
+          <span>{{ action.label }}</span>
         </router-link>
         <router-link
           v-if="designModeEnabled && tableAccess.canEdit && foreignKeys.length > 0"

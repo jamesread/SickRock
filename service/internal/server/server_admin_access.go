@@ -19,6 +19,7 @@ var systemSettingsTableConfigurations = map[string]bool{
 	"table_dashboards":           true,
 	"table_dashboard_components": true,
 	"device_codes":               true,
+	"table_images":               true,
 }
 
 func isSystemSettingsTableConfiguration(tcName string) bool {

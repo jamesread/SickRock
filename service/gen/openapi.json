@@ -60,6 +60,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/AddItemQuantity": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "AddItemQuantity",
+        "operationId": "sickrock.SickRock.AddItemQuantity",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.AddItemQuantityRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.AddItemQuantityResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/AddTableColumn": {
       "post": {
         "tags": [
@@ -6231,6 +6289,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/UploadImage": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "UploadImage",
+        "operationId": "sickrock.SickRock.UploadImage",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.UploadImageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.UploadImageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/ValidateToken": {
       "post": {
         "tags": [
@@ -6460,6 +6576,102 @@
         "title": "AcknowledgeHealthIssueResponse",
         "additionalProperties": false
       },
+      "sickrock.AddItemQuantityRequest": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "title": "page_id"
+          },
+          "match": {
+            "type": "object",
+            "title": "match",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            }
+          },
+          "quantityColumn": {
+            "type": "string",
+            "title": "quantity_column"
+          },
+          "quantity": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "quantity",
+            "format": "int64",
+            "description": "Amount to add; negative to take away (a row never goes below zero)."
+          },
+          "fields": {
+            "type": "object",
+            "title": "fields",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "Values for a newly created row only."
+          }
+        },
+        "title": "AddItemQuantityRequest",
+        "additionalProperties": false,
+        "description": "AddItemQuantityRequest adds quantity to the newest row matching every `match` column (an empty value\n matches NULL), or creates a row from match + fields when none matches and quantity is positive."
+      },
+      "sickrock.AddItemQuantityRequest.FieldsEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "value": {
+            "type": "string",
+            "title": "value"
+          }
+        },
+        "title": "FieldsEntry",
+        "additionalProperties": false
+      },
+      "sickrock.AddItemQuantityRequest.MatchEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "value": {
+            "type": "string",
+            "title": "value"
+          }
+        },
+        "title": "MatchEntry",
+        "additionalProperties": false
+      },
+      "sickrock.AddItemQuantityResponse": {
+        "type": "object",
+        "properties": {
+          "item": {
+            "title": "item",
+            "$ref": "#/components/schemas/sickrock.Item"
+          },
+          "created": {
+            "type": "boolean",
+            "title": "created"
+          },
+          "quantity": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "quantity",
+            "format": "int64",
+            "description": "The row's quantity after the change."
+          }
+        },
+        "title": "AddItemQuantityResponse",
+        "additionalProperties": false
+      },
       "sickrock.AddTableColumnRequest": {
         "type": "object",
         "properties": {
@@ -6474,6 +6686,45 @@
         },
         "title": "AddTableColumnRequest",
         "additionalProperties": false
+      },
+      "sickrock.BulkEntryConfig": {
+        "type": "object",
+        "properties": {
+          "scanColumn": {
+            "type": "string",
+            "title": "scan_column",
+            "description": "Column the scanned code is entered into."
+          },
+          "quantityColumn": {
+            "type": "string",
+            "title": "quantity_column",
+            "description": "When set, an entry adds to this column on a matching row instead of creating a new one."
+          },
+          "matchColumns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "match_columns",
+            "description": "Columns besides scan_column that must be equal for an entry to match an existing row."
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "fields",
+            "description": "Other columns shown on the form; filled in from an earlier row with the same code."
+          },
+          "saveOnScan": {
+            "type": "boolean",
+            "title": "save_on_scan",
+            "description": "Default for saving as soon as a code is scanned (the page can override it)."
+          }
+        },
+        "title": "BulkEntryConfig",
+        "additionalProperties": false,
+        "description": "BulkEntryConfig configures a table's bulk entry (barcode scanning) page."
       },
       "sickrock.ChangeColumnNameRequest": {
         "type": "object",
@@ -8682,6 +8933,19 @@
             },
             "title": "column_display_settings",
             "description": "All persisted column display rows for this table (physical and relation synthetic columns)."
+          },
+          "rowActions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.RowAction"
+            },
+            "title": "row_actions",
+            "description": "Links shown on a row's item page (table_configurations.row_actions); query values may use {id} and {column} templates."
+          },
+          "bulkEntry": {
+            "title": "bulk_entry",
+            "description": "Bulk entry page settings (table_configurations.bulk_entry_json); unset when bulk entry is off.",
+            "$ref": "#/components/schemas/sickrock.BulkEntryConfig"
           }
         },
         "title": "GetTableStructureResponse",
@@ -9116,6 +9380,57 @@
         "title": "IamUser",
         "additionalProperties": false,
         "description": "IAM / RBAC (armature-iam)"
+      },
+      "sickrock.ImageInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "id",
+            "format": "int64"
+          },
+          "mimeType": {
+            "type": "string",
+            "title": "mime_type"
+          },
+          "sizeBytes": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "size_bytes",
+            "format": "int64"
+          },
+          "width": {
+            "type": "integer",
+            "title": "width",
+            "format": "int32"
+          },
+          "height": {
+            "type": "integer",
+            "title": "height",
+            "format": "int32"
+          },
+          "originalFilename": {
+            "type": "string",
+            "title": "original_filename"
+          },
+          "sha256": {
+            "type": "string",
+            "title": "sha256"
+          },
+          "url": {
+            "type": "string",
+            "title": "url",
+            "description": "Path the image is served from, e.g. /api/images/12."
+          }
+        },
+        "title": "ImageInfo",
+        "additionalProperties": false,
+        "description": "ImageInfo is a row of the images system table: an uploaded image file and its metadata."
       },
       "sickrock.InitRequest": {
         "type": "object",
@@ -10135,6 +10450,51 @@
         "title": "ResetUserPasswordResponse",
         "additionalProperties": false
       },
+      "sickrock.RowAction": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "label"
+          },
+          "path": {
+            "type": "string",
+            "title": "path",
+            "description": "Frontend route path, e.g. \"/admin/table/create\"."
+          },
+          "query": {
+            "type": "object",
+            "title": "query",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "Query parameters; values may contain {id} (the row's primary key) and {column} placeholders."
+          },
+          "icon": {
+            "type": "string",
+            "title": "icon"
+          }
+        },
+        "title": "RowAction",
+        "additionalProperties": false,
+        "description": "RowAction is a link from a row's item page to another page, filled in with values from that row."
+      },
+      "sickrock.RowAction.QueryEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "value": {
+            "type": "string",
+            "title": "value"
+          }
+        },
+        "title": "QueryEntry",
+        "additionalProperties": false
+      },
       "sickrock.RssCalendarFeed": {
         "type": "object",
         "properties": {
@@ -10990,6 +11350,44 @@
           }
         },
         "title": "UpdateUserNotificationChannelResponse",
+        "additionalProperties": false
+      },
+      "sickrock.UploadImageRequest": {
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "title": "page_id",
+            "description": "Table configuration the image column belongs to."
+          },
+          "columnName": {
+            "type": "string",
+            "title": "column_name"
+          },
+          "data": {
+            "type": "string",
+            "title": "data",
+            "format": "byte",
+            "description": "JPEG, PNG, GIF or WebP file contents."
+          },
+          "filename": {
+            "type": "string",
+            "title": "filename"
+          }
+        },
+        "title": "UploadImageRequest",
+        "additionalProperties": false,
+        "description": "UploadImageRequest stores an image for an image column; the column value is then set to the\n returned image id with CreateItem or EditItem."
+      },
+      "sickrock.UploadImageResponse": {
+        "type": "object",
+        "properties": {
+          "image": {
+            "title": "image",
+            "$ref": "#/components/schemas/sickrock.ImageInfo"
+          }
+        },
+        "title": "UploadImageResponse",
         "additionalProperties": false
       },
       "sickrock.UserBookmark": {

@@ -31,7 +31,9 @@ func TestUpdateTableRelationPullThrough(t *testing.T) {
 			row_name_plural TEXT,
 			icon TEXT,
 			primary_key_column TEXT,
-			default_sort_column TEXT
+			default_sort_column TEXT,
+			row_actions TEXT,
+			bulk_entry_json TEXT
 		);
 		INSERT INTO table_configurations (name, "db", "table", title, ordinal) VALUES
 			('customers', 'main', 'customers', 'Customers', 0),

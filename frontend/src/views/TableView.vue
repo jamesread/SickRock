@@ -7,6 +7,10 @@ import type { GetTableStructureResponse } from '../gen/sickrock_pb'
 import TableComponent from '../components/TableComponent.vue'
 import CalendarComponent from '../components/CalendarComponent.vue'
 import TickListComponent from '../components/TickListComponent.vue'
+import WeeklyPlanComponent from '../components/WeeklyPlanComponent.vue'
+import CardsComponent from '../components/CardsComponent.vue'
+import { WEEKLY_PLAN_VIEW_TYPE } from '../utils/weeklyPlan'
+import { CARDS_VIEW_TYPE } from '../utils/cardsView'
 import Section from 'picocrank/vue/components/Section.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { DatabaseIcon } from '@hugeicons/core-free-icons'
@@ -108,6 +112,20 @@ onMounted(async () => {
   <template v-else>
     <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" :view-name="currentViewName" :view-id="viewManager.selectedViewId.value ?? undefined" @view-changed="handleViewChanged" />
     <TickListComponent v-else-if="currentViewType === 'ticklist'" :table-id="tableId" @view-changed="handleViewChanged" />
+    <WeeklyPlanComponent
+      v-else-if="currentViewType === WEEKLY_PLAN_VIEW_TYPE"
+      :table-id="tableId"
+      :view-id="viewManager.selectedViewId.value ?? undefined"
+      :view-name="currentViewName"
+      @view-changed="handleViewChanged"
+    />
+    <CardsComponent
+      v-else-if="currentViewType === CARDS_VIEW_TYPE"
+      :table-id="tableId"
+      :view-id="viewManager.selectedViewId.value ?? undefined"
+      :view-name="currentViewName"
+      @view-changed="handleViewChanged"
+    />
     <Section
       v-else
       :padding="false"

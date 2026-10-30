@@ -13,6 +13,20 @@ export function isIconFieldType(fieldType: string | undefined): boolean {
   return (fieldType ?? '').toLowerCase() === ICON_FIELD_TYPE
 }
 
+/** Column semantic for an images.id (edited with ImageField: file upload or camera capture). */
+export const IMAGE_FIELD_TYPE = 'image'
+
+export function isImageFieldType(fieldType: string | undefined): boolean {
+  return (fieldType ?? '').toLowerCase() === IMAGE_FIELD_TYPE
+}
+
+/** Whether a stored image column value refers to an image (NULL, empty and 0 mean none). */
+export function hasImageValue(raw: unknown): boolean {
+  if (raw == null) return false
+  const value = String(raw).trim()
+  return value !== '' && value !== '0' && value !== 'null'
+}
+
 export function findFieldDef(fields: Field[], columnName: string): Field | undefined {
   const lower = columnName.toLowerCase()
   return fields.find(field => field.name.toLowerCase() === lower)

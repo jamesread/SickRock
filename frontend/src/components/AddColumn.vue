@@ -8,7 +8,7 @@ import { SickRock } from '../gen/sickrock_pb'
 const props = withDefaults(defineProps<{
   tableId: string
   initialName?: string
-  initialType?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref'
+  initialType?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image'
   navigateOnSuccess?: boolean
 }>(), {
   navigateOnSuccess: true,
@@ -18,7 +18,7 @@ const emit = defineEmits<{ added: [] }>()
 const router = useRouter()
 
 const name = ref('')
-const type = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref'>('string')
+const type = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image'>('string')
 const required = ref(false)
 const defaultToCurrentTimestamp = ref(false)
 const loading = ref(false)
@@ -81,9 +81,13 @@ async function submit() {
                     <option value="tinyint">tinyint</option>
                     <option value="datetime">datetime</option>
                     <option value="user_ref">User reference</option>
+                    <option value="image">Image</option>
                 </select>
                 <div v-if="type === 'user_ref'" class="desc">
                     Stores a SickRock user account id. Values are shown as username chips in tables and forms.
+                </div>
+                <div v-else-if="type === 'image'" class="desc">
+                    Stores a reference to an uploaded image. Images can be uploaded from a file or taken with the device camera.
                 </div>
             </div>
 

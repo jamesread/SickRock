@@ -173,6 +173,11 @@ const (
 	SickRockListItemsProcedure = "/sickrock.SickRock/ListItems"
 	// SickRockCreateItemProcedure is the fully-qualified name of the SickRock's CreateItem RPC.
 	SickRockCreateItemProcedure = "/sickrock.SickRock/CreateItem"
+	// SickRockAddItemQuantityProcedure is the fully-qualified name of the SickRock's AddItemQuantity
+	// RPC.
+	SickRockAddItemQuantityProcedure = "/sickrock.SickRock/AddItemQuantity"
+	// SickRockUploadImageProcedure is the fully-qualified name of the SickRock's UploadImage RPC.
+	SickRockUploadImageProcedure = "/sickrock.SickRock/UploadImage"
 	// SickRockGetItemProcedure is the fully-qualified name of the SickRock's GetItem RPC.
 	SickRockGetItemProcedure = "/sickrock.SickRock/GetItem"
 	// SickRockEditItemProcedure is the fully-qualified name of the SickRock's EditItem RPC.
@@ -389,6 +394,8 @@ type SickRockClient interface {
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
+	AddItemQuantity(context.Context, *connect.Request[proto.AddItemQuantityRequest]) (*connect.Response[proto.AddItemQuantityResponse], error)
+	UploadImage(context.Context, *connect.Request[proto.UploadImageRequest]) (*connect.Response[proto.UploadImageResponse], error)
 	GetItem(context.Context, *connect.Request[proto.GetItemRequest]) (*connect.Response[proto.GetItemResponse], error)
 	EditItem(context.Context, *connect.Request[proto.EditItemRequest]) (*connect.Response[proto.EditItemResponse], error)
 	DeleteItem(context.Context, *connect.Request[proto.DeleteItemRequest]) (*connect.Response[proto.DeleteItemResponse], error)
@@ -790,6 +797,18 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("CreateItem")),
 			connect.WithClientOptions(opts...),
 		),
+		addItemQuantity: connect.NewClient[proto.AddItemQuantityRequest, proto.AddItemQuantityResponse](
+			httpClient,
+			baseURL+SickRockAddItemQuantityProcedure,
+			connect.WithSchema(sickRockMethods.ByName("AddItemQuantity")),
+			connect.WithClientOptions(opts...),
+		),
+		uploadImage: connect.NewClient[proto.UploadImageRequest, proto.UploadImageResponse](
+			httpClient,
+			baseURL+SickRockUploadImageProcedure,
+			connect.WithSchema(sickRockMethods.ByName("UploadImage")),
+			connect.WithClientOptions(opts...),
+		),
 		getItem: connect.NewClient[proto.GetItemRequest, proto.GetItemResponse](
 			httpClient,
 			baseURL+SickRockGetItemProcedure,
@@ -1178,6 +1197,8 @@ type sickRockClient struct {
 	previewRssCalendarFeed             *connect.Client[proto.PreviewRssCalendarFeedRequest, proto.PreviewRssCalendarFeedResponse]
 	listItems                          *connect.Client[proto.ListItemsRequest, proto.ListItemsResponse]
 	createItem                         *connect.Client[proto.CreateItemRequest, proto.CreateItemResponse]
+	addItemQuantity                    *connect.Client[proto.AddItemQuantityRequest, proto.AddItemQuantityResponse]
+	uploadImage                        *connect.Client[proto.UploadImageRequest, proto.UploadImageResponse]
 	getItem                            *connect.Client[proto.GetItemRequest, proto.GetItemResponse]
 	editItem                           *connect.Client[proto.EditItemRequest, proto.EditItemResponse]
 	deleteItem                         *connect.Client[proto.DeleteItemRequest, proto.DeleteItemResponse]
@@ -1498,6 +1519,16 @@ func (c *sickRockClient) ListItems(ctx context.Context, req *connect.Request[pro
 // CreateItem calls sickrock.SickRock.CreateItem.
 func (c *sickRockClient) CreateItem(ctx context.Context, req *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error) {
 	return c.createItem.CallUnary(ctx, req)
+}
+
+// AddItemQuantity calls sickrock.SickRock.AddItemQuantity.
+func (c *sickRockClient) AddItemQuantity(ctx context.Context, req *connect.Request[proto.AddItemQuantityRequest]) (*connect.Response[proto.AddItemQuantityResponse], error) {
+	return c.addItemQuantity.CallUnary(ctx, req)
+}
+
+// UploadImage calls sickrock.SickRock.UploadImage.
+func (c *sickRockClient) UploadImage(ctx context.Context, req *connect.Request[proto.UploadImageRequest]) (*connect.Response[proto.UploadImageResponse], error) {
+	return c.uploadImage.CallUnary(ctx, req)
 }
 
 // GetItem calls sickrock.SickRock.GetItem.
@@ -1838,6 +1869,8 @@ type SickRockHandler interface {
 	// Generic CRUD over items on a page
 	ListItems(context.Context, *connect.Request[proto.ListItemsRequest]) (*connect.Response[proto.ListItemsResponse], error)
 	CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error)
+	AddItemQuantity(context.Context, *connect.Request[proto.AddItemQuantityRequest]) (*connect.Response[proto.AddItemQuantityResponse], error)
+	UploadImage(context.Context, *connect.Request[proto.UploadImageRequest]) (*connect.Response[proto.UploadImageResponse], error)
 	GetItem(context.Context, *connect.Request[proto.GetItemRequest]) (*connect.Response[proto.GetItemResponse], error)
 	EditItem(context.Context, *connect.Request[proto.EditItemRequest]) (*connect.Response[proto.EditItemResponse], error)
 	DeleteItem(context.Context, *connect.Request[proto.DeleteItemRequest]) (*connect.Response[proto.DeleteItemResponse], error)
@@ -2233,6 +2266,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockCreateItemProcedure,
 		svc.CreateItem,
 		connect.WithSchema(sickRockMethods.ByName("CreateItem")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockAddItemQuantityHandler := connect.NewUnaryHandler(
+		SickRockAddItemQuantityProcedure,
+		svc.AddItemQuantity,
+		connect.WithSchema(sickRockMethods.ByName("AddItemQuantity")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockUploadImageHandler := connect.NewUnaryHandler(
+		SickRockUploadImageProcedure,
+		svc.UploadImage,
+		connect.WithSchema(sickRockMethods.ByName("UploadImage")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockGetItemHandler := connect.NewUnaryHandler(
@@ -2673,6 +2718,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockListItemsHandler.ServeHTTP(w, r)
 		case SickRockCreateItemProcedure:
 			sickRockCreateItemHandler.ServeHTTP(w, r)
+		case SickRockAddItemQuantityProcedure:
+			sickRockAddItemQuantityHandler.ServeHTTP(w, r)
+		case SickRockUploadImageProcedure:
+			sickRockUploadImageHandler.ServeHTTP(w, r)
 		case SickRockGetItemProcedure:
 			sickRockGetItemHandler.ServeHTTP(w, r)
 		case SickRockEditItemProcedure:
@@ -3002,6 +3051,14 @@ func (UnimplementedSickRockHandler) ListItems(context.Context, *connect.Request[
 
 func (UnimplementedSickRockHandler) CreateItem(context.Context, *connect.Request[proto.CreateItemRequest]) (*connect.Response[proto.CreateItemResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateItem is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) AddItemQuantity(context.Context, *connect.Request[proto.AddItemQuantityRequest]) (*connect.Response[proto.AddItemQuantityResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.AddItemQuantity is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) UploadImage(context.Context, *connect.Request[proto.UploadImageRequest]) (*connect.Response[proto.UploadImageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UploadImage is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetItem(context.Context, *connect.Request[proto.GetItemRequest]) (*connect.Response[proto.GetItemResponse], error) {

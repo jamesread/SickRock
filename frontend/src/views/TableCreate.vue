@@ -110,7 +110,23 @@ onMounted(async () => {
     createTableInDatabase.value = false
     createConfiguration.value = true
   }
+  const appId = Number(route.query.navigationAppId)
+  if (appId > 0) {
+    createNavigationEntry.value = true
+    navigationAppId.value = appId
+  }
 })
+
+/** Returns to the row this form was opened from (e.g. an app's item page), if any. */
+async function returnToOriginRow(): Promise<boolean> {
+  const fromTable = route.query.fromTable
+  const fromRowId = route.query.fromRowId
+  if (typeof fromTable !== 'string' || typeof fromRowId !== 'string' || !fromTable || !fromRowId) {
+    return false
+  }
+  await router.push({ name: 'row', params: { tableName: fromTable, rowId: fromRowId } })
+  return true
+}
 
 watch(table, (newTable) => {
   if (!nameManuallyEdited.value) {
@@ -174,7 +190,9 @@ async function submit() {
         ? 'Table and configuration created successfully'
         : 'Table configuration created successfully'
 
-      await router.push(`/table/${encodeURIComponent(name.value)}`)
+      if (!(await returnToOriginRow())) {
+        await router.push(`/table/${encodeURIComponent(name.value)}`)
+      }
     } else {
       await router.push(`/table/${encodeURIComponent(table.value)}`)
     }

@@ -20,15 +20,19 @@ function authInterceptor(getToken: () => string | undefined): Interceptor {
 }
 
 
+/** The signed-in session token sent with API requests, if any. */
+export function currentSessionToken(): string | undefined {
+  const authStore = useAuthStore()
+  return authStore.user?.token ?? localStorage.getItem(SESSION_TOKEN_KEY) ?? undefined
+}
+
 // ConnectRPC-compatible API client using fetch with proper message construction
 export const createApiClient = () => {
-  const authStore = useAuthStore()
-
   const transport = createConnectTransport({
     baseUrl: '/api',
     fetch: (input, init) => fetch(input, { ...init, credentials: 'include' }),
     interceptors: [
-      authInterceptor(() => authStore.user?.token ?? localStorage.getItem(SESSION_TOKEN_KEY) ?? undefined),
+      authInterceptor(currentSessionToken),
     ],
   })
 

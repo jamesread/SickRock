@@ -5,9 +5,11 @@ import { createApiClient } from '../stores/api'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { SickRock } from '../gen/sickrock_pb'
 import { useIamUsers } from '../composables/useIamUsers'
-import { isIconFieldType, isUserRefFieldType } from '../utils/fieldTypes'
+import { isIconFieldType, isImageFieldType, isUserRefFieldType } from '../utils/fieldTypes'
 import IconPickerField from './IconPickerField.vue'
+import ImageField from './ImageField.vue'
 import { fieldDisplayLabel } from '../utils/fieldColumnDisplay'
+import { toSqlDateTime } from '../utils/dateFormatting'
 import UserRefChip from './UserRefChip.vue'
 import type { Field, IamUser, ItemFieldGroup } from '../gen/sickrock_pb'
 
@@ -311,7 +313,7 @@ function isIntegerLikeFieldType(fieldType: string): boolean {
 
 /** Value sent to API to clear a nullable column (server maps "" and "0" to NULL for FK ints). */
 function clearedFieldPayloadValue(field: { name: string; type: string }): string {
-  if (isForeignKey(field.name) || isUserRefField(field.name) || isIntegerLikeFieldType(field.type)) {
+  if (isForeignKey(field.name) || isUserRefField(field.name) || isImageFieldType(field.type) || isIntegerLikeFieldType(field.type)) {
     return '0'
   }
   return ''
@@ -652,22 +654,10 @@ async function submit() {
     }
 
     if (f.type === 'datetime' || f.type === 'timestamp') {
-      // For datetime fields, convert to MySQL-compatible format (YYYY-MM-DD HH:MM:SS)
-      try {
-        const date = new Date(v)
-        if (!isNaN(date.getTime())) {
-          // Convert to MySQL datetime format: YYYY-MM-DD HH:MM:SS
-          const year = date.getFullYear()
-          const month = String(date.getMonth() + 1).padStart(2, '0')
-          const day = String(date.getDate()).padStart(2, '0')
-          const hours = String(date.getHours()).padStart(2, '0')
-          const minutes = String(date.getMinutes()).padStart(2, '0')
-          const seconds = String(date.getSeconds()).padStart(2, '0')
-          payload[f.name] = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-        }
-      } catch {
-        // Skip invalid dates
-        continue
+      // For datetime fields, convert to MySQL-compatible format (YYYY-MM-DD HH:MM:SS); skip invalid dates
+      const sqlDateTime = toSqlDateTime(v)
+      if (sqlDateTime) {
+        payload[f.name] = sqlDateTime
       }
     } else if (
       f.type === 'int64'
@@ -675,6 +665,7 @@ async function submit() {
       || f.type === 'bigint'
       || f.type === 'integer'
       || isUserRefFieldType(f.type)
+      || isImageFieldType(f.type)
     ) {
       payload[f.name] = String(Number(v))
     } else if (f.type === 'float') {
@@ -734,6 +725,16 @@ function cancel() {
               v-if="isIconFieldType(f.type)"
               :id="'field-' + f.name"
               v-model="form[f.name]"
+              :clearable="!f.required"
+            />
+
+            <!-- Image: upload or camera capture -->
+            <ImageField
+              v-else-if="isImageFieldType(f.type)"
+              :id="'field-' + f.name"
+              v-model="form[f.name]"
+              :table-id="tableId"
+              :column-name="f.name"
               :clearable="!f.required"
             />
 

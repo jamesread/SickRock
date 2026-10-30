@@ -3,6 +3,7 @@ import { HugeiconsIcon } from '@hugeicons/vue'
 import {
   Add01Icon,
   AddCircleIcon,
+  BarCode01Icon,
   Download01Icon,
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
@@ -18,6 +19,8 @@ defineProps<{
   showStructure?: boolean
   showInsert?: boolean
   showQuickAdd?: boolean
+  /** Shows the "Bulk entry" link (tables with bulk_entry_json set). */
+  showBulkEntry?: boolean
   insertRoute: string | { path: string; query?: Record<string, string> }
   insertButtonText: string
   tableViews: TableView[]
@@ -71,6 +74,14 @@ const emit = defineEmits<{
   >
     <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
     <span>Structure</span>
+  </router-link>
+  <router-link
+    v-if="showBulkEntry"
+    :to="`/table/${tableId}/bulk-entry`"
+    class="button inline-icon neutral"
+  >
+    <HugeiconsIcon :icon="BarCode01Icon" width="1em" height="1em" aria-hidden="true" />
+    <span>Bulk entry</span>
   </router-link>
   <div v-if="showInsert" class="insert-button-group">
     <!-- Wide screens show "Create <row>"; narrow screens fall back to the compact quick-add button. -->
