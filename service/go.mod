@@ -25,6 +25,7 @@ require (
 	github.com/yuin/goldmark v1.8.6
 	go.akshayshah.org/connectproto v0.6.0
 	golang.org/x/crypto v0.58.0
+	golang.org/x/image v0.47.0
 	google.golang.org/protobuf v1.36.12
 	modernc.org/sqlite v1.60.1
 )
@@ -36,11 +37,10 @@ require (
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.72.0 // indirect
 	github.com/prometheus/procfs v0.22.0 // indirect
-	golang.org/x/image v0.47.0 // indirect
 )
 
 require (
-	connectrpc.com/authn v0.2.0 // indirect
+	connectrpc.com/authn v0.2.0
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/MicahParks/jwkset v0.11.3 // indirect
 	github.com/MicahParks/keyfunc/v3 v3.8.2 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1 // indirect
 	github.com/google/jsonschema-go v0.4.3 // indirect
-	github.com/jamesread/armature-health v0.0.0
+	github.com/jamesread/armature-health v1.0.0
 	github.com/jamesread/httpauthshim v0.2.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.1 // indirect
@@ -95,5 +95,3 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.12.1 // indirect
 )
-
-replace github.com/jamesread/armature-health => ../../../armature-health

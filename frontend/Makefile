@@ -1,6 +1,6 @@
 .PHONY: all deps build preview test lint ci
 
-all: build
+all: ci
 
 ci: deps build
 
