@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, ViewIcon } from '@hugeicons/core-free-icons'
@@ -572,21 +573,15 @@ async function deleteTableView() {
       </div>
     </form>
 
-    <!-- Delete Confirmation Dialog -->
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click="showDeleteConfirm = false">
-      <div class="modal" @click.stop>
-        <h3>Delete View</h3>
-        <p>Are you sure you want to delete the view "{{ viewName }}"? This action cannot be undone.</p>
-        <div class="modal-actions">
-          <button @click="showDeleteConfirm = false" class="button neutral">
-            Cancel
-          </button>
-          <button @click="deleteTableView" :disabled="deleting" class="button bad">
-            {{ deleting ? 'Deleting...' : 'Delete View' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- Delete Confirmation -->
+    <Dialog v-model:open="showDeleteConfirm" title="Delete View" size="small">
+      <p>Are you sure you want to delete the view "{{ viewName }}"? This action cannot be undone.</p>
+      <template #actions>
+        <button type="button" :disabled="deleting" class="button bad" @click="deleteTableView">
+          {{ deleting ? 'Deleting...' : 'Delete View' }}
+        </button>
+      </template>
+    </Dialog>
   </Section>
 </template>
 
@@ -776,41 +771,4 @@ async function deleteTableView() {
   margin-top: 2rem;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: 400px;
-  width: 90%;
-}
-
-.modal h3 {
-  margin: 0 0 1rem 0;
-  color: #333;
-}
-
-.modal p {
-  margin: 0 0 1.5rem 0;
-  color: #666;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
 </style>

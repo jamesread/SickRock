@@ -1,57 +1,54 @@
 <template>
-  <div v-if="visible" class="modal-overlay" @click="close" @keydown.escape="close" tabindex="0">
-    <div class="modal-content keyboard-shortcuts-modal" @click.stop>
-      <div class="modal-header">
-        <h2>Keyboard Shortcuts</h2>
-        <button @click="close" class="button neutral" title="Close">
-          ✕
-        </button>
-      </div>
-      <div class="modal-body">
-        <div class="shortcuts-section">
-          <h3>Global Shortcuts</h3>
-          <div class="shortcuts-list">
-            <div v-for="shortcut in globalShortcuts" :key="shortcut.key" class="shortcut-item">
-              <div class="shortcut-keys">
-                <kbd v-for="(key, idx) in formatShortcutKeys(shortcut)" :key="idx">{{ key }}</kbd>
-              </div>
-              <div class="shortcut-description">{{ shortcut.description }}</div>
-            </div>
+  <Dialog
+    :open="visible"
+    title="Keyboard Shortcuts"
+    size="large"
+    class="keyboard-shortcuts-dialog"
+    @update:open="open => { if (!open) close() }"
+  >
+    <div class="shortcuts-section">
+      <h3>Global Shortcuts</h3>
+      <div class="shortcuts-list">
+        <div v-for="shortcut in globalShortcuts" :key="shortcut.key" class="shortcut-item">
+          <div class="shortcut-keys">
+            <kbd v-for="(key, idx) in formatShortcutKeys(shortcut)" :key="idx">{{ key }}</kbd>
           </div>
-        </div>
-
-        <div class="shortcuts-section">
-          <h3>Table Navigation</h3>
-          <div class="shortcuts-list">
-            <div v-for="shortcut in tableShortcuts" :key="shortcut.key" class="shortcut-item">
-              <div class="shortcut-keys">
-                <kbd v-for="(key, idx) in formatShortcutKeys(shortcut)" :key="idx">{{ key }}</kbd>
-              </div>
-              <div class="shortcut-description">{{ shortcut.description }}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="shortcuts-section">
-          <h3>Navigation</h3>
-          <div class="shortcuts-list">
-            <div v-for="shortcut in navigationShortcuts" :key="shortcut.key" class="shortcut-item">
-              <div class="shortcut-keys">
-                <kbd v-for="(key, idx) in formatShortcutKeys(shortcut)" :key="idx">{{ key }}</kbd>
-              </div>
-              <div class="shortcut-description">{{ shortcut.description }}</div>
-            </div>
-          </div>
+          <div class="shortcut-description">{{ shortcut.description }}</div>
         </div>
       </div>
     </div>
-  </div>
+
+    <div class="shortcuts-section">
+      <h3>Table Navigation</h3>
+      <div class="shortcuts-list">
+        <div v-for="shortcut in tableShortcuts" :key="shortcut.key" class="shortcut-item">
+          <div class="shortcut-keys">
+            <kbd v-for="(key, idx) in formatShortcutKeys(shortcut)" :key="idx">{{ key }}</kbd>
+          </div>
+          <div class="shortcut-description">{{ shortcut.description }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="shortcuts-section">
+      <h3>Navigation</h3>
+      <div class="shortcuts-list">
+        <div v-for="shortcut in navigationShortcuts" :key="shortcut.key" class="shortcut-item">
+          <div class="shortcut-keys">
+            <kbd v-for="(key, idx) in formatShortcutKeys(shortcut)" :key="idx">{{ key }}</kbd>
+          </div>
+          <div class="shortcut-description">{{ shortcut.description }}</div>
+        </div>
+      </div>
+    </div>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed } from 'vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 
-const props = defineProps<{
+defineProps<{
   visible: boolean
 }>()
 
@@ -66,38 +63,6 @@ const isMac = computed(() => {
 function close() {
   emit('update:visible', false)
 }
-
-function handleEscape(e: KeyboardEvent) {
-  if (e.key === 'Escape' && props.visible) {
-    close()
-  }
-}
-
-// Watch for visibility changes and add/remove escape listener
-watch(() => props.visible, (isVisible) => {
-  if (isVisible) {
-    window.addEventListener('keydown', handleEscape)
-    // Focus the overlay so it can receive keyboard events
-    nextTick(() => {
-      const overlay = document.querySelector('.modal-overlay') as HTMLElement
-      if (overlay) {
-        overlay.focus()
-      }
-    })
-  } else {
-    window.removeEventListener('keydown', handleEscape)
-  }
-})
-
-onMounted(() => {
-  if (props.visible) {
-    window.addEventListener('keydown', handleEscape)
-  }
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', handleEscape)
-})
 
 function formatShortcutKeys(shortcut: { key: string; ctrl?: boolean; meta?: boolean; shift?: boolean; alt?: boolean }): string[] {
   const keys: string[] = []
@@ -160,47 +125,6 @@ const navigationShortcuts = [
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  padding: 1rem;
-  box-sizing: border-box;
-}
-
-.keyboard-shortcuts-modal {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-  width: 90%;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid #ddd;
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-.modal-body {
-  padding: 1rem;
-}
 
 .shortcuts-section {
   margin-bottom: 2rem;

@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 
 import { createApiClient } from '../stores/api'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
+import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import { SickRock } from '../gen/sickrock_pb'
 import { useIamUsers } from '../composables/useIamUsers'
 import { isIconFieldType, isImageFieldType, isUserRefFieldType } from '../utils/fieldTypes'
@@ -716,7 +717,7 @@ function cancel() {
 
 <template>
   <div>
-    <form @submit.prevent="submit">
+    <FormLayout @submit.prevent="submit">
       <template v-for="{ field: f, heading } in orderedFields" :key="f.name">
         <template v-if="f.name !== 'id'">
             <h3 v-if="heading" class="field-group-heading">{{ heading }}</h3>
@@ -904,7 +905,7 @@ function cancel() {
         </template>
       </template>
 
-      <div class="form-actions grid-span-32">
+      <template #actions>
         <button
           v-if="isEditMode || cancellable"
           type="button"
@@ -921,8 +922,8 @@ function cancel() {
         >
           {{ isEditMode ? (saving ? 'Saving...' : 'Save Changes') : (loading ? 'Adding...' : 'Add') }}
         </button>
-      </div>
-    </form>
+      </template>
+    </FormLayout>
     <NotificationBlock v-if="error" type="error" :message="error" />
   </div>
 </template>
@@ -951,16 +952,6 @@ function cancel() {
   font-style: italic;
 }
 
-.grid-span-32 {
-  grid-column: 2;
-}
-
-form {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: 1em;
-}
-
 .field-group-heading {
   grid-column: 1 / -1;
   margin: 0.75rem 0 0;
@@ -980,39 +971,6 @@ form {
   width: auto;
   height: auto;
   padding: 0.15rem 0.45rem;
-}
-
-input[type="datetime-local"] {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  background-color: white;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-input[type="datetime-local"]:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-input[type="datetime-local"]:hover {
-  border-color: #999;
-}
-
-/* Ensure datetime inputs have consistent styling with other inputs */
-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
-  cursor: pointer;
-  border-radius: 4px;
-  margin-right: 2px;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-}
-
-input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover {
-  opacity: 1;
 }
 
 /* Foreign key searchable dropdown styling */
@@ -1189,19 +1147,5 @@ select:disabled {
   font-style: italic;
 }
 
-/* Form actions styling */
-.form-actions {
-  margin-top: 2rem;
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-
-/* Error styling */
-@media (max-width: 768px) {
-  form {
-    grid-template-columns: 1fr;
-  }
-}
 
 </style>

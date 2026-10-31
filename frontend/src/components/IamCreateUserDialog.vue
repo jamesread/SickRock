@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, reactive, nextTick } from 'vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { createApiClient } from '../stores/api'
+import type { DialogApi } from '../utils/dialog'
 
 const emit = defineEmits<{ created: [userId: number] }>()
 
-const dialogEl = ref<HTMLDialogElement | null>(null)
+const dialogEl = ref<DialogApi | null>(null)
 const nameInput = ref<HTMLInputElement | null>(null)
 const saving = ref(false)
 const errorMessage = ref('')
@@ -22,7 +24,7 @@ function resetForm() {
 
 function open() {
   resetForm()
-  dialogEl.value?.showModal()
+  dialogEl.value?.show()
   nextTick(() => nameInput.value?.focus())
 }
 
@@ -62,11 +64,10 @@ defineExpose({ open, close })
 </script>
 
 <template>
-  <dialog ref="dialogEl" class="dialog" @close="resetForm">
-    <h2>Create user</h2>
+  <Dialog ref="dialogEl" title="Create user" @close="resetForm">
     <p>Create a new user account. Password is optional — omit it to disable interactive login until a password is set.</p>
 
-    <FormLayout @submit.prevent="submit">
+    <FormLayout id="dialog-el-form" @submit.prevent="submit">
       <FormField label="Username" for="new-user-name" :disabled="saving">
         <input
           id="new-user-name"
@@ -91,13 +92,12 @@ defineExpose({ open, close })
       </FormField>
 
       <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
-
-      <template #actions>
-        <button type="button" class="neutral" :disabled="saving" @click="close">Cancel</button>
-        <button type="submit" class="good" :disabled="saving || !form.username.trim()">
-          {{ saving ? 'Creating…' : 'Create user' }}
-        </button>
-      </template>
     </FormLayout>
-  </dialog>
+
+    <template #actions>
+      <button type="submit" form="dialog-el-form" class="good" :disabled="saving || !form.username.trim()">
+        {{ saving ? 'Creating…' : 'Create user' }}
+      </button>
+    </template>
+  </Dialog>
 </template>

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Dialog from 'picocrank/vue/components/Dialog.vue'
+import type { DialogApi } from '../utils/dialog'
 // Edits an image column: upload a file, take a photo with the browser camera, or paste an image
 // from the clipboard (the Paste button, or Ctrl+V while the field has focus). The image is
 // uploaded straight away (UploadImage) and the field's value becomes the new images.id; the row
@@ -40,7 +42,7 @@ const client = createApiClient()
 const camera = useCameraCapture()
 
 const fileInput = ref<HTMLInputElement | null>(null)
-const dialogEl = ref<HTMLDialogElement | null>(null)
+const dialogEl = ref<DialogApi | null>(null)
 const video = ref<HTMLVideoElement | null>(null)
 const uploading = ref(false)
 const error = ref<string | null>(null)
@@ -90,7 +92,7 @@ async function onFileChosen(event: Event) {
 
 async function openCamera() {
   error.value = null
-  dialogEl.value?.showModal()
+  dialogEl.value?.show()
   await nextTick()
   if (video.value) {
     await camera.start(video.value)
@@ -206,12 +208,11 @@ function clear() {
     />
     <NotificationBlock v-if="error" type="error" :message="error" />
 
-    <dialog ref="dialogEl" class="dialog image-camera-dialog" @close="camera.stop()">
-      <h2>Take a photo</h2>
+    <Dialog ref="dialogEl" title="Take a photo" class="image-camera-dialog" @close="camera.stop()">
       <video ref="video" muted playsinline autoplay />
       <NotificationBlock v-if="camera.error.value" type="warning" :message="camera.error.value" />
       <p v-else-if="camera.starting.value" class="subtle">Starting camera…</p>
-      <div class="image-field-actions">
+      <template #actions>
         <button
           type="button"
           class="button inline-icon good"
@@ -231,9 +232,8 @@ function clear() {
           <HugeiconsIcon :icon="CameraRotated01Icon" width="1em" height="1em" aria-hidden="true" />
           <span>Switch camera</span>
         </button>
-        <button type="button" class="button neutral" @click="dialogEl?.close()">Cancel</button>
-      </div>
-    </dialog>
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -256,6 +256,7 @@ function clear() {
   display: block;
   width: 100%;
   max-height: 60vh;
+  max-height: 60dvh;
   background: #000;
   border-radius: 0.25rem;
   margin-block: 0.5rem;

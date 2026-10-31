@@ -229,6 +229,8 @@ When developing UI components for agents:
 3. **Avoid custom CSS** - New CSS rules should generally be avoided in favor of existing library styles
 4. **Maintain consistency** - Use the established design system to ensure UI consistency across the application
 5. **Component composition** - Build complex UIs by composing existing picocrank components rather than creating new styled elements
+6. **Dialogs** - Use picocrank's `Dialog` (`v-model:open`, or a template ref typed `DialogApi` from `frontend/src/utils/dialog.ts` with `show()`/`close()`), not hand-made overlays or bare `<dialog>`s. Put the main action in its `actions` slot (a submit button reaches its form with `form="<form id>"`); the close button, Escape and a backdrop click dismiss it, so there is no Cancel button. It is a bottom sheet on narrow screens (`narrow-layout="fullscreen"` for pickers).
+7. **Responsive layout** - Narrow screens are 768px and below (`useIsNarrow()`, `.hide-narrow` / `.show-narrow`). Section and Header toolbars fold into a ⋮ menu when they do not fit, so keep toolbar controls as direct children (give a wrapper `display: contents`), give icon-only buttons an `aria-label` (shown as the menu label), and do not hide toolbar buttons on phones. Use `.action-row` for groups of buttons and `dvh` (after a `vh` fallback) for viewport heights.
 
 **Example of preferred approach:**
 ```vue

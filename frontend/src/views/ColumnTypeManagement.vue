@@ -5,6 +5,8 @@ import { useRoute } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
+import type { DialogApi } from '../utils/dialog'
 import Table from 'picocrank/vue/components/Table.vue'
 import ConditionalFormattingRules from '../components/ConditionalFormattingRules.vue'
 import FieldGroupingEditor from '../components/FieldGroupingEditor.vue'
@@ -57,7 +59,7 @@ const customType = ref('')
 const useCustomType = ref(false)
 const showDropConfirm = ref<string | null>(null)
 const dropping = ref(false)
-const createColumnDialog = ref<HTMLDialogElement | null>(null)
+const createColumnDialog = ref<DialogApi | null>(null)
 const createColumnName = ref<string | undefined>()
 const createColumnType = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image' | undefined>()
 
@@ -378,13 +380,11 @@ async function dropForeignKey(constraintName: string) {
 function openCreateColumn(name?: string, type?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image') {
   createColumnName.value = name
   createColumnType.value = type
-  nextTick(() => createColumnDialog.value?.showModal())
+  nextTick(() => createColumnDialog.value?.show())
 }
 
 function closeCreateColumn() {
-  if (createColumnDialog.value?.open) {
-    createColumnDialog.value.close()
-  }
+  createColumnDialog.value?.close()
   createColumnName.value = undefined
   createColumnType.value = undefined
 }
@@ -451,8 +451,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <dialog ref="createColumnDialog" class="dialog create-column-dialog" @close="closeCreateColumn">
-    <h2>Create column</h2>
+  <Dialog ref="createColumnDialog" title="Create column" class="create-column-dialog" @close="closeCreateColumn">
     <p>Add a new column to this table. Choose a name and database type.</p>
     <AddColumn
       :key="`${createColumnName ?? ''}:${createColumnType ?? ''}`"
@@ -462,10 +461,7 @@ onMounted(async () => {
       :navigate-on-success="false"
       @added="onColumnAdded"
     />
-    <div class="dialog-actions">
-      <button type="button" class="neutral" @click="closeCreateColumn">Cancel</button>
-    </div>
-  </dialog>
+  </Dialog>
 
   <Section v-if="quickJumpLinks.length > 0" title="On this page" :icon="Link01Icon">
     <nav class="quick-jump" aria-label="Jump to sections on this page">
@@ -769,28 +765,30 @@ onMounted(async () => {
     />
   </div>
 
-  <!-- Drop Column Confirmation Modal -->
-  <div v-if="showDropConfirm" class="modal-overlay" @click="showDropConfirm = null">
-    <div class="modal" @click.stop>
-      <h3>Drop Column</h3>
-      <p>Are you sure you want to drop the column <strong>{{ showDropConfirm }}</strong>?</p>
-      <p class="warning">This action cannot be undone and will permanently delete all data in this column.</p>
-      <div class="modal-actions">
-        <button
-          type="button"
-          :disabled="dropping"
-          class="button bad"
-          @click="dropColumn(showDropConfirm!)"
-        >
-          <HugeiconsIcon :icon="Delete01Icon" />
-          {{ dropping ? 'Dropping…' : 'Drop column' }}
-        </button>
-        <button type="button" :disabled="dropping" class="button neutral" @click="showDropConfirm = null">
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
+  <!-- Drop Column Confirmation -->
+  <Dialog
+    :open="showDropConfirm !== null"
+    title="Drop Column"
+    size="small"
+    @update:open="open => { if (!open) showDropConfirm = null }"
+  >
+    <p>Are you sure you want to drop the column <strong>{{ showDropConfirm }}</strong>?</p>
+    <NotificationBlock
+      type="warning"
+      message="This action cannot be undone and will permanently delete all data in this column."
+    />
+    <template #actions>
+      <button
+        type="button"
+        :disabled="dropping"
+        class="button inline-icon bad"
+        @click="dropColumn(showDropConfirm!)"
+      >
+        <HugeiconsIcon :icon="Delete01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>{{ dropping ? 'Dropping…' : 'Drop column' }}</span>
+      </button>
+    </template>
+  </Dialog>
 
   <!-- Standard Fields Section -->
   <div id="standard-fields" class="quick-jump-anchor">
@@ -824,18 +822,24 @@ onMounted(async () => {
     <ConditionalFormattingRules />
   </div>
 
-  <!-- Drop Foreign Key Confirmation Modal -->
-  <div v-if="showDropFkConfirm" class="modal-overlay" @click="showDropFkConfirm = null">
-    <div class="modal" @click.stop>
-      <h3>Drop Foreign Key</h3>
-      <p>Are you sure you want to drop the foreign key <strong>{{ showDropFkConfirm }}</strong>?</p>
-      <p class="warning">This action cannot be undone. It removes referential integrity for the linked column.</p>
-      <div class="modal-actions">
-        <button class="button bad" :disabled="droppingFk" @click="dropForeignKey(showDropFkConfirm!)">{{ droppingFk ? 'Dropping…' : 'Drop Foreign Key' }}</button>
-        <button class="button neutral" :disabled="droppingFk" @click="showDropFkConfirm = null">Cancel</button>
-      </div>
-    </div>
-  </div>
+  <!-- Drop Foreign Key Confirmation -->
+  <Dialog
+    :open="showDropFkConfirm !== null"
+    title="Drop Foreign Key"
+    size="small"
+    @update:open="open => { if (!open) showDropFkConfirm = null }"
+  >
+    <p>Are you sure you want to drop the foreign key <strong>{{ showDropFkConfirm }}</strong>?</p>
+    <NotificationBlock
+      type="warning"
+      message="This action cannot be undone. It removes referential integrity for the linked column."
+    />
+    <template #actions>
+      <button type="button" class="button bad" :disabled="droppingFk" @click="dropForeignKey(showDropFkConfirm!)">
+        {{ droppingFk ? 'Dropping…' : 'Drop Foreign Key' }}
+      </button>
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>
@@ -892,10 +896,6 @@ onMounted(async () => {
 
 .rename-input {
   min-width: 10rem;
-}
-
-.create-column-dialog {
-  max-width: 40rem;
 }
 
 .section-description {
@@ -1015,52 +1015,4 @@ onMounted(async () => {
   justify-content: flex-end;
 }
 
-/* Modal styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: 500px;
-  width: 90%;
-}
-
-.modal h3 {
-  margin: 0 0 1rem 0;
-  color: #333;
-}
-
-.modal p {
-  margin: 0 0 1rem 0;
-  color: #666;
-}
-
-.modal .warning {
-  color: #dc3545;
-  font-weight: bold;
-  background: #f8d7da;
-  padding: 0.75rem;
-  border-radius: 4px;
-  border: 1px solid #f5c6cb;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-  margin-top: 1.5rem;
-}
 </style>

@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router'
 import { inject } from 'vue'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
@@ -342,145 +343,92 @@ onMounted(load)
     </template>
   </Section>
 
-  <div v-if="showAddModal" class="modal-overlay" @click.self="closeModal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>Workflow members for {{ workflowName }}</h2>
-        <button type="button" class="modal-close neutral" @click="closeModal" aria-label="Close">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="subtle modal-hint">
-          Choose sidebar links for this workflow and set their order. To add a sidebar entry that opens a workflow
-          directly, edit Navigation — not this dialog.
-        </p>
+  <Dialog
+    :open="showAddModal"
+    :title="`Workflow members for ${workflowName}`"
+    @update:open="open => { if (!open) closeModal() }"
+  >
+    <p class="subtle modal-hint">
+      Choose sidebar links for this workflow and set their order. To add a sidebar entry that opens a workflow
+      directly, edit Navigation — not this dialog.
+    </p>
 
-        <h3 class="modal-subtitle">Selected members (order)</h3>
-        <p v-if="!orderedSelectedIds.length" class="subtle">No members selected. Add links below.</p>
-        <ul v-else class="member-order-list">
-          <li v-for="(memberId, index) in orderedSelectedIds" :key="memberId" class="member-order-row">
-            <div class="member-order-main">
-              <HugeIcon
-                :name="availableItemById(memberId)?.icon"
-                :fallback="defaultItemIcon(availableItemById(memberId) ?? { icon: '', dashboardId: 0 })"
-                width="1.25em"
-                height="1.25em"
-                aria-hidden="true"
-              />
-              <span class="member-order-title">{{ availableItemById(memberId)?.title ?? `Link #${memberId}` }}</span>
-            </div>
-            <div class="member-order-actions">
-              <button
-                type="button"
-                class="inline-icon neutral"
-                title="Move up"
-                aria-label="Move up"
-                :disabled="index === 0 || addingItems"
-                @click="moveModalMemberUp(index)"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                class="inline-icon neutral"
-                title="Move down"
-                aria-label="Move down"
-                :disabled="index === orderedSelectedIds.length - 1 || addingItems"
-                @click="moveModalMemberDown(index)"
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                class="inline-icon bad"
-                title="Remove from workflow"
-                aria-label="Remove from workflow"
-                :disabled="addingItems"
-                @click="toggleItemSelection(memberId)"
-              >
-                ✕
-              </button>
-            </div>
-          </li>
-        </ul>
-
-        <h3 class="modal-subtitle">Add navigation links</h3>
-        <p v-if="!unselectedAvailableItems.length" class="subtle">All navigation links are already members.</p>
-        <ul v-else class="items-list">
-          <li
-            v-for="item in unselectedAvailableItems"
-            :key="item.id"
-            class="item-option"
-            @click="toggleItemSelection(item.id)"
+    <h3 class="modal-subtitle">Selected members (order)</h3>
+    <p v-if="!orderedSelectedIds.length" class="subtle">No members selected. Add links below.</p>
+    <ul v-else class="member-order-list">
+      <li v-for="(memberId, index) in orderedSelectedIds" :key="memberId" class="member-order-row">
+        <div class="member-order-main">
+          <HugeIcon
+            :name="availableItemById(memberId)?.icon"
+            :fallback="defaultItemIcon(availableItemById(memberId) ?? { icon: '', dashboardId: 0 })"
+            width="1.25em"
+            height="1.25em"
+            aria-hidden="true"
+          />
+          <span class="member-order-title">{{ availableItemById(memberId)?.title ?? `Link #${memberId}` }}</span>
+        </div>
+        <div class="member-order-actions">
+          <button
+            type="button"
+            class="inline-icon neutral"
+            title="Move up"
+            aria-label="Move up"
+            :disabled="index === 0 || addingItems"
+            @click="moveModalMemberUp(index)"
           >
-            <HugeIcon :name="item.icon" :fallback="defaultItemIcon(item)" width="1.25em" height="1.25em" aria-hidden="true" />
-            <div class="item-info">
-              <div class="item-title">{{ item.title }}</div>
-              <div class="subtle item-subtitle">{{ itemSubtitle(item) }}</div>
-            </div>
-            <span class="tag note">Add</span>
-          </li>
-        </ul>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="button neutral" @click="closeModal" :disabled="addingItems">
-          Cancel
-        </button>
-        <button type="button" class="button good" @click="addSelectedItems" :disabled="addingItems">
-          {{ addingItems ? 'Saving…' : 'Save Changes' }}
-        </button>
-      </div>
-    </div>
-  </div>
+            ↑
+          </button>
+          <button
+            type="button"
+            class="inline-icon neutral"
+            title="Move down"
+            aria-label="Move down"
+            :disabled="index === orderedSelectedIds.length - 1 || addingItems"
+            @click="moveModalMemberDown(index)"
+          >
+            ↓
+          </button>
+          <button
+            type="button"
+            class="inline-icon bad"
+            title="Remove from workflow"
+            aria-label="Remove from workflow"
+            :disabled="addingItems"
+            @click="toggleItemSelection(memberId)"
+          >
+            ✕
+          </button>
+        </div>
+      </li>
+    </ul>
+
+    <h3 class="modal-subtitle">Add navigation links</h3>
+    <p v-if="!unselectedAvailableItems.length" class="subtle">All navigation links are already members.</p>
+    <ul v-else class="items-list">
+      <li
+        v-for="item in unselectedAvailableItems"
+        :key="item.id"
+        class="item-option"
+        @click="toggleItemSelection(item.id)"
+      >
+        <HugeIcon :name="item.icon" :fallback="defaultItemIcon(item)" width="1.25em" height="1.25em" aria-hidden="true" />
+        <div class="item-info">
+          <div class="item-title">{{ item.title }}</div>
+          <div class="subtle item-subtitle">{{ itemSubtitle(item) }}</div>
+        </div>
+        <span class="tag note">Add</span>
+      </li>
+    </ul>
+
+    <template #actions>
+      <button type="button" class="button good" :disabled="addingItems" @click="addSelectedItems">
+        {{ addingItems ? 'Saving…' : 'Save Changes' }}
+      </button>
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: color-mix(in srgb, var(--body-bg-color, #000) 45%, transparent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
-
-.modal-content {
-  background: var(--section-bg-color, #fff);
-  color: var(--text-color, inherit);
-  border-radius: 8px;
-  box-shadow: var(--menu-dropdown-shadow, 0 4px 20px rgba(0, 0, 0, 0.15));
-  max-width: 640px;
-  width: 100%;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--border-color, #e9ecef);
-}
-
-.modal-header h2 {
-  margin: 0;
-  font-size: 1.15rem;
-}
-
-.modal-close {
-  font-size: 1.5rem;
-  line-height: 1;
-  padding: 0.25rem 0.5rem;
-}
-
-.modal-body {
-  padding: 1rem 1.25rem;
-  overflow-y: auto;
-  flex: 1;
-}
 
 .modal-hint {
   margin-top: 0;
@@ -557,14 +505,6 @@ onMounted(load)
 
 .item-subtitle {
   font-size: 0.9rem;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  border-top: 1px solid var(--border-color, #e9ecef);
 }
 
 .muted {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
+import Dialog from 'picocrank/vue/components/Dialog.vue'
+import type { DialogApi } from '../utils/dialog'
 // Picks a row of another table from tiles showing its name and image, with a search on the name.
 // Call open(); the chosen option is emitted as "pick". With createLabel and createTableId set, a
 // create button swaps the tiles for that table's insert form (name filled in from the search),
 // and the new row is emitted as "created".
 import { computed, nextTick, ref } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon, Cancel01Icon, Image01Icon, Search01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Image01Icon, Search01Icon } from '@hugeicons/core-free-icons'
 import ImageThumb from './ImageThumb.vue'
 import InsertRow from './InsertRow.vue'
 import type { Item } from '../gen/sickrock_pb'
@@ -25,7 +27,7 @@ const emit = defineEmits<{
   created: [item: Item | undefined]
 }>()
 
-const dialogEl = ref<HTMLDialogElement | null>(null)
+const dialogEl = ref<DialogApi | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 const query = ref('')
 const creating = ref(false)
@@ -50,7 +52,7 @@ async function open(initialQuery = '') {
   query.value = initialQuery
   initialSearch.value = initialQuery
   creating.value = false
-  dialogEl.value?.showModal()
+  dialogEl.value?.show()
   await nextTick()
   searchInput.value?.focus()
   // Selected, so typing replaces the keywords; arrow keys keep them to refine.
@@ -91,13 +93,13 @@ defineExpose({ open, close })
 </script>
 
 <template>
-  <dialog ref="dialogEl" class="dialog row-picker-dialog">
-    <div class="row-picker-titlebar">
-      <h2>{{ creating ? createLabel : title }}</h2>
-      <button type="button" class="button inline-icon neutral" aria-label="Close" @click="close">
-        <HugeiconsIcon :icon="Cancel01Icon" width="1.25em" height="1.25em" aria-hidden="true" />
-      </button>
-    </div>
+  <Dialog
+    ref="dialogEl"
+    :title="creating ? createLabel : title"
+    size="large"
+    narrow-layout="fullscreen"
+    class="row-picker-dialog"
+  >
 
     <template v-if="creating && createTableId">
       <!-- Cancel returns to the tiles. -->
@@ -147,33 +149,16 @@ defineExpose({ open, close })
       </ul>
       <p v-else class="subtle">{{ options.length === 0 ? 'There is nothing to choose from yet.' : `Nothing matches “${query.trim()}”.` }}</p>
     </template>
-  </dialog>
+  </Dialog>
 </template>
 
 <style scoped>
-.row-picker-dialog {
-  width: min(52rem, 96vw);
-  max-width: none;
-  max-height: 90vh;
-}
-
-.row-picker-titlebar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.row-picker-titlebar h2 {
-  margin: 0;
-}
-
 .row-picker-toolbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem 1rem;
-  margin-block: 0.75rem;
+  margin-block: 0 0.75rem;
 }
 
 .row-picker-toolbar > .button {

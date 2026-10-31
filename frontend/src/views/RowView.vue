@@ -6,7 +6,6 @@ import type { Field, ForeignKey, GetTableStructureResponse, Item } from '../gen/
 import { HugeiconsIcon } from '@hugeicons/vue'
 import {
   ArrowLeft01Icon,
-  Cancel01Icon,
   DatabaseIcon,
   Delete01Icon,
   ViewIcon,
@@ -23,6 +22,8 @@ import Tabs from 'picocrank/vue/components/Tabs.vue'
 import RelatedRelationPanel, { type RelatedTableEntry } from './RelatedRelationPanel.vue'
 import DangerZone from 'picocrank/vue/components/DangerZone.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
+import type { DialogApi } from '../utils/dialog'
 import type { createApiClient } from '../stores/api'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
 import { useTableAccess } from '../composables/useTableAccess'
@@ -154,7 +155,7 @@ const foreignKeys = ref<Array<{
 const relatedChildStructures = ref<Record<string, GetTableStructureResponse>>({})
 const relatedPullThroughExtraFields = ref<Record<string, Field[]>>({})
 const fkReferencedItems = ref<Record<string, Item[]>>({})
-const relationDialog = ref<HTMLDialogElement | null>(null)
+const relationDialog = ref<DialogApi | null>(null)
 const managingConstraintName = ref('')
 const relationDisplayNameDraft = ref('')
 const relationAbsorbDraft = ref(false)
@@ -864,16 +865,14 @@ const columnNamesForFieldGrouping = computed(() => {
   return [...physical, ...synthetic.filter(name => !seen.has(name))]
 })
 
-const fieldGroupingDialog = ref<HTMLDialogElement | null>(null)
+const fieldGroupingDialog = ref<DialogApi | null>(null)
 
 function openFieldGroupingDialog() {
-  fieldGroupingDialog.value?.showModal()
+  fieldGroupingDialog.value?.show()
 }
 
 function closeFieldGroupingDialog() {
-  if (fieldGroupingDialog.value?.open) {
-    fieldGroupingDialog.value.close()
-  }
+  fieldGroupingDialog.value?.close()
 }
 
 async function onFieldGroupsSaved() {
@@ -1211,7 +1210,7 @@ function openManageRelation(constraintName: string, displayName?: string) {
     }))
   relationSaveError.value = null
   nextTick(async () => {
-    relationDialog.value?.showModal()
+    relationDialog.value?.show()
     await loadRelationDialogContext()
   })
 }
@@ -1592,18 +1591,13 @@ function cancelDelete() {
       </div>
     </DangerZone>
 
-    <dialog ref="fieldGroupingDialog" class="dialog field-grouping-dialog" @close="closeFieldGroupingDialog">
-      <div class="field-grouping-dialog-titlebar">
-        <h2>Field grouping</h2>
-        <button
-          type="button"
-          class="button inline-icon neutral dialog-close"
-          aria-label="Close"
-          @click="closeFieldGroupingDialog"
-        >
-          <HugeiconsIcon :icon="Cancel01Icon" width="1.25em" height="1.25em" aria-hidden="true" />
-        </button>
-      </div>
+    <Dialog
+      ref="fieldGroupingDialog"
+      title="Field grouping"
+      size="large"
+      class="field-grouping-dialog"
+      @close="closeFieldGroupingDialog"
+    >
       <p class="muted field-grouping-dialog-intro">
         Organize fields on every item row page into titled accordion sections. Unassigned fields stay at the bottom.
       </p>
@@ -1614,10 +1608,9 @@ function cancelDelete() {
         :client="client"
         @saved="onFieldGroupsSaved"
       />
-    </dialog>
+    </Dialog>
 
-    <dialog ref="relationDialog" class="dialog relation-dialog" @close="closeManageRelation">
-      <h2>Manage relation</h2>
+    <Dialog ref="relationDialog" title="Manage relation" class="relation-dialog" @close="closeManageRelation">
       <dl v-if="managingRelationFk" class="relation-endpoints">
         <dt>Relation ID</dt>
         <dd>
@@ -1790,29 +1783,21 @@ function cancelDelete() {
         Add calculated column
       </button>
       <p v-if="relationSaveError" class="inline-notification error">{{ relationSaveError }}</p>
-      <div class="dialog-actions">
-        <button type="button" class="neutral" :disabled="savingRelation" @click="closeManageRelation">Cancel</button>
+      <template #actions>
         <button type="button" class="good" :disabled="savingRelation" @click="saveRelationDisplayName">
           {{ savingRelation ? 'Saving…' : 'Save' }}
         </button>
-      </div>
-    </dialog>
+      </template>
+    </Dialog>
 
-    <!-- Delete Confirmation Dialog -->
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDelete">
-      <div class="modal-content" @click.stop>
-        <h3>Confirm Delete</h3>
-        <p>Are you sure you want to delete this row? This action cannot be undone.</p>
-        <div class="modal-actions">
-          <button @click="cancelDelete" class="button" :disabled="deleting">
-            Cancel
-          </button>
-          <button @click="deleteItem" class="button bad" :disabled="deleting">
-            {{ deleting ? 'Deleting...' : 'Delete' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
+      <p>Are you sure you want to delete this row? This action cannot be undone.</p>
+      <template #actions>
+        <button type="button" class="button bad" :disabled="deleting" @click="deleteItem">
+          {{ deleting ? 'Deleting...' : 'Delete' }}
+        </button>
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -1860,56 +1845,6 @@ function cancelDelete() {
 }
 
 /* Modal Dialog Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 8px;
-  padding: 2rem;
-  max-width: 400px;
-  width: 90%;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.modal-content h3 {
-  margin: 0 0 1rem 0;
-  color: #dc3545;
-  font-size: 1.25rem;
-}
-
-.modal-content p {
-  margin: 0 0 1.5rem 0;
-  color: #666;
-  line-height: 1.5;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
-
-@media (max-width: 768px) {
-  .modal-actions {
-    flex-direction: column;
-  }
-
-  .modal-actions .button {
-    width: 100%;
-  }
-}
-
 .loading-related {
   text-align: center;
   padding: 2rem;
@@ -1943,30 +1878,8 @@ function cancelDelete() {
   background-color: var(--hover-background-color, #f8f9fa);
 }
 
-.field-grouping-dialog {
-  max-width: min(56rem, 96vw);
-  max-height: 90vh;
-  overflow: auto;
-}
-
-.field-grouping-dialog-titlebar {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.35rem;
-}
-
-.field-grouping-dialog-titlebar h2 {
-  margin: 0;
-}
-
 .field-grouping-dialog-intro {
   margin-top: 0;
-}
-
-.field-grouping-dialog .dialog-close {
-  flex-shrink: 0;
 }
 
 .relation-dialog-subheading {

@@ -51,7 +51,7 @@ const emit = defineEmits<{
   />
   <button
     type="button"
-    class="button inline-icon neutral ss-large"
+    class="button inline-icon neutral"
     :class="{ good: multiSelectEnabled }"
     :aria-pressed="multiSelectEnabled"
     title="Select multiple rows for bulk actions"
@@ -62,7 +62,7 @@ const emit = defineEmits<{
   <router-link
     v-if="showExport"
     :to="`/table/${tableId}/export`"
-    class="button inline-icon neutral ss-large"
+    class="button inline-icon neutral"
   >
     <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" aria-hidden="true" />
     <span>Export</span>
@@ -70,7 +70,7 @@ const emit = defineEmits<{
   <router-link
     v-if="showStructure"
     :to="`/table/${tableId}/column-types`"
-    class="button inline-icon neutral ss-large design-only"
+    class="button inline-icon neutral design-only"
   >
     <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
     <span>Structure</span>
@@ -111,9 +111,13 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
+/*
+ * Unwrapped so the surrounding toolbar (a picocrank Section's) sees each
+ * control: it lays them out and folds them into its overflow menu on narrow
+ * screens.
+ */
 .table-component-toolbar {
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  display: contents;
 }
 
 .quick-add-button {

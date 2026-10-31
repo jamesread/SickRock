@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { createApiClient } from '../stores/api'
 import { SickRock } from '../gen/sickrock_pb'
 import Section from 'picocrank/vue/components/Section.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { ArrowLeft01Icon, PlusSignIcon, ColumnDeleteIcon, Edit03Icon, Link01Icon } from '@hugeicons/core-free-icons'
@@ -340,21 +341,20 @@ onMounted(async () => {
       </form>
     </div>
 
-    <!-- Delete Confirmation Dialog -->
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click="showDeleteConfirm = null">
-      <div class="modal" @click.stop>
-        <h3>Delete Foreign Key</h3>
-        <p>Are you sure you want to delete this foreign key constraint? This action cannot be undone.</p>
-        <div class="modal-actions">
-          <button @click="showDeleteConfirm = null" class="button neutral">
-            Cancel
-          </button>
-          <button @click="deleteForeignKey(showDeleteConfirm)" :disabled="loading" class="button bad">
-            {{ loading ? 'Deleting...' : 'Delete Foreign Key' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- Delete Confirmation -->
+    <Dialog
+      :open="showDeleteConfirm !== null"
+      title="Delete Foreign Key"
+      size="small"
+      @update:open="open => { if (!open) showDeleteConfirm = null }"
+    >
+      <p>Are you sure you want to delete this foreign key constraint? This action cannot be undone.</p>
+      <template #actions>
+        <button type="button" :disabled="loading" class="button bad" @click="deleteForeignKey(showDeleteConfirm!)">
+          {{ loading ? 'Deleting...' : 'Delete Foreign Key' }}
+        </button>
+      </template>
+    </Dialog>
   </Section>
 </template>
 
@@ -461,41 +461,4 @@ select:disabled {
   margin-top: 1.5rem;
 }
 
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: white;
-  padding: 2rem;
-  border-radius: 8px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  max-width: 400px;
-  width: 90%;
-}
-
-.modal h3 {
-  margin: 0 0 1rem 0;
-  color: #333;
-}
-
-.modal p {
-  margin: 0 0 1.5rem 0;
-  color: #666;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 1rem;
-  justify-content: flex-end;
-}
 </style>

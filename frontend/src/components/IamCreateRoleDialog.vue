@@ -1,15 +1,17 @@
 <script setup lang="ts">
 import { computed, reactive, ref, nextTick } from 'vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import type { RbacPermission } from '../gen/sickrock_pb'
 import { createApiClient } from '../stores/api'
+import type { DialogApi } from '../utils/dialog'
 
 const props = defineProps<{ permissions: RbacPermission[] }>()
 const emit = defineEmits<{ created: [roleId: number] }>()
 
-const dialogEl = ref<HTMLDialogElement | null>(null)
+const dialogEl = ref<DialogApi | null>(null)
 const nameInput = ref<HTMLInputElement | null>(null)
 const saving = ref(false)
 const errorMessage = ref('')
@@ -35,7 +37,7 @@ function resetForm() {
 
 function open() {
   resetForm()
-  dialogEl.value?.showModal()
+  dialogEl.value?.show()
   nextTick(() => nameInput.value?.focus())
 }
 
@@ -71,11 +73,10 @@ defineExpose({ open, close })
 </script>
 
 <template>
-  <dialog ref="dialogEl" class="dialog" @close="resetForm">
-    <h2>Create role</h2>
+  <Dialog ref="dialogEl" title="Create role" @close="resetForm">
     <p>Define a new RBAC role and choose which permissions it grants.</p>
 
-    <FormLayout @submit.prevent="submit">
+    <FormLayout id="dialog-el-form" @submit.prevent="submit">
       <FormField label="Name" for="new-role-name" :disabled="saving">
         <input
           id="new-role-name"
@@ -120,15 +121,14 @@ defineExpose({ open, close })
       </FormField>
 
       <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
-
-      <template #actions>
-        <button type="button" class="neutral" :disabled="saving" @click="close">Cancel</button>
-        <button type="submit" class="good" :disabled="saving || !form.name.trim()">
-          {{ saving ? 'Creating…' : 'Create role' }}
-        </button>
-      </template>
     </FormLayout>
-  </dialog>
+
+    <template #actions>
+      <button type="submit" form="dialog-el-form" class="good" :disabled="saving || !form.name.trim()">
+        {{ saving ? 'Creating…' : 'Create role' }}
+      </button>
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>

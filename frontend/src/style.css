@@ -12,11 +12,6 @@
   .date {
     font-size: 0.8em;
   }
-
-  /* Secondary toolbar controls shown only when there is room ("small screen: large only"). */
-  .ss-large {
-    display: none;
-  }
 }
 
 /* Controls that exist only while design mode is on. */
@@ -39,4 +34,36 @@ a.button.neutral.design-only:focus-visible,
 a.button.design-only:focus-visible {
   background-color: color-mix(in srgb, var(--button-good-bg, #0f7a52) 32%, var(--section-bg-color, #fff));
   color: var(--button-good-hover-bg, #0b5c3e);
+}
+
+/*
+ * femtocrank styles datetime-local but not the other date/time inputs, so
+ * give date, time, month and week the same look (theme colours, dark mode).
+ */
+input[type="date"],
+input[type="time"],
+input[type="month"],
+input[type="week"] {
+  padding: 1em;
+  border-radius: .4em;
+  border: 1px solid var(--border-color);
+  font-family: sans-serif;
+  background-color: var(--input-bg-color);
+  color: var(--input-fg-color);
+  color-scheme: light dark;
+}
+
+:is(input[type="date"], input[type="time"], input[type="month"], input[type="week"], input[type="datetime-local"])::-webkit-datetime-edit,
+:is(input[type="date"], input[type="time"], input[type="month"], input[type="week"], input[type="datetime-local"])::-webkit-datetime-edit-fields-wrapper,
+:is(input[type="date"], input[type="time"], input[type="month"], input[type="week"], input[type="datetime-local"])::-webkit-datetime-edit-text {
+  color: var(--input-fg-color);
+}
+
+:is(input[type="date"], input[type="time"], input[type="month"], input[type="week"], input[type="datetime-local"])::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: .6;
+}
+
+:is(input[type="date"], input[type="time"], input[type="month"], input[type="week"], input[type="datetime-local"])::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }

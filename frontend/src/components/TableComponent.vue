@@ -3,6 +3,7 @@ import type { IconData } from '../utils/hugeicons'
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import Section from 'picocrank/vue/components/Section.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import {
@@ -89,6 +90,7 @@ type TableApi = {
     options?: { focus?: boolean; wrapColumns?: boolean },
   ) => CellContext | null
   getActiveCellContext: () => CellContext | null
+  focusActiveCell: (options?: FocusOptions) => boolean | void
 }
 
 const props = defineProps<{
@@ -912,6 +914,15 @@ async function saveEditRow(row: TableRow) {
   }
 }
 
+// Enter/Escape in the editor: save or cancel, then hand focus back to the
+// cell so keyboard navigation (and Enter to edit again) carries on.
+async function finishEditFromKeyboard(row: TableRow, save: boolean) {
+  if (save) await saveEditRow(row)
+  else cancelEdit()
+  await nextTick()
+  tableRef.value?.focusActiveCell()
+}
+
 // Bulk selection and deletion
 const selectedItems = computed(() => {
   const keys = new Set(selectedKeys.value)
@@ -923,10 +934,6 @@ const deleting = ref(false)
 
 function confirmDeleteSelected() {
   if (selectedItems.value.length > 0) showDeleteConfirm.value = true
-}
-
-function cancelDeleteSelected() {
-  showDeleteConfirm.value = false
 }
 
 async function deleteSelectedItems() {
@@ -976,10 +983,6 @@ function openQuickAddDialog() {
     ?? initialTableView(tableViews.value, userDefaultViewId.value)?.id
     ?? -1
   showQuickAddDialog.value = true
-  setTimeout(() => {
-    const dialog = document.querySelector('.modal-overlay')
-    if (dialog instanceof HTMLElement) dialog.focus()
-  }, 100)
 }
 
 function closeQuickAddDialog() {
@@ -1280,8 +1283,8 @@ onUnmounted(() => {
                   type="datetime-local"
                   :disabled="saving"
                   class="edit-input"
-                  @keyup.enter="saveEditRow(row)"
-                  @keyup.escape="cancelEdit"
+                  @keydown.enter.prevent="finishEditFromKeyboard(row, true)"
+                  @keydown.escape.prevent="finishEditFromKeyboard(row, false)"
                   @blur="saveEditRow(row)"
                 />
                 <input
@@ -1291,8 +1294,8 @@ onUnmounted(() => {
                   type="text"
                   :disabled="saving"
                   class="edit-input"
-                  @keyup.enter="saveEditRow(row)"
-                  @keyup.escape="cancelEdit"
+                  @keydown.enter.prevent="finishEditFromKeyboard(row, true)"
+                  @keydown.escape.prevent="finishEditFromKeyboard(row, false)"
                   @blur="saveEditRow(row)"
                 />
               </div>
@@ -1302,6 +1305,7 @@ onUnmounted(() => {
               v-else
               class="cell-content"
               :class="{ editable: canEditColumn(header.key) }"
+              :data-row-click-ignore="canEditColumn(header.key) ? '' : undefined"
               @click="startEditRow(row, header.key)"
             >
               <span
@@ -1412,7 +1416,7 @@ onUnmounted(() => {
                 <router-link class="button inline-icon good" :to="effectiveInsertRoute">
                   <span>{{ insertButtonText }}</span>
                 </router-link>
-                <div v-if="!isRelatedEmptyState" class="empty-state-actions">
+                <div v-if="!isRelatedEmptyState" class="action-row center empty-state-actions">
                   <router-link class="button" :to="`/table/${props.tableId}/add-column`">
                     Add Column
                   </router-link>
@@ -1434,74 +1438,49 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDeleteSelected">
-      <div class="modal-content" @click.stop>
-        <h3>Confirm Delete</h3>
-        <p>
-          Are you sure you want to delete {{ selectedKeys.length }} selected row(s)?
-          This action cannot be undone.
-        </p>
-        <div class="modal-actions">
-          <button
-            class="button neutral"
-            :disabled="deleting"
-            @click="cancelDeleteSelected"
-          >
-            Cancel
-          </button>
-          <button
-            class="button bad"
-            :disabled="deleting"
-            @click="deleteSelectedItems"
-          >
-            {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.length} Row(s)` }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
+      <p>
+        Are you sure you want to delete {{ selectedKeys.length }} selected row(s)?
+        This action cannot be undone.
+      </p>
+      <template #actions>
+        <button
+          type="button"
+          class="button bad"
+          :disabled="deleting"
+          @click="deleteSelectedItems"
+        >
+          {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.length} Row(s)` }}
+        </button>
+      </template>
+    </Dialog>
 
-    <div
-      v-if="showQuickAddDialog"
-      class="modal-overlay"
-      tabindex="0"
-      @click="closeQuickAddDialog"
-      @keydown.escape="closeQuickAddDialog"
+    <Dialog
+      :open="showQuickAddDialog"
+      :title="insertButtonText"
+      size="large"
+      class="quick-add-dialog"
+      @update:open="open => { if (!open) closeQuickAddDialog() }"
     >
-      <div class="modal-content quick-add-modal" @click.stop>
-        <Section :title="insertButtonText" :icon="Add01Icon" class="quick-add-section">
-          <template #toolbar>
-            <div class="insert-toolbar">
-              <div class="view-selector">
-                <label for="quick-add-view-select">View:</label>
-                <select
-                  id="quick-add-view-select"
-                  v-model="quickAddSelectedViewId"
-                  class="view-dropdown"
-                >
-                  <option v-for="view in viewOptions" :key="view.id" :value="view.id">
-                    {{ view.viewName }}
-                  </option>
-                </select>
-              </div>
-              <button
-                type="button"
-                class="button neutral"
-                title="Close"
-                @click="closeQuickAddDialog"
-              >
-                Close
-              </button>
-            </div>
-          </template>
-          <InsertRow
-            :table-id="props.tableId"
-            :field-defs="quickAddFieldDefs"
-            @created="onQuickAddCreated"
-            @cancelled="closeQuickAddDialog"
-          />
-        </Section>
+      <div class="view-selector">
+        <label for="quick-add-view-select">View:</label>
+        <select
+          id="quick-add-view-select"
+          v-model="quickAddSelectedViewId"
+          class="view-dropdown"
+        >
+          <option v-for="view in viewOptions" :key="view.id" :value="view.id">
+            {{ view.viewName }}
+          </option>
+        </select>
       </div>
-    </div>
+      <InsertRow
+        :table-id="props.tableId"
+        :field-defs="quickAddFieldDefs"
+        @created="onQuickAddCreated"
+        @cancelled="closeQuickAddDialog"
+      />
+    </Dialog>
     </div>
   </Section>
 
@@ -1603,8 +1582,8 @@ onUnmounted(() => {
                   type="datetime-local"
                   :disabled="saving"
                   class="edit-input"
-                  @keyup.enter="saveEditRow(row)"
-                  @keyup.escape="cancelEdit"
+                  @keydown.enter.prevent="finishEditFromKeyboard(row, true)"
+                  @keydown.escape.prevent="finishEditFromKeyboard(row, false)"
                   @blur="saveEditRow(row)"
                 />
                 <input
@@ -1614,8 +1593,8 @@ onUnmounted(() => {
                   type="text"
                   :disabled="saving"
                   class="edit-input"
-                  @keyup.enter="saveEditRow(row)"
-                  @keyup.escape="cancelEdit"
+                  @keydown.enter.prevent="finishEditFromKeyboard(row, true)"
+                  @keydown.escape.prevent="finishEditFromKeyboard(row, false)"
                   @blur="saveEditRow(row)"
                 />
               </div>
@@ -1625,6 +1604,7 @@ onUnmounted(() => {
               v-else
               class="cell-content"
               :class="{ editable: canEditColumn(header.key) }"
+              :data-row-click-ignore="canEditColumn(header.key) ? '' : undefined"
               @click="startEditRow(row, header.key)"
             >
               <span
@@ -1735,7 +1715,7 @@ onUnmounted(() => {
                 <router-link class="button inline-icon good" :to="effectiveInsertRoute">
                   <span>{{ insertButtonText }}</span>
                 </router-link>
-                <div v-if="!isRelatedEmptyState" class="empty-state-actions">
+                <div v-if="!isRelatedEmptyState" class="action-row center empty-state-actions">
                   <router-link class="button" :to="`/table/${props.tableId}/add-column`">
                     Add Column
                   </router-link>
@@ -1757,74 +1737,49 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click="cancelDeleteSelected">
-      <div class="modal-content" @click.stop>
-        <h3>Confirm Delete</h3>
-        <p>
-          Are you sure you want to delete {{ selectedKeys.length }} selected row(s)?
-          This action cannot be undone.
-        </p>
-        <div class="modal-actions">
-          <button
-            class="button neutral"
-            :disabled="deleting"
-            @click="cancelDeleteSelected"
-          >
-            Cancel
-          </button>
-          <button
-            class="button bad"
-            :disabled="deleting"
-            @click="deleteSelectedItems"
-          >
-            {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.length} Row(s)` }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
+      <p>
+        Are you sure you want to delete {{ selectedKeys.length }} selected row(s)?
+        This action cannot be undone.
+      </p>
+      <template #actions>
+        <button
+          type="button"
+          class="button bad"
+          :disabled="deleting"
+          @click="deleteSelectedItems"
+        >
+          {{ deleting ? 'Deleting...' : `Delete ${selectedKeys.length} Row(s)` }}
+        </button>
+      </template>
+    </Dialog>
 
-    <div
-      v-if="showQuickAddDialog"
-      class="modal-overlay"
-      tabindex="0"
-      @click="closeQuickAddDialog"
-      @keydown.escape="closeQuickAddDialog"
+    <Dialog
+      :open="showQuickAddDialog"
+      :title="insertButtonText"
+      size="large"
+      class="quick-add-dialog"
+      @update:open="open => { if (!open) closeQuickAddDialog() }"
     >
-      <div class="modal-content quick-add-modal" @click.stop>
-        <Section :title="insertButtonText" :icon="Add01Icon" class="quick-add-section">
-          <template #toolbar>
-            <div class="insert-toolbar">
-              <div class="view-selector">
-                <label for="quick-add-view-select">View:</label>
-                <select
-                  id="quick-add-view-select"
-                  v-model="quickAddSelectedViewId"
-                  class="view-dropdown"
-                >
-                  <option v-for="view in viewOptions" :key="view.id" :value="view.id">
-                    {{ view.viewName }}
-                  </option>
-                </select>
-              </div>
-              <button
-                type="button"
-                class="button neutral"
-                title="Close"
-                @click="closeQuickAddDialog"
-              >
-                Close
-              </button>
-            </div>
-          </template>
-          <InsertRow
-            :table-id="props.tableId"
-            :field-defs="quickAddFieldDefs"
-            @created="onQuickAddCreated"
-            @cancelled="closeQuickAddDialog"
-          />
-        </Section>
+      <div class="view-selector">
+        <label for="quick-add-view-select">View:</label>
+        <select
+          id="quick-add-view-select"
+          v-model="quickAddSelectedViewId"
+          class="view-dropdown"
+        >
+          <option v-for="view in viewOptions" :key="view.id" :value="view.id">
+            {{ view.viewName }}
+          </option>
+        </select>
       </div>
-    </div>
+      <InsertRow
+        :table-id="props.tableId"
+        :field-defs="quickAddFieldDefs"
+        @created="onQuickAddCreated"
+        @cancelled="closeQuickAddDialog"
+      />
+    </Dialog>
   </div>
 </template>
 
@@ -1976,11 +1931,7 @@ onUnmounted(() => {
 }
 
 .empty-state-actions {
-  display: flex;
-  justify-content: center;
-  gap: 1rem;
   margin-top: 1.5rem;
-  flex-wrap: wrap;
 }
 
 .insert-button-group {
@@ -1994,75 +1945,24 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.modal-overlay {
-  position: fixed;
-  z-index: 1000;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  padding: 1rem;
-  background-color: rgb(0 0 0 / 50%);
-}
-
-.modal-content {
-  width: 90%;
-  max-width: 400px;
-  padding: 1rem;
-  border-radius: 8px;
-  background: white;
-  box-shadow: 0 4px 20px rgb(0 0 0 / 30%);
-}
-
-.modal-content p {
-  margin: 0 0 1.5rem;
-  color: #666;
-  line-height: 1.5;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-}
-
-.quick-add-modal {
-  width: 90%;
-  max-width: 640px;
-  max-height: 85vh;
-  overflow-y: auto;
-}
-
-.quick-add-section {
-  margin: 0;
-}
-
-.insert-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+/* Not a picocrank Section toolbar (no overflow menu): wrap the controls. */
+.embedded-table-toolbar > [role="toolbar"] {
   flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .view-selector {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
 .view-selector label {
   font-weight: 600;
-  color: #333;
 }
 
 .view-dropdown {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  background: white;
-  font-size: 1rem;
-  cursor: pointer;
   min-width: 150px;
 }
 
@@ -2126,46 +2026,9 @@ onUnmounted(() => {
     margin-left: 0;
   }
 
-  .modal-actions {
-    flex-direction: column;
-  }
-
-  .modal-actions .button {
-    width: 100%;
-  }
-
   .empty-state {
     min-height: 300px;
     padding: 1rem;
-  }
-
-  .empty-state-actions {
-    flex-direction: column;
-    align-items: center;
-  }
-
-  .modal-overlay {
-    align-items: flex-start;
-    padding: 2rem 0.5rem 0.5rem;
-  }
-
-  .modal-content {
-    width: 100%;
-    max-width: none;
-    padding: 0.5rem;
-    border-radius: 4px;
-  }
-
-  .quick-add-modal {
-    width: 95%;
-    max-width: 95%;
-    max-height: 90vh;
-    margin: 0.5rem;
-  }
-
-  .insert-toolbar {
-    flex-direction: column;
-    align-items: stretch;
   }
 
   .view-selector .view-dropdown {

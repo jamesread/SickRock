@@ -3,7 +3,9 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTableViewManager, type TableView } from '../composables/useTableViewManager'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon, Edit03Icon, Settings01Icon, Cancel01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Edit03Icon, Settings01Icon } from '@hugeicons/core-free-icons'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
+import type { DialogApi } from '../utils/dialog'
 import { useDesignMode } from '../composables/useDesignMode'
 
 const { designModeEnabled } = useDesignMode()
@@ -76,22 +78,16 @@ const currentView = computed(() => {
   return internalManager.currentView.value
 })
 
-const dialogRef = ref<HTMLDialogElement | null>(null)
+const dialogRef = ref<DialogApi | null>(null)
 
 function openViewsDialog() {
   nextTick(() => {
-    dialogRef.value?.showModal()
+    dialogRef.value?.show()
   })
 }
 
 function closeViewsDialog() {
   dialogRef.value?.close()
-}
-
-function onDialogBackdropClick(event: MouseEvent) {
-  if (event.target === dialogRef.value) {
-    closeViewsDialog()
-  }
 }
 
 function selectView(viewId: number) {
@@ -141,7 +137,7 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
 <template>
   <button
     type="button"
-    class="button inline-icon neutral ss-large"
+    class="button inline-icon neutral"
     :title="allowStructureLink ? 'Views and structure' : 'Manage views'"
     @click="openViewsDialog"
   >
@@ -149,111 +145,74 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
     <span v-if="!iconOnly">Views</span>
   </button>
 
-  <dialog
-    ref="dialogRef"
-    class="dialog views-picker-dialog"
-    :aria-labelledby="`views-picker-title-${tableId}`"
-    @click="onDialogBackdropClick"
-  >
-    <div class="views-picker-panel" @click.stop>
-      <div class="flex-row views-picker-header">
-        <h2 :id="`views-picker-title-${tableId}`">{{ dialogTitle }}</h2>
-        <button
-          type="button"
-          class="button inline-icon neutral"
-          aria-label="Close"
-          @click="closeViewsDialog"
-        >
-          <HugeiconsIcon :icon="Cancel01Icon" width="1em" height="1em" aria-hidden="true" />
-        </button>
-      </div>
+  <Dialog ref="dialogRef" :title="dialogTitle" class="views-picker-dialog">
+    <p class="subtle views-picker-help">Choose which saved view to display for this table.</p>
 
-      <p class="subtle views-picker-help">Choose which saved view to display for this table.</p>
-
-      <div class="table-scroll views-picker-scroll">
-        <table class="row-hover views-picker-table">
-          <thead>
-            <tr>
-              <th scope="col">View</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="view in viewsForDialog"
-              :key="view.id"
-              tabindex="0"
-              :aria-selected="selectedViewId === view.id"
-              :class="{ 'views-picker-selected': selectedViewId === view.id }"
-              @click="selectView(view.id)"
-              @keydown.enter.prevent="selectView(view.id)"
-            >
-              <td>
-                <span class="views-picker-name">{{ view.viewName }}</span>
-                <span v-if="view.isDefault" class="tag note">Default</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div v-if="hasFooterActions" role="toolbar" class="flex-row g1 views-picker-actions">
-        <button
-          v-if="allowViewCreate"
-          type="button"
-          class="button inline-icon design-only"
-          @click="createTableView"
-        >
-          <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Create view</span>
-        </button>
-        <button
-          v-if="allowViewEdit && currentView && currentView.id !== -1"
-          type="button"
-          class="button inline-icon neutral design-only"
-          @click="editTableView"
-        >
-          <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Edit view</span>
-        </button>
-        <router-link
-          v-if="allowStructureLink"
-          :to="`/table/${tableId}/column-types`"
-          class="button inline-icon neutral design-only"
-          @click="closeViewsDialog"
-        >
-          <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>Structure</span>
-        </router-link>
-      </div>
+    <div class="table-scroll views-picker-scroll">
+      <table class="row-hover views-picker-table">
+        <thead>
+          <tr>
+            <th scope="col">View</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="view in viewsForDialog"
+            :key="view.id"
+            tabindex="0"
+            :aria-selected="selectedViewId === view.id"
+            :class="{ 'views-picker-selected': selectedViewId === view.id }"
+            @click="selectView(view.id)"
+            @keydown.enter.prevent="selectView(view.id)"
+          >
+            <td>
+              <span class="views-picker-name">{{ view.viewName }}</span>
+              <span v-if="view.isDefault" class="tag note">Default</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
-  </dialog>
+
+    <template v-if="hasFooterActions" #actions>
+      <button
+        v-if="allowViewCreate"
+        type="button"
+        class="button inline-icon design-only"
+        @click="createTableView"
+      >
+        <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Create view</span>
+      </button>
+      <button
+        v-if="allowViewEdit && currentView && currentView.id !== -1"
+        type="button"
+        class="button inline-icon neutral design-only"
+        @click="editTableView"
+      >
+        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Edit view</span>
+      </button>
+      <router-link
+        v-if="allowStructureLink"
+        :to="`/table/${tableId}/column-types`"
+        class="button inline-icon neutral design-only"
+        @click="closeViewsDialog"
+      >
+        <HugeiconsIcon :icon="Settings01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Structure</span>
+      </router-link>
+    </template>
+  </Dialog>
 </template>
 
 <style scoped>
-.views-picker-dialog {
-  max-width: 32rem;
-  width: min(32rem, 92vw);
-}
-
-.views-picker-panel h2 {
-  margin: 0;
-  font-size: 1.25rem;
-}
-
-.views-picker-header {
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-bottom: 0.35rem;
-}
-
 .views-picker-help {
   margin: 0 0 0.75rem;
 }
 
 .views-picker-scroll {
   max-height: 18rem;
-  margin-bottom: 1rem;
 }
 
 .views-picker-table td {
@@ -266,10 +225,5 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
 
 .views-picker-selected td {
   font-weight: 600;
-}
-
-.views-picker-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
 }
 </style>

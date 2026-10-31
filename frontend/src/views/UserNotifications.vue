@@ -12,8 +12,10 @@ import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import Table from 'picocrank/vue/components/Table.vue'
+import type { DialogApi } from '../utils/dialog'
 
 const iconStrokeWidth = 2.5
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')!
@@ -65,8 +67,8 @@ const newChannelName = ref('')
 const newSubscriptionEventCode = ref('')
 const newSubscriptionChannelId = ref(0)
 
-const createChannelDialog = ref<HTMLDialogElement | null>(null)
-const createSubscriptionDialog = ref<HTMLDialogElement | null>(null)
+const createChannelDialog = ref<DialogApi | null>(null)
+const createSubscriptionDialog = ref<DialogApi | null>(null)
 const channelValueInput = ref<HTMLInputElement | null>(null)
 
 const activeChannels = computed(() => notificationChannels.value.filter((c) => c.isActive))
@@ -207,7 +209,7 @@ function resetSubscriptionForm() {
 
 function openCreateChannelDialog() {
   resetChannelForm()
-  createChannelDialog.value?.showModal()
+  createChannelDialog.value?.show()
   nextTick(() => channelValueInput.value?.focus())
 }
 
@@ -221,7 +223,7 @@ function openCreateSubscriptionDialog() {
     return
   }
   resetSubscriptionForm()
-  createSubscriptionDialog.value?.showModal()
+  createSubscriptionDialog.value?.show()
 }
 
 function closeCreateSubscriptionDialog() {
@@ -333,11 +335,10 @@ onMounted(async () => {
 </script>
 
 <template>
-  <dialog ref="createChannelDialog" class="dialog" @close="resetChannelForm">
-    <h2>Add notification channel</h2>
+  <Dialog ref="createChannelDialog" title="Add notification channel" @close="resetChannelForm">
     <p>Choose how SickRock should deliver notifications to you.</p>
 
-    <FormLayout @submit.prevent="createNotificationChannel">
+    <FormLayout id="create-channel-dialog-form" @submit.prevent="createNotificationChannel">
       <FormField label="Channel type" for="channel-type" :disabled="creatingChannel">
         <select id="channel-type" v-model="newChannelType" :disabled="creatingChannel">
           <option value="email">Email</option>
@@ -375,23 +376,19 @@ onMounted(async () => {
       </FormField>
 
       <NotificationBlock v-if="channelCreateError" type="error" :message="channelCreateError" />
-
-      <template #actions>
-        <button type="button" class="neutral" :disabled="creatingChannel" @click="closeCreateChannelDialog">
-          Cancel
-        </button>
-        <button type="submit" class="good" :disabled="creatingChannel || !newChannelValue.trim()">
-          {{ creatingChannel ? 'Adding…' : 'Add channel' }}
-        </button>
-      </template>
     </FormLayout>
-  </dialog>
 
-  <dialog ref="createSubscriptionDialog" class="dialog" @close="resetSubscriptionForm">
-    <h2>Subscribe to event</h2>
+    <template #actions>
+      <button type="submit" form="create-channel-dialog-form" class="good" :disabled="creatingChannel || !newChannelValue.trim()">
+        {{ creatingChannel ? 'Adding…' : 'Add channel' }}
+      </button>
+    </template>
+  </Dialog>
+
+  <Dialog ref="createSubscriptionDialog" title="Subscribe to event" @close="resetSubscriptionForm">
     <p>Pick an event and the channel that should receive it.</p>
 
-    <FormLayout @submit.prevent="createNotificationSubscription">
+    <FormLayout id="create-subscription-dialog-form" @submit.prevent="createNotificationSubscription">
       <FormField label="Event" for="subscription-event" :disabled="creatingSubscription">
         <select
           id="subscription-event"
@@ -422,28 +419,21 @@ onMounted(async () => {
       </FormField>
 
       <NotificationBlock v-if="subscriptionCreateError" type="error" :message="subscriptionCreateError" />
-
-      <template #actions>
-        <button
-          type="button"
-          class="neutral"
-          :disabled="creatingSubscription"
-          @click="closeCreateSubscriptionDialog"
-        >
-          Cancel
-        </button>
-        <button
-          type="submit"
-          class="good"
-          :disabled="
-            creatingSubscription || !newSubscriptionEventCode || !newSubscriptionChannelId
-          "
-        >
-          {{ creatingSubscription ? 'Saving…' : 'Subscribe' }}
-        </button>
-      </template>
     </FormLayout>
-  </dialog>
+
+    <template #actions>
+      <button
+        type="submit"
+        form="create-subscription-dialog-form"
+        class="good"
+        :disabled="
+          creatingSubscription || !newSubscriptionEventCode || !newSubscriptionChannelId
+        "
+      >
+        {{ creatingSubscription ? 'Saving…' : 'Subscribe' }}
+      </button>
+    </template>
+  </Dialog>
 
   <Section
     title="Notification channels"

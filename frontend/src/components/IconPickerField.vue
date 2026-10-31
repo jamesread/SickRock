@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import Dialog from 'picocrank/vue/components/Dialog.vue'
+import type { DialogApi } from '../utils/dialog'
 // Picks a Hugeicons icon name. The name catalog is fetched from the server only when
 // the dialog opens, and each tile loads just its own icon (see utils/hugeicons.ts).
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
@@ -27,7 +29,7 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const dialogEl = ref<HTMLDialogElement | null>(null)
+const dialogEl = ref<DialogApi | null>(null)
 const searchInput = ref<HTMLInputElement | null>(null)
 const catalog = ref<HugeiconCatalog | null>(null)
 const loadingCatalog = ref(false)
@@ -67,7 +69,7 @@ async function loadCatalog() {
 function open() {
   if (props.disabled) return
   chosen = false
-  dialogEl.value?.showModal()
+  dialogEl.value?.show()
   nextTick(() => searchInput.value?.focus())
   loadCatalog()
 }
@@ -101,8 +103,7 @@ defineExpose({ open })
     <button :id="id" type="button" class="neutral" :disabled="disabled" @click="open">Choose…</button>
     <button v-if="clearable && currentName" type="button" class="neutral" :disabled="disabled" @click="clear">Clear</button>
 
-    <dialog ref="dialogEl" class="dialog icon-picker-dialog" @close="onDialogClose">
-      <h2>Choose an icon</h2>
+    <Dialog ref="dialogEl" title="Choose an icon" size="large" class="icon-picker-dialog" @close="onDialogClose">
       <input
         ref="searchInput"
         v-model="query"
@@ -140,11 +141,10 @@ defineExpose({ open })
         </button>
       </template>
 
-      <div class="icon-picker-actions">
-        <button v-if="catalogError" type="button" class="neutral" @click="loadCatalog">Retry</button>
-        <button type="button" class="neutral" @click="dialogEl?.close()">Cancel</button>
-      </div>
-    </dialog>
+      <template v-if="catalogError" #actions>
+        <button type="button" class="neutral" @click="loadCatalog">Retry</button>
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -154,14 +154,6 @@ defineExpose({ open })
   align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-}
-
-/* femtocrank dialogs shrink to fit (max 600px), which collapses the auto-fill grid
-   to a few columns: give the picker a fixed, viewport-relative width instead. */
-.icon-picker-dialog {
-  width: min(56rem, calc(100vw - 2rem));
-  max-width: none;
-  box-sizing: border-box;
 }
 
 .icon-picker-dialog input[type="search"] {
@@ -174,6 +166,7 @@ defineExpose({ open })
   grid-template-columns: repeat(auto-fill, minmax(3rem, 1fr));
   gap: 0.25rem;
   max-height: 50vh;
+  max-height: 50dvh;
   overflow-y: auto;
   margin-block: 0.5rem;
 }
@@ -190,10 +183,4 @@ defineExpose({ open })
   outline: 2px solid currentColor;
 }
 
-.icon-picker-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
-}
 </style>

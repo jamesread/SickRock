@@ -1430,7 +1430,7 @@ var systemTableConfigs = []systemTableConfig{
 	{name: "table_configurations", title: "Table Configurations", table: "table_configurations", ordinal: 1, createDelegate: "/admin/table/create", createButtonText: "Create Table", rowName: "Table configuration"},
 	{name: "table_workflows", title: "Workflows", table: "table_workflows", ordinal: 2, createButtonText: "Add Workflow", rowName: "Workflow"},
 	{name: "table_navigation", title: "Navigation", table: "table_navigation", ordinal: 3, createButtonText: "Add Navigation Item", rowName: "Navigation item"},
-	{name: "table_apps", title: "Sidebar apps", table: "apps", ordinal: 9, createButtonText: "Add app", rowName: "App", rowActions: appRowActions},
+	{name: "table_apps", title: "Apps", table: "apps", ordinal: 9, createButtonText: "Add app", rowName: "App", rowActions: appRowActions},
 	{name: "table_app_navigation_links", title: "App navigation links", table: "app_navigation_links", ordinal: 10, createButtonText: "Add link", rowName: "App navigation link"},
 	{name: "table_dashboards", title: "Dashboards", table: "table_dashboards", ordinal: 4, createDelegate: "/admin/dashboard/create", createButtonText: "Create Dashboard", rowName: "Dashboard"},
 	{name: "table_dashboard_components", title: "Dashboard components", table: "table_dashboard_components", ordinal: 8, createButtonText: "Add Component", rowName: "Dashboard component"},

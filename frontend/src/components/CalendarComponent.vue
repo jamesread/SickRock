@@ -948,7 +948,7 @@ onMounted(load)
       <button
         v-if="!readOnly && canManageExports && effectiveTableId"
         type="button"
-        class="button inline-icon neutral ss-large"
+        class="button inline-icon neutral"
         title="Create read-only export for this calendar"
         @click="exportDialogOpen = true"
       >

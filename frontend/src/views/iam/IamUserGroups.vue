@@ -6,12 +6,14 @@ import { Add01Icon, ArrowLeft01Icon, RefreshIcon, UserGroupIcon } from '@hugeico
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import { createApiClient } from '../../stores/api'
 import { useRbac } from '../../composables/useRbac'
 import { isSystemGroup } from '../../utils/rbacAccess'
 import type { UserGroup } from '../../gen/sickrock_pb'
+import type { DialogApi } from '../../utils/dialog'
 
 const iconStrokeWidth = 2.5
 const router = useRouter()
@@ -24,7 +26,7 @@ const saving = ref(false)
 const errorMessage = ref('')
 const createGroupError = ref('')
 const newGroupName = ref('')
-const createGroupDialog = ref<HTMLDialogElement | null>(null)
+const createGroupDialog = ref<DialogApi | null>(null)
 const createGroupNameInput = ref<HTMLInputElement | null>(null)
 
 const canManage = computed(() => hasPermission('usergroups.manage'))
@@ -79,7 +81,7 @@ function openGroupDetails({ row }: { row: Record<string, unknown> }) {
 function openCreateGroupDialog() {
   newGroupName.value = ''
   createGroupError.value = ''
-  createGroupDialog.value?.showModal()
+  createGroupDialog.value?.show()
   nextTick(() => createGroupNameInput.value?.focus())
 }
 
@@ -124,9 +126,8 @@ onMounted(loadAll)
 </script>
 
 <template>
-  <dialog ref="createGroupDialog" class="dialog" @close="newGroupName = ''">
-    <h2>Create group</h2>
-    <FormLayout @submit.prevent="createGroup">
+  <Dialog ref="createGroupDialog" title="Create group" @close="newGroupName = ''">
+    <FormLayout id="create-group-dialog-form" @submit.prevent="createGroup">
       <FormField label="Name" for="new-group-name" :disabled="saving">
         <input
           id="new-group-name"
@@ -139,12 +140,12 @@ onMounted(loadAll)
         />
       </FormField>
       <NotificationBlock v-if="createGroupError" type="error" :message="createGroupError" />
-      <template #actions>
-        <button type="button" class="neutral" :disabled="saving" @click="closeCreateGroupDialog">Cancel</button>
-        <button type="submit" class="good" :disabled="saving || !newGroupName.trim()">Create group</button>
-      </template>
     </FormLayout>
-  </dialog>
+
+    <template #actions>
+      <button type="submit" form="create-group-dialog-form" class="good" :disabled="saving || !newGroupName.trim()">Create group</button>
+    </template>
+  </Dialog>
 
   <Section
     title="User Groups"

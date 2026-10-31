@@ -13,9 +13,11 @@ import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
+import type { DialogApi } from '../utils/dialog'
 
 const iconStrokeWidth = 2.5
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')!
@@ -42,8 +44,8 @@ const newApiKeyExpiresAt = ref('')
 const newApiKeyReadOnly = ref(false)
 const newApiKeyValue = ref('')
 
-const createDialog = ref<HTMLDialogElement | null>(null)
-const newKeyDialog = ref<HTMLDialogElement | null>(null)
+const createDialog = ref<DialogApi | null>(null)
+const newKeyDialog = ref<DialogApi | null>(null)
 const createNameInput = ref<HTMLInputElement | null>(null)
 
 const tableHeaders = [
@@ -102,7 +104,7 @@ function resetCreateForm() {
 
 function openCreateDialog() {
   resetCreateForm()
-  createDialog.value?.showModal()
+  createDialog.value?.show()
   nextTick(() => createNameInput.value?.focus())
 }
 
@@ -111,12 +113,7 @@ function closeCreateDialog() {
 }
 
 function openNewKeyDialog() {
-  newKeyDialog.value?.showModal()
-}
-
-function closeNewKeyDialog() {
-  newKeyDialog.value?.close()
-  newApiKeyValue.value = ''
+  newKeyDialog.value?.show()
 }
 
 async function createAPIKey() {
@@ -197,11 +194,10 @@ onMounted(loadAPIKeys)
 </script>
 
 <template>
-  <dialog ref="createDialog" class="dialog" @close="resetCreateForm">
-    <h2>Create API key</h2>
+  <Dialog ref="createDialog" title="Create API key" @close="resetCreateForm">
     <p>Create a key for programmatic access to SickRock.</p>
 
-    <FormLayout @submit.prevent="createAPIKey">
+    <FormLayout id="create-dialog-form" @submit.prevent="createAPIKey">
       <FormField label="Name" for="api-key-name" :disabled="saving">
         <input
           id="api-key-name"
@@ -234,18 +230,16 @@ onMounted(loadAPIKeys)
       </FormField>
 
       <NotificationBlock v-if="createError" type="error" :message="createError" />
-
-      <template #actions>
-        <button type="button" class="neutral" :disabled="saving" @click="closeCreateDialog">Cancel</button>
-        <button type="submit" class="good" :disabled="saving || !newApiKeyName.trim()">
-          {{ saving ? 'Creating…' : 'Create API key' }}
-        </button>
-      </template>
     </FormLayout>
-  </dialog>
 
-  <dialog ref="newKeyDialog" class="dialog" @close="newApiKeyValue = ''">
-    <h2>API key created</h2>
+    <template #actions>
+      <button type="submit" form="create-dialog-form" class="good" :disabled="saving || !newApiKeyName.trim()">
+        {{ saving ? 'Creating…' : 'Create API key' }}
+      </button>
+    </template>
+  </Dialog>
+
+  <Dialog ref="newKeyDialog" title="API key created" @close="newApiKeyValue = ''">
     <p class="inline-notification note">
       This is the only time you will see this API key. Copy it now and store it securely.
     </p>
@@ -256,10 +250,7 @@ onMounted(loadAPIKeys)
         <span>Copy</span>
       </button>
     </div>
-    <div class="dialog-actions">
-      <button type="button" class="neutral" @click="closeNewKeyDialog">Close</button>
-    </div>
-  </dialog>
+  </Dialog>
 
   <Section
     title="API Keys"
@@ -373,11 +364,5 @@ onMounted(loadAPIKeys)
 .new-key-value code {
   flex: 1 1 16rem;
   word-break: break-all;
-}
-
-.dialog-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
 }
 </style>

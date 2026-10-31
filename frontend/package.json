@@ -17,7 +17,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "barcode-detector": "3.2.3",
-    "picocrank": "^1.37.0",
+    "picocrank": "^1.38.1",
     "pinia": "^4.1.0",
     "vite-plugin-mkcert": "^2.1.0",
     "vue": "^3.5.44",

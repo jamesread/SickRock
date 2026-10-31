@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Sidebar from 'picocrank/vue/components/Sidebar.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import { ref, onMounted, onUnmounted, computed, watch, provide, nextTick } from 'vue'
 import { Activity01Icon, DatabaseIcon, DatabaseSettingIcon, PhoneArrowDownFreeIcons, HomeIcon, CheckmarkSquare03Icon, BookmarkIcon, QuestionIcon, Delete01Icon, Download01Icon, LayoutIcon } from '@hugeicons/core-free-icons'
@@ -1118,10 +1119,12 @@ onMounted(async () => {
                                 v-if="isInstallable && !isInstalled"
                                 @click="handlePWAInstall"
                                 :disabled="installingPWA"
+                                type="button"
                                 class="neutral pwa-install-header-button"
                                 :title="installingPWA ? 'Installing...' : 'Install App'"
+                                :aria-label="installingPWA ? 'Installing app' : 'Install app'"
                             >
-                                <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" />
+                                <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" aria-hidden="true" />
                             </button>
                             <button
                                 type="button"
@@ -1136,18 +1139,22 @@ onMounted(async () => {
                             </button>
                             <button
                                 @click="showShortcutsHelp = true"
+                                type="button"
                                 class="neutral help-button"
                                 title="Keyboard Shortcuts (g then ?)"
+                                aria-label="Keyboard shortcuts"
                             >
-                                <HugeiconsIcon :icon="QuestionIcon" width="1em" height="1em" />
+                                <HugeiconsIcon :icon="QuestionIcon" width="1em" height="1em" aria-hidden="true" />
                             </button>
                             <button
                                 @click="showBookmarks = !showBookmarks"
                                 class="neutral bookmark-button"
                                 :class="{ 'bookmarked': isCurrentPageBookmarked }"
+                                type="button"
                                 :title="isCurrentPageBookmarked ? 'Remove bookmark' : 'Add bookmark'"
+                                aria-label="Bookmarks"
                             >
-                                <HugeiconsIcon :icon="CheckmarkSquare03Icon" width="1em" height="1em" />
+                                <HugeiconsIcon :icon="CheckmarkSquare03Icon" width="1em" height="1em" aria-hidden="true" />
                             </button>
                         </div>
                     </template>
@@ -1184,76 +1191,58 @@ onMounted(async () => {
     </template>
 
     <!-- Bookmarks Dialog -->
-    <div
-        v-if="showBookmarks"
-        class="modal-overlay"
-        @click="showBookmarks = false"
-        @keydown.escape="showBookmarks = false"
-        tabindex="0"
-    >
-        <div class="modal-content bookmarks-modal" @click.stop>
-            <div class="modal-header">
-                <div class="modal-header-left">
-                    <h3>Bookmarks</h3>
-                </div>
-                <button @click="showBookmarks = false" class="button neutral" title="Close">
-                    ✕
+    <Dialog v-model:open="showBookmarks" title="Bookmarks" class="bookmarks-dialog">
+        <div class="bookmarks-toolbar">
+            <!-- Bookmark this page button -->
+            <div v-if="!isCurrentPageBookmarked && canBookmarkCurrentPage" class="bookmark-this-page-section">
+                <button
+                    @click="toggleCurrentPageBookmark"
+                    class="button good bookmark-this-page-button"
+                >
+                    <HugeiconsIcon :icon="BookmarkIcon" />
+                    Bookmark this page
                 </button>
             </div>
-            <div class="modal-body">
-                <div class="bookmarks-toolbar">
-                    <!-- Bookmark this page button -->
-                    <div v-if="!isCurrentPageBookmarked && canBookmarkCurrentPage" class="bookmark-this-page-section">
-                        <button
-                            @click="toggleCurrentPageBookmark"
-                            class="button good bookmark-this-page-button"
-                        >
-                            <HugeiconsIcon :icon="BookmarkIcon" />
-                            Bookmark this page
-                        </button>
-                    </div>
-                    <div v-if="bookmarks.length === 0" class="no-bookmarks-toolbar">
-                        <p v-if="isCurrentPageBookmarked">No other bookmarks</p>
-                        <p v-else>No bookmarks yet</p>
-                    </div>
-                    <div v-else class="bookmarks-list-toolbar">
-                        <div
-                            v-for="bookmark in bookmarks.slice(0, 10)"
-                            :key="bookmark.id"
-                            class="bookmark-item-wrapper"
-                        >
-                            <router-link
-                                :to="bookmark.navigationItem?.dashboardId > 0
-                                    ? `/dashboard/${bookmark.navigationItem.dashboardName}`
-                                    : bookmark.navigationItem?.workflowId && bookmark.navigationItem.workflowId > 0
-                                    ? `/workflow/${bookmark.navigationItem.workflowId}`
-                                    : `/table/${bookmark.navigationItem?.tableName}`"
-                                class="bookmark-toolbar-item"
-                                :title="bookmark.title || bookmark.navigationItem?.tableName"
-                                @click="showBookmarks = false"
-                            >
-                                <HugeIcon
-                                    :name="bookmark.navigationItem?.icon"
-                                    :fallback="DatabaseIcon"
-                                    class="bookmark-toolbar-icon"
-                                />
-                                <span class="bookmark-toolbar-text">
-                                    {{ bookmark.title || bookmark.navigationItem?.tableName }}
-                                </span>
-                            </router-link>
-                            <button
-                                @click.stop="removeBookmark(bookmark.id)"
-                                class="bookmark-delete-button"
-                                :title="'Remove bookmark'"
-                            >
-                                <HugeiconsIcon :icon="Delete01Icon" />
-                            </button>
-                        </div>
-                    </div>
+            <div v-if="bookmarks.length === 0" class="no-bookmarks-toolbar">
+                <p v-if="isCurrentPageBookmarked">No other bookmarks</p>
+                <p v-else>No bookmarks yet</p>
+            </div>
+            <div v-else class="bookmarks-list-toolbar">
+                <div
+                    v-for="bookmark in bookmarks.slice(0, 10)"
+                    :key="bookmark.id"
+                    class="bookmark-item-wrapper"
+                >
+                    <router-link
+                        :to="bookmark.navigationItem?.dashboardId > 0
+                            ? `/dashboard/${bookmark.navigationItem.dashboardName}`
+                            : bookmark.navigationItem?.workflowId && bookmark.navigationItem.workflowId > 0
+                            ? `/workflow/${bookmark.navigationItem.workflowId}`
+                            : `/table/${bookmark.navigationItem?.tableName}`"
+                        class="bookmark-toolbar-item"
+                        :title="bookmark.title || bookmark.navigationItem?.tableName"
+                        @click="showBookmarks = false"
+                    >
+                        <HugeIcon
+                            :name="bookmark.navigationItem?.icon"
+                            :fallback="DatabaseIcon"
+                            class="bookmark-toolbar-icon"
+                        />
+                        <span class="bookmark-toolbar-text">
+                            {{ bookmark.title || bookmark.navigationItem?.tableName }}
+                        </span>
+                    </router-link>
+                    <button
+                        @click.stop="removeBookmark(bookmark.id)"
+                        class="bookmark-delete-button"
+                        :title="'Remove bookmark'"
+                    >
+                        <HugeiconsIcon :icon="Delete01Icon" />
+                    </button>
                 </div>
             </div>
         </div>
-    </div>
+    </Dialog>
 
     <!-- Keyboard Shortcuts Help Modal -->
     <KeyboardShortcutsHelp v-model:visible="showShortcutsHelp" />
@@ -1295,12 +1284,12 @@ onMounted(async () => {
 }
 
 /* Toolbar Styles */
+/*
+ * Unwrapped so picocrank's Header sees each control: it lays them out in a row
+ * and folds them into its overflow menu when the header is crowded.
+ */
 .toolbar-content {
-    display: inline-flex;
-    align-self: stretch;
-    align-items: stretch;
-    gap: 0.25rem;
-    position: relative;
+    display: contents;
 }
 
 .bookmarks-toolbar {
@@ -1391,90 +1380,38 @@ onMounted(async () => {
     color: white;
 }
 
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 3000;
-    padding: 20px;
-    box-sizing: border-box;
-}
-
-.modal-content {
-    background: #ffffff;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-    max-width: 600px;
-    width: 90%;
-    display: flex;
-    flex-direction: column;
-}
-
-.modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.4);
-}
-
-.modal-header-left h3 {
-    margin: 0;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #212529;
-}
-
-.modal-body {
-    padding: 16px 20px 20px;
-}
-
-.bookmarks-modal {
-    max-width: 520px;
-}
-
-.bookmarks-modal .modal-body {
-    padding-top: 0;
-}
-
-.bookmarks-modal .bookmarks-toolbar {
+.bookmarks-dialog .bookmarks-toolbar {
     flex-direction: column;
     align-items: stretch;
     gap: 0.75rem;
 }
 
-.bookmarks-modal .bookmarks-list-toolbar {
+.bookmarks-dialog .bookmarks-list-toolbar {
     flex-direction: column;
     max-height: 320px;
     overflow-y: auto;
 }
 
-.bookmarks-modal .bookmark-toolbar-item {
+.bookmarks-dialog .bookmark-toolbar-item {
     width: 100%;
     background: transparent;
     border: none;
-    color: #111827;
+    color: var(--text-color);
     padding: 8px 10px;
     border-radius: 6px;
     transition: background-color 0.15s ease;
 }
 
-.bookmarks-modal .bookmark-toolbar-item:hover {
-    background-color: #f3f4f6;
-    color: #111827;
+.bookmarks-dialog .bookmark-toolbar-item:hover {
+    background-color: var(--hover-background-color);
+    color: var(--text-color);
 }
 
-.bookmarks-modal .bookmark-toolbar-icon {
-    color: #4b5563;
+.bookmarks-dialog .bookmark-toolbar-icon {
+    color: var(--muted-text-color);
 }
 
-.bookmarks-modal .bookmark-toolbar-text {
+.bookmarks-dialog .bookmark-toolbar-text {
     max-width: none;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -1499,7 +1436,7 @@ onMounted(async () => {
     padding: 4px 8px;
     background: transparent;
     border: none;
-    color: #6c757d;
+    color: var(--muted-text-color);
     cursor: pointer;
     border-radius: 4px;
     transition: all 0.15s ease;
@@ -1507,8 +1444,8 @@ onMounted(async () => {
 }
 
 .bookmark-delete-button:hover {
-    background: #f3f4f6;
-    color: #dc2626;
+    background: var(--hover-background-color);
+    color: var(--karma-bad, #dc2626);
 }
 
 .bookmark-delete-button :deep(svg) {
@@ -1516,8 +1453,8 @@ onMounted(async () => {
     height: 16px;
 }
 
-.bookmarks-modal .no-bookmarks-toolbar {
-    color: #6c757d;
+.bookmarks-dialog .no-bookmarks-toolbar {
+    color: var(--muted-text-color);
     font-style: italic;
     padding: 8px 0;
 }
@@ -1639,14 +1576,6 @@ onMounted(async () => {
 
 /* Mobile responsive styles */
 @media (max-width: 768px) {
-    .pinned-workflow-toolbar {
-        display: none;
-    }
-
-    .help-button {
-        display: none;
-    }
-
     .g-key-content {
         font-size: 0.95rem;
         padding: 0.75rem 1.25rem;

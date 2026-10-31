@@ -84,7 +84,7 @@ function returnToDashboard() {
       <p>What would you like to do next?</p>
     </div>
 
-    <div class="action-buttons">
+    <div class="action-row center action-buttons">
       <button type="button" class="button neutral" @click="returnToTable">
         📋 {{ returnToTableLabel }}
       </button>
@@ -119,21 +119,13 @@ function returnToDashboard() {
   font-size: 1.1rem;
 }
 
-.action-buttons {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
+/* picocrank .action-row stacks the buttons on narrow screens; keep them a readable width. */
 @media (max-width: 768px) {
   .action-buttons {
-    flex-direction: column;
     align-items: center;
   }
 
-  .button {
-    width: 100%;
+  .action-buttons > .button {
     max-width: 300px;
   }
 }
