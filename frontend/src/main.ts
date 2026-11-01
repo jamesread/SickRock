@@ -63,24 +63,10 @@ initializeApp()
 // If registration fails, unregister any existing service workers to prevent blank pages
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-
-        // Monitor for service worker errors and updates
-        registration.addEventListener('updatefound', () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            newWorker.addEventListener('statechange', () => {
-              if (newWorker.state === 'redundant') {
-                console.warn('Service worker became redundant, unregistering to prevent issues');
-                registration.unregister().catch(err => {
-                  console.warn('Failed to unregister redundant service worker:', err);
-                });
-              }
-            });
-          }
-        });
-      })
+    // updateViaCache 'none': always check /sw.js itself for updates, bypassing the HTTP cache.
+    // A new worker that fails to install becomes "redundant" and the current one keeps
+    // working, so that needs no handling here.
+    navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
       .catch((registrationError) => {
         console.error('SW registration failed: ', registrationError);
         // Unregister any existing service workers to prevent blank pages

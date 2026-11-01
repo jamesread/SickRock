@@ -88,7 +88,7 @@ const emit = defineEmits<{
     <router-link
       :to="insertRoute"
       class="button inline-icon good insert-button"
-      :class="{ 'has-quick-add': showQuickAdd }"
+      :class="{ 'has-quick-add': showQuickAdd, 'hide-narrow': showQuickAdd }"
       accesskey="n"
       title="Insert row"
     >
@@ -98,7 +98,7 @@ const emit = defineEmits<{
     <button
       v-if="showQuickAdd"
       type="button"
-      class="button inline-icon good quick-add-button"
+      class="button inline-icon good quick-add-button show-narrow"
       title="Quick Add"
       aria-label="Quick Add"
       @click="emit('open-quick-add')"
@@ -120,17 +120,19 @@ const emit = defineEmits<{
   display: contents;
 }
 
-.quick-add-button {
-  display: none;
-}
+/*
+ * Wide/narrow swap of "Create <row>" and Quick Add uses picocrank's .hide-narrow and
+ * .show-narrow (!important), so menu layout rules cannot unhide either.
+ */
+</style>
 
-@media (max-width: 768px) {
-  .insert-button.has-quick-add {
-    display: none;
-  }
-
-  .quick-add-button {
-    display: inline-flex;
-  }
+<!--
+  Unscoped: the overflow menu is picocrank's element. (In a scoped block, ":global(x) y"
+  compiles to just "x", which would unwrap the whole menu.)
+-->
+<style>
+/* In the overflow menu, Create and Quick Add are separate full-width items. */
+[role="toolbar"].toolbar-overflow-menu .insert-button-group {
+  display: contents;
 }
 </style>

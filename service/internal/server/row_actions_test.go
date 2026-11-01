@@ -4,7 +4,7 @@ import "testing"
 
 func TestRowActionsToProto(t *testing.T) {
 	got := rowActionsToProto("table_apps", `[
-		{"label":"Create table in this app","path":"/admin/table/create","query":{"navigationAppId":"{id}"}},
+		{"label":"Create app table","path":"/admin/table/create","query":{"navigationAppId":"{id}"}},
 		{"label":"","path":"/skipped"},
 		{"label":"No path"}
 	]`)

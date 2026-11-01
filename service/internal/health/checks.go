@@ -27,6 +27,8 @@ type Deps struct {
 	Getenv func(string) string
 	// LogLevel is the configured log level.
 	LogLevel string
+	// FrontendDir is the built frontend ("" disables pwa.installable).
+	FrontendDir string
 }
 
 // DefaultChecks returns every check, in the order they run and are listed. Add new checks here.
@@ -38,6 +40,9 @@ func DefaultChecks(deps Deps) []armhealth.Check {
 		BookmarksOrphanedCheck{Repo: deps.Repo},
 		RelationsDanglingCheck{Repo: deps.Repo},
 		CalendarFeedsFailingCheck{Repo: deps.Repo},
+	}
+	if deps.FrontendDir != "" {
+		checkList = append(checkList, PWACheck{FrontendDir: deps.FrontendDir})
 	}
 	if deps.AdminUsesDefaultPassword != nil {
 		checkList = append(checkList, checks.DefaultPassword{

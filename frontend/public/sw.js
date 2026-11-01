@@ -1,9 +1,20 @@
-// Derive cache names that are scoped per deployment path to avoid collisions
-const CACHE_VERSION = 'v7';
+// SickRock service worker: makes the app installable and lets table pages open offline.
+//
+// - Hashed build assets (/assets/*) are cache-first: their names change with their content.
+// - Page loads are network-first. Each successful one refreshes the cached app shell (every
+//   page is the same index.html). Offline, home and table pages get the shell, which loads
+//   table data from IndexedDB; other pages get offline.html.
+// - Nothing is cached unless it is a 200 from this site of the expected kind: an HTML page is
+//   never stored as a script, stylesheet, image or manifest.
+// - API calls, /openapi and /llms.txt always go to the network.
+//
+// Bump CACHE_VERSION whenever the caching rules change; old caches are deleted on activate.
+// frontend/src/sw.test.ts runs this file against a fake browser.
+
+const CACHE_VERSION = 'v8';
 const SCOPE_PATH = (() => {
   try {
     const scopeUrl = new URL(self.registration.scope);
-    // Normalise to a safe cache key fragment
     return (scopeUrl.pathname || '/')
       .toLowerCase()
       .replace(/[^a-z0-9/_-]/g, '-')
@@ -15,336 +26,178 @@ const SCOPE_PATH = (() => {
   }
 })();
 
-const CACHE_NAME = `sickrock-${CACHE_VERSION}-${SCOPE_PATH}`;
-const STATIC_CACHE_NAME = `sickrock-static-${CACHE_VERSION}-${SCOPE_PATH}`;
-// Per-icon JSON files (/assets/hugeicons/<version>/<Name>.json). The paths are versioned
-// and never change, so they are served cache-first.
+const SHELL_CACHE_NAME = `sickrock-shell-${CACHE_VERSION}-${SCOPE_PATH}`;
+const ASSET_CACHE_NAME = `sickrock-assets-${CACHE_VERSION}-${SCOPE_PATH}`;
+// Per-icon JSON files (/assets/hugeicons/<version>/<Name>.json): versioned paths, cache-first.
 const HUGEICONS_CACHE_NAME = `sickrock-hugeicons-${CACHE_VERSION}-${SCOPE_PATH}`;
+const CURRENT_CACHES = [SHELL_CACHE_NAME, ASSET_CACHE_NAME, HUGEICONS_CACHE_NAME];
 
-// Routes that should be cached for offline use (table views only)
-const CACHEABLE_ROUTES = [
-  '/',
-  '/table/'
-];
+const SHELL_KEY = '/';
+const OFFLINE_PAGE = '/offline.html';
 
-// Routes that should NOT be cached (admin/control panel)
-const EXCLUDED_ROUTES = [
-  '/admin/',
-  '/control-panel',
-  '/user-preferences',
-  '/dashboards',
-  '/workflow/',
-  '/device-code-claimer'
-];
+// Fetched on install so the app can start offline (the shell is refreshed by every page load).
+const PRECACHE = [SHELL_KEY, OFFLINE_PAGE, '/manifest.json', '/icons/icon-192x192.png', '/icons/icon-512x512.png'];
 
-// Paths that must always be fetched from the network (never cached or SPA-fallback)
-const BYPASS_PATHS = [
-  '/llms.txt',
-  '/openapi.json',
-  '/openapi',
-];
+// Pages that open offline from the cached shell. Others (admin, settings) show offline.html.
+const OFFLINE_PAGES = ['/', '/table/'];
 
-// Check if a URL should bypass the service worker entirely
-function shouldBypass(url) {
-  const urlPath = new URL(url).pathname;
-  return BYPASS_PATHS.includes(urlPath);
+// Always from the network; the service worker does not touch them.
+const BYPASS_PATHS = ['/llms.txt', '/openapi.json', '/openapi', '/metrics'];
+const BYPASS_PREFIXES = ['/api/', '/mcp'];
+
+function pathOf(url) {
+  return new URL(url).pathname;
+}
+
+function shouldBypass(urlPath) {
+  return BYPASS_PATHS.includes(urlPath) || BYPASS_PREFIXES.some((prefix) => urlPath.startsWith(prefix));
+}
+
+function opensOffline(urlPath) {
+  return OFFLINE_PAGES.some((page) => (page === '/' ? urlPath === '/' : urlPath.startsWith(page)));
 }
 
 // Icon files only; the picker's catalog.json always comes from the network.
-function isHugeiconFile(url) {
-  const urlPath = new URL(url).pathname;
+function isHugeiconFile(urlPath) {
   return urlPath.startsWith('/assets/hugeicons/') && urlPath.endsWith('.json') && !urlPath.endsWith('/catalog.json');
 }
 
-// Cache-first for icon files. Network failures are passed through to the page (which
-// shows a default icon and retries later) rather than answered with stand-in data.
-function respondWithHugeicon(request) {
-  return caches.open(HUGEICONS_CACHE_NAME)
-    .then((cache) => cache.match(request).then((cached) => ({ cache, cached })))
-    .catch(() => ({ cache: null, cached: null }))
-    .then(({ cache, cached }) => {
+// Vite build output: name-<8 character hash>.<ext>. Never changes once published.
+function isHashedAsset(urlPath) {
+  return urlPath.startsWith('/assets/') && /-[A-Za-z0-9_-]{8}\.[a-z0-9]+$/.test(urlPath);
+}
+
+function contentType(response) {
+  return (response && response.headers && response.headers.get('Content-Type')) || '';
+}
+
+function isHTML(response) {
+  return contentType(response).includes('text/html');
+}
+
+// A response worth caching: a full 200 from this site.
+function isCacheable(response) {
+  return Boolean(response) && response.status === 200 && response.type === 'basic';
+}
+
+function putInCache(cacheName, key, response) {
+  return caches.open(cacheName)
+    .then((cache) => cache.put(key, response))
+    .catch((err) => console.warn(`Service worker could not cache ${key}:`, err));
+}
+
+function matchInCache(cacheName, key) {
+  return caches.open(cacheName)
+    .then((cache) => cache.match(key))
+    .catch(() => undefined);
+}
+
+// Cache-first for files whose content never changes at a given URL. `accept` decides whether a
+// network response may be stored. Network failures pass through to the page.
+function cacheFirst(cacheName, request, accept) {
+  return matchInCache(cacheName, request.url).then((cached) => {
+    if (cached) {
+      return cached;
+    }
+    return fetch(request).then((response) => {
+      if (isCacheable(response) && accept(response)) {
+        putInCache(cacheName, request.url, response.clone());
+      }
+      return response;
+    });
+  });
+}
+
+function offlineFallback(urlPath) {
+  const shell = opensOffline(urlPath) ? matchInCache(SHELL_CACHE_NAME, SHELL_KEY) : Promise.resolve(undefined);
+  return shell
+    .then((cached) => cached || matchInCache(SHELL_CACHE_NAME, OFFLINE_PAGE))
+    .then((cached) => cached || new Response('SickRock is offline.', {
+      status: 503,
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    }));
+}
+
+// Network-first for page loads. A good page refreshes the cached shell.
+function handleNavigation(request) {
+  const urlPath = pathOf(request.url);
+  return fetch(request)
+    .then((response) => {
+      if (isCacheable(response) && isHTML(response)) {
+        putInCache(SHELL_CACHE_NAME, SHELL_KEY, response.clone());
+      }
+      return response;
+    })
+    .catch(() => offlineFallback(urlPath));
+}
+
+// Network-first for the precached files (icons, manifest, offline page): fresh when online,
+// cached when not.
+function handlePrecached(request) {
+  return fetch(request)
+    .then((response) => {
+      const urlPath = pathOf(request.url);
+      const expectHTML = urlPath === SHELL_KEY || urlPath === OFFLINE_PAGE;
+      if (isCacheable(response) && isHTML(response) === expectHTML) {
+        putInCache(SHELL_CACHE_NAME, urlPath, response.clone());
+      }
+      return response;
+    })
+    .catch(() => matchInCache(SHELL_CACHE_NAME, pathOf(request.url)).then((cached) => {
       if (cached) {
         return cached;
       }
-      return fetch(request).then((response) => {
-        const isJson = (response?.headers.get('Content-Type') || '').includes('application/json');
-        if (cache && response && response.status === 200 && response.type === 'basic' && isJson) {
-          cache.put(request, response.clone()).catch(err => {
-            console.warn('Failed to cache icon:', err);
-          });
-        }
-        return response;
-      });
-    });
+      throw new TypeError(`Offline and ${request.url} is not cached`);
+    }));
 }
 
-// Check if a URL should be cached
-function shouldCache(url) {
-  const urlPath = new URL(url).pathname;
-
-  if (shouldBypass(url)) {
-    return false;
-  }
-
-  // Don't cache excluded routes
-  if (EXCLUDED_ROUTES.some(route => urlPath.startsWith(route))) {
-    return false;
-  }
-
-  // Don't cache API requests (we use IndexedDB for table data)
-  if (urlPath.startsWith('/api/')) {
-    return false;
-  }
-
-  // Cache table routes and home
-  if (urlPath === '/' || urlPath.startsWith('/table/')) {
-    return true;
-  }
-
-  // Don't cache other routes
-  return false;
-}
-
-// Install event - cache essential resources
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
-
-  // Use a more resilient approach - don't block installation on errors
-  const installPromise = caches.open(STATIC_CACHE_NAME)
-    .then((cache) => {
-      console.log('Opened cache');
-      // Cache resources individually to prevent one failure from blocking installation
-      const resourcesToCache = [
-        '/',
-        '/offline.html',
-        '/icons/icon-192x192.png',
-        '/icons/icon-512x512.png'
-      ];
-
-      // Cache each resource individually, logging failures but not blocking installation
-      return Promise.allSettled(
-        resourcesToCache.map(url =>
-          cache.add(url).catch(err => {
-            console.warn(`Failed to cache ${url}:`, err);
-            return null; // Don't throw, just log the error
-          })
-        )
-      );
-    })
-    .then(() => {
-      console.log('Service Worker installed');
-      return self.skipWaiting();
-    })
-    .catch((error) => {
-      console.error('Service Worker installation error:', error);
-      // Still skip waiting to allow activation even if caching fails
-      // This ensures the service worker doesn't block the app
-      return self.skipWaiting();
-    });
-
-  // Use waitUntil but ensure it doesn't block if there's an error
+  // One missing file must not stop installation; each is cached on its own.
   event.waitUntil(
-    installPromise.catch((error) => {
-      console.error('Critical service worker installation error:', error);
-      // Even if everything fails, skip waiting so the app can continue
-      return self.skipWaiting();
-    })
+    caches.open(SHELL_CACHE_NAME)
+      .then((cache) => Promise.allSettled(PRECACHE.map((url) => cache.add(url).catch((err) => {
+        console.warn(`Service worker could not precache ${url}:`, err);
+      }))))
+      .catch((err) => console.error('Service worker install error:', err))
+      .then(() => self.skipWaiting()),
   );
 });
 
-// Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker activating...');
-
-  const activatePromise = caches.keys()
-    .then((cacheNames) => {
-      return Promise.allSettled(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && cacheName !== STATIC_CACHE_NAME && cacheName !== HUGEICONS_CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName).catch(err => {
-              console.warn(`Failed to delete cache ${cacheName}:`, err);
-              return null; // Don't throw, just log
-            });
-          }
-          return Promise.resolve();
-        })
-      );
-    })
-    .then(() => {
-      console.log('Service Worker activated');
-      return self.clients.claim();
-    })
-    .catch((error) => {
-      console.error('Service Worker activation error:', error);
-      // Still try to claim clients even if cache cleanup fails
-      return self.clients.claim().catch(err => {
-        console.warn('Failed to claim clients:', err);
-        return null;
-      });
-    });
-
   event.waitUntil(
-    activatePromise.catch((error) => {
-      console.error('Critical service worker activation error:', error);
-      // Don't block activation even on errors
-      return Promise.resolve();
-    })
+    caches.keys()
+      .then((names) => Promise.allSettled(names
+        .filter((name) => name.startsWith('sickrock-') && name.endsWith(`-${SCOPE_PATH}`) && !CURRENT_CACHES.includes(name))
+        .map((name) => caches.delete(name))))
+      .catch((err) => console.warn('Service worker could not delete old caches:', err))
+      .then(() => self.clients.claim()),
   );
 });
 
-// Fetch event - serve from cache when offline
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== 'GET') {
+  const request = event.request;
+  if (request.method !== 'GET' || !request.url.startsWith('http')) {
+    return;
+  }
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin || shouldBypass(url.pathname)) {
     return;
   }
 
-  // Skip chrome-extension and other non-http requests
-  if (!event.request.url.startsWith('http')) {
+  if (isHugeiconFile(url.pathname)) {
+    event.respondWith(cacheFirst(HUGEICONS_CACHE_NAME, request, (response) => contentType(response).includes('application/json')));
     return;
   }
-
-  const url = new URL(event.request.url);
-
-  // Always fetch from network; never cache or serve SPA fallback for these paths
-  if (shouldBypass(event.request.url)) {
+  if (isHashedAsset(url.pathname)) {
+    event.respondWith(cacheFirst(ASSET_CACHE_NAME, request, (response) => !isHTML(response)));
     return;
   }
-
-  // Don't cache API requests - table data is handled via IndexedDB
-  if (url.pathname.startsWith('/api/')) {
+  if (request.mode === 'navigate') {
+    event.respondWith(handleNavigation(request));
     return;
   }
-
-  if (isHugeiconFile(event.request.url)) {
-    event.respondWith(respondWithHugeicon(event.request));
-    return;
+  if (PRECACHE.includes(url.pathname)) {
+    event.respondWith(handlePrecached(request));
   }
-
-  // Handle navigation requests (page loads)
-  if (event.request.mode === 'navigate') {
-    // Wrap in try-catch to gracefully handle any errors
-    try {
-      event.respondWith(
-        fetch(event.request)
-          .then((response) => {
-            // Cache successful responses
-            if (response && response.status === 200 && response.type === 'basic') {
-              const responseToCache = response.clone();
-              caches.open(CACHE_NAME)
-                .then((cache) => {
-                  cache.put(event.request, responseToCache).catch(err => {
-                    console.warn('Failed to cache navigation response:', err);
-                  });
-                })
-                .catch(err => {
-                  console.warn('Failed to open cache for navigation:', err);
-                });
-            }
-            return response;
-          })
-          .catch(() => {
-            // When offline, try to serve cached version of the page
-            return caches.match(event.request)
-              .then((cachedResponse) => {
-                if (cachedResponse) {
-                  return cachedResponse;
-                }
-                // If no cached version, try to serve the app shell (index.html) from both caches
-                return Promise.all([
-                  caches.open(CACHE_NAME).then(cache => cache.match('/')).catch(() => null),
-                  caches.open(STATIC_CACHE_NAME).then(cache => cache.match('/')).catch(() => null)
-                ]).then(([cached1, cached2]) => {
-                  if (cached1) return cached1;
-                  if (cached2) return cached2;
-                  // Last resort: serve offline.html
-                  return caches.match('/offline.html').catch(() => null);
-                }).catch(() => {
-                  // If all caching fails, fetch the request normally (don't cache)
-                  console.warn('Service worker cache failed, fetching normally');
-                  return fetch(event.request);
-                });
-              })
-              .catch(() => {
-                // If cache matching fails completely, fetch the request normally
-                console.warn('Service worker cache match failed, fetching normally');
-                return fetch(event.request);
-              });
-          })
-          .catch(() => {
-            // Final fallback: fetch the request normally without caching
-            console.warn('Service worker fetch handler failed, fetching normally');
-            return fetch(event.request);
-          })
-      );
-    } catch (error) {
-      // If respondWith itself fails, log and let the browser handle it
-      console.error('Service worker respondWith failed:', error);
-      // Don't call respondWith, let browser handle the request
-    }
-    return;
-  }
-
-  // Only cache specific routes (table views, not admin/control panel)
-  if (!shouldCache(event.request.url)) {
-    return;
-  }
-
-  // Wrap in try-catch to gracefully handle any errors
-  try {
-    event.respondWith(
-      caches.match(event.request)
-        .then((response) => {
-          // Return cached version if available
-          if (response) {
-            return response;
-          }
-
-          // Otherwise fetch from network
-          return fetch(event.request)
-            .then((response) => {
-              // Don't cache if not a valid response
-              if (!response || response.status !== 200 || response.type !== 'basic') {
-                return response;
-              }
-
-              // Clone the response
-              const responseToCache = response.clone();
-
-              // Cache the response (only for cacheable routes)
-              if (shouldCache(event.request.url)) {
-                caches.open(CACHE_NAME)
-                  .then((cache) => {
-                    cache.put(event.request, responseToCache).catch(err => {
-                      console.warn('Failed to cache response:', err);
-                    });
-                  })
-                  .catch(err => {
-                    console.warn('Failed to open cache:', err);
-                  });
-              }
-
-              return response;
-            })
-            .catch(() => {
-              // For other requests, try cached version if available
-              return caches.match(event.request).catch(() => {
-                // If cache match fails, fetch normally
-                console.warn('Service worker cache match failed, fetching normally');
-                return fetch(event.request);
-              });
-            });
-        })
-        .catch(() => {
-          // If cache match fails, fetch the request normally
-          console.warn('Service worker cache match failed, fetching normally');
-          return fetch(event.request);
-        })
-    );
-  } catch (error) {
-    // If respondWith itself fails, log and let the browser handle it
-    console.error('Service worker respondWith failed:', error);
-    // Don't call respondWith, let browser handle the request
-  }
+  // Anything else goes straight to the network.
 });

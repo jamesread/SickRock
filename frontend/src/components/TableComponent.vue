@@ -1460,9 +1460,22 @@ onUnmounted(() => {
       :title="insertButtonText"
       size="large"
       class="quick-add-dialog"
+      toolbar-label="View"
       @update:open="open => { if (!open) closeQuickAddDialog() }"
     >
-      <div class="view-selector">
+      <!-- Narrow screens: the view picker sits in the title bar instead of above the form. -->
+      <template #toolbar>
+        <select
+          v-model="quickAddSelectedViewId"
+          class="show-narrow view-dropdown"
+          aria-label="View"
+        >
+          <option v-for="view in viewOptions" :key="view.id" :value="view.id">
+            {{ view.viewName }}
+          </option>
+        </select>
+      </template>
+      <div class="view-selector hide-narrow">
         <label for="quick-add-view-select">View:</label>
         <select
           id="quick-add-view-select"
@@ -1759,9 +1772,22 @@ onUnmounted(() => {
       :title="insertButtonText"
       size="large"
       class="quick-add-dialog"
+      toolbar-label="View"
       @update:open="open => { if (!open) closeQuickAddDialog() }"
     >
-      <div class="view-selector">
+      <!-- Narrow screens: the view picker sits in the title bar instead of above the form. -->
+      <template #toolbar>
+        <select
+          v-model="quickAddSelectedViewId"
+          class="show-narrow view-dropdown"
+          aria-label="View"
+        >
+          <option v-for="view in viewOptions" :key="view.id" :value="view.id">
+            {{ view.viewName }}
+          </option>
+        </select>
+      </template>
+      <div class="view-selector hide-narrow">
         <label for="quick-add-view-select">View:</label>
         <select
           id="quick-add-view-select"

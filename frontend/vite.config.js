@@ -28,6 +28,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      // Built by the SickRock server (named after the instance); see service/internal/pwa.
+      '/manifest.json': {
+        target: backendTarget,
+        changeOrigin: true,
+        secure: false,
+      },
       '/metrics': {
         target: backendTarget,
         changeOrigin: true,

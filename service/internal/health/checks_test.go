@@ -155,6 +155,7 @@ func TestDefaultChecksHaveUniqueIDs(t *testing.T) {
 		ErrorLog:                 errorlog.New(),
 		AdminUsesDefaultPassword: func(context.Context) (bool, error) { return false, nil },
 		Getenv:                   func(string) string { return "" },
+		FrontendDir:              t.TempDir(),
 	})
 	seen := map[string]bool{}
 	for _, check := range checks {
@@ -163,7 +164,7 @@ func TestDefaultChecksHaveUniqueIDs(t *testing.T) {
 		}
 		seen[check.ID()] = true
 	}
-	if len(checks) != 9 {
-		t.Fatalf("expected 9 default checks, got %d", len(checks))
+	if len(checks) != 10 {
+		t.Fatalf("expected 10 default checks, got %d", len(checks))
 	}
 }

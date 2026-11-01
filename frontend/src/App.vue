@@ -23,7 +23,7 @@ import { isOnline } from './utils/indexedDB'
 import { resolveNavigationIcon } from './utils/navigationIcon'
 import { pagesFromNavigationItems, registerMainSidebarNavigation, updateSidebarHealthLink } from './utils/registerMainSidebarNavigation'
 import { HEALTH_CHANGED_EVENT } from './utils/health'
-import { appTitle, setAppTitle } from './appTitle'
+import { appTitle, setAppTitle, syncAppTitleMeta } from './appTitle'
 import { useDesignMode } from './composables/useDesignMode'
 
 const { designModeEnabled, toggleDesignMode } = useDesignMode()
@@ -67,59 +67,6 @@ const pages = ref<Array<{
 }>>([])
 const version = ref<string>('')
 const quickSearch = ref(null)
-// Dynamically generate PWA manifest from template based on appTitle
-async function updateManifest(title: string) {
-    try {
-        // Load the manifest template from the public folder
-        const response = await fetch('/manifest.template.json', { cache: 'no-cache' })
-        if (!response.ok) {
-            console.warn('Failed to load manifest template, status:', response.status)
-            return
-        }
-
-        const template = await response.json()
-
-        // Update title-related fields
-        const trimmedTitle = title && title.trim().length > 0 ? title.trim() : 'SickRock'
-        template.name = trimmedTitle
-        template.short_name = trimmedTitle
-
-        // Derive a stable ID for this instance from the title
-        const normalizedId = trimmedTitle
-            .toLowerCase()
-            .replace(/\s+/g, '-')
-            .replace(/[^a-z0-9-_]/g, '')
-
-        template.id = `/${normalizedId || 'sickrock'}`
-
-        const manifestBlob = new Blob([JSON.stringify(template)], {
-            type: 'application/manifest+json',
-        })
-        const manifestUrl = URL.createObjectURL(manifestBlob)
-
-        // Ensure there's a single <link rel="manifest"> element
-        let linkEl = document.querySelector<HTMLLinkElement>('link[rel="manifest"]')
-        if (!linkEl) {
-            linkEl = document.createElement('link')
-            linkEl.rel = 'manifest'
-            document.head.appendChild(linkEl)
-        }
-
-        // Revoke previous object URL if it was one we created
-        try {
-            if (linkEl.href && linkEl.href.startsWith('blob:')) {
-                URL.revokeObjectURL(linkEl.href)
-            }
-        } catch {
-            // Ignore revoke errors
-        }
-
-        linkEl.href = manifestUrl
-    } catch (e) {
-        console.warn('Failed to update PWA manifest:', e)
-    }
-}
-
 // Bookmarks state
 const bookmarks = ref<Array<{
   id: number;
@@ -402,8 +349,8 @@ async function loadAppData() {
             // Keep default 'SickRock' if loading fails
         }
 
-        // Ensure manifest is in sync with the resolved appTitle
-        updateManifest(appTitle.value)
+        // The manifest (/manifest.json) is named by the server; iOS reads this meta tag instead.
+        syncAppTitleMeta(appTitle.value)
 
         navResponse = await apiClient.getNavigation({})
 
@@ -532,12 +479,8 @@ watch(isAuthenticated, (newValue) => {
     }
 })
 
-// Regenerate manifest whenever appTitle changes
-watch(appTitle, (newTitle, oldTitle) => {
-    if (newTitle && newTitle !== oldTitle) {
-        updateManifest(newTitle)
-    }
-})
+// Keep the iOS home-screen title in step with appTitle
+watch(appTitle, (newTitle) => syncAppTitleMeta(newTitle))
 
 // Watch for bookmarks dialog opening to check if current page can be bookmarked
 watch(showBookmarks, async (isOpen) => {

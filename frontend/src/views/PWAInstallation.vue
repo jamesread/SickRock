@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { fetchManifest } from '../utils/pwaDiagnostics'
 import { ref, computed, onMounted } from 'vue'
 import { usePWAInstall } from '../composables/usePWAInstall'
 import { HugeiconsIcon } from '@hugeicons/vue'
@@ -209,17 +210,10 @@ async function runPWADiagnostics(): Promise<PWADiagnostic[]> {
   let manifestData: any = null
   let manifestError = ''
   if (manifestHref) {
-    try {
-      const response = await fetch(manifestHref)
-      if (response.ok) {
-        manifestData = await response.json()
-        manifestValid = true
-      } else {
-        manifestError = `HTTP ${response.status}: ${response.statusText}`
-      }
-    } catch (e: any) {
-      manifestError = e.message || 'Failed to fetch manifest'
-    }
+    const manifest = await fetchManifest(manifestHref)
+    manifestData = manifest.data
+    manifestError = manifest.error
+    manifestValid = manifest.data !== null && manifest.error === ''
   }
   results.push({
     name: 'Manifest File',

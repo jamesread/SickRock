@@ -1419,18 +1419,24 @@ type systemTableConfig struct {
 	createButtonText string
 	rowName          string
 	rowActions       string
-	ordinal          int
+	// previousRowActions are earlier defaults of rowActions. A stored value still equal to one
+	// of them (so never edited) is replaced with rowActions at startup.
+	previousRowActions []string
+	ordinal            int
 }
 
 // appRowActions links an app's item page to creating a table configuration in that app.
-const appRowActions = `[{"label":"Create table in this app","path":"/admin/table/create","query":{"navigationAppId":"{id}"},"icon":"Add01Icon"}]`
+const appRowActions = `[{"label":"Create app table","path":"/admin/table/create","query":{"navigationAppId":"{id}"},"icon":"Add01Icon"}]`
+
+// appRowActionsV1 is the first default of appRowActions.
+const appRowActionsV1 = `[{"label":"Create table in this app","path":"/admin/table/create","query":{"navigationAppId":"{id}"},"icon":"Add01Icon"}]`
 
 var systemTableConfigs = []systemTableConfig{
 	{name: "table_settings", title: "Settings", table: "table_settings", ordinal: 0, createButtonText: "Add Setting", rowName: "Setting"},
 	{name: "table_configurations", title: "Table Configurations", table: "table_configurations", ordinal: 1, createDelegate: "/admin/table/create", createButtonText: "Create Table", rowName: "Table configuration"},
 	{name: "table_workflows", title: "Workflows", table: "table_workflows", ordinal: 2, createButtonText: "Add Workflow", rowName: "Workflow"},
 	{name: "table_navigation", title: "Navigation", table: "table_navigation", ordinal: 3, createButtonText: "Add Navigation Item", rowName: "Navigation item"},
-	{name: "table_apps", title: "Apps", table: "apps", ordinal: 9, createButtonText: "Add app", rowName: "App", rowActions: appRowActions},
+	{name: "table_apps", title: "Apps", table: "apps", ordinal: 9, createButtonText: "Add app", rowName: "App", rowActions: appRowActions, previousRowActions: []string{appRowActionsV1}},
 	{name: "table_app_navigation_links", title: "App navigation links", table: "app_navigation_links", ordinal: 10, createButtonText: "Add link", rowName: "App navigation link"},
 	{name: "table_dashboards", title: "Dashboards", table: "table_dashboards", ordinal: 4, createDelegate: "/admin/dashboard/create", createButtonText: "Create Dashboard", rowName: "Dashboard"},
 	{name: "table_dashboard_components", title: "Dashboard components", table: "table_dashboard_components", ordinal: 8, createButtonText: "Add Component", rowName: "Dashboard component"},
@@ -1463,6 +1469,14 @@ func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error 
 			return fmt.Errorf("upsert system table config %s: %w", c.name, err)
 		}
 		log.Infof("Updated system table config: %s (db: %s)", c.name, dbName)
+
+		for _, previous := range c.previousRowActions {
+			if _, err := r.db.ExecContext(ctx,
+				`UPDATE table_configurations SET row_actions = ? WHERE name = ? AND row_actions = ?`,
+				c.rowActions, c.name, previous); err != nil {
+				return fmt.Errorf("update default row actions of %s: %w", c.name, err)
+			}
+		}
 	}
 	return nil
 }

@@ -7,7 +7,9 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -32,6 +34,7 @@ import (
 	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/images"
 	"github.com/jamesread/SickRock/internal/mcp"
+	"github.com/jamesread/SickRock/internal/pwa"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
 	armhealth "github.com/jamesread/armature-health"
@@ -223,11 +226,13 @@ func main() {
 	srv := srvpkg.NewSickRockServer(repository, authLayer)
 	configureImageStore(cfg, srv)
 
+	frontendDir := findFrontendDir()
+
 	go startDeviceCodeCleanupJob(repository)
 	go startRssCalendarFeedRefreshJob(srv)
-	startHealthCheckJob(cfg, repository, iamStore, srv, errorLog)
+	startHealthCheckJob(cfg, repository, iamStore, srv, errorLog, frontendDir)
 
-	router := newRouter(srv, authLayer)
+	router := newRouter(srv, authLayer, frontendDir, repository.GetAppTitle)
 
 	addr := ":" + cfg.Port
 	logListenPort(cfg.Port)
@@ -275,7 +280,7 @@ func openDatabase() (*sqlx.DB, *repo.Repository) {
 }
 
 // newRouter serves the Connect API under /api, the AI discovery endpoints, MCP, metrics and the frontend.
-func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer) *gin.Engine {
+func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer, frontendDir string, appTitle pwa.TitleFunc) *gin.Engine {
 	jsonOpt := connectproto.WithJSON(
 		protojson.MarshalOptions{
 			EmitUnpopulated:   true,
@@ -316,7 +321,7 @@ func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer) *gin.Engine
 	router.Any("/mcp", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
 	router.Any("/mcp/*path", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
 
-	registerFrontendRoutes(router, findFrontendDir())
+	registerFrontendRoutes(router, frontendDir, appTitle)
 	return router
 }
 
@@ -348,24 +353,44 @@ func corsMiddleware(c *gin.Context) {
 	c.Next()
 }
 
-// registerFrontendRoutes serves the built SPA from frontendDir, falling back to index.html for client routes.
-func registerFrontendRoutes(router *gin.Engine, frontendDir string) {
-	router.Static("/assets", filepath.Join(frontendDir, "assets"))
+// staticFileExtensions are file types served from the frontend. A missing one is a 404, never
+// the SPA page: an HTML page returned for a script, stylesheet or image breaks the app, and the
+// service worker could cache it.
+var staticFileExtensions = map[string]bool{
+	".js": true, ".mjs": true, ".css": true, ".map": true, ".json": true, ".webmanifest": true,
+	".png": true, ".jpg": true, ".jpeg": true, ".gif": true, ".svg": true, ".ico": true, ".webp": true,
+	".woff": true, ".woff2": true, ".ttf": true, ".wasm": true, ".txt": true, ".xml": true,
+}
+
+// hashedAssetName matches Vite's content-hashed build output (name-<hash>.<ext>), which never
+// changes once published.
+var hashedAssetName = regexp.MustCompile(`-[A-Za-z0-9_-]{8}\.[a-z0-9]+$`)
+
+// registerFrontendRoutes serves the built SPA from frontendDir, falling back to index.html for
+// client routes. appTitle names the web app manifest.
+func registerFrontendRoutes(router *gin.Engine, frontendDir string, appTitle pwa.TitleFunc) {
+	assets := router.Group("/assets", func(c *gin.Context) {
+		if hashedAssetName.MatchString(c.Request.URL.Path) {
+			c.Header("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		c.Next()
+	})
+	assets.Static("/", filepath.Join(frontendDir, "assets"))
 	router.Static("/css", filepath.Join(frontendDir, "css"))
 	router.Static("/js", filepath.Join(frontendDir, "js"))
 	router.Static("/images", filepath.Join(frontendDir, "images"))
 	router.StaticFile("/favicon.ico", filepath.Join(frontendDir, "favicon.ico"))
 
-	router.GET("/manifest.json", func(c *gin.Context) {
-		manifestPath := filepath.Join(frontendDir, "manifest.json")
-		c.Header("Content-Type", "application/manifest+json")
-		c.File(manifestPath)
-	})
+	manifest := pwa.Handler{FrontendDir: frontendDir, Title: appTitle}
+	router.GET(pwa.Path, gin.WrapH(manifest))
+	router.HEAD(pwa.Path, gin.WrapH(manifest))
 
 	router.GET("/sw.js", func(c *gin.Context) {
 		swPath := filepath.Join(frontendDir, "sw.js")
 		c.Header("Content-Type", "application/javascript")
 		c.Header("Service-Worker-Allowed", "/")
+		// Browsers must always see the latest worker, or fixes never reach installed apps.
+		c.Header("Cache-Control", "no-cache")
 		c.File(swPath)
 	})
 
@@ -374,12 +399,14 @@ func registerFrontendRoutes(router *gin.Engine, frontendDir string) {
 	router.Static("/screenshots", filepath.Join(frontendDir, "screenshots"))
 
 	router.NoRoute(func(c *gin.Context) {
-		// Missing static assets (e.g. an unknown /assets/hugeicons/<version>/<Name>.json)
-		// must 404 rather than fall back to the SPA page.
-		if strings.HasPrefix(c.Request.URL.Path, "/api") || strings.HasPrefix(c.Request.URL.Path, "/assets/") {
+		requestPath := c.Request.URL.Path
+		if strings.HasPrefix(requestPath, "/api") || strings.HasPrefix(requestPath, "/assets/") ||
+			staticFileExtensions[strings.ToLower(path.Ext(requestPath))] {
 			c.Status(http.StatusNotFound)
 			return
 		}
+		// The page names the current hashed assets, so it must be revalidated every time.
+		c.Header("Cache-Control", "no-cache")
 		c.File(filepath.Join(frontendDir, "index.html"))
 	})
 }
@@ -477,7 +504,7 @@ func cleanupDeviceCodes(repository *repo.Repository) {
 
 // startHealthCheckJob creates the health check service, attaches it to the server and runs it
 // in the background (shortly after startup, then every cfg.HealthCheckInterval).
-func startHealthCheckJob(cfg *config.Config, repository *repo.Repository, iamStore armstore.Store, srv *srvpkg.SickRockServer, errorLog *errorlog.ErrorLog) {
+func startHealthCheckJob(cfg *config.Config, repository *repo.Repository, iamStore armstore.Store, srv *srvpkg.SickRockServer, errorLog *errorlog.ErrorLog, frontendDir string) {
 	interval := healthCheckInterval(cfg.HealthCheckInterval)
 
 	checks := health.DefaultChecks(health.Deps{
@@ -486,8 +513,9 @@ func startHealthCheckJob(cfg *config.Config, repository *repo.Repository, iamSto
 		AdminUsesDefaultPassword: func(ctx context.Context) (bool, error) {
 			return adminUsesDefaultPassword(ctx, iamStore)
 		},
-		Getenv:   os.Getenv,
-		LogLevel: cfg.LogLevel,
+		Getenv:      os.Getenv,
+		LogLevel:    cfg.LogLevel,
+		FrontendDir: frontendDir,
 	})
 	db := repository.DB()
 	svc := armhealth.NewService(sqlstore.New(db.DB, db.DriverName()), checks, srv.NotificationService(), armhealth.Options{})
