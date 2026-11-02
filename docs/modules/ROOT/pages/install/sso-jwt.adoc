@@ -1,0 +1,33 @@
+= Single Sign-On with JWT (Cloudflare Access)
+
+SickRock can trust a signed JWT added by an authenticating reverse proxy, such as https://developers.cloudflare.com/cloudflare-one/policies/access/[Cloudflare Access]. Users who reach SickRock through the proxy are signed in automatically, without using the SickRock login page.
+
+Add an `auth` block to `config.yaml` in the `/config` volume (or the directory given by `-configdir` / `SICKROCK_CONFIGDIR`):
+
+.config.yaml
+[source,yaml]
+----
+auth:
+  jwt:
+    certsUrl: "https://<team>.cloudflareaccess.com/cdn-cgi/access/certs"
+    issuer: "https://<team>.cloudflareaccess.com"
+    aud: "<Access application AUD tag>"
+    claimUsername: "email"
+    header: "Cf-Access-Jwt-Assertion"
+    cookieName: "CF_Authorization"
+----
+
+* `certsUrl` is the JWKS endpoint used to verify the token signature. `pubKeyPath` (RSA public key file) or `hmacSecret` can be used instead.
+* `issuer` and `aud` must match the token claims.
+* `claimUsername` is the claim used as the SickRock username.
+* `header` and `cookieName` say where the token is read from; set either or both.
+
+Restart SickRock after changing `config.yaml`. The startup log shows `httpauthshim: JWT header authentication enabled` (and `... cookie ...`) when it is active.
+
+== Users
+
+The first time a JWT user visits, SickRock creates their account automatically (`created_by: sso-autocreated`) and adds it to the *Everyone* group. Grant further roles or groups from the IAM pages, as for any other user. Usernames are matched exactly, so an existing local account with the same username (for example the email address) is used as-is.
+
+Signing out of SickRock does not end the proxy's session; while the JWT is still sent, the user is signed straight back in.
+
+NOTE: Only enable this when SickRock is reachable *solely* through the authenticating proxy, and always set `issuer` and `aud`.

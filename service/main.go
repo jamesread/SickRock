@@ -218,7 +218,7 @@ func main() {
 		log.Fatalf("IAM bootstrap failed: %v", err)
 	}
 
-	authLayer, err := iam.NewAuthLayer(iamStore)
+	authLayer, err := iam.NewAuthLayer(iamStore, cfg.Auth)
 	if err != nil {
 		log.Fatalf("auth layer: %v", err)
 	}

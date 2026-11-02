@@ -35,6 +35,8 @@ Open `http://localhost:8080` in your web browser.
 
 SickRock reads configuration from the `/config` volume. You can place a `config.yaml` file there and set environment variables prefixed with `SICKROCK_` (for example `SICKROCK_PORT`).
 
+To sign users in automatically from an authenticating proxy such as Cloudflare Access, see xref:install/sso-jwt.adoc[Single Sign-On (JWT)].
+
 == Next steps
 
 If you see the SickRock web interface, proceed to the xref:getting-started.adoc[Getting Started Guide].

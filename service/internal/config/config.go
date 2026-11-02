@@ -26,6 +26,9 @@ type Config struct {
 	HealthCheckInterval string
 	// ImagesDir is where uploaded image files are stored.
 	ImagesDir string
+	// Auth is the "auth" block of config.yaml, passed to armature-iam (httpauthshim).
+	// Supports auth.jwt.* (eg Cloudflare Access) the same way as Starloom.
+	Auth map[string]any
 }
 
 // Load builds configuration from -configdir, config file, and environment.
@@ -44,6 +47,11 @@ func Load() (*Config, error) {
 
 	dir := resolveConfigDir(*configDir)
 	if err := loadConfigFile(k, dir); err != nil {
+		return nil, err
+	}
+
+	auth, err := loadAuthConfig(k)
+	if err != nil {
 		return nil, err
 	}
 
@@ -72,8 +80,23 @@ func Load() (*Config, error) {
 			{"default", defaultImagesDir(dir)},
 		}),
 		ConfigDir: dir,
+		Auth:      auth,
 	}
 	return cfg, nil
+}
+
+// loadAuthConfig returns the "auth" block (or nil) and logs whether JWT auth is configured.
+func loadAuthConfig(k *koanf.Koanf) (map[string]any, error) {
+	if !k.Exists("auth") {
+		return nil, nil
+	}
+	var auth map[string]any
+	if err := k.Unmarshal("auth", &auth); err != nil {
+		return nil, fmt.Errorf("loading auth config: %w", err)
+	}
+	_, hasJWT := auth["jwt"]
+	log.WithField("jwt_configured", hasJWT).Info("loaded auth config")
+	return auth, nil
 }
 
 // defaultImagesDir keeps images in the config directory (the /config volume in the container), or
@@ -97,7 +120,14 @@ func resolveConfigDir(flagDir string) string {
 	if flagDir != "" {
 		return flagDir
 	}
-	return os.Getenv(envPrefix + "CONFIGDIR")
+	if dir := os.Getenv(envPrefix + "CONFIGDIR"); dir != "" {
+		return dir
+	}
+	// The container image declares VOLUME /config.
+	if dirExists("/config") {
+		return "/config"
+	}
+	return ""
 }
 
 func loadConfigFile(k *koanf.Koanf, dir string) error {

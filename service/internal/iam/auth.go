@@ -19,10 +19,12 @@ type AuthLayer struct {
 	Store store.Store
 }
 
-// NewAuthLayer wires armature-iam Connect auth.
-func NewAuthLayer(st store.Store) (*AuthLayer, error) {
+// NewAuthLayer wires armature-iam Connect auth. authYAML is the config.yaml "auth"
+// block (eg auth.jwt for Cloudflare Access); JWT users are auto-created on first login.
+func NewAuthLayer(st store.Store, authYAML map[string]any) (*AuthLayer, error) {
 	cfg := armlayer.Config{
 		CookieName: CookieName,
+		AuthYAML:   authYAML,
 		Logger:     log.StandardLogger(),
 		AllowUnauthenticated: []string{
 			sickrockpbconnect.SickRockInitProcedure,
