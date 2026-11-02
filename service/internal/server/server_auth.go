@@ -137,6 +137,11 @@ func (s *SickRockServer) Logout(ctx context.Context, req *connect.Request[sickro
 	})
 	clearCookie := s.auth.ClearSessionCookie()
 	res.Header().Add("Set-Cookie", (&clearCookie).String())
+	// Signed in by a proxy JWT (eg Cloudflare Access): ignore it from now on, or the
+	// next request would sign the user straight back in.
+	if optOut, ok := s.auth.SSOOptOutCookie(req.Header()); ok {
+		res.Header().Add("Set-Cookie", (&optOut).String())
+	}
 	return res, nil
 }
 

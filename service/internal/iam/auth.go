@@ -17,6 +17,7 @@ const CookieName = "sickrock-sid"
 type AuthLayer struct {
 	*armlayer.Layer
 	Store store.Store
+	jwt   jwtSources
 }
 
 // NewAuthLayer wires armature-iam Connect auth. authYAML is the config.yaml "auth"
@@ -46,16 +47,18 @@ func NewAuthLayer(st store.Store, authYAML map[string]any) (*AuthLayer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthLayer{Layer: inner, Store: st}, nil
+	return &AuthLayer{Layer: inner, Store: st, jwt: jwtSourcesFromAuthYAML(authYAML)}, nil
 }
 
 // WrapHandler injects Session-Token / non-API-key Bearer into the session cookie
 // so armature-iam's CookieSID provider accepts the SPA's localStorage token on
 // local HTTP (where Secure cookies are dropped) and when cookies are absent.
+// It also drops the JWT when the browser has opted out of SSO (see SSOOptOutCookieName),
+// since armature-iam checks JWTs before the session cookie.
 func (a *AuthLayer) WrapHandler(in http.Handler) http.Handler {
 	authed := a.Layer.WrapHandler(in)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		authed.ServeHTTP(w, injectSessionCookieFromHeaders(r))
+		authed.ServeHTTP(w, a.jwt.stripJWTIfOptedOut(injectSessionCookieFromHeaders(r)))
 	})
 }
 

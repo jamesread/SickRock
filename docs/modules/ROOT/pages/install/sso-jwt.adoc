@@ -28,6 +28,10 @@ Restart SickRock after changing `config.yaml`. The startup log shows `httpauthsh
 
 The first time a JWT user visits, SickRock creates their account automatically (`created_by: sso-autocreated`) and adds it to the *Everyone* group. Grant further roles or groups from the IAM pages, as for any other user. Usernames are matched exactly, so an existing local account with the same username (for example the email address) is used as-is.
 
-Signing out of SickRock does not end the proxy's session; while the JWT is still sent, the user is signed straight back in.
+== Signing out and switching accounts
+
+Signing out of a JWT session does not end the proxy's session. Instead SickRock sets a `sickrock-sso-off` cookie in that browser, and ignores the JWT while it is present. This shows the login form, so you can sign in with a username and password (or another method) instead.
+
+To go back to the JWT user, choose *Single Sign-On* on the login page. This clears the cookie and signs you in from the proxy again.
 
 NOTE: Only enable this when SickRock is reachable *solely* through the authenticating proxy, and always set `issuer` and `aud`.

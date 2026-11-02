@@ -29,20 +29,29 @@ import Login from 'picocrank/vue/components/Login.vue'
 import DeviceCodeLogin from './DeviceCodeLogin.vue'
 import logo from '../resources/images/logo.png'
 import { createApiClient } from '../stores/api'
+import { clearSSOOptOutCookie, hasSSOOptOut, SSO_PROVIDER_ID } from '../utils/ssoOptOut'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const loginFormRef = ref<InstanceType<typeof Login> | null>(null)
 const client = createApiClient()
 
+// After logging out of a Cloudflare Access (JWT) session the server sets an opt-out
+// cookie so the JWT is ignored; offer a way back to SSO.
+const ssoOptedOut = ref(hasSSOOptOut(document.cookie))
+
 const oauthProviders = computed(() => {
   const list = authStore.initResponse?.oauthProviders ?? []
-  return list.map(p => ({
+  const providers = list.map(p => ({
     id: p.id,
     name: p.label || p.id,
     authUrl: p.authUrl,
     class: 'neutral',
   }))
+  if (ssoOptedOut.value) {
+    providers.unshift({ id: SSO_PROVIDER_ID, name: 'Single Sign-On', authUrl: '', class: 'neutral' })
+  }
+  return providers
 })
 
 const loginTabs = computed(() => {
@@ -50,7 +59,7 @@ const loginTabs = computed(() => {
     { id: 'local', label: 'Username & Password' },
   ]
   if (oauthProviders.value.length > 0) {
-    tabs.push({ id: 'oauth', label: 'OAuth2' })
+    tabs.push({ id: 'oauth', label: ssoOptedOut.value ? 'Single Sign-On' : 'OAuth2' })
   }
   tabs.push({ id: 'device-code', label: 'Device Code' })
   return tabs
@@ -95,12 +104,19 @@ const handleLocalLogin = async (credentials: { username: string; password: strin
   }
 }
 
-const handleOAuthLogin = (provider: { authUrl?: string; auth_url?: string }) => {
+const handleOAuthLogin = (provider: { id?: string; authUrl?: string; auth_url?: string }) => {
+  const redirect = (router.currentRoute.value.query.redirect as string) || '/'
+  if (provider.id === SSO_PROVIDER_ID) {
+    document.cookie = clearSSOOptOutCookie(window.location.protocol === 'https:')
+    ssoOptedOut.value = false
+    // Full reload so Init runs again with the proxy JWT.
+    window.location.href = redirect.startsWith('/') ? redirect : '/'
+    return
+  }
   const url = provider.authUrl || provider.auth_url
   if (!url) {
     return
   }
-  const redirect = (router.currentRoute.value.query.redirect as string) || '/'
   try {
     const target = new URL(url, window.location.origin)
     if (redirect && redirect !== '/') {
