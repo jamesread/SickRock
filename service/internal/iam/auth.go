@@ -1,11 +1,11 @@
 package iam
 
 import (
+	"database/sql"
 	"net/http"
 	"os"
 	"strings"
 
-	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
 	armlayer "github.com/jamesread/armature-iam/layer"
 	"github.com/jamesread/armature-iam/store"
 	log "github.com/sirupsen/logrus"
@@ -18,27 +18,21 @@ type AuthLayer struct {
 	*armlayer.Layer
 	Store store.Store
 	jwt   jwtSources
+	// db holds the API key scope tables; nil (tests only) skips API key scopes.
+	db *sql.DB
 }
 
 // NewAuthLayer wires armature-iam Connect auth. authYAML is the config.yaml "auth"
 // block (eg auth.jwt for Cloudflare Access); JWT users are auto-created on first login.
-func NewAuthLayer(st store.Store, authYAML map[string]any) (*AuthLayer, error) {
+// db is the database that holds the API key tables, for API key expiry and scopes.
+func NewAuthLayer(st store.Store, db *sql.DB, authYAML map[string]any) (*AuthLayer, error) {
 	cfg := armlayer.Config{
-		CookieName: CookieName,
-		AuthYAML:   authYAML,
-		Logger:     log.StandardLogger(),
-		AllowUnauthenticated: []string{
-			sickrockpbconnect.SickRockInitProcedure,
-			sickrockpbconnect.SickRockLoginProcedure,
-			sickrockpbconnect.SickRockLogoutProcedure,
-			sickrockpbconnect.SickRockValidateTokenProcedure,
-			sickrockpbconnect.SickRockGenerateDeviceCodeProcedure,
-			sickrockpbconnect.SickRockCheckDeviceCodeProcedure,
-			sickrockpbconnect.SickRockGetDeviceCodeSessionProcedure,
-			sickrockpbconnect.SickRockPingProcedure,
-		},
-		RequiredPermission: RequiredPermission,
-		DevDisableAuth:     os.Getenv("SICKROCK_DEV_DISABLE_AUTH") == "true",
+		CookieName:           CookieName,
+		AuthYAML:             authYAML,
+		Logger:               log.StandardLogger(),
+		AllowUnauthenticated: allowUnauthenticated,
+		RequiredPermission:   RequiredPermission,
+		DevDisableAuth:       os.Getenv("SICKROCK_DEV_DISABLE_AUTH") == "true",
 		// Secure cookies require HTTPS. Local HTTP (and Vite proxy) must set
 		// SICKROCK_SECURE_COOKIES=false or the browser will drop the session cookie.
 		SecureCookies: os.Getenv("SICKROCK_SECURE_COOKIES") != "false",
@@ -47,7 +41,7 @@ func NewAuthLayer(st store.Store, authYAML map[string]any) (*AuthLayer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &AuthLayer{Layer: inner, Store: st, jwt: jwtSourcesFromAuthYAML(authYAML)}, nil
+	return &AuthLayer{Layer: inner, Store: st, jwt: jwtSourcesFromAuthYAML(authYAML), db: db}, nil
 }
 
 // WrapHandler injects Session-Token / non-API-key Bearer into the session cookie
@@ -55,11 +49,17 @@ func NewAuthLayer(st store.Store, authYAML map[string]any) (*AuthLayer, error) {
 // local HTTP (where Secure cookies are dropped) and when cookies are absent.
 // It also drops the JWT when the browser has opted out of SSO (see SSOOptOutCookieName),
 // since armature-iam checks JWTs before the session cookie.
+// API key expiry and scopes are applied after authentication (see withAPIKeyScope).
 func (a *AuthLayer) WrapHandler(in http.Handler) http.Handler {
-	authed := a.Layer.WrapHandler(in)
+	authed := a.Layer.WrapHandler(withAPIKeyScope(a.db, in))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authed.ServeHTTP(w, a.jwt.stripJWTIfOptedOut(injectSessionCookieFromHeaders(r)))
 	})
+}
+
+// WrapMCPHandler authenticates MCP requests (API keys only) and applies API key expiry and scopes.
+func (a *AuthLayer) WrapMCPHandler(in http.Handler) http.Handler {
+	return a.Layer.WrapMCPHandler(withAPIKeyScope(a.db, in))
 }
 
 func injectSessionCookieFromHeaders(r *http.Request) *http.Request {
@@ -84,7 +84,7 @@ func injectSessionCookieFromHeaders(r *http.Request) *http.Request {
 func bearerSessionToken(authorization string) string {
 	token, ok := strings.CutPrefix(authorization, "Bearer ")
 	token = strings.TrimSpace(token)
-	if !ok || strings.HasPrefix(token, "sk_") {
+	if !ok || strings.HasPrefix(token, APIKeyPrefix) {
 		return ""
 	}
 	return token

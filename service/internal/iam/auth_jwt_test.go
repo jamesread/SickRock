@@ -55,7 +55,7 @@ func TestNewAuthLayer_JWTAutoCreatesUser(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, st.EnsureRBACBootstrap(ctx))
 
-	layer, err := NewAuthLayer(st, testJWTAuthYAML())
+	layer, err := NewAuthLayer(st, nil, testJWTAuthYAML())
 	require.NoError(t, err)
 
 	req := httptest.NewRequestWithContext(ctx, "POST", sickrockpbconnect.SickRockInitProcedure, nil)
@@ -79,7 +79,7 @@ func TestNewAuthLayer_NoAuthConfigIgnoresJWT(t *testing.T) {
 	t.Cleanup(func() { _ = st.Close() })
 	ctx := context.Background()
 
-	layer, err := NewAuthLayer(st, nil)
+	layer, err := NewAuthLayer(st, nil, nil)
 	require.NoError(t, err)
 
 	req := httptest.NewRequestWithContext(ctx, "POST", sickrockpbconnect.SickRockInitProcedure, nil)

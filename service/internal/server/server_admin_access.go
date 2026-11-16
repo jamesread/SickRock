@@ -6,6 +6,7 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/jamesread/SickRock/internal/audit"
+	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/armature-iam/rbac"
 )
 
@@ -51,5 +52,6 @@ func (s *SickRockServer) canDiscoverTableConfiguration(ctx context.Context, tcNa
 	case isSystemSettingsTableConfiguration(tcName):
 		return s.requireSystemSettings(ctx) == nil
 	}
-	return true
+	// An API key limited to some tables only discovers those.
+	return iam.APIKeyScopeFromContext(ctx).AllowsResource(iam.ResourceTypeTable, tcName)
 }

@@ -3,11 +3,13 @@ package server
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"connectrpc.com/connect"
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/audit"
+	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/iam/systemroles"
 	"github.com/jamesread/SickRock/internal/repo"
 	armlayer "github.com/jamesread/armature-iam/layer"
@@ -26,6 +28,51 @@ func isAuthenticated(au *armlayer.AuthenticatedUser) bool {
 // isSuperuser reports whether au holds the RBAC superuser flag.
 func isSuperuser(au *armlayer.AuthenticatedUser) bool {
 	return au != nil && au.RBAC != nil && au.RBAC.IsSuperuser
+}
+
+// resourceSuperuser reports whether au's owner is a superuser for resource checks. A
+// permission-restricted API key's RBAC is no longer superuser, but its owner still reaches every
+// resource the key's scope allows.
+func resourceSuperuser(ctx context.Context, au *armlayer.AuthenticatedUser) bool {
+	if isSuperuser(au) {
+		return true
+	}
+	scope := iam.APIKeyScopeFromContext(ctx)
+	return scope != nil && scope.OwnerIsSuperuser
+}
+
+// requireAPIKeyResource checks that the API key behind the request, if any, may use a resource
+// with a permission. Requests not made with an API key always pass.
+func requireAPIKeyResource(ctx context.Context, resourceType, key, permission string) error {
+	scope := iam.APIKeyScopeFromContext(ctx)
+	if scope == nil {
+		return nil
+	}
+	if !scope.AllowsPermission(permission) {
+		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("this API key does not have the %s permission", permission))
+	}
+	if !scope.AllowsResource(resourceType, key) {
+		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("this API key cannot use %s %s", resourceType, key))
+	}
+	return nil
+}
+
+// apiKeyTableAccess limits access to what the API key behind the request, if any, allows.
+func apiKeyTableAccess(ctx context.Context, tableName string, access *sickrockpb.GetTableAccessResponse) *sickrockpb.GetTableAccessResponse {
+	allows := func(action repo.ResourceGrantAction) bool {
+		perm, _ := repo.TableActionPermission(action)
+		return requireAPIKeyResource(ctx, iam.ResourceTypeTable, tableName, perm) == nil
+	}
+	readOnly := false
+	if au := armlayer.UserFromContext(ctx); au != nil {
+		readOnly = au.ReadOnly
+	}
+	return &sickrockpb.GetTableAccessResponse{
+		CanView:   access.GetCanView() && allows(repo.ResourceActionView),
+		CanInsert: access.GetCanInsert() && !readOnly && allows(repo.ResourceActionInsert),
+		CanEdit:   access.GetCanEdit() && !readOnly && allows(repo.ResourceActionEdit),
+		CanDelete: access.GetCanDelete() && !readOnly && allows(repo.ResourceActionDelete),
+	}
 }
 
 // fullTableAccess grants every table action.
@@ -48,19 +95,19 @@ func (s *SickRockServer) GetTableAccess(ctx context.Context, req *connect.Reques
 		}
 		return connect.NewResponse(access), nil
 	}
-	if isSuperuser(au) {
-		return connect.NewResponse(fullTableAccess()), nil
+	if resourceSuperuser(ctx, au) {
+		return connect.NewResponse(apiKeyTableAccess(ctx, tableName, fullTableAccess())), nil
 	}
 	access, err := s.repo.GetUserTableAccess(ctx, au.User.ID, tableName)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("table access: %w", err))
 	}
-	return connect.NewResponse(&sickrockpb.GetTableAccessResponse{
+	return connect.NewResponse(apiKeyTableAccess(ctx, tableName, &sickrockpb.GetTableAccessResponse{
 		CanView:   access.CanView,
 		CanInsert: access.CanInsert,
 		CanEdit:   access.CanEdit,
 		CanDelete: access.CanDelete,
-	}), nil
+	})), nil
 }
 
 // systemTableAccess returns access to the audit log, read-only exports and system settings tables,
@@ -108,7 +155,15 @@ func (s *SickRockServer) requireTableAccess(ctx context.Context, tableConfigurat
 	if !isAuthenticated(au) {
 		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
-	if isSuperuser(au) {
+	perm, err := repo.TableActionPermission(action)
+	if err != nil {
+		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("invalid table action"))
+	}
+	if err := requireAPIKeyResource(ctx, iam.ResourceTypeTable, tableConfiguration, perm); err != nil {
+		s.auditTableAccess(ctx, tableConfiguration, action, "", false, err.Error())
+		return err
+	}
+	if resourceSuperuser(ctx, au) {
 		s.auditTableAccess(ctx, tableConfiguration, action, "", true, "allowed (superuser)")
 		return nil
 	}
@@ -155,7 +210,10 @@ func (s *SickRockServer) requireDashboardAccess(ctx context.Context, dashboardNa
 	if !isAuthenticated(au) {
 		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
-	if isSuperuser(au) {
+	if err := requireAPIKeyResource(ctx, iam.ResourceTypeDashboard, dashboardName, systemroles.PermissionDashboardView); err != nil {
+		return err
+	}
+	if resourceSuperuser(ctx, au) {
 		return nil
 	}
 	if !mayViewDashboards(au) {
@@ -180,6 +238,11 @@ func mayViewDashboards(au *armlayer.AuthenticatedUser) bool {
 	return au.RBAC.Has(systemroles.PermissionDashboardView) || au.RBAC.Has(rbac.PermissionAppAccess)
 }
 
+var workflowActionPermissions = map[repo.ResourceGrantAction]string{
+	repo.ResourceActionView:  systemroles.PermissionWorkflowView,
+	repo.ResourceActionStart: systemroles.PermissionWorkflowStart,
+}
+
 func (s *SickRockServer) requireWorkflowAccess(ctx context.Context, workflowID int, action repo.ResourceGrantAction) error {
 	if workflowID <= 0 {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("workflow_id is required"))
@@ -188,14 +251,15 @@ func (s *SickRockServer) requireWorkflowAccess(ctx context.Context, workflowID i
 	if !isAuthenticated(au) {
 		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
-	if isSuperuser(au) {
-		return nil
-	}
-
-	switch action {
-	case repo.ResourceActionView, repo.ResourceActionStart:
-	default:
+	perm, ok := workflowActionPermissions[action]
+	if !ok {
 		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("invalid workflow action"))
+	}
+	if err := requireAPIKeyResource(ctx, iam.ResourceTypeWorkflow, strconv.Itoa(workflowID), perm); err != nil {
+		return err
+	}
+	if resourceSuperuser(ctx, au) {
+		return nil
 	}
 
 	ok, err := s.repo.UserHasWorkflowGrant(ctx, au.User.ID, workflowID, action)
@@ -213,7 +277,8 @@ func (s *SickRockServer) canViewNavigationItem(ctx context.Context, item repo.Na
 	if !isAuthenticated(au) {
 		return false
 	}
-	if isSuperuser(au) {
+	// API keys go through the target's checks, which apply the key's scope.
+	if isSuperuser(au) && iam.APIKeyScopeFromContext(ctx) == nil {
 		return true
 	}
 	return s.canViewNavigationTarget(ctx, item)

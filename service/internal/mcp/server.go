@@ -5,6 +5,7 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"connectrpc.com/connect"
@@ -12,8 +13,9 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
+	sickrockpbconnect "github.com/jamesread/SickRock/gen/sickrockpbconnect"
+	"github.com/jamesread/SickRock/internal/iam"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
-	armlayer "github.com/jamesread/armature-iam/layer"
 )
 
 // NewHandler returns an http.Handler that serves the MCP Streamable HTTP endpoint.
@@ -32,34 +34,44 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		mcp.WithDescription("Check connectivity to the SickRock API (health check)."),
 		mcp.WithString("message", mcp.Description("Optional message to echo")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handlePing(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockPingProcedure, func() (*mcp.CallToolResult, error) {
+			return handlePing(ctx, srv, req)
+		})
 	})
 
 	// Navigation
 	mcpServer.AddTool(mcp.NewTool("sickrock_get_navigation",
 		mcp.WithDescription("Get the navigation tree (pages, workflows, bookmarks) from SickRock."),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleGetNavigation(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockGetNavigationProcedure, func() (*mcp.CallToolResult, error) {
+			return handleGetNavigation(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_get_table_configurations",
 		mcp.WithDescription("List all table configurations (pages) available in SickRock."),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleGetTableConfigurations(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockGetTableConfigurationsProcedure, func() (*mcp.CallToolResult, error) {
+			return handleGetTableConfigurations(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_get_database_tables",
 		mcp.WithDescription("List tables in a database. Use the database name (e.g. 'main' for SQLite)."),
 		mcp.WithString("database", mcp.Required(), mcp.Description("Database name")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleGetDatabaseTables(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockGetDatabaseTablesProcedure, func() (*mcp.CallToolResult, error) {
+			return handleGetDatabaseTables(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_get_table_structure",
 		mcp.WithDescription("Get the structure (fields, types, foreign keys) of a table. page_id is the table config name or table identifier."),
 		mcp.WithString("page_id", mcp.Required(), mcp.Description("Table/page ID (table configuration name or table name)")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleGetTableStructure(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockGetTableStructureProcedure, func() (*mcp.CallToolResult, error) {
+			return handleGetTableStructure(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_list_items",
@@ -68,7 +80,9 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		mcp.WithString("where", mcp.Description("Optional JSON object of column name to value for filtering, e.g. {\"status\":\"active\"}")),
 		mcp.WithBoolean("include_tick_state", mcp.Description("Optional. When true, adds a boolean \"completed\" to each item from the table's tick list state (as shown in Tick List views).")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleListItems(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockListItemsProcedure, func() (*mcp.CallToolResult, error) {
+			return handleListItems(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_get_item",
@@ -76,7 +90,9 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		mcp.WithString("page_id", mcp.Required(), mcp.Description("Table/page ID")),
 		mcp.WithString("id", mcp.Required(), mcp.Description("Item ID")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleGetItem(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockGetItemProcedure, func() (*mcp.CallToolResult, error) {
+			return handleGetItem(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_create_item",
@@ -84,7 +100,9 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		mcp.WithString("page_id", mcp.Required(), mcp.Description("Table/page ID")),
 		mcp.WithString("additional_fields", mcp.Required(), mcp.Description("JSON object of column names to values, e.g. {\"name\":\"Foo\",\"count\":42}")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleCreateItem(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockCreateItemProcedure, func() (*mcp.CallToolResult, error) {
+			return handleCreateItem(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_edit_item",
@@ -93,7 +111,9 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		mcp.WithString("id", mcp.Required(), mcp.Description("Item ID")),
 		mcp.WithString("additional_fields", mcp.Required(), mcp.Description("JSON object of column names to new values")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleEditItem(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockEditItemProcedure, func() (*mcp.CallToolResult, error) {
+			return handleEditItem(ctx, srv, req)
+		})
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_delete_item",
@@ -101,7 +121,9 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		mcp.WithString("page_id", mcp.Required(), mcp.Description("Table/page ID")),
 		mcp.WithString("id", mcp.Required(), mcp.Description("Item ID")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-		return handleDeleteItem(ctx, srv, req)
+		return authorized(ctx, sickrockpbconnect.SickRockDeleteItemProcedure, func() (*mcp.CallToolResult, error) {
+			return handleDeleteItem(ctx, srv, req)
+		})
 	})
 
 	return server.NewStreamableHTTPServer(
@@ -251,9 +273,6 @@ func handleGetItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Call
 }
 
 func handleCreateItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if result := denyReadOnlyMCP(ctx, "create items"); result != nil {
-		return result, nil
-	}
 	pageID, err := req.RequireString("page_id")
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -277,9 +296,6 @@ func handleCreateItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.C
 }
 
 func handleEditItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if result := denyReadOnlyMCP(ctx, "edit items"); result != nil {
-		return result, nil
-	}
 	pageID, id, err := requirePageAndID(req)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -304,9 +320,6 @@ func handleEditItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Cal
 }
 
 func handleDeleteItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	if result := denyReadOnlyMCP(ctx, "delete items"); result != nil {
-		return result, nil
-	}
 	pageID, id, err := requirePageAndID(req)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
@@ -318,11 +331,19 @@ func handleDeleteItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.C
 	return jsonResult(map[string]any{"deleted": res.Msg.GetDeleted()})
 }
 
-func denyReadOnlyMCP(ctx context.Context, action string) *mcp.CallToolResult {
-	if au := armlayer.UserFromContext(ctx); au != nil && au.ReadOnly {
-		return mcp.NewToolResultError("permission denied: read-only API key cannot " + action)
+// authorized runs a tool only when the caller may call the Connect procedure behind it: its RBAC
+// permission and, for API keys, the key's read-only flag and scope (MCP calls server methods
+// directly, so the Connect handler's checks do not run).
+func authorized(ctx context.Context, procedure string, run func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
+	if err := iam.AuthorizeProcedure(ctx, procedure); err != nil {
+		msg := err.Error()
+		var cerr *connect.Error
+		if errors.As(err, &cerr) {
+			msg = cerr.Message()
+		}
+		return mcp.NewToolResultError("permission denied: " + msg), nil
 	}
-	return nil
+	return run()
 }
 
 func requirePageAndID(req mcp.CallToolRequest) (string, string, error) {
