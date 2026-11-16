@@ -22,7 +22,8 @@ type TableAccess struct {
 	CanDelete bool
 }
 
-func tableActionPermission(action ResourceGrantAction) (string, error) {
+// TableActionPermission returns the RBAC permission a table action needs (eg table.view).
+func TableActionPermission(action ResourceGrantAction) (string, error) {
 	perms := map[ResourceGrantAction]string{
 		ResourceActionView:   systemroles.PermissionTableView,
 		ResourceActionInsert: systemroles.PermissionTableInsert,
@@ -40,7 +41,7 @@ func (r *Repository) UserHasTableGrant(ctx context.Context, userID int, tableCon
 	if userID <= 0 || tableConfiguration == "" {
 		return false, nil
 	}
-	perm, err := tableActionPermission(action)
+	perm, err := TableActionPermission(action)
 	if err != nil {
 		return false, err
 	}

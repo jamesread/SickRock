@@ -16,7 +16,6 @@ import (
 	"connectrpc.com/connect"
 	"github.com/expr-lang/expr"
 	armhealth "github.com/jamesread/armature-health"
-	armpassword "github.com/jamesread/armature-iam/password"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/parser"
@@ -2122,129 +2121,6 @@ func (s *SickRockServer) ClearTickListState(ctx context.Context, req *connect.Re
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 	return connect.NewResponse(&sickrockpb.ClearTickListStateResponse{}), nil
-}
-
-// API Key Management Methods
-
-// CreateAPIKey creates a new API key for the authenticated user
-func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[sickrockpb.CreateAPIKeyRequest]) (*connect.Response[sickrockpb.CreateAPIKeyResponse], error) {
-	userID, err := s.getUserIDFromContext(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, err)
-	}
-
-	name := strings.TrimSpace(req.Msg.GetName())
-	if name == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
-	}
-
-	apiKey, keyID, err := s.createStoredAPIKey(ctx, userID, name, req.Msg.GetReadOnly())
-	if err != nil {
-		return nil, err
-	}
-
-	return connect.NewResponse(&sickrockpb.CreateAPIKeyResponse{
-		Success:  true,
-		Message:  "API key created successfully",
-		ApiKey:   apiKey,
-		ApiKeyId: toInt32(keyID),
-	}), nil
-}
-
-func (s *SickRockServer) createStoredAPIKey(ctx context.Context, userID int, name string, readOnly bool) (string, int, error) {
-	apiKey, err := armpassword.GenerateAPIKey("sk_")
-	if err != nil {
-		return "", 0, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to generate API key: %w", err))
-	}
-	keyID, err := s.auth.Store.CreateAPIKey(ctx, userID, name, apiKey, readOnly)
-	if err != nil {
-		return "", 0, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create API key: %w", err))
-	}
-	return apiKey, keyID, nil
-}
-
-// GetAPIKeys retrieves all API keys for the authenticated user
-func (s *SickRockServer) GetAPIKeys(ctx context.Context, req *connect.Request[sickrockpb.GetAPIKeysRequest]) (*connect.Response[sickrockpb.GetAPIKeysResponse], error) {
-	userID, err := s.getUserIDFromContext(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, err)
-	}
-
-	apiKeys, err := s.auth.Store.ListAPIKeysForUser(ctx, userID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve API keys: %w", err))
-	}
-
-	var pbAPIKeys []*sickrockpb.APIKey
-	for _, apiKey := range apiKeys {
-		pbAPIKeys = append(pbAPIKeys, &sickrockpb.APIKey{
-			Id:         toInt32(apiKey.ID),
-			UserId:     toInt32(apiKey.UserAccountID),
-			Name:       apiKey.Name,
-			CreatedAt:  parseIAMTimestamp(apiKey.CreatedAt),
-			LastUsedAt: parseIAMTimestamp(apiKey.LastUsedAt),
-			IsActive:   true,
-			ReadOnly:   apiKey.ReadOnly,
-		})
-	}
-
-	return connect.NewResponse(&sickrockpb.GetAPIKeysResponse{
-		ApiKeys: pbAPIKeys,
-	}), nil
-}
-
-// DeleteAPIKey permanently deletes an API key
-func (s *SickRockServer) DeleteAPIKey(ctx context.Context, req *connect.Request[sickrockpb.DeleteAPIKeyRequest]) (*connect.Response[sickrockpb.DeleteAPIKeyResponse], error) {
-	userID, err := s.getUserIDFromContext(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, err)
-	}
-
-	apiKeyID := int(req.Msg.GetApiKeyId())
-	if apiKeyID <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
-	}
-
-	err = s.auth.Store.DeleteAPIKey(ctx, apiKeyID, userID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to delete API key: %w", err))
-	}
-
-	return connect.NewResponse(&sickrockpb.DeleteAPIKeyResponse{
-		Success: true,
-		Message: "API key deleted successfully",
-	}), nil
-}
-
-// DeactivateAPIKey deactivates an API key
-func (s *SickRockServer) DeactivateAPIKey(ctx context.Context, req *connect.Request[sickrockpb.DeactivateAPIKeyRequest]) (*connect.Response[sickrockpb.DeactivateAPIKeyResponse], error) {
-	userID, err := s.getUserIDFromContext(ctx)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, err)
-	}
-
-	apiKeyID := int(req.Msg.GetApiKeyId())
-	if apiKeyID <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
-	}
-
-	err = s.auth.Store.DeleteAPIKey(ctx, apiKeyID, userID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to deactivate API key: %w", err))
-	}
-
-	return connect.NewResponse(&sickrockpb.DeactivateAPIKeyResponse{
-		Success: true,
-		Message: "API key deleted successfully",
-	}), nil
-}
-
-// UpdateAPIKey is not supported with armature-iam keys (delete and recreate instead).
-func (s *SickRockServer) UpdateAPIKey(ctx context.Context, req *connect.Request[sickrockpb.UpdateAPIKeyRequest]) (*connect.Response[sickrockpb.UpdateAPIKeyResponse], error) {
-	if _, err := s.getUserIDFromContext(ctx); err != nil {
-		return nil, connect.NewError(connect.CodeUnauthenticated, err)
-	}
-	return nil, connect.NewError(connect.CodeUnimplemented, fmt.Errorf("update API key is not supported; delete and create a new key"))
 }
 
 // GetConditionalFormattingRules retrieves conditional formatting rules

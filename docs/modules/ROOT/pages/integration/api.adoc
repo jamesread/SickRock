@@ -26,3 +26,14 @@ Authorization: Bearer <api-key>
 ----
 
 Create keys in **Settings → API Keys** in the SickRock UI.
+
+== Limiting what a key can do
+
+Each key can be edited after it is created (its secret stays the same). A key never has more access than the user who owns it, and if the owner's access shrinks, so does the key's. Within that, a key can be limited:
+
+* **Read-only:** the key can only call procedures that read (`Get…`, `List…` and similar); anything else is refused.
+* **Expiry:** after this time the key is refused.
+* **Permissions:** either everything the owner can do, or only the permissions chosen. Most reads need `app.read` and most writes need `app.access`, in addition to the specific permission such as `table.view` or `table.insert`.
+* **Tables, dashboards and workflows:** either everything the owner can use, or only those chosen. System tables (settings, users, audit logs and so on) are governed by permissions instead.
+
+API keys cannot create, edit or delete API keys, change passwords or claim device codes; use the web UI for those. The same limits apply to the xref:integration/mcp.adoc[MCP server].

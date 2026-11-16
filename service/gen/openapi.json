@@ -6546,10 +6546,81 @@
             "type": "boolean",
             "title": "read_only",
             "description": "If true, key can only perform read operations"
+          },
+          "scope": {
+            "title": "scope",
+            "$ref": "#/components/schemas/sickrock.APIKeyScope"
           }
         },
         "title": "APIKey",
         "additionalProperties": false
+      },
+      "sickrock.APIKeyResource": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "type",
+            "description": "\"table\" (table configuration name), \"dashboard\" (name) or \"workflow\" (id)"
+          },
+          "key": {
+            "type": "string",
+            "title": "key"
+          }
+        },
+        "title": "APIKeyResource",
+        "additionalProperties": false
+      },
+      "sickrock.APIKeyResourceOption": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "type"
+          },
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "label": {
+            "type": "string",
+            "title": "label"
+          }
+        },
+        "title": "APIKeyResourceOption",
+        "additionalProperties": false
+      },
+      "sickrock.APIKeyScope": {
+        "type": "object",
+        "properties": {
+          "restrictPermissions": {
+            "type": "boolean",
+            "title": "restrict_permissions",
+            "description": "false: every permission the owner has. true: only those listed."
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "permissions"
+          },
+          "restrictResources": {
+            "type": "boolean",
+            "title": "restrict_resources",
+            "description": "false: every table, dashboard and workflow the owner can use. true: only those listed."
+          },
+          "resources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.APIKeyResource"
+            },
+            "title": "resources"
+          }
+        },
+        "title": "APIKeyScope",
+        "additionalProperties": false,
+        "description": "What an API key may do. Its owner's current access is always the ceiling: a scope can only\n take access away."
       },
       "sickrock.AcknowledgeHealthIssueRequest": {
         "type": "object",
@@ -7031,6 +7102,11 @@
             "type": "boolean",
             "title": "read_only",
             "description": "If true, key can only perform read operations (no create/edit/delete)"
+          },
+          "scope": {
+            "title": "scope",
+            "description": "Unset: the key can do everything its owner can",
+            "$ref": "#/components/schemas/sickrock.APIKeyScope"
           }
         },
         "title": "CreateAPIKeyRequest",
@@ -8279,6 +8355,21 @@
               "$ref": "#/components/schemas/sickrock.APIKey"
             },
             "title": "api_keys"
+          },
+          "availablePermissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "available_permissions",
+            "description": "What the caller can choose from when scoping a key: their own permissions and the tables,\n dashboards and workflows they can view."
+          },
+          "availableResources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.APIKeyResourceOption"
+            },
+            "title": "available_resources"
           }
         },
         "title": "GetAPIKeysResponse",
@@ -11089,6 +11180,11 @@
             ],
             "title": "read_only",
             "description": "If set, update read-only access level"
+          },
+          "scope": {
+            "title": "scope",
+            "description": "If set, replace the key's scope",
+            "$ref": "#/components/schemas/sickrock.APIKeyScope"
           }
         },
         "title": "UpdateAPIKeyRequest",

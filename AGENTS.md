@@ -111,9 +111,12 @@ The `ListItems` API automatically includes synthetic fields to enhance data anal
 
 **API Endpoints**:
 - `CreateAPIKey` - Generate API keys
+- `UpdateAPIKey` - Change a key's name, expiry, read-only flag or scope (the secret stays the same)
 - `GenerateDeviceCode` - Device authentication
 - `ValidateToken` - Session management
 - `ResetUserPassword` - Password management
+
+**API key scopes** (like StencilBox's): a key may be read-only, may expire (`api_keys.expires_at`), and may be limited to some of its owner's permissions (`restrict_permissions`, `api_key_permissions`) and to some tables, dashboards and workflows (`restrict_resources`, `api_key_resources`, keyed by table configuration name, dashboard name or workflow id). The owner's current access is always the ceiling. `service/internal/iam/apikeyscope*.go` holds the scope and a middleware that runs after armature-iam authenticates a request (`AuthLayer.WrapHandler`/`WrapMCPHandler`): it refuses expired keys, writes from read-only keys (anything not named `Get…`/`List…`/…), procedures whose permission the scope leaves out, and key management from any key; narrows the request's RBAC to the scope; and puts the scope in the context (`iam.APIKeyScopeFromContext`). Resource checks (`requireTableAccess`, `requireDashboardAccess`, `requireWorkflowAccess`, navigation and table discovery in `service/internal/server/server_resource_access.go`) apply it, so any new resource check should go through them. MCP tools check their Connect procedure with `iam.AuthorizeProcedure`. `GetAPIKeys` also returns the permissions and resources a scope can be chosen from; the UI is `UserAPIKeys.vue` with `ApiKeyScopeFields.vue`.
 
 ### 5. Migration Agent
 **Purpose**: Automatically handle database migrations and schema changes

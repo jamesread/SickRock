@@ -1205,6 +1205,7 @@ message CreateAPIKeyRequest {
   string name = 1;
   int64 expires_at = 2; // Unix timestamp, 0 for no expiration
   bool read_only = 3;   // If true, key can only perform read operations (no create/edit/delete)
+  APIKeyScope scope = 4; // Unset: the key can do everything its owner can
 }
 
 message CreateAPIKeyResponse {
@@ -1218,6 +1219,10 @@ message GetAPIKeysRequest {}
 
 message GetAPIKeysResponse {
   repeated APIKey api_keys = 1;
+  // What the caller can choose from when scoping a key: their own permissions and the tables,
+  // dashboards and workflows they can view.
+  repeated string available_permissions = 2;
+  repeated APIKeyResourceOption available_resources = 3;
 }
 
 message UpdateAPIKeyRequest {
@@ -1225,6 +1230,7 @@ message UpdateAPIKeyRequest {
   optional string name = 2;       // If set, update the key name
   optional int64 expires_at = 3;  // If set, update expiration (0 = no expiration)
   optional bool read_only = 4;    // If set, update read-only access level
+  APIKeyScope scope = 5;          // If set, replace the key's scope
 }
 
 message UpdateAPIKeyResponse {
@@ -1259,6 +1265,29 @@ message APIKey {
   int64 expires_at = 6;
   bool is_active = 7;
   bool read_only = 8;  // If true, key can only perform read operations
+  APIKeyScope scope = 9;
+}
+
+// What an API key may do. Its owner's current access is always the ceiling: a scope can only
+// take access away.
+message APIKeyScope {
+  // false: every permission the owner has. true: only those listed.
+  bool restrict_permissions = 1;
+  repeated string permissions = 2;
+  // false: every table, dashboard and workflow the owner can use. true: only those listed.
+  bool restrict_resources = 3;
+  repeated APIKeyResource resources = 4;
+}
+
+message APIKeyResource {
+  string type = 1; // "table" (table configuration name), "dashboard" (name) or "workflow" (id)
+  string key = 2;
+}
+
+message APIKeyResourceOption {
+  string type = 1;
+  string key = 2;
+  string label = 3;
 }
 
 // Conditional Formatting Rules

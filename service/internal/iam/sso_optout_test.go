@@ -66,7 +66,7 @@ func TestSSOOptOut_IgnoresJWTEndToEnd(t *testing.T) {
 	ctx := context.Background()
 	require.NoError(t, st.EnsureRBACBootstrap(ctx))
 
-	layer, err := NewAuthLayer(st, testJWTAuthYAMLWithCookie())
+	layer, err := NewAuthLayer(st, nil, testJWTAuthYAMLWithCookie())
 	require.NoError(t, err)
 
 	req := newJWTRequest(t, "alice@example.com")
@@ -87,7 +87,7 @@ func TestSSOOptOutCookie(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = st.Close() })
 
-	layer, err := NewAuthLayer(st, testJWTAuthYAML())
+	layer, err := NewAuthLayer(st, nil, testJWTAuthYAML())
 	require.NoError(t, err)
 
 	c, ok := layer.SSOOptOutCookie(newJWTRequest(t, "alice@example.com").Header)
@@ -100,7 +100,7 @@ func TestSSOOptOutCookie(t *testing.T) {
 	_, ok = layer.SSOOptOutCookie(http.Header{})
 	assert.False(t, ok, "no JWT on the request: nothing to opt out of")
 
-	noJWT, err := NewAuthLayer(st, nil)
+	noJWT, err := NewAuthLayer(st, nil, nil)
 	require.NoError(t, err)
 	_, ok = noJWT.SSOOptOutCookie(newJWTRequest(t, "alice@example.com").Header)
 	assert.False(t, ok, "JWT not configured")
