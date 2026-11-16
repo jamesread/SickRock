@@ -16,13 +16,13 @@
     "@connectrpc/connect-web": "^2.3.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@vitejs/plugin-basic-ssl": "^2.3.0",
-    "barcode-detector": "3.2.3",
+    "barcode-detector": "3.2.4",
     "picocrank": "^1.40.0",
     "pinia": "^4.1.0",
     "vite-plugin-mkcert": "^2.1.0",
     "vue": "^3.5.44",
     "vue-router": "^5.4.0",
-    "zxing-wasm": "3.1.6"
+    "zxing-wasm": "3.1.7"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
