@@ -5,6 +5,7 @@ import {
   Add01Icon,
   Copy01Icon,
   Delete01Icon,
+  Edit02Icon,
   KeyIcon,
   PauseIcon,
   RefreshIcon,
@@ -16,8 +17,18 @@ import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import Dialog from 'picocrank/vue/components/Dialog.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
 import Table from 'picocrank/vue/components/Table.vue'
+import ApiKeyScopeFields from '../components/ApiKeyScopeFields.vue'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
 import type { DialogApi } from '../utils/dialog'
+import {
+  dateTimeLocalToUnix,
+  emptyScope,
+  scopeFromApi,
+  scopeSummary,
+  unixToDateTimeLocal,
+  type ApiKeyResourceOption,
+  type ApiKeyScope,
+} from '../utils/apiKeyScope'
 
 const iconStrokeWidth = 2.5
 const client = inject<ReturnType<typeof createApiClient>>('apiClient')!
@@ -31,22 +42,28 @@ type ApiKeyRow = {
   expiresAt: number
   isActive: boolean
   readOnly: boolean
+  scope: ApiKeyScope
 }
 
 const apiKeys = ref<ApiKeyRow[]>([])
+const availablePermissions = ref<string[]>([])
+const availableResources = ref<ApiKeyResourceOption[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
-const createError = ref('')
+const formError = ref('')
 
-const newApiKeyName = ref('')
-const newApiKeyExpiresAt = ref('')
-const newApiKeyReadOnly = ref(false)
+// The key dialog creates a key (editingKeyId null) or edits one. The secret never changes.
+const editingKeyId = ref<number | null>(null)
+const formName = ref('')
+const formExpiresAt = ref('')
+const formReadOnly = ref(false)
+const formScope = ref<ApiKeyScope>(emptyScope())
 const newApiKeyValue = ref('')
 
-const createDialog = ref<DialogApi | null>(null)
+const keyDialog = ref<DialogApi | null>(null)
 const newKeyDialog = ref<DialogApi | null>(null)
-const createNameInput = ref<HTMLInputElement | null>(null)
+const nameInput = ref<HTMLInputElement | null>(null)
 
 const tableHeaders = [
   { key: 'name', label: 'Name', sortable: true },
@@ -54,8 +71,8 @@ const tableHeaders = [
   { key: 'lastUsedAt', label: 'Last used', sortable: true, width: '10rem' },
   { key: 'expiresAt', label: 'Expires', sortable: true, width: '10rem' },
   { key: 'isActive', label: 'Status', sortable: true, width: '7rem' },
-  { key: 'readOnly', label: 'Access', sortable: true, width: '8rem' },
-  { key: 'actions', label: 'Actions', sortable: false, width: '7rem' },
+  { key: 'readOnly', label: 'Access', sortable: false },
+  { key: 'actions', label: 'Actions', sortable: false, width: '9rem' },
 ]
 
 function formatDate(timestamp: number): string {
@@ -68,10 +85,6 @@ function formatExpirationDate(timestamp: number): string {
   return formatUnixTimestamp(timestamp)
 }
 
-function expiresAtToUnix(value: string): bigint {
-  if (!value.trim()) return 0n
-  return BigInt(Math.floor(new Date(value).getTime() / 1000))
-}
 
 async function loadAPIKeys() {
   loading.value = true
@@ -87,7 +100,10 @@ async function loadAPIKeys() {
       expiresAt: Number(key.expiresAt),
       isActive: key.isActive,
       readOnly: key.readOnly ?? false,
+      scope: scopeFromApi(key.scope),
     }))
+    availablePermissions.value = [...(response.availablePermissions || [])]
+    availableResources.value = (response.availableResources || []).map((r) => ({ type: r.type, key: r.key, label: r.label }))
   } catch (e: unknown) {
     errorMessage.value = e instanceof Error ? e.message : 'Failed to load API keys.'
   } finally {
@@ -95,52 +111,68 @@ async function loadAPIKeys() {
   }
 }
 
-function resetCreateForm() {
-  newApiKeyName.value = ''
-  newApiKeyExpiresAt.value = ''
-  newApiKeyReadOnly.value = false
-  createError.value = ''
+function resetForm() {
+  editingKeyId.value = null
+  formName.value = ''
+  formExpiresAt.value = ''
+  formReadOnly.value = false
+  formScope.value = emptyScope()
+  formError.value = ''
+}
+
+function showKeyDialog() {
+  keyDialog.value?.show()
+  nextTick(() => nameInput.value?.focus())
 }
 
 function openCreateDialog() {
-  resetCreateForm()
-  createDialog.value?.show()
-  nextTick(() => createNameInput.value?.focus())
+  resetForm()
+  showKeyDialog()
 }
 
-function closeCreateDialog() {
-  createDialog.value?.close()
+function openEditDialog(row: ApiKeyRow) {
+  resetForm()
+  editingKeyId.value = row.id
+  formName.value = row.name
+  formExpiresAt.value = unixToDateTimeLocal(row.expiresAt)
+  formReadOnly.value = row.readOnly
+  formScope.value = scopeFromApi(row.scope)
+  showKeyDialog()
 }
 
-function openNewKeyDialog() {
-  newKeyDialog.value?.show()
+function scopeToApi(scope: ApiKeyScope) {
+  return {
+    restrictPermissions: scope.restrictPermissions,
+    permissions: scope.restrictPermissions ? scope.permissions : [],
+    restrictResources: scope.restrictResources,
+    resources: scope.restrictResources ? scope.resources : [],
+  }
 }
 
-async function createAPIKey() {
-  if (!newApiKeyName.value.trim()) {
-    createError.value = 'API key name is required.'
+async function saveKey() {
+  const name = formName.value.trim()
+  if (!name) {
+    formError.value = 'API key name is required.'
     return
   }
 
   saving.value = true
-  createError.value = ''
+  formError.value = ''
+  const expiresAt = BigInt(dateTimeLocalToUnix(formExpiresAt.value))
+  const scope = scopeToApi(formScope.value)
   try {
-    const response = await client.createAPIKey({
-      name: newApiKeyName.value.trim(),
-      expiresAt: expiresAtToUnix(newApiKeyExpiresAt.value),
-      readOnly: newApiKeyReadOnly.value,
-    })
-
-    if (response.success) {
+    if (editingKeyId.value === null) {
+      const response = await client.createAPIKey({ name, expiresAt, readOnly: formReadOnly.value, scope })
       newApiKeyValue.value = response.apiKey
-      closeCreateDialog()
-      openNewKeyDialog()
-      await loadAPIKeys()
+      keyDialog.value?.close()
+      newKeyDialog.value?.show()
     } else {
-      createError.value = response.message || 'Failed to create API key.'
+      await client.updateAPIKey({ apiKeyId: editingKeyId.value, name, expiresAt, readOnly: formReadOnly.value, scope })
+      keyDialog.value?.close()
     }
+    await loadAPIKeys()
   } catch (e: unknown) {
-    createError.value = e instanceof Error ? e.message : 'Failed to create API key.'
+    formError.value = e instanceof Error ? e.message : 'Failed to save API key.'
   } finally {
     saving.value = false
   }
@@ -194,15 +226,16 @@ onMounted(loadAPIKeys)
 </script>
 
 <template>
-  <Dialog ref="createDialog" title="Create API key" @close="resetCreateForm">
-    <p>Create a key for programmatic access to SickRock.</p>
+  <Dialog ref="keyDialog" :title="editingKeyId === null ? 'Create API key' : 'Edit API key'" @close="resetForm">
+    <p v-if="editingKeyId === null">Create a key for programmatic access to SickRock.</p>
+    <p v-else>Changes apply to the existing key straight away; its secret stays the same.</p>
 
-    <FormLayout id="create-dialog-form" @submit.prevent="createAPIKey">
+    <FormLayout id="key-dialog-form" @submit.prevent="saveKey">
       <FormField label="Name" for="api-key-name" :disabled="saving">
         <input
           id="api-key-name"
-          ref="createNameInput"
-          v-model="newApiKeyName"
+          ref="nameInput"
+          v-model="formName"
           type="text"
           placeholder="e.g., My App API Key"
           autocomplete="off"
@@ -214,27 +247,40 @@ onMounted(loadAPIKeys)
       <FormField label="Expires at (optional)" for="api-key-expires" :disabled="saving">
         <input
           id="api-key-expires"
-          v-model="newApiKeyExpiresAt"
+          v-model="formExpiresAt"
           type="datetime-local"
           :disabled="saving"
         />
       </FormField>
 
-      <FormField label="Read-only access" for="api-key-readonly" :disabled="saving">
+      <FormField
+        label="Read-only access"
+        for="api-key-readonly"
+        description="Read-only keys cannot change anything, whatever their permissions."
+        :disabled="saving"
+      >
         <input
           id="api-key-readonly"
-          v-model="newApiKeyReadOnly"
+          v-model="formReadOnly"
           type="checkbox"
           :disabled="saving"
         />
       </FormField>
 
-      <NotificationBlock v-if="createError" type="error" :message="createError" />
+      <ApiKeyScopeFields
+        v-model="formScope"
+        :available-permissions="availablePermissions"
+        :available-resources="availableResources"
+        :disabled="saving"
+      />
+
+      <NotificationBlock v-if="formError" type="error" :message="formError" />
     </FormLayout>
 
     <template #actions>
-      <button type="submit" form="create-dialog-form" class="good" :disabled="saving || !newApiKeyName.trim()">
-        {{ saving ? 'Creating…' : 'Create API key' }}
+      <button type="submit" form="key-dialog-form" class="good" :disabled="saving || !formName.trim()">
+        <template v-if="editingKeyId === null">{{ saving ? 'Creating…' : 'Create API key' }}</template>
+        <template v-else>{{ saving ? 'Saving…' : 'Save changes' }}</template>
       </button>
     </template>
   </Dialog>
@@ -302,14 +348,23 @@ onMounted(loadAPIKeys)
         </template>
         <template #cell-isActive="{ value }">
           <span :class="value ? 'tag fg-good' : 'tag bad'">
-            {{ value ? 'Active' : 'Inactive' }}
+            {{ value ? 'Active' : 'Expired' }}
           </span>
         </template>
-        <template #cell-readOnly="{ value }">
-          {{ value ? 'Read-only' : 'Read-write' }}
+        <template #cell-readOnly="{ row }">
+          {{ scopeSummary(row.scope, row.readOnly) }}
         </template>
         <template #cell-actions="{ row }">
           <div class="actions-cell">
+            <button
+              type="button"
+              class="inline-icon neutral small"
+              aria-label="Edit API key"
+              :disabled="saving"
+              @click="openEditDialog(row)"
+            >
+              <HugeiconsIcon :icon="Edit02Icon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+            </button>
             <button
               v-if="row.isActive"
               type="button"
