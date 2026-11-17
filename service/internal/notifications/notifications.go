@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	repo "github.com/jamesread/SickRock/internal/repo"
@@ -33,8 +34,18 @@ func getTelegramBotToken() string {
 	return os.Getenv("SICKROCK_TELEGRAM_BOT_TOKEN")
 }
 
-// SendNotification sends a notification for a specific event
+// EventUserNotified is sent by one user to another (NotifyUsers), never broadcast.
+const EventUserNotified = "user.notified"
+
+// targetedEvents are only ever sent to chosen recipients with SendToUser: broadcasting one
+// would send a user's message to everyone subscribed to the event.
+var targetedEvents = map[string]bool{EventUserNotified: true}
+
+// SendNotification sends a notification for a specific event to every subscriber.
 func (ns *NotificationService) SendNotification(ctx context.Context, eventCode string, data map[string]any) error {
+	if targetedEvents[eventCode] {
+		return fmt.Errorf("event %s is sent to chosen users only", eventCode)
+	}
 	// Get all subscriptions for this event
 	subscriptions, err := ns.repo.GetSubscriptionsForEvent(ctx, eventCode)
 	if err != nil {
@@ -53,6 +64,42 @@ func (ns *NotificationService) SendNotification(ctx context.Context, eventCode s
 		ns.sendOneSubscription(ctx, eventCode, message, data, sub.Channel)
 	}
 	return nil
+}
+
+// SendToUser sends eventCode to one user's active channels subscribed to it, and returns how
+// many subscriptions it had and how many sends succeeded. Channels are sent to in parallel.
+func (ns *NotificationService) SendToUser(ctx context.Context, userID int, eventCode string, data map[string]any) (subscribed, delivered int, err error) {
+	subscriptions, err := ns.repo.GetUserSubscriptionsForEvent(ctx, userID, eventCode)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed to get subscriptions: %w", err)
+	}
+	message := ns.buildMessage(eventCode, data)
+	results := make(chan error, len(subscriptions))
+	for _, sub := range subscriptions {
+		go func(channel repo.UserNotificationChannel) {
+			results <- ns.sendToUserChannel(ctx, userID, eventCode, channel, message, data)
+		}(sub.Channel)
+	}
+	for range subscriptions {
+		if <-results == nil {
+			delivered++
+		}
+	}
+	return len(subscriptions), delivered, nil
+}
+
+// sendToUserChannel sends message to one of a user's channels, logging a failure as a warning.
+func (ns *NotificationService) sendToUserChannel(ctx context.Context, userID int, eventCode string, channel repo.UserNotificationChannel, message string, data map[string]any) error {
+	err := ns.sendToChannel(ctx, channel, message, data)
+	if err != nil {
+		log.WithError(err).WithFields(log.Fields{
+			"event_code":   eventCode,
+			"user_id":      userID,
+			"channel_id":   channel.ID,
+			"channel_type": channel.ChannelType,
+		}).Warn("Failed to send notification")
+	}
+	return err
 }
 
 func (ns *NotificationService) sendOneSubscription(ctx context.Context, eventCode, message string, data map[string]any, channel repo.UserNotificationChannel) {
@@ -74,6 +121,8 @@ func (ns *NotificationService) buildMessage(eventCode string, data map[string]an
 		return fmt.Sprintf("Password reset reminder for user %s", stringOr(data, "username", "unknown"))
 	case "health.issue_raised":
 		return healthIssueMessage(data)
+	case EventUserNotified:
+		return userNotifiedMessage(data)
 	default:
 		return fmt.Sprintf("Notification for event: %s", eventCode)
 	}
@@ -85,6 +134,18 @@ func stringOr(data map[string]any, key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// userNotifiedMessage is "sender: title", then the message and link on their own lines.
+func userNotifiedMessage(data map[string]any) string {
+	var message strings.Builder
+	fmt.Fprintf(&message, "%s: %s", stringOr(data, "sender", "Someone"), stringOr(data, "title", ""))
+	for _, key := range []string{"message", "link"} {
+		if v := stringOr(data, key, ""); v != "" {
+			message.WriteString("\n" + v)
+		}
+	}
+	return message.String()
 }
 
 func healthIssueMessage(data map[string]any) string {

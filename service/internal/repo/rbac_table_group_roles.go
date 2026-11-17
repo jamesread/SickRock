@@ -138,22 +138,32 @@ func (r *Repository) SetGroupTableRoleGrants(ctx context.Context, groupID int, g
 		return fmt.Errorf("group_id is required")
 	}
 	return r.inTx(ctx, func(tx *sqlx.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE user_group_id = ?`, groupID); err != nil {
-			return fmt.Errorf("clear table group roles: %w", err)
-		}
-		for _, g := range grants {
-			if g.TableKey == "" || g.RoleID <= 0 {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
-				groupID, g.TableKey, g.RoleID,
-			); err != nil {
-				return fmt.Errorf("insert table group role: %w", err)
-			}
-		}
-		return nil
+		return replaceGroupTableRoleGrants(ctx, tx, groupID, grants)
 	})
+}
+
+// groupTableRoleGrantValid reports whether the grant names a table and a role.
+func groupTableRoleGrantValid(g GroupTableRoleGrant) bool {
+	return g.TableKey != "" && g.RoleID > 0
+}
+
+// replaceGroupTableRoleGrants clears a group's table roles and inserts the valid grants.
+func replaceGroupTableRoleGrants(ctx context.Context, tx *sqlx.Tx, groupID int, grants []GroupTableRoleGrant) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE user_group_id = ?`, groupID); err != nil {
+		return fmt.Errorf("clear table group roles: %w", err)
+	}
+	for _, g := range grants {
+		if !groupTableRoleGrantValid(g) {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
+			groupID, g.TableKey, g.RoleID,
+		); err != nil {
+			return fmt.Errorf("insert table group role: %w", err)
+		}
+	}
+	return nil
 }
 
 type TableShareGrant struct {
@@ -201,22 +211,32 @@ func (r *Repository) SetTableShareGrants(ctx context.Context, tableKey string, g
 		return fmt.Errorf("table_key is required")
 	}
 	return r.inTx(ctx, func(tx *sqlx.Tx) error {
-		if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE table_key = ?`, tableKey); err != nil {
-			return fmt.Errorf("clear table share grants: %w", err)
-		}
-		for _, g := range grants {
-			if g.GroupID <= 0 || g.RoleID <= 0 {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx,
-				`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
-				g.GroupID, tableKey, g.RoleID,
-			); err != nil {
-				return fmt.Errorf("insert table share grant: %w", err)
-			}
-		}
-		return nil
+		return replaceTableShareGrants(ctx, tx, tableKey, grants)
 	})
+}
+
+// tableShareGrantValid reports whether the grant names a group and a role.
+func tableShareGrantValid(g TableShareGrant) bool {
+	return g.GroupID > 0 && g.RoleID > 0
+}
+
+// replaceTableShareGrants clears a table's group roles and inserts the valid grants.
+func replaceTableShareGrants(ctx context.Context, tx *sqlx.Tx, tableKey string, grants []TableShareGrant) error {
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rbac_table_group_roles WHERE table_key = ?`, tableKey); err != nil {
+		return fmt.Errorf("clear table share grants: %w", err)
+	}
+	for _, g := range grants {
+		if !tableShareGrantValid(g) {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO rbac_table_group_roles (user_group_id, table_key, role_id) VALUES (?, ?, ?)`,
+			g.GroupID, tableKey, g.RoleID,
+		); err != nil {
+			return fmt.Errorf("insert table share grant: %w", err)
+		}
+	}
+	return nil
 }
 
 func (r *Repository) EnsureEveryoneTableRole(ctx context.Context, tableConfiguration string, roleName string) error {

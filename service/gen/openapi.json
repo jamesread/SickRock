@@ -4488,6 +4488,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/ListNotifiableUsers": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "ListNotifiableUsers",
+        "operationId": "sickrock.SickRock.ListNotifiableUsers",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ListNotifiableUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ListNotifiableUsersResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/ListRbacPermissions": {
       "post": {
         "tags": [
@@ -4947,6 +5005,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.LogoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/NotifyUsers": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "NotifyUsers",
+        "operationId": "sickrock.SickRock.NotifyUsers",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.NotifyUsersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.NotifyUsersResponse"
                 }
               }
             }
@@ -9852,6 +9968,26 @@
         "title": "ListItemsResponse",
         "additionalProperties": false
       },
+      "sickrock.ListNotifiableUsersRequest": {
+        "type": "object",
+        "title": "ListNotifiableUsersRequest",
+        "additionalProperties": false,
+        "description": "User-to-user notifications. The sender may notify users who share an IAM group with them;\n each recipient gets it on their channels subscribed to the user.notified event."
+      },
+      "sickrock.ListNotifiableUsersResponse": {
+        "type": "object",
+        "properties": {
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.NotifiableUser"
+            },
+            "title": "users"
+          }
+        },
+        "title": "ListNotifiableUsersResponse",
+        "additionalProperties": false
+      },
       "sickrock.ListRbacPermissionsRequest": {
         "type": "object",
         "title": "ListRbacPermissionsRequest",
@@ -10166,6 +10302,22 @@
         "title": "NavigationLink",
         "additionalProperties": false
       },
+      "sickrock.NotifiableUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "id",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string",
+            "title": "username"
+          }
+        },
+        "title": "NotifiableUser",
+        "additionalProperties": false
+      },
       "sickrock.NotificationEvent": {
         "type": "object",
         "properties": {
@@ -10190,6 +10342,74 @@
         "title": "NotificationEvent",
         "additionalProperties": false,
         "description": "Notification System"
+      },
+      "sickrock.NotifyUserResult": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "integer",
+            "title": "user_id",
+            "format": "int32"
+          },
+          "username": {
+            "type": "string",
+            "title": "username"
+          },
+          "status": {
+            "type": "string",
+            "title": "status",
+            "description": "\"sent\", \"not_subscribed\" (no active channel subscribed to user.notified) or \"failed\"."
+          },
+          "deliveredChannels": {
+            "type": "integer",
+            "title": "delivered_channels",
+            "format": "int32"
+          }
+        },
+        "title": "NotifyUserResult",
+        "additionalProperties": false
+      },
+      "sickrock.NotifyUsersRequest": {
+        "type": "object",
+        "properties": {
+          "recipientUserIds": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "title": "recipient_user_ids"
+          },
+          "title": {
+            "type": "string",
+            "title": "title"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          },
+          "linkPath": {
+            "type": "string",
+            "title": "link_path",
+            "description": "A path on this site, e.g. /table/meals?view=3; sent as an absolute link."
+          }
+        },
+        "title": "NotifyUsersRequest",
+        "additionalProperties": false
+      },
+      "sickrock.NotifyUsersResponse": {
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.NotifyUserResult"
+            },
+            "title": "results"
+          }
+        },
+        "title": "NotifyUsersResponse",
+        "additionalProperties": false
       },
       "sickrock.OAuthProvider": {
         "type": "object",

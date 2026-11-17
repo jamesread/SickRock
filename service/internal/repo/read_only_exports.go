@@ -1,6 +1,7 @@
 package repo
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -173,9 +174,7 @@ func parseExportWhereJSON(raw string) (map[string]string, error) {
 
 // calendarExportColumnAllowlist returns columns to SELECT for calendar exports.
 func calendarExportColumnAllowlist(freeBusy bool, tableColumns []FieldSpec, pkColumn string) []string {
-	if pkColumn == "" {
-		pkColumn = defaultTableKeyColumn
-	}
+	pkColumn = cmp.Or(pkColumn, defaultTableKeyColumn)
 	// Key and calendar columns come first, in this order, when the table has them.
 	leading := []string{pkColumn, "sr_created", "sr_updated", "calendar_date", "starts", "finishes"}
 	names := presentColumns(leading, tableColumns)
@@ -211,12 +210,7 @@ func (r *Repository) ListItemsForReadOnlyExport(ctx context.Context, exp *ReadOn
 		return nil, err
 	}
 
-	tc, err := r.GetTableConfiguration(ctx, exp.TableConfiguration)
-	if err != nil {
-		return nil, err
-	}
-
-	columns, err := r.ListColumns(ctx, tc)
+	tc, columns, err := r.exportTableAndColumns(ctx, exp)
 	if err != nil {
 		return nil, err
 	}
@@ -228,10 +222,29 @@ func (r *Repository) ListItemsForReadOnlyExport(ctx context.Context, exp *ReadOn
 		return nil, err
 	}
 
+	return applyExportItemFilters(exp, items), nil
+}
+
+// applyExportItemFilters applies an export's client-side post-filters to loaded items.
+func applyExportItemFilters(exp *ReadOnlyCalendarExport, items []Item) []Item {
 	if exp.WeekendsOnly {
-		items = filterItemsWeekendsOnly(items)
+		return filterItemsWeekendsOnly(items)
 	}
-	return items, nil
+	return items
+}
+
+// exportTableAndColumns loads an export's table configuration and its columns.
+func (r *Repository) exportTableAndColumns(ctx context.Context, exp *ReadOnlyCalendarExport) (*TableConfig, []FieldSpec, error) {
+	tc, err := r.GetTableConfiguration(ctx, exp.TableConfiguration)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	columns, err := r.ListColumns(ctx, tc)
+	if err != nil {
+		return nil, nil, err
+	}
+	return tc, columns, nil
 }
 
 // readOnlyExportQuery selects selectCols (or just the key when empty) from the table, filtered by where,
@@ -302,15 +315,17 @@ func isWeekend(dt time.Time) bool {
 	return wd == time.Saturday || wd == time.Sunday
 }
 
-func resolveItemCalendarDate(item Item) (time.Time, bool) {
-	get := func(key string) string {
-		if v, ok := item.Fields[key]; ok && v != nil {
-			return strings.TrimSpace(fmt.Sprint(v))
-		}
-		return ""
+// itemFieldString returns an item field as trimmed text, or "" when it is missing or nil.
+func itemFieldString(item Item, key string) string {
+	if v, ok := item.Fields[key]; ok && v != nil {
+		return strings.TrimSpace(fmt.Sprint(v))
 	}
+	return ""
+}
+
+func resolveItemCalendarDate(item Item) (time.Time, bool) {
 	for _, key := range []string{"calendar_date", "starts", "finishes"} {
-		if s := get(key); s != "" {
+		if s := itemFieldString(item, key); s != "" {
 			if t, ok := parseFlexibleDateTime(s); ok {
 				return t, true
 			}

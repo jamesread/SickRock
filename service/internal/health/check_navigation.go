@@ -25,32 +25,40 @@ func (c NavigationBrokenLinksCheck) Run(ctx context.Context) ([]armhealth.Issue,
 	}
 	issues := make([]armhealth.Issue, 0, len(links))
 	for _, link := range links {
-		var missing []string
-		if link.MissingTable {
-			missing = append(missing, fmt.Sprintf("table configuration #%d", link.TableConfiguration))
-		}
-		if link.MissingDashboard {
-			missing = append(missing, fmt.Sprintf("dashboard #%d", link.DashboardID))
-		}
-		if link.MissingWorkflow {
-			missing = append(missing, fmt.Sprintf("workflow #%d", link.WorkflowID))
-		}
-
-		title := fmt.Sprintf("Navigation link %s points to a deleted %s", navigationLabel(link), strings.Join(missing, " and "))
-		detail := "The link is hidden from the sidebar and from users' bookmarks. Point it at an existing item, or delete it."
-		if len(missing) == 0 {
-			title = fmt.Sprintf("Navigation link %s does not point to anything", navigationLabel(link))
-			detail = "It has no table configuration, dashboard or workflow set, so it never appears in the sidebar. Set a target, or delete it."
-		}
-		issues = append(issues, armhealth.Issue{
-			Key:      fmt.Sprintf("nav:%d", link.ID),
-			Severity: armhealth.SeverityWarning,
-			Title:    title,
-			Detail:   detail,
-			Link:     fmt.Sprintf("/table/table_navigation/%d/edit", link.ID),
-		})
+		issues = append(issues, brokenNavigationIssue(link))
 	}
 	return issues, nil
+}
+
+func missingNavigationTargets(link repo.BrokenNavigationLink) []string {
+	var missing []string
+	if link.MissingTable {
+		missing = append(missing, fmt.Sprintf("table configuration #%d", link.TableConfiguration))
+	}
+	if link.MissingDashboard {
+		missing = append(missing, fmt.Sprintf("dashboard #%d", link.DashboardID))
+	}
+	if link.MissingWorkflow {
+		missing = append(missing, fmt.Sprintf("workflow #%d", link.WorkflowID))
+	}
+	return missing
+}
+
+func brokenNavigationIssue(link repo.BrokenNavigationLink) armhealth.Issue {
+	missing := missingNavigationTargets(link)
+	title := fmt.Sprintf("Navigation link %s points to a deleted %s", navigationLabel(link), strings.Join(missing, " and "))
+	detail := "The link is hidden from the sidebar and from users' bookmarks. Point it at an existing item, or delete it."
+	if len(missing) == 0 {
+		title = fmt.Sprintf("Navigation link %s does not point to anything", navigationLabel(link))
+		detail = "It has no table configuration, dashboard or workflow set, so it never appears in the sidebar. Set a target, or delete it."
+	}
+	return armhealth.Issue{
+		Key:      fmt.Sprintf("nav:%d", link.ID),
+		Severity: armhealth.SeverityWarning,
+		Title:    title,
+		Detail:   detail,
+		Link:     fmt.Sprintf("/table/table_navigation/%d/edit", link.ID),
+	}
 }
 
 func navigationLabel(link repo.BrokenNavigationLink) string {

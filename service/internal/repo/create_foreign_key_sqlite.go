@@ -75,20 +75,28 @@ type sqliteForeignKeyRow struct {
 
 func sqliteColumnDefinition(col sqliteTableInfoRow, tableDDL string) string {
 	parts := []string{quoteSQLiteIdent(col.Name), col.Type}
-	if col.Pk > 0 {
-		if strings.Contains(strings.ToUpper(tableDDL), "AUTOINCREMENT") &&
-			strings.Contains(strings.ToUpper(tableDDL), strings.ToUpper(col.Name)) {
-			parts = append(parts, "PRIMARY KEY AUTOINCREMENT")
-		} else {
-			parts = append(parts, "PRIMARY KEY")
-		}
-	} else if col.NotNull == 1 {
-		parts = append(parts, "NOT NULL")
+	if constraint := sqliteKeyConstraint(col, tableDDL); constraint != "" {
+		parts = append(parts, constraint)
 	}
 	if col.DfltValue != nil && *col.DfltValue != "" {
 		parts = append(parts, sqliteDefaultClause(*col.DfltValue))
 	}
 	return strings.Join(parts, " ")
+}
+
+// sqliteKeyConstraint returns a column's PRIMARY KEY or NOT NULL constraint, or "".
+func sqliteKeyConstraint(col sqliteTableInfoRow, tableDDL string) string {
+	if col.Pk > 0 {
+		if strings.Contains(strings.ToUpper(tableDDL), "AUTOINCREMENT") &&
+			strings.Contains(strings.ToUpper(tableDDL), strings.ToUpper(col.Name)) {
+			return "PRIMARY KEY AUTOINCREMENT"
+		}
+		return "PRIMARY KEY"
+	}
+	if col.NotNull == 1 {
+		return "NOT NULL"
+	}
+	return ""
 }
 
 // sqliteDefaultClause formats a PRAGMA table_info dflt_value for CREATE TABLE.
@@ -221,15 +229,26 @@ type sqliteTableSnapshot struct {
 	indexes []sqliteIndexRow
 }
 
+// loadSQLiteTableDDL returns the CREATE TABLE statement of physicalTable, failing when it does not exist.
+func (r *Repository) loadSQLiteTableDDL(ctx context.Context, physicalTable string) (string, error) {
+	var ddl string
+	if err := r.db.GetContext(ctx, &ddl,
+		"SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", physicalTable); err != nil {
+		return "", fmt.Errorf("load table ddl: %w", err)
+	}
+	if ddl == "" {
+		return "", fmt.Errorf("table %q not found", physicalTable)
+	}
+	return ddl, nil
+}
+
 func (r *Repository) loadSQLiteTableSnapshot(ctx context.Context, physicalTable string) (*sqliteTableSnapshot, error) {
 	snapshot := &sqliteTableSnapshot{}
-	if err := r.db.GetContext(ctx, &snapshot.ddl,
-		"SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", physicalTable); err != nil {
-		return nil, fmt.Errorf("load table ddl: %w", err)
+	ddl, err := r.loadSQLiteTableDDL(ctx, physicalTable)
+	if err != nil {
+		return nil, err
 	}
-	if snapshot.ddl == "" {
-		return nil, fmt.Errorf("table %q not found", physicalTable)
-	}
+	snapshot.ddl = ddl
 
 	if err := r.db.SelectContext(ctx, &snapshot.columns, fmt.Sprintf("PRAGMA table_info(%s)", physicalTable)); err != nil {
 		return nil, fmt.Errorf("table_info: %w", err)

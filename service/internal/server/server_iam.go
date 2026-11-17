@@ -75,22 +75,40 @@ func (s *SickRockServer) CreateUser(ctx context.Context, req *connect.Request[si
 	if err := s.validateNewUser(ctx, username, password); err != nil {
 		return nil, err
 	}
-	hash, err := hashOptionalPassword(password)
+	id, err := s.createUserAccount(ctx, username, password)
 	if err != nil {
 		return nil, err
 	}
+	user, err := s.loadCreatedUser(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&sickrockpb.CreateUserResponse{User: iamUserRow(user)}), nil
+}
+
+// createUserAccount creates an admin-created user, adds it to the Everyone group and returns its id.
+func (s *SickRockServer) createUserAccount(ctx context.Context, username, password string) (int, error) {
+	hash, err := hashOptionalPassword(password)
+	if err != nil {
+		return 0, err
+	}
 	id, err := s.auth.Store.CreateUserAccount(ctx, username, hash, armstore.UserCreatedByAdmin)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("create user: %w", err))
+		return 0, connect.NewError(connect.CodeInternal, fmt.Errorf("create user: %w", err))
 	}
 	if err = s.auth.Store.EnsureUserInEveryoneGroup(ctx, id); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("ensure everyone group: %w", err))
+		return 0, connect.NewError(connect.CodeInternal, fmt.Errorf("ensure everyone group: %w", err))
 	}
+	return id, nil
+}
+
+// loadCreatedUser reloads a just-created user account.
+func (s *SickRockServer) loadCreatedUser(ctx context.Context, id int) (*armstore.UserAccountRow, error) {
 	user, err := s.auth.Store.GetUserByID(ctx, id)
 	if err != nil || user == nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("load created user"))
 	}
-	return connect.NewResponse(&sickrockpb.CreateUserResponse{User: iamUserRow(user)}), nil
+	return user, nil
 }
 
 // validateNewUser checks the username is set and free, and an optional password is long enough.
@@ -151,14 +169,22 @@ func (s *SickRockServer) ChangePassword(ctx context.Context, req *connect.Reques
 	if failure != "" {
 		return connect.NewResponse(&sickrockpb.ChangePasswordResponse{Success: false, Message: failure}), nil
 	}
-	hash, err := iam.HashPassword(newPassword)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("hash password: %w", err))
-	}
-	if err := s.auth.Store.UpdateUserPassword(ctx, au.User.ID, hash); err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("update password: %w", err))
+	if err := s.updatePassword(ctx, au.User.ID, newPassword); err != nil {
+		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.ChangePasswordResponse{Success: true, Message: "password updated"}), nil
+}
+
+// updatePassword hashes newPassword and saves it for the user.
+func (s *SickRockServer) updatePassword(ctx context.Context, userID int, newPassword string) error {
+	hash, err := iam.HashPassword(newPassword)
+	if err != nil {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("hash password: %w", err))
+	}
+	if err := s.auth.Store.UpdateUserPassword(ctx, userID, hash); err != nil {
+		return connect.NewError(connect.CodeInternal, fmt.Errorf("update password: %w", err))
+	}
+	return nil
 }
 
 // checkPasswordChange validates a password change, returning a user-facing failure message when the
@@ -167,6 +193,11 @@ func (s *SickRockServer) checkPasswordChange(ctx context.Context, userID int, cu
 	if problem := newPasswordProblem(current, newPassword); problem != "" {
 		return problem, nil
 	}
+	return s.checkCurrentPassword(ctx, userID, current)
+}
+
+// checkCurrentPassword returns a user-facing failure message when the user is missing or current is wrong.
+func (s *SickRockServer) checkCurrentPassword(ctx context.Context, userID int, current string) (string, error) {
 	user, err := s.auth.Store.GetUserByID(ctx, userID)
 	if err != nil {
 		return "", connect.NewError(connect.CodeInternal, err)
@@ -225,11 +256,8 @@ func (s *SickRockServer) ListRbacRoles(ctx context.Context, _ *connect.Request[s
 
 func (s *SickRockServer) CreateRbacRole(ctx context.Context, req *connect.Request[sickrockpb.CreateRbacRoleRequest]) (*connect.Response[sickrockpb.CreateRbacRoleResponse], error) {
 	name := strings.TrimSpace(req.Msg.GetName())
-	if name == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("name is required"))
-	}
-	if iam.IsSystemRole(name) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("reserved role name"))
+	if err := validateNewRoleName(name); err != nil {
+		return nil, err
 	}
 	permIDs := int32SliceToInt(req.Msg.GetPermissionIds())
 	id, err := s.auth.Store.CreateRBACRole(ctx, name, strings.TrimSpace(req.Msg.GetDescription()), permIDs)
@@ -243,27 +271,56 @@ func (s *SickRockServer) CreateRbacRole(ctx context.Context, req *connect.Reques
 	return connect.NewResponse(&sickrockpb.CreateRbacRoleResponse{Role: rbacRoleRow(role)}), nil
 }
 
-func (s *SickRockServer) UpdateRbacRole(ctx context.Context, req *connect.Request[sickrockpb.UpdateRbacRoleRequest]) (*connect.Response[sickrockpb.UpdateRbacRoleResponse], error) {
-	roleID := int(req.Msg.GetRoleId())
-	if roleID <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("role_id is required"))
-	}
-	name := strings.TrimSpace(req.Msg.GetName())
+// validateNewRoleName rejects an empty name and the reserved system role names.
+func validateNewRoleName(name string) error {
 	if name == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("name is required"))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("name is required"))
 	}
-	if err := s.requireEditableRBACRole(ctx, roleID, name); err != nil {
+	if iam.IsSystemRole(name) {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("reserved role name"))
+	}
+	return nil
+}
+
+// updateRbacRoleInput validates and returns the role id and trimmed name of an update request.
+func updateRbacRoleInput(msg *sickrockpb.UpdateRbacRoleRequest) (int, string, error) {
+	roleID := int(msg.GetRoleId())
+	if roleID <= 0 {
+		return 0, "", connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("role_id is required"))
+	}
+	name := strings.TrimSpace(msg.GetName())
+	if name == "" {
+		return 0, "", connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("name is required"))
+	}
+	return roleID, name, nil
+}
+
+func (s *SickRockServer) UpdateRbacRole(ctx context.Context, req *connect.Request[sickrockpb.UpdateRbacRoleRequest]) (*connect.Response[sickrockpb.UpdateRbacRoleResponse], error) {
+	roleID, name, err := updateRbacRoleInput(req.Msg)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.requireEditableRBACRole(ctx, roleID, name); err != nil {
 		return nil, err
 	}
 	permIDs := int32SliceToInt(req.Msg.GetPermissionIds())
-	if err := s.auth.Store.UpdateRBACRole(ctx, roleID, name, strings.TrimSpace(req.Msg.GetDescription()), permIDs); err != nil {
+	if err = s.auth.Store.UpdateRBACRole(ctx, roleID, name, strings.TrimSpace(req.Msg.GetDescription()), permIDs); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("update role: %w", err))
 	}
-	role, err := s.auth.Store.GetRBACRole(ctx, roleID)
-	if err != nil || role == nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("load updated role"))
+	role, err := s.reloadRBACRole(ctx, roleID, "load updated role")
+	if err != nil {
+		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.UpdateRbacRoleResponse{Role: rbacRoleRow(role)}), nil
+}
+
+// reloadRBACRole fetches a role after a write, failing with Internal and message when it cannot be loaded.
+func (s *SickRockServer) reloadRBACRole(ctx context.Context, roleID int, message string) (*armstore.RBACRoleRow, error) {
+	role, err := s.auth.Store.GetRBACRole(ctx, roleID)
+	if err != nil || role == nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("%s", message))
+	}
+	return role, nil
 }
 
 // requireEditableRBACRole checks the role exists, is not the superuser role, and is not being renamed
@@ -279,10 +336,15 @@ func (s *SickRockServer) requireEditableRBACRole(ctx context.Context, roleID int
 	if existing.Name == rbac.RoleSuperuser {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("cannot modify system role %s", rbac.RoleSuperuser))
 	}
-	if iam.IsSystemRole(newName) && newName != existing.Name {
+	if isRenameToSystemRole(newName, existing.Name) {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("reserved role name"))
 	}
 	return nil
+}
+
+// isRenameToSystemRole reports whether newName is a reserved system role name different from the current name.
+func isRenameToSystemRole(newName, currentName string) bool {
+	return iam.IsSystemRole(newName) && newName != currentName
 }
 
 func (s *SickRockServer) DeleteRbacRole(ctx context.Context, req *connect.Request[sickrockpb.DeleteRbacRoleRequest]) (*connect.Response[sickrockpb.DeleteRbacRoleResponse], error) {
@@ -298,16 +360,33 @@ func (s *SickRockServer) DeleteRbacRole(ctx context.Context, req *connect.Reques
 
 func (s *SickRockServer) GetUserRbacRoles(ctx context.Context, req *connect.Request[sickrockpb.GetUserRbacRolesRequest]) (*connect.Response[sickrockpb.GetUserRbacRolesResponse], error) {
 	userID := int(req.Msg.GetUserId())
-	if userID <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("user_id is required"))
-	}
-	if user, _ := s.auth.Store.GetUserByID(ctx, userID); user == nil {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("user not found"))
+	if err := s.requireExistingUser(ctx, userID); err != nil {
+		return nil, err
 	}
 	roleNames, err := s.auth.Store.GetUserRbacRoleNames(ctx, userID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("get user roles: %w", err))
 	}
+	nameToID, err := s.rbacRoleIDsByName(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return connect.NewResponse(&sickrockpb.GetUserRbacRolesResponse{RoleIds: roleIDsForNames(roleNames, nameToID)}), nil
+}
+
+// requireExistingUser rejects a missing user id and a user that does not exist.
+func (s *SickRockServer) requireExistingUser(ctx context.Context, userID int) error {
+	if userID <= 0 {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("user_id is required"))
+	}
+	if user, _ := s.auth.Store.GetUserByID(ctx, userID); user == nil {
+		return connect.NewError(connect.CodeNotFound, fmt.Errorf("user not found"))
+	}
+	return nil
+}
+
+// rbacRoleIDsByName maps every role name to its id.
+func (s *SickRockServer) rbacRoleIDsByName(ctx context.Context) (map[string]int, error) {
 	allRoles, err := s.auth.Store.ListRBACRoles(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list roles: %w", err))
@@ -316,7 +395,7 @@ func (s *SickRockServer) GetUserRbacRoles(ctx context.Context, req *connect.Requ
 	for _, r := range allRoles {
 		nameToID[r.Name] = r.ID
 	}
-	return connect.NewResponse(&sickrockpb.GetUserRbacRolesResponse{RoleIds: roleIDsForNames(roleNames, nameToID)}), nil
+	return nameToID, nil
 }
 
 // roleIDsForNames maps role names to ids, skipping names with no role.
@@ -332,11 +411,8 @@ func roleIDsForNames(roleNames []string, nameToID map[string]int) []int32 {
 
 func (s *SickRockServer) GetUserEffectiveRoleGrants(ctx context.Context, req *connect.Request[sickrockpb.GetUserEffectiveRoleGrantsRequest]) (*connect.Response[sickrockpb.GetUserEffectiveRoleGrantsResponse], error) {
 	userID := int(req.Msg.GetUserId())
-	if userID <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("user_id is required"))
-	}
-	if user, _ := s.auth.Store.GetUserByID(ctx, userID); user == nil {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("user not found"))
+	if err := s.requireExistingUser(ctx, userID); err != nil {
+		return nil, err
 	}
 	db := s.repo.DB()
 	isSuper, err := rolegrants.UserIsSuperuser(ctx, db, userID)
@@ -347,6 +423,13 @@ func (s *SickRockServer) GetUserEffectiveRoleGrants(ctx context.Context, req *co
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list role grants: %w", err))
 	}
+	return connect.NewResponse(&sickrockpb.GetUserEffectiveRoleGrantsResponse{
+		IsSuperuser: isSuper,
+		Grants:      effectiveRoleGrantsToProto(rows),
+	}), nil
+}
+
+func effectiveRoleGrantsToProto(rows []rolegrants.Row) []*sickrockpb.UserEffectiveRoleGrant {
 	grants := make([]*sickrockpb.UserEffectiveRoleGrant, 0, len(rows))
 	for _, row := range rows {
 		grants = append(grants, &sickrockpb.UserEffectiveRoleGrant{
@@ -356,10 +439,7 @@ func (s *SickRockServer) GetUserEffectiveRoleGrants(ctx context.Context, req *co
 			GroupName: row.GroupName,
 		})
 	}
-	return connect.NewResponse(&sickrockpb.GetUserEffectiveRoleGrantsResponse{
-		IsSuperuser: isSuper,
-		Grants:      grants,
-	}), nil
+	return grants
 }
 
 func (s *SickRockServer) GetUserGroupRbacRoles(ctx context.Context, req *connect.Request[sickrockpb.GetUserGroupRbacRolesRequest]) (*connect.Response[sickrockpb.GetUserGroupRbacRolesResponse], error) {
@@ -417,16 +497,10 @@ func groupTableRoleGrantsToProto(rows []repo.GroupTableRoleGrant) []*sickrockpb.
 	return out
 }
 
-func (s *SickRockServer) SetGroupTableRoleGrants(ctx context.Context, req *connect.Request[sickrockpb.SetGroupTableRoleGrantsRequest]) (*connect.Response[sickrockpb.SetGroupTableRoleGrantsResponse], error) {
-	groupID := int(req.Msg.GetGroupId())
-	if groupID <= 0 {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("group_id is required"))
-	}
-	if g, _ := s.auth.Store.GetUserGroupByID(ctx, groupID); g == nil {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("group not found"))
-	}
-	grants := make([]repo.GroupTableRoleGrant, 0, len(req.Msg.GetGrants()))
-	for _, g := range req.Msg.GetGrants() {
+// groupTableRoleGrantsFromProto converts grants, skipping nil entries and the audit log table.
+func groupTableRoleGrantsFromProto(in []*sickrockpb.GroupTableRoleGrant) []repo.GroupTableRoleGrant {
+	grants := make([]repo.GroupTableRoleGrant, 0, len(in))
+	for _, g := range in {
 		if g == nil {
 			continue
 		}
@@ -439,6 +513,18 @@ func (s *SickRockServer) SetGroupTableRoleGrants(ctx context.Context, req *conne
 			RoleID:   int(g.GetRoleId()),
 		})
 	}
+	return grants
+}
+
+func (s *SickRockServer) SetGroupTableRoleGrants(ctx context.Context, req *connect.Request[sickrockpb.SetGroupTableRoleGrantsRequest]) (*connect.Response[sickrockpb.SetGroupTableRoleGrantsResponse], error) {
+	groupID := int(req.Msg.GetGroupId())
+	if groupID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("group_id is required"))
+	}
+	if g, _ := s.auth.Store.GetUserGroupByID(ctx, groupID); g == nil {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("group not found"))
+	}
+	grants := groupTableRoleGrantsFromProto(req.Msg.GetGrants())
 	if err := s.repo.SetGroupTableRoleGrants(ctx, groupID, grants); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("set table role grants: %w", err))
 	}
@@ -460,6 +546,10 @@ func (s *SickRockServer) ListTableShareGrants(ctx context.Context, req *connect.
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("list table share grants: %w", err))
 	}
+	return connect.NewResponse(&sickrockpb.ListTableShareGrantsResponse{Grants: tableShareGrantsToProto(rows)}), nil
+}
+
+func tableShareGrantsToProto(rows []repo.TableShareGrant) []*sickrockpb.TableShareGrant {
 	out := make([]*sickrockpb.TableShareGrant, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, &sickrockpb.TableShareGrant{
@@ -468,7 +558,22 @@ func (s *SickRockServer) ListTableShareGrants(ctx context.Context, req *connect.
 			RoleId:    toInt32(row.RoleID),
 		})
 	}
-	return connect.NewResponse(&sickrockpb.ListTableShareGrantsResponse{Grants: out}), nil
+	return out
+}
+
+// tableShareGrantsFromProto converts grants, skipping nil entries.
+func tableShareGrantsFromProto(in []*sickrockpb.TableShareGrant) []repo.TableShareGrant {
+	grants := make([]repo.TableShareGrant, 0, len(in))
+	for _, g := range in {
+		if g == nil {
+			continue
+		}
+		grants = append(grants, repo.TableShareGrant{
+			GroupID: int(g.GetGroupId()),
+			RoleID:  int(g.GetRoleId()),
+		})
+	}
+	return grants
 }
 
 func (s *SickRockServer) SetTableShareGrants(ctx context.Context, req *connect.Request[sickrockpb.SetTableShareGrantsRequest]) (*connect.Response[sickrockpb.SetTableShareGrantsResponse], error) {
@@ -482,16 +587,7 @@ func (s *SickRockServer) SetTableShareGrants(ctx context.Context, req *connect.R
 	if _, err := s.repo.GetTableConfiguration(ctx, tableKey); err != nil {
 		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("table not found"))
 	}
-	grants := make([]repo.TableShareGrant, 0, len(req.Msg.GetGrants()))
-	for _, g := range req.Msg.GetGrants() {
-		if g == nil {
-			continue
-		}
-		grants = append(grants, repo.TableShareGrant{
-			GroupID: int(g.GetGroupId()),
-			RoleID:  int(g.GetRoleId()),
-		})
-	}
+	grants := tableShareGrantsFromProto(req.Msg.GetGrants())
 	if err := s.repo.SetTableShareGrants(ctx, tableKey, grants); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("set table share grants: %w", err))
 	}
@@ -573,13 +669,21 @@ func (s *SickRockServer) ListUserGroups(ctx context.Context, _ *connect.Request[
 	return connect.NewResponse(&sickrockpb.ListUserGroupsResponse{Groups: out}), nil
 }
 
-func (s *SickRockServer) CreateUserGroup(ctx context.Context, req *connect.Request[sickrockpb.CreateUserGroupRequest]) (*connect.Response[sickrockpb.CreateUserGroupResponse], error) {
-	name := strings.TrimSpace(req.Msg.GetName())
+// validateNewGroupName rejects an empty name and the reserved system group names.
+func validateNewGroupName(name string) error {
 	if name == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("name is required"))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("name is required"))
 	}
 	if rbac.IsSystemGroup(name) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("reserved group name"))
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("reserved group name"))
+	}
+	return nil
+}
+
+func (s *SickRockServer) CreateUserGroup(ctx context.Context, req *connect.Request[sickrockpb.CreateUserGroupRequest]) (*connect.Response[sickrockpb.CreateUserGroupResponse], error) {
+	name := strings.TrimSpace(req.Msg.GetName())
+	if err := validateNewGroupName(name); err != nil {
+		return nil, err
 	}
 	id, err := s.auth.Store.CreateUserGroup(ctx, name)
 	if err != nil {

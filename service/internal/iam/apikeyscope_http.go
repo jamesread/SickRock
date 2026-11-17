@@ -74,30 +74,54 @@ func AuthorizeAPIKeyProcedure(procedure string, readOnly bool, scope *APIKeyScop
 	if allowUnauthenticatedSet[procedure] {
 		return nil
 	}
-	if scope != nil && sessionOnlyProcedures[procedure] {
-		return connect.NewError(connect.CodePermissionDenied,
-			errors.New("API keys cannot manage API keys or passwords; log in to the web UI"))
+	if err := denySessionOnlyAPIKey(procedure, scope); err != nil {
+		return err
 	}
-	if readOnly && !IsReadProcedure(procedure) {
-		return connect.NewError(connect.CodePermissionDenied,
-			fmt.Errorf("read-only API key cannot call %s", procedure))
+	if err := denyReadOnlyAPIKeyWrite(procedure, readOnly); err != nil {
+		return err
 	}
-	if required := RequiredPermission(procedure); required != "" && !scope.AllowsPermission(required) {
-		return connect.NewError(connect.CodePermissionDenied,
-			fmt.Errorf("this API key does not have the %s permission", required))
+	return denyMissingScopedPermission(procedure, scope)
+}
+
+func denySessionOnlyAPIKey(procedure string, scope *APIKeyScope) error {
+	if scope == nil || !sessionOnlyProcedures[procedure] {
+		return nil
 	}
-	return nil
+	return connect.NewError(connect.CodePermissionDenied,
+		errors.New("API keys cannot manage API keys or passwords; log in to the web UI"))
+}
+
+func denyReadOnlyAPIKeyWrite(procedure string, readOnly bool) error {
+	if !readOnly || IsReadProcedure(procedure) {
+		return nil
+	}
+	return connect.NewError(connect.CodePermissionDenied,
+		fmt.Errorf("read-only API key cannot call %s", procedure))
+}
+
+func denyMissingScopedPermission(procedure string, scope *APIKeyScope) error {
+	required := RequiredPermission(procedure)
+	if required == "" || scope.AllowsPermission(required) {
+		return nil
+	}
+	return connect.NewError(connect.CodePermissionDenied,
+		fmt.Errorf("this API key does not have the %s permission", required))
+}
+
+// lacksRequiredPermission reports whether procedure needs a permission the user does not have.
+func lacksRequiredPermission(au *armlayer.AuthenticatedUser, procedure, required string) bool {
+	return required != "" && !allowUnauthenticatedSet[procedure] && !au.HasPermission(required)
 }
 
 // AuthorizeProcedure checks that the caller may run a Connect procedure: its RBAC permission and,
 // for API keys, the key's read-only flag and scope. It is for callers that reach server methods
 // without going through the Connect handler, such as the MCP server.
 func AuthorizeProcedure(ctx context.Context, procedure string) error {
-	au := armlayer.UserFromContext(ctx)
-	if au == nil || au.User == nil {
+	au, ok := authenticatedAPIKeyUser(ctx)
+	if !ok {
 		return connect.NewError(connect.CodeUnauthenticated, errors.New("authentication required"))
 	}
-	if required := RequiredPermission(procedure); required != "" && !allowUnauthenticatedSet[procedure] && !au.HasPermission(required) {
+	if required := RequiredPermission(procedure); lacksRequiredPermission(au, procedure, required) {
 		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("missing permission %s", required))
 	}
 	return AuthorizeAPIKeyProcedure(procedure, au.ReadOnly, APIKeyScopeFromContext(ctx))
@@ -120,36 +144,83 @@ func withAPIKeyScope(db *sql.DB, next http.Handler) http.Handler {
 
 func applyAPIKeyScope(r *http.Request, db *sql.DB) (context.Context, error) {
 	ctx := r.Context()
-	token, ok := authn.BearerToken(r)
-	token = strings.TrimSpace(token)
-	if !ok || !strings.HasPrefix(token, APIKeyPrefix) {
+	token, au, ok := apiKeyRequestUser(r)
+	if !ok {
 		return ctx, nil
 	}
-	au := armlayer.UserFromContext(ctx)
-	if au == nil || au.User == nil {
-		return ctx, nil // a guest on an allow-listed procedure; the key was not accepted
-	}
-	details, err := LoadAPIKeyDetailsByValue(ctx, db, token)
+	details, err := loadLiveAPIKeyDetails(ctx, db, token)
 	if err != nil {
-		log.WithError(err).Error("load api key scope")
-		return ctx, connect.NewError(connect.CodeInternal, errors.New("could not load API key"))
+		return ctx, err
 	}
 	if details == nil {
 		return ctx, nil
 	}
-	if details.Expired(time.Now()) {
-		return ctx, connect.NewError(connect.CodeUnauthenticated, errors.New("API key has expired"))
-	}
 	scope := details.Scope
-	if procedure, ok := connectProcedure(r); ok {
-		if err := AuthorizeAPIKeyProcedure(procedure, au.ReadOnly, &scope); err != nil {
-			log.WithFields(log.Fields{"user": au.User.Username, "procedure": procedure}).WithError(err).Warn("API key scope denied")
-			return ctx, err
-		}
+	if err := authorizeScopedRequest(r, au, &scope); err != nil {
+		return ctx, err
 	}
-	scope.OwnerIsSuperuser = au.RBAC != nil && au.RBAC.IsSuperuser
+	scope.OwnerIsSuperuser = ownerIsSuperuser(au)
 	au.RBAC = NarrowRBAC(au.RBAC, &scope)
 	return ContextWithAPIKeyScope(ctx, &scope), nil
+}
+
+// apiKeyRequestUser returns the API key token the request carries and its authenticated user. It is false
+// without a key, or for a guest on an allow-listed procedure (the key was not accepted).
+func apiKeyRequestUser(r *http.Request) (string, *armlayer.AuthenticatedUser, bool) {
+	token, ok := bearerAPIKey(r)
+	if !ok {
+		return "", nil, false
+	}
+	au, ok := authenticatedAPIKeyUser(r.Context())
+	return token, au, ok
+}
+
+func ownerIsSuperuser(au *armlayer.AuthenticatedUser) bool {
+	return au.RBAC != nil && au.RBAC.IsSuperuser
+}
+
+func bearerAPIKey(r *http.Request) (string, bool) {
+	token, ok := authn.BearerToken(r)
+	token = strings.TrimSpace(token)
+	if !ok || !strings.HasPrefix(token, APIKeyPrefix) {
+		return "", false
+	}
+	return token, true
+}
+
+func authenticatedAPIKeyUser(ctx context.Context) (*armlayer.AuthenticatedUser, bool) {
+	au := armlayer.UserFromContext(ctx)
+	if au == nil || au.User == nil {
+		return nil, false
+	}
+	return au, true
+}
+
+func loadLiveAPIKeyDetails(ctx context.Context, db *sql.DB, token string) (*APIKeyDetails, error) {
+	details, err := LoadAPIKeyDetailsByValue(ctx, db, token)
+	if err != nil {
+		log.WithError(err).Error("load api key scope")
+		return nil, connect.NewError(connect.CodeInternal, errors.New("could not load API key"))
+	}
+	if details == nil {
+		return nil, nil
+	}
+	if details.Expired(time.Now()) {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("API key has expired"))
+	}
+	return details, nil
+}
+
+func authorizeScopedRequest(r *http.Request, au *armlayer.AuthenticatedUser, scope *APIKeyScope) error {
+	procedure, ok := connectProcedure(r)
+	if !ok {
+		return nil
+	}
+	if err := AuthorizeAPIKeyProcedure(procedure, au.ReadOnly, scope); err != nil {
+		log.WithFields(log.Fields{"user": au.User.Username, "procedure": procedure}).WithError(err).Warn("API key scope denied")
+		return err
+	}
+	return nil
 }
 
 // connectProcedure returns the SickRock Connect procedure a request calls, if it calls one.
@@ -169,8 +240,7 @@ func writeScopeError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	status := http.StatusForbidden
 	msg := err.Error()
-	var cerr *connect.Error
-	if errors.As(err, &cerr) {
+	if cerr, ok := errors.AsType[*connect.Error](err); ok {
 		msg = cerr.Message()
 		switch cerr.Code() {
 		case connect.CodeUnauthenticated:

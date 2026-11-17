@@ -30,35 +30,47 @@ func (s *SickRockServer) CreateAPIKey(ctx context.Context, req *connect.Request[
 	if err != nil {
 		return nil, err
 	}
-
-	name := strings.TrimSpace(req.Msg.GetName())
-	if name == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
-	}
-	expiresAt := req.Msg.GetExpiresAt()
-	if err := validateAPIKeyExpiry(expiresAt); err != nil {
+	name, expiresAt, err := createAPIKeyFields(req.Msg)
+	if err != nil {
 		return nil, err
 	}
-
 	apiKey, keyID, err := s.createStoredAPIKey(ctx, userID, name, req.Msg.GetReadOnly())
 	if err != nil {
 		return nil, err
 	}
 	update := iam.APIKeyUpdate{ExpiresAt: &expiresAt, Scope: apiKeyScopeFromProto(req.Msg.GetScope())}
-	if err := iam.UpdateAPIKey(ctx, s.repo.DB().DB, keyID, userID, update); err != nil {
-		// Never leave behind a key with more access than was asked for.
-		if delErr := s.auth.Store.DeleteAPIKey(ctx, keyID, userID); delErr != nil {
-			log.WithError(delErr).Error("delete API key after failed scope")
-		}
-		return nil, apiKeyUpdateError(err)
+	if err := s.applyNewAPIKeyScope(ctx, keyID, userID, update); err != nil {
+		return nil, err
 	}
-
 	return connect.NewResponse(&sickrockpb.CreateAPIKeyResponse{
 		Success:  true,
 		Message:  "API key created successfully",
 		ApiKey:   apiKey,
 		ApiKeyId: toInt32(keyID),
 	}), nil
+}
+
+func createAPIKeyFields(msg *sickrockpb.CreateAPIKeyRequest) (name string, expiresAt int64, err error) {
+	name = strings.TrimSpace(msg.GetName())
+	if name == "" {
+		return "", 0, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
+	}
+	expiresAt = msg.GetExpiresAt()
+	if err := validateAPIKeyExpiry(expiresAt); err != nil {
+		return "", 0, err
+	}
+	return name, expiresAt, nil
+}
+
+func (s *SickRockServer) applyNewAPIKeyScope(ctx context.Context, keyID, userID int, update iam.APIKeyUpdate) error {
+	if err := iam.UpdateAPIKey(ctx, s.repo.DB().DB, keyID, userID, update); err != nil {
+		// Never leave behind a key with more access than was asked for.
+		if delErr := s.auth.Store.DeleteAPIKey(ctx, keyID, userID); delErr != nil {
+			log.WithError(delErr).Error("delete API key after failed scope")
+		}
+		return apiKeyUpdateError(err)
+	}
+	return nil
 }
 
 func (s *SickRockServer) createStoredAPIKey(ctx context.Context, userID int, name string, readOnly bool) (string, int, error) {
@@ -123,24 +135,10 @@ func (s *SickRockServer) UpdateAPIKey(ctx context.Context, req *connect.Request[
 	if apiKeyID <= 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key ID is required"))
 	}
-
-	update := iam.APIKeyUpdate{Scope: apiKeyScopeFromProto(req.Msg.GetScope())}
-	if req.Msg.Name != nil {
-		name := strings.TrimSpace(req.Msg.GetName())
-		if name == "" {
-			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
-		}
-		update.Name = &name
+	update, err := apiKeyUpdateFromRequest(req.Msg)
+	if err != nil {
+		return nil, err
 	}
-	if req.Msg.ExpiresAt != nil {
-		expiresAt := req.Msg.GetExpiresAt()
-		if err := validateAPIKeyExpiry(expiresAt); err != nil {
-			return nil, err
-		}
-		update.ExpiresAt = &expiresAt
-	}
-	update.ReadOnly = req.Msg.ReadOnly
-
 	if err := iam.UpdateAPIKey(ctx, s.repo.DB().DB, apiKeyID, userID, update); err != nil {
 		return nil, apiKeyUpdateError(err)
 	}
@@ -148,6 +146,38 @@ func (s *SickRockServer) UpdateAPIKey(ctx context.Context, req *connect.Request[
 		Success: true,
 		Message: "API key updated successfully",
 	}), nil
+}
+
+func apiKeyUpdateFromRequest(msg *sickrockpb.UpdateAPIKeyRequest) (iam.APIKeyUpdate, error) {
+	update := iam.APIKeyUpdate{Scope: apiKeyScopeFromProto(msg.GetScope()), ReadOnly: msg.ReadOnly}
+	if err := setAPIKeyUpdateName(&update, msg); err != nil {
+		return update, err
+	}
+	return update, setAPIKeyUpdateExpiry(&update, msg)
+}
+
+func setAPIKeyUpdateName(update *iam.APIKeyUpdate, msg *sickrockpb.UpdateAPIKeyRequest) error {
+	if msg.Name == nil {
+		return nil
+	}
+	name := strings.TrimSpace(msg.GetName())
+	if name == "" {
+		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("API key name is required"))
+	}
+	update.Name = &name
+	return nil
+}
+
+func setAPIKeyUpdateExpiry(update *iam.APIKeyUpdate, msg *sickrockpb.UpdateAPIKeyRequest) error {
+	if msg.ExpiresAt == nil {
+		return nil
+	}
+	expiresAt := msg.GetExpiresAt()
+	if err := validateAPIKeyExpiry(expiresAt); err != nil {
+		return err
+	}
+	update.ExpiresAt = &expiresAt
+	return nil
 }
 
 // DeleteAPIKey permanently deletes an API key.

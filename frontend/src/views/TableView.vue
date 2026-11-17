@@ -91,6 +91,15 @@ onMounted(async () => {
     // Load views using the view manager
     await viewManager.loadTableViews()
 
+    // A ?view=<id> link (e.g. from a notification) opens that view.
+    const linkedViewId = Number(route.query.view)
+    const linkedView = viewManager.tableViews.value.find(view => view.id === linkedViewId)
+    if (linkedView) {
+      viewManager.selectedViewId.value = linkedView.id
+      currentViewType.value = linkedView.viewType || 'table'
+      viewTypeInitialized.value = true
+    }
+
     // Determine the current view type (only if not already set by user)
     if (!viewTypeInitialized.value) {
       const currentView = viewManager.currentView.value

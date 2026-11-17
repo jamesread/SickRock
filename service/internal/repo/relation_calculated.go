@@ -169,18 +169,29 @@ func buildRelationExprScopes(
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	for _, rel := range sourceRelations {
+	referencedScopes, err := r.referencedRelationExprScopes(ctx, sourceRelations)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	scopes = append(scopes, referencedScopes...)
+	return sourceTC, scopes, sourceRelations, nil
+}
+
+// referencedRelationExprScopes returns the expression scope of each relation's referenced table.
+func (r *Repository) referencedRelationExprScopes(ctx context.Context, relations []TableRelation) ([]relationExprScope, error) {
+	var scopes []relationExprScope
+	for _, rel := range relations {
 		refTC, err := r.GetTableConfiguration(ctx, rel.ReferencedTableKey)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
 		scope, err := r.relationExprScopeFor(ctx, refTC)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
 		scopes = append(scopes, scope)
 	}
-	return sourceTC, scopes, sourceRelations, nil
+	return scopes, nil
 }
 
 // relationExprScopeFor returns a table's expression aliases and lower-cased column names.
@@ -213,6 +224,11 @@ func validateCalculatedExpr(expression string, scopes []relationExprScope) error
 			return err
 		}
 	}
+	return trialRunRelationExpr(expression, scopes)
+}
+
+// trialRunRelationExpr type-checks an expression and runs it against a sample environment.
+func trialRunRelationExpr(expression string, scopes []relationExprScope) error {
 	env := sampleRelationExprEnv(scopes)
 	program, err := exprlang.Compile(normalizeRelationExpr(expression), exprlang.Env(env))
 	if err != nil {
@@ -278,14 +294,23 @@ func setExprAliases(env map[string]any, tc *TableConfig, fields map[string]any) 
 	}
 }
 
+// relationSourceID returns the item's foreign key value for rel, and false when it is unset or empty.
+func relationSourceID(item Item, rel TableRelation) (string, bool) {
+	rawID, ok := lookupFieldValue(item.Fields, rel.SourceColumn)
+	if !ok || rawID == nil {
+		return "", false
+	}
+	id := fmt.Sprintf("%v", rawID)
+	return id, id != ""
+}
+
 // referencedExprFields returns the expression fields of the row item references through rel, or an
 // empty map when the foreign key is unset or the row cannot be loaded. Rows are cached in refCache.
 func (r *Repository) referencedExprFields(ctx context.Context, refTC *TableConfig, rel TableRelation, item Item, refCache map[string]map[string]any) map[string]any {
-	rawID, ok := lookupFieldValue(item.Fields, rel.SourceColumn)
-	if !ok || rawID == nil || fmt.Sprintf("%v", rawID) == "" {
+	id, ok := relationSourceID(item, rel)
+	if !ok {
 		return map[string]any{}
 	}
-	id := fmt.Sprintf("%v", rawID)
 	cacheKey := rel.ReferencedTableKey + "\x00" + id
 	if cached, ok := refCache[cacheKey]; ok {
 		return cached
@@ -361,6 +386,11 @@ func (r *Repository) ApplyRelationCalculatedColumns(
 	if err != nil {
 		return nil, err
 	}
+	return r.itemsWithCalculatedColumns(ctx, sourceTC, sourceRelations, columns, items)
+}
+
+// itemsWithCalculatedColumns returns copies of items with each calculated column evaluated.
+func (r *Repository) itemsWithCalculatedColumns(ctx context.Context, sourceTC *TableConfig, sourceRelations []TableRelation, columns []RelationPullThroughField, items []Item) ([]Item, error) {
 	refCache := make(map[string]map[string]any)
 	out := make([]Item, 0, len(items))
 	for _, item := range items {

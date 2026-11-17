@@ -1,9 +1,12 @@
 <script setup lang="ts">
 // Settings for a WeeklyPlan view (stored in the view's layout_json, see utils/weeklyPlan.ts).
-import { computed } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowDown01Icon, ArrowUp01Icon, Delete02Icon } from '@hugeicons/core-free-icons'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
+import CheckGroup from 'picocrank/vue/components/CheckGroup.vue'
+import { createApiClient } from '../stores/api'
+import { useAuthStore } from '../stores/auth'
 import type { ForeignKey } from '../gen/sickrock_pb'
 import { weeklyPlanConfigProblems, type WeeklyPlanConfig, type WeeklyPlanSlot } from '../utils/weeklyPlan'
 
@@ -46,6 +49,21 @@ function moveSlot(index: number, offset: number) {
 function removeSlot(index: number) {
   update({ slots: config.value.slots.filter((_, i) => i !== index) })
 }
+
+// People the Notify dialog ticks by default; listed only for editors who may notify.
+const auth = useAuthStore()
+const notifiableUsers = ref<Array<{ value: number; label: string }>>([])
+const canNotify = computed(() => auth.hasPermission('notifications.send'))
+
+onMounted(async () => {
+  if (!canNotify.value) return
+  try {
+    const res = await createApiClient().listNotifiableUsers({})
+    notifiableUsers.value = res.users.map(user => ({ value: user.id, label: user.username }))
+  } catch (error) {
+    console.warn('Could not load users to notify:', error)
+  }
+})
 
 function addSlot() {
   update({ slots: [...config.value.slots, { label: '', time: '' }] })
@@ -129,6 +147,19 @@ function addSlot() {
       </select>
       <NotificationBlock v-if="problems.length > 0" type="warning" :message="problems.join(' ')" />
     </div>
+
+    <template v-if="canNotify && notifiableUsers.length > 0">
+      <span id="wp-notify-label">Notify by default</span>
+      <div>
+        <CheckGroup
+          :model-value="config.notifyUserIds"
+          :options="notifiableUsers"
+          aria-labelledby="wp-notify-label"
+          @update:model-value="(ids: number[]) => update({ notifyUserIds: ids })"
+        />
+        <small>Ticked when someone uses <strong>Notify…</strong> to say the week's plan is ready.</small>
+      </div>
+    </template>
   </div>
 </template>
 

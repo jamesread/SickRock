@@ -25,20 +25,22 @@ func loadOAuthProvidersFromEnv() []*sickrockpb.OAuthProvider {
 	}
 	out := make([]*sickrockpb.OAuthProvider, 0, len(parsed))
 	for _, p := range parsed {
-		id := strings.TrimSpace(p.ID)
-		label := strings.TrimSpace(p.Label)
-		authURL := strings.TrimSpace(p.AuthURL)
-		if id == "" || authURL == "" {
-			continue
+		if provider := oauthProviderFromEnv(p); provider != nil {
+			out = append(out, provider)
 		}
-		if label == "" {
-			label = id
-		}
-		out = append(out, &sickrockpb.OAuthProvider{
-			Id:      id,
-			Label:   label,
-			AuthUrl: authURL,
-		})
 	}
 	return out
+}
+
+func oauthProviderFromEnv(p oauthProviderEnv) *sickrockpb.OAuthProvider {
+	id := strings.TrimSpace(p.ID)
+	authURL := strings.TrimSpace(p.AuthURL)
+	if id == "" || authURL == "" {
+		return nil
+	}
+	label := strings.TrimSpace(p.Label)
+	if label == "" {
+		label = id
+	}
+	return &sickrockpb.OAuthProvider{Id: id, Label: label, AuthUrl: authURL}
 }

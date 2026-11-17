@@ -22,8 +22,8 @@ type TitleFunc func(ctx context.Context) (string, error)
 
 // Handler serves the manifest, built from TemplateFile in FrontendDir with the title from Title.
 type Handler struct {
-	FrontendDir string
 	Title       TitleFunc
+	FrontendDir string
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -33,17 +33,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	template, err := ReadTemplate(h.FrontendDir)
-	if err != nil {
-		log.WithError(err).Error("Cannot read the web app manifest template")
-		http.Error(w, "manifest unavailable", http.StatusInternalServerError)
-		return
-	}
-
-	body, err := Build(template, h.title(r.Context()))
-	if err != nil {
-		log.WithError(err).Error("Cannot build the web app manifest")
-		http.Error(w, "manifest unavailable", http.StatusInternalServerError)
+	body, ok := h.manifestBody(w, r)
+	if !ok {
 		return
 	}
 
@@ -54,8 +45,27 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	header.Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(http.StatusOK)
 	if r.Method == http.MethodGet {
-		_, _ = w.Write(body)
+		// Body is application/manifest+json produced by Build (encoding/json); not HTML.
+		_, _ = w.Write(body) //nolint:gosec // G705: JSON we built; Content-Type is application/manifest+json with nosniff
 	}
+}
+
+// manifestBody builds the manifest, replying with a 500 and returning false when it cannot.
+func (h Handler) manifestBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
+	template, err := ReadTemplate(h.FrontendDir)
+	if err != nil {
+		log.WithError(err).Error("Cannot read the web app manifest template")
+		http.Error(w, "manifest unavailable", http.StatusInternalServerError)
+		return nil, false
+	}
+
+	body, err := Build(template, h.title(r.Context()))
+	if err != nil {
+		log.WithError(err).Error("Cannot build the web app manifest")
+		http.Error(w, "manifest unavailable", http.StatusInternalServerError)
+		return nil, false
+	}
+	return body, true
 }
 
 func (h Handler) title(ctx context.Context) string {
@@ -75,11 +85,11 @@ func (h Handler) title(ctx context.Context) string {
 // ReadTemplate reads the manifest template from a built frontend (frontendDir) or, for a
 // development server pointed at the frontend sources, from frontendDir/public.
 func ReadTemplate(frontendDir string) ([]byte, error) {
-	template, err := os.ReadFile(filepath.Join(frontendDir, TemplateFile))
+	template, err := readFrontendFile(frontendDir, TemplateFile)
 	if err == nil {
 		return template, nil
 	}
-	if fromSources, srcErr := os.ReadFile(filepath.Join(frontendDir, "public", TemplateFile)); srcErr == nil {
+	if fromSources, srcErr := readFrontendFile(frontendDir, filepath.Join("public", TemplateFile)); srcErr == nil {
 		return fromSources, nil
 	}
 	return nil, err
@@ -89,19 +99,9 @@ func ReadTemplate(frontendDir string) ([]byte, error) {
 // installable PWA: the manifest template, the files it references, the manifest link in
 // index.html, the service worker and the offline page.
 func FrontendProblems(frontendDir string) []string {
-	var problems []string
+	problems := templateProblems(frontendDir)
 
-	template, err := os.ReadFile(filepath.Join(frontendDir, TemplateFile))
-	if err != nil {
-		problems = append(problems, TemplateFile+" is missing from the frontend")
-	} else if manifest, err := Build(template, DefaultTitle); err != nil {
-		problems = append(problems, err.Error())
-	} else {
-		problems = append(problems, Validate(manifest)...)
-		problems = append(problems, CheckFiles(manifest, frontendDir)...)
-	}
-
-	index, err := os.ReadFile(filepath.Join(frontendDir, "index.html"))
+	index, err := readFrontendFile(frontendDir, "index.html")
 	switch {
 	case err != nil:
 		problems = append(problems, "index.html is missing from the frontend")
@@ -117,15 +117,38 @@ func FrontendProblems(frontendDir string) []string {
 	return problems
 }
 
+// templateProblems builds the manifest from the template in frontendDir and returns
+// what is wrong with it or the files it references.
+func templateProblems(frontendDir string) []string {
+	template, err := readFrontendFile(frontendDir, TemplateFile)
+	if err != nil {
+		return []string{TemplateFile + " is missing from the frontend"}
+	}
+	manifest, err := Build(template, DefaultTitle)
+	if err != nil {
+		return []string{err.Error()}
+	}
+	return append(Validate(manifest), CheckFiles(manifest, frontendDir)...)
+}
+
+// readFrontendFile reads name (a path relative to frontendDir) without leaving frontendDir.
+func readFrontendFile(frontendDir, name string) ([]byte, error) {
+	root, err := os.OpenRoot(frontendDir)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
+	return root.ReadFile(name)
+}
+
 // HasManifestLink reports whether an HTML document links to the served manifest.
 func HasManifestLink(html string) bool {
 	html = htmlComment.ReplaceAllString(html, "")
 	for _, tag := range strings.Split(html, "<link")[1:] {
-		end := strings.Index(tag, ">")
-		if end < 0 {
+		attrs, _, closed := strings.Cut(tag, ">")
+		if !closed {
 			continue
 		}
-		attrs := tag[:end]
 		if strings.Contains(attrs, `rel="manifest"`) && strings.Contains(attrs, `href="`+Path+`"`) {
 			return true
 		}
