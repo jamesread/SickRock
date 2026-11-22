@@ -37,6 +37,7 @@ const Dashboard = () => import('./views/Dashboard.vue')
 const WorkflowView = () => import('./views/WorkflowView.vue')
 const HealthView = () => import('./views/HealthView.vue')
 const UserPreferences = () => import('./views/UserPreferences.vue')
+const UserUiUsage = () => import('./views/UserUiUsage.vue')
 const UserControlPanel = () => import('./views/UserControlPanel.vue')
 const UserBookmarks = () => import('./views/UserBookmarks.vue')
 const UserAPIKeys = () => import('./views/UserAPIKeys.vue')
@@ -170,6 +171,12 @@ const router = createRouter({
       path: '/user-preferences',
       name: 'user-preferences',
       component: UserPreferences,
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/user-ui-usage',
+      name: 'user-ui-usage',
+      component: UserUiUsage,
       meta: { requiresAuth: true }
     },
     {
