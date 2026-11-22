@@ -63,10 +63,7 @@ func applyMarkdownRules(rules []*repo.ConditionalFormattingRule, fields map[stri
 		if rule.FormatType != "markdown" || !rule.IsActive {
 			continue
 		}
-		fieldValue := ""
-		if val := fields[rule.ColumnName]; val != nil {
-			fieldValue = fmt.Sprintf("%v", val)
-		}
+		fieldValue := fieldValueString(fields, rule.ColumnName)
 		shouldApply := markdownRuleApplies(rule, fieldValue)
 		log.WithFields(log.Fields{
 			"ruleID":         rule.ID,
@@ -79,6 +76,14 @@ func applyMarkdownRules(rules []*repo.ConditionalFormattingRule, fields map[stri
 			additionalFields[rule.ColumnName+"Markdown"] = renderMarkdown(joinNonEmpty(fieldValue, rule.FormatValue))
 		}
 	}
+}
+
+// fieldValueString returns the column's value formatted with %v, or "" when it is missing or nil.
+func fieldValueString(fields map[string]any, column string) string {
+	if val := fields[column]; val != nil {
+		return fmt.Sprintf("%v", val)
+	}
+	return ""
 }
 
 // joinNonEmpty appends suffix to value as a new paragraph when suffix is set.
@@ -97,12 +102,18 @@ func markdownRuleApplies(rule *repo.ConditionalFormattingRule, fieldValue string
 		return fieldValue == rule.ConditionValue
 	case "contains":
 		return strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
-	case "greater_than":
-		return compareNumeric(fieldValue, rule.ConditionValue, func(a, b float64) bool { return a > b })
-	case "less_than":
-		return compareNumeric(fieldValue, rule.ConditionValue, func(a, b float64) bool { return a < b })
+	case "greater_than", "less_than":
+		return numericRuleApplies(rule, fieldValue)
 	}
 	return false
+}
+
+// numericRuleApplies evaluates a greater_than or less_than rule.
+func numericRuleApplies(rule *repo.ConditionalFormattingRule, fieldValue string) bool {
+	if rule.ConditionType == "greater_than" {
+		return compareNumeric(fieldValue, rule.ConditionValue, func(a, b float64) bool { return a > b })
+	}
+	return compareNumeric(fieldValue, rule.ConditionValue, func(a, b float64) bool { return a < b })
 }
 
 // compareNumeric parses both values as floats and applies cmp; unparsable values never match.

@@ -16,6 +16,8 @@ const (
 	PermissionAPIKeysUse      = "apikeys.use"
 	PermissionDeviceCodeClaim = "devicecode.claim"
 	PermissionAuditView       = "audit.view"
+	// PermissionNotificationsSend lets a user notify users who share a group with them.
+	PermissionNotificationsSend = "notifications.send"
 
 	RoleViewer  = "viewer"
 	RoleAuditor = "auditor"

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 	"github.com/mark3labs/mcp-go/mcp"
@@ -126,6 +127,26 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		})
 	})
 
+	mcpServer.AddTool(mcp.NewTool("sickrock_list_notifiable_users",
+		mcp.WithDescription("List the users you may notify with sickrock_notify_users: those who share a user group with you."),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return authorized(ctx, sickrockpbconnect.SickRockListNotifiableUsersProcedure, func() (*mcp.CallToolResult, error) {
+			return handleListNotifiableUsers(ctx, srv)
+		})
+	})
+
+	mcpServer.AddTool(mcp.NewTool("sickrock_notify_users",
+		mcp.WithDescription("Notify other users (e.g. that a weekly plan is ready). Each recipient gets it on the notification channels they subscribed to \"Notified by another user\"; the result says, per recipient, sent, not_subscribed or failed."),
+		mcp.WithString("recipients", mcp.Required(), mcp.Description("Comma-separated usernames, from sickrock_list_notifiable_users")),
+		mcp.WithString("title", mcp.Required(), mcp.Description("Short title, up to 200 characters")),
+		mcp.WithString("message", mcp.Description("Optional message, up to 2000 characters")),
+		mcp.WithString("link_path", mcp.Description("Optional path on this site to link to, e.g. /table/meals?view=3")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return authorized(ctx, sickrockpbconnect.SickRockNotifyUsersProcedure, func() (*mcp.CallToolResult, error) {
+			return handleNotifyUsers(ctx, srv, req)
+		})
+	})
+
 	return server.NewStreamableHTTPServer(
 		mcpServer,
 		server.WithEndpointPath("/mcp"),
@@ -209,13 +230,9 @@ func handleListItems(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Ca
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
-	r := &sickrockpb.ListItemsRequest{TcName: tcName}
-	if w := req.GetString("where", ""); w != "" {
-		where, errResult, parseErr := stringMapArg(w, "where")
-		if parseErr != nil {
-			return errResult, parseErr
-		}
-		r.Where = where
+	r, errResult, parseErr := listItemsRequest(req, tcName)
+	if parseErr != nil {
+		return errResult, parseErr
 	}
 	res, err := srv.ListItems(ctx, connect.NewRequest(r))
 	if err != nil {
@@ -225,6 +242,20 @@ func handleListItems(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.Ca
 		return jsonResult(map[string]any{"items": res.Msg.GetItems()})
 	}
 	return itemsWithTickState(ctx, srv, tcName, res.Msg.GetItems())
+}
+
+// listItemsRequest builds the ListItems request, parsing the optional where argument. On invalid JSON it
+// also returns the tool error result to send.
+func listItemsRequest(req mcp.CallToolRequest, tcName string) (*sickrockpb.ListItemsRequest, *mcp.CallToolResult, error) {
+	r := &sickrockpb.ListItemsRequest{TcName: tcName}
+	if w := req.GetString("where", ""); w != "" {
+		where, errResult, parseErr := stringMapArg(w, "where")
+		if parseErr != nil {
+			return nil, errResult, parseErr
+		}
+		r.Where = where
+	}
+	return r, nil, nil
 }
 
 // itemsWithTickState returns the items annotated with whether each is ticked off in the table's tick list.
@@ -337,8 +368,7 @@ func handleDeleteItem(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.C
 func authorized(ctx context.Context, procedure string, run func() (*mcp.CallToolResult, error)) (*mcp.CallToolResult, error) {
 	if err := iam.AuthorizeProcedure(ctx, procedure); err != nil {
 		msg := err.Error()
-		var cerr *connect.Error
-		if errors.As(err, &cerr) {
+		if cerr, ok := errors.AsType[*connect.Error](err); ok {
 			msg = cerr.Message()
 		}
 		return mcp.NewToolResultError("permission denied: " + msg), nil
@@ -356,4 +386,71 @@ func requirePageAndID(req mcp.CallToolRequest) (string, string, error) {
 		return "", "", err
 	}
 	return pageID, id, nil
+}
+
+func handleListNotifiableUsers(ctx context.Context, srv *srvpkg.SickRockServer) (*mcp.CallToolResult, error) {
+	res, err := srv.ListNotifiableUsers(ctx, connect.NewRequest(&sickrockpb.ListNotifiableUsersRequest{}))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return jsonResult(res.Msg.GetUsers())
+}
+
+func handleNotifyUsers(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	recipients, err := req.RequireString("recipients")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	title, err := req.RequireString("title")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	ids, errResult := resolveNotifyRecipients(ctx, srv, recipients)
+	if errResult != nil {
+		return errResult, nil
+	}
+	res, err := srv.NotifyUsers(ctx, connect.NewRequest(&sickrockpb.NotifyUsersRequest{
+		RecipientUserIds: ids,
+		Title:            title,
+		Message:          req.GetString("message", ""),
+		LinkPath:         req.GetString("link_path", ""),
+	}))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return jsonResult(res.Msg.GetResults())
+}
+
+// resolveNotifyRecipients resolves usernames to ids among the users the caller may notify, or returns the
+// tool error result to send.
+func resolveNotifyRecipients(ctx context.Context, srv *srvpkg.SickRockServer, recipients string) ([]int32, *mcp.CallToolResult) {
+	users, err := srv.ListNotifiableUsers(ctx, connect.NewRequest(&sickrockpb.ListNotifiableUsersRequest{}))
+	if err != nil {
+		return nil, mcp.NewToolResultError(err.Error())
+	}
+	ids, unknown := notifyRecipientIDs(recipients, users.Msg.GetUsers())
+	if len(unknown) > 0 {
+		return nil, mcp.NewToolResultError("you cannot notify: " + strings.Join(unknown, ", ") + " (see sickrock_list_notifiable_users)")
+	}
+	return ids, nil
+}
+
+// notifyRecipientIDs resolves comma-separated usernames (case-insensitively) to user ids.
+func notifyRecipientIDs(recipients string, users []*sickrockpb.NotifiableUser) (ids []int32, unknown []string) {
+	byName := make(map[string]int32, len(users))
+	for _, u := range users {
+		byName[strings.ToLower(u.GetUsername())] = u.GetId()
+	}
+	for name := range strings.SplitSeq(recipients, ",") {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			continue
+		}
+		if id, ok := byName[strings.ToLower(name)]; ok {
+			ids = append(ids, id)
+		} else {
+			unknown = append(unknown, name)
+		}
+	}
+	return ids, unknown
 }

@@ -7,7 +7,7 @@ import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import { SickRock } from '../gen/sickrock_pb'
 import { useIamUsers } from '../composables/useIamUsers'
-import { booleanFromStored, booleanToStored, isBarcodeFieldType, isBooleanFieldType, isIconFieldType, isImageFieldType, isUserRefFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
+import { booleanFromStored, booleanToStored, isBarcodeFieldType, isBooleanFieldType, isIconFieldType, isImageFieldType, isTrueBooleanValue, isUserRefFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
 import IconPickerField from './IconPickerField.vue'
 import ImageField from './ImageField.vue'
 import BarcodeField from './BarcodeField.vue'
@@ -651,6 +651,11 @@ async function submit() {
   for (const f of props.fieldDefs) {
     if (f.name === 'id') continue
     const v = form.value[f.name]
+    if (isBooleanFieldType(f.type)) {
+      // An unticked box is false, so it is sent rather than left to the column default.
+      payload[f.name] = isTrueBooleanValue(v) ? '1' : '0'
+      continue
+    }
     if (v == null || v === '') {
       if (shouldSendClearedFieldOnEdit(f.name, v)) {
         payload[f.name] = clearedFieldPayloadValue(f)

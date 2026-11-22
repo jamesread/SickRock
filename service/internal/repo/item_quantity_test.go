@@ -65,11 +65,11 @@ func TestAddItemQuantity(t *testing.T) {
 	}
 
 	var rows int
-	if err := db.Get(&rows, "SELECT COUNT(*) FROM inventory"); err != nil || rows != 3 {
+	if err = db.Get(&rows, "SELECT COUNT(*) FROM inventory"); err != nil || rows != 3 {
 		t.Fatalf("rows = %d, %v; want 3", rows, err)
 	}
 	var nullQty int
-	if err := db.Get(&nullQty, "SELECT quantity FROM inventory WHERE expirydate IS NULL"); err != nil || nullQty != 2 {
+	if err = db.Get(&nullQty, "SELECT quantity FROM inventory WHERE expirydate IS NULL"); err != nil || nullQty != 2 {
 		t.Fatalf("NULL-expiry quantity = %d, %v; want 2", nullQty, err)
 	}
 

@@ -29,7 +29,15 @@ import type { createApiClient } from '../stores/api'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
 import { useTableAccess } from '../composables/useTableAccess'
 import { useIamUsers } from '../composables/useIamUsers'
-import { findFieldDef, hasStoredUserRefValue, isImageFieldType, isUserRefColumn as columnIsUserRef, isUserRefFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
+import {
+  findFieldDef,
+  hasStoredUserRefValue,
+  isBooleanFieldType,
+  isImageFieldType,
+  isUserRefColumn as columnIsUserRef,
+  isUserRefFieldType,
+  YES_NO_OPTIONS,
+} from '../utils/fieldTypes'
 import { appTitle, formatDocumentTitle } from '../appTitle'
 import { rowEditActionLabel, rowNamePluralLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
 import { getItemNameFieldValue, itemViewSectionTitle } from '../utils/itemViewSectionTitle'
@@ -239,8 +247,7 @@ function isUserRefColumn(column: string): boolean {
 }
 
 function isTinyintColumn(column: string): boolean {
-  const type = fieldType(column).toLowerCase()
-  return type.startsWith('tinyint') || type === 'bool' || type === 'boolean'
+  return isBooleanFieldType(fieldType(column))
 }
 
 function isDatetimeColumn(column: string): boolean {

@@ -15,11 +15,10 @@ const CookieName = "sickrock-sid"
 
 // AuthLayer wraps armature-iam Connect auth for SickRock.
 type AuthLayer struct {
-	*armlayer.Layer
 	Store store.Store
-	jwt   jwtSources
-	// db holds the API key scope tables; nil (tests only) skips API key scopes.
-	db *sql.DB
+	*armlayer.Layer
+	db  *sql.DB
+	jwt jwtSources
 }
 
 // NewAuthLayer wires armature-iam Connect auth. authYAML is the config.yaml "auth"

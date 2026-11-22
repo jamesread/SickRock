@@ -28,6 +28,8 @@ export type WeeklyPlanConfig = {
   slots: WeeklyPlanSlot[]
   /** 0 = Sunday, 1 = Monday, ... */
   weekStartsOn: number
+  /** Users pre-ticked in the Notify dialog. */
+  notifyUserIds: number[]
 }
 
 export const DEFAULT_WEEKLY_PLAN_SLOTS: WeeklyPlanSlot[] = [
@@ -54,6 +56,7 @@ export function defaultWeeklyPlanConfig(): WeeklyPlanConfig {
     itemColumn: '',
     slots: DEFAULT_WEEKLY_PLAN_SLOTS.map(slot => ({ ...slot })),
     weekStartsOn: 1,
+    notifyUserIds: [],
   }
 }
 
@@ -78,7 +81,15 @@ export function parseWeeklyPlanConfig(layoutJson: string | undefined): WeeklyPla
   if (Number.isInteger(weekStartsOn) && weekStartsOn >= 0 && weekStartsOn <= 6) {
     config.weekStartsOn = weekStartsOn
   }
+  config.notifyUserIds = cleanUserIds(stored.notifyUserIds)
   return config
+}
+
+/** Positive integer user ids, once each, in order; anything else is dropped. */
+function cleanUserIds(value: unknown): number[] {
+  if (!Array.isArray(value)) return []
+  const ids = value.map(Number).filter(id => Number.isInteger(id) && id > 0)
+  return [...new Set(ids)]
 }
 
 /** Returns layoutJson with its weeklyPlan settings replaced, keeping every other key. */
@@ -92,6 +103,7 @@ export function withWeeklyPlanConfig(layoutJson: string | undefined, config: Wee
       .map(cleanSlot)
       .filter(slot => slot.label !== ''),
     weekStartsOn: config.weekStartsOn,
+    notifyUserIds: cleanUserIds(config.notifyUserIds),
   }
   return JSON.stringify(layout)
 }
@@ -152,6 +164,31 @@ export function addDays(date: Date, days: number): Date {
 export function dayKey(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+}
+
+/** The week start a ?week=YYYY-MM-DD link asks for, or null when it is missing or not a date. */
+export function weekFromQuery(value: unknown, weekStartsOn: number): Date | null {
+  if (typeof value !== 'string') return null
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  if (Number.isNaN(date.getTime()) || dayKey(date) !== value) return null
+  return startOfWeek(date, weekStartsOn)
+}
+
+/** The Notify dialog's title for a week, e.g. "Meal plan for 2 Nov – 8 Nov is ready". */
+export function notifyTitle(viewName: string, weekStart: Date, locale?: string): string {
+  const short: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' }
+  const range = `${weekStart.toLocaleDateString(locale, short)} – ${addDays(weekStart, 6).toLocaleDateString(locale, short)}`
+  return `${viewName.trim() || 'Weekly plan'} for ${range} is ready`
+}
+
+/** Link to a week of a weekly plan view. */
+export function notifyLinkPath(tableId: string, viewId: number | undefined, weekStart: Date): string {
+  const query = new URLSearchParams()
+  if (viewId && viewId > 0) query.set('view', String(viewId))
+  query.set('week', dayKey(weekStart))
+  return `/table/${encodeURIComponent(tableId)}?${query.toString()}`
 }
 
 function minutesOf(time: string): number {

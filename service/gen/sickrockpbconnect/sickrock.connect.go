@@ -320,6 +320,11 @@ const (
 	// SickRockDeleteUserNotificationSubscriptionProcedure is the fully-qualified name of the SickRock's
 	// DeleteUserNotificationSubscription RPC.
 	SickRockDeleteUserNotificationSubscriptionProcedure = "/sickrock.SickRock/DeleteUserNotificationSubscription"
+	// SickRockListNotifiableUsersProcedure is the fully-qualified name of the SickRock's
+	// ListNotifiableUsers RPC.
+	SickRockListNotifiableUsersProcedure = "/sickrock.SickRock/ListNotifiableUsers"
+	// SickRockNotifyUsersProcedure is the fully-qualified name of the SickRock's NotifyUsers RPC.
+	SickRockNotifyUsersProcedure = "/sickrock.SickRock/NotifyUsers"
 	// SickRockGetTickListStateProcedure is the fully-qualified name of the SickRock's GetTickListState
 	// RPC.
 	SickRockGetTickListStateProcedure = "/sickrock.SickRock/GetTickListState"
@@ -462,6 +467,8 @@ type SickRockClient interface {
 	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
 	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
 	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
+	ListNotifiableUsers(context.Context, *connect.Request[proto.ListNotifiableUsersRequest]) (*connect.Response[proto.ListNotifiableUsersResponse], error)
+	NotifyUsers(context.Context, *connect.Request[proto.NotifyUsersRequest]) (*connect.Response[proto.NotifyUsersResponse], error)
 	// Tick list state (shared across clients)
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
@@ -1121,6 +1128,18 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationSubscription")),
 			connect.WithClientOptions(opts...),
 		),
+		listNotifiableUsers: connect.NewClient[proto.ListNotifiableUsersRequest, proto.ListNotifiableUsersResponse](
+			httpClient,
+			baseURL+SickRockListNotifiableUsersProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListNotifiableUsers")),
+			connect.WithClientOptions(opts...),
+		),
+		notifyUsers: connect.NewClient[proto.NotifyUsersRequest, proto.NotifyUsersResponse](
+			httpClient,
+			baseURL+SickRockNotifyUsersProcedure,
+			connect.WithSchema(sickRockMethods.ByName("NotifyUsers")),
+			connect.WithClientOptions(opts...),
+		),
 		getTickListState: connect.NewClient[proto.GetTickListStateRequest, proto.GetTickListStateResponse](
 			httpClient,
 			baseURL+SickRockGetTickListStateProcedure,
@@ -1251,6 +1270,8 @@ type sickRockClient struct {
 	getUserNotificationSubscriptions   *connect.Client[proto.GetUserNotificationSubscriptionsRequest, proto.GetUserNotificationSubscriptionsResponse]
 	createUserNotificationSubscription *connect.Client[proto.CreateUserNotificationSubscriptionRequest, proto.CreateUserNotificationSubscriptionResponse]
 	deleteUserNotificationSubscription *connect.Client[proto.DeleteUserNotificationSubscriptionRequest, proto.DeleteUserNotificationSubscriptionResponse]
+	listNotifiableUsers                *connect.Client[proto.ListNotifiableUsersRequest, proto.ListNotifiableUsersResponse]
+	notifyUsers                        *connect.Client[proto.NotifyUsersRequest, proto.NotifyUsersResponse]
 	getTickListState                   *connect.Client[proto.GetTickListStateRequest, proto.GetTickListStateResponse]
 	setTickListCompletion              *connect.Client[proto.SetTickListCompletionRequest, proto.SetTickListCompletionResponse]
 	clearTickListState                 *connect.Client[proto.ClearTickListStateRequest, proto.ClearTickListStateResponse]
@@ -1791,6 +1812,16 @@ func (c *sickRockClient) DeleteUserNotificationSubscription(ctx context.Context,
 	return c.deleteUserNotificationSubscription.CallUnary(ctx, req)
 }
 
+// ListNotifiableUsers calls sickrock.SickRock.ListNotifiableUsers.
+func (c *sickRockClient) ListNotifiableUsers(ctx context.Context, req *connect.Request[proto.ListNotifiableUsersRequest]) (*connect.Response[proto.ListNotifiableUsersResponse], error) {
+	return c.listNotifiableUsers.CallUnary(ctx, req)
+}
+
+// NotifyUsers calls sickrock.SickRock.NotifyUsers.
+func (c *sickRockClient) NotifyUsers(ctx context.Context, req *connect.Request[proto.NotifyUsersRequest]) (*connect.Response[proto.NotifyUsersResponse], error) {
+	return c.notifyUsers.CallUnary(ctx, req)
+}
+
 // GetTickListState calls sickrock.SickRock.GetTickListState.
 func (c *sickRockClient) GetTickListState(ctx context.Context, req *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error) {
 	return c.getTickListState.CallUnary(ctx, req)
@@ -1937,6 +1968,8 @@ type SickRockHandler interface {
 	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
 	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
 	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
+	ListNotifiableUsers(context.Context, *connect.Request[proto.ListNotifiableUsersRequest]) (*connect.Response[proto.ListNotifiableUsersResponse], error)
+	NotifyUsers(context.Context, *connect.Request[proto.NotifyUsersRequest]) (*connect.Response[proto.NotifyUsersResponse], error)
 	// Tick list state (shared across clients)
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
@@ -2592,6 +2625,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationSubscription")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockListNotifiableUsersHandler := connect.NewUnaryHandler(
+		SickRockListNotifiableUsersProcedure,
+		svc.ListNotifiableUsers,
+		connect.WithSchema(sickRockMethods.ByName("ListNotifiableUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockNotifyUsersHandler := connect.NewUnaryHandler(
+		SickRockNotifyUsersProcedure,
+		svc.NotifyUsers,
+		connect.WithSchema(sickRockMethods.ByName("NotifyUsers")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockGetTickListStateHandler := connect.NewUnaryHandler(
 		SickRockGetTickListStateProcedure,
 		svc.GetTickListState,
@@ -2826,6 +2871,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockCreateUserNotificationSubscriptionHandler.ServeHTTP(w, r)
 		case SickRockDeleteUserNotificationSubscriptionProcedure:
 			sickRockDeleteUserNotificationSubscriptionHandler.ServeHTTP(w, r)
+		case SickRockListNotifiableUsersProcedure:
+			sickRockListNotifiableUsersHandler.ServeHTTP(w, r)
+		case SickRockNotifyUsersProcedure:
+			sickRockNotifyUsersHandler.ServeHTTP(w, r)
 		case SickRockGetTickListStateProcedure:
 			sickRockGetTickListStateHandler.ServeHTTP(w, r)
 		case SickRockSetTickListCompletionProcedure:
@@ -3267,6 +3316,14 @@ func (UnimplementedSickRockHandler) CreateUserNotificationSubscription(context.C
 
 func (UnimplementedSickRockHandler) DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserNotificationSubscription is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListNotifiableUsers(context.Context, *connect.Request[proto.ListNotifiableUsersRequest]) (*connect.Response[proto.ListNotifiableUsersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListNotifiableUsers is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) NotifyUsers(context.Context, *connect.Request[proto.NotifyUsersRequest]) (*connect.Response[proto.NotifyUsersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.NotifyUsers is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error) {

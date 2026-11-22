@@ -20,6 +20,20 @@ export function isImageFieldType(fieldType: string | undefined): boolean {
   return (fieldType ?? '').toLowerCase() === IMAGE_FIELD_TYPE
 }
 
+/** A boolean column: MySQL tinyint (TINYINT(1)), or a SQLite column declared BOOLEAN/BOOL/TINYINT. */
+export function isBooleanFieldType(fieldType: string | undefined): boolean {
+  const type = (fieldType ?? '').trim().toLowerCase()
+  return type.startsWith('tinyint') || type === 'bool' || type === 'boolean'
+}
+
+/** Whether a stored boolean column value is true ("1", "true", "yes"; NULL, "" and "0" are false). */
+export function isTrueBooleanValue(raw: unknown): boolean {
+  if (typeof raw === 'boolean') return raw
+  if (typeof raw === 'number') return raw !== 0
+  const value = String(raw ?? '').trim().toLowerCase()
+  return value !== '' && value !== '0' && value !== 'false' && value !== 'no' && value !== 'null'
+}
+
 /**
  * Options for a yes/no choice: picocrank's RadioGroup with variant="boolean", used instead of a
  * checkbox for boolean settings and boolean columns.
@@ -29,21 +43,10 @@ export const YES_NO_OPTIONS = [
   { value: false, label: 'No' },
 ]
 
-/** Whether a column type stores a yes/no value (edited with a boolean RadioGroup). */
-export function isBooleanFieldType(fieldType: string | undefined): boolean {
-  const type = (fieldType ?? '').toLowerCase()
-  return type.startsWith('tinyint') || type === 'bool' || type === 'boolean'
-}
-
-/** A stored boolean column value as a choice: true, false, or null when unset. */
+/** A stored boolean column value as a choice: null when unset, otherwise as isTrueBooleanValue reads it. */
 export function booleanFromStored(raw: unknown): boolean | null {
   if (raw === null || raw === undefined || raw === '') return null
-  if (raw === true || raw === false) return raw
-  const text = String(raw).trim().toLowerCase()
-  if (text === 'true') return true
-  if (text === 'false') return false
-  const n = Number(text)
-  return Number.isNaN(n) ? null : n !== 0
+  return isTrueBooleanValue(raw)
 }
 
 /** The value written for a boolean column. */

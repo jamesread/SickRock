@@ -65,6 +65,20 @@ func (r *Repository) CreateDashboard(ctx context.Context, name string, createNav
 		return 0, fmt.Errorf("dashboard name is required")
 	}
 
+	dashboardID, err := r.insertUniqueDashboard(ctx, name)
+	if err != nil {
+		return 0, err
+	}
+
+	if createNavigation {
+		r.createDashboardNavigation(ctx, dashboardID, name)
+	}
+
+	return int(dashboardID), nil
+}
+
+// insertUniqueDashboard inserts a dashboard whose name is not yet used and returns its id.
+func (r *Repository) insertUniqueDashboard(ctx context.Context, name string) (int64, error) {
 	var exists int
 	if err := r.db.GetContext(ctx, &exists, "SELECT COUNT(*) FROM table_dashboards WHERE name = ?", name); err != nil {
 		return 0, fmt.Errorf("failed to check existing dashboard: %w", err)
@@ -81,12 +95,7 @@ func (r *Repository) CreateDashboard(ctx context.Context, name string, createNav
 	if err != nil {
 		return 0, fmt.Errorf("failed to get dashboard id: %w", err)
 	}
-
-	if createNavigation {
-		r.createDashboardNavigation(ctx, dashboardID, name)
-	}
-
-	return int(dashboardID), nil
+	return dashboardID, nil
 }
 
 // createDashboardNavigation adds a sidebar link for a new dashboard; failures are logged, not returned.
@@ -397,19 +406,24 @@ func (r *Repository) SetWorkflowNavigationMembers(ctx context.Context, workflowI
 		if _, err := tx.ExecContext(ctx, "DELETE FROM workflow_navigation_members WHERE workflow_id = ?", workflowID); err != nil {
 			return fmt.Errorf("clear workflow members: %w", err)
 		}
-		for _, m := range members {
-			if m.NavigationItemID <= 0 {
-				continue
-			}
-			if _, err := tx.ExecContext(ctx,
-				"INSERT INTO workflow_navigation_members (workflow_id, navigation_item_id, ordinal) VALUES (?, ?, ?)",
-				workflowID, m.NavigationItemID, cmp.Or(max(m.Ordinal, 0), 99),
-			); err != nil {
-				return fmt.Errorf("insert workflow member: %w", err)
-			}
-		}
-		return nil
+		return insertWorkflowNavigationMembers(ctx, tx, workflowID, members)
 	})
+}
+
+// insertWorkflowNavigationMembers inserts each member with a navigation item, defaulting a missing ordinal to 99.
+func insertWorkflowNavigationMembers(ctx context.Context, tx *sqlx.Tx, workflowID int, members []WorkflowNavigationMemberInput) error {
+	for _, m := range members {
+		if m.NavigationItemID <= 0 {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx,
+			"INSERT INTO workflow_navigation_members (workflow_id, navigation_item_id, ordinal) VALUES (?, ?, ?)",
+			workflowID, m.NavigationItemID, cmp.Or(max(m.Ordinal, 0), 99),
+		); err != nil {
+			return fmt.Errorf("insert workflow member: %w", err)
+		}
+	}
+	return nil
 }
 
 type Workflow struct {
@@ -530,17 +544,23 @@ func (r *Repository) insertDefaultAdminUser(ctx context.Context) error {
 	return nil
 }
 
+// hashNewPassword validates the username and password are set and returns the bcrypt hash of the password.
+func hashNewPassword(username, newPassword string) (string, error) {
+	if username == "" || newPassword == "" {
+		return "", fmt.Errorf("username and new password are required")
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	return string(hashed), err
+}
+
 // UpdateUserPassword sets a new bcrypt-hashed password for a given username.
 func (r *Repository) UpdateUserPassword(ctx context.Context, username, newPassword string) error {
-	if username == "" || newPassword == "" {
-		return fmt.Errorf("username and new password are required")
-	}
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	hashedPassword, err := hashNewPassword(username, newPassword)
 	if err != nil {
 		return err
 	}
 	query := "UPDATE table_users SET password = ? WHERE username = ?"
-	res, err := r.db.ExecContext(ctx, query, string(hashedPassword), username)
+	res, err := r.db.ExecContext(ctx, query, hashedPassword, username)
 	if err != nil {
 		return err
 	}
@@ -939,23 +959,32 @@ func writableColumn(columns []FieldSpec, fieldName string) *FieldSpec {
 	return nil
 }
 
-func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
-	log.Infof("GetLastItem: %d", tcID)
+// lastItemQuery builds the SQL selecting the newest row (by the table's sort column) of a table.
+func (r *Repository) lastItemQuery(ctx context.Context, tcID int) (string, error) {
 	tc, err := r.GetTableConfigurationByID(ctx, tcID)
 
 	if err != nil {
-		return Item{}, fmt.Errorf("failed to get table configuration for table %d: %w", tcID, err)
+		return "", fmt.Errorf("failed to get table configuration for table %d: %w", tcID, err)
 	}
 
 	// First get the column names for this table
 	columns, err := r.ListColumns(ctx, tc)
 	if err != nil {
-		return Item{}, fmt.Errorf("failed to get columns for table %d: %w", tcID, err)
+		return "", fmt.Errorf("failed to get columns for table %d: %w", tcID, err)
 	}
 
 	columnNames := fieldSpecNames(columns)
 	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` ORDER BY `%s` DESC LIMIT 1", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, tc.SortColumnName(columnNames))
 	log.Debugf("GetLastItem SQL Query: %s db:%v tbl:%v", query, tc.Db.String, tc.Table.String)
+	return query, nil
+}
+
+func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
+	log.Infof("GetLastItem: %d", tcID)
+	query, err := r.lastItemQuery(ctx, tcID)
+	if err != nil {
+		return Item{}, err
+	}
 	rows, err := r.db.QueryxContext(ctx, query)
 	if err != nil {
 		return Item{}, fmt.Errorf("failed to get last item for table %d: %w", tcID, err)
@@ -972,12 +1001,16 @@ func (r *Repository) GetLastItem(ctx context.Context, tcID int) (Item, error) {
 	}
 
 	// Unlike scanRowToItem, every column (including the key and timestamps) stays in Fields.
+	return itemWithAllFields(rowMap), rows.Err()
+}
+
+// itemWithAllFields builds an Item holding every column of rowMap in Fields.
+func itemWithAllFields(rowMap map[string]any) Item {
 	item := Item{Fields: make(map[string]any, len(rowMap))}
 	for colName, value := range rowMap {
 		item.Fields[colName] = bytesToString(value)
 	}
-
-	return item, rows.Err()
+	return item
 }
 
 // bytesToString converts a scanned []byte column value to a string, leaving other values unchanged.
@@ -996,10 +1029,7 @@ func (r *Repository) GetItemInTable(ctx context.Context, tc *TableConfig, id str
 	}
 
 	// Build dynamic SELECT query with all columns
-	columnNames := make([]string, 0, len(columns))
-	for _, col := range columns {
-		columnNames = append(columnNames, col.Name)
-	}
+	columnNames := fieldSpecNames(columns)
 
 	pkColumn := tc.PrimaryKeyColumnName()
 	query := fmt.Sprintf("SELECT `%s` FROM `%s`.`%s` WHERE `%s` = ?", strings.Join(columnNames, "`, `"), tc.Db.String, tc.Table.String, pkColumn)
@@ -1069,6 +1099,12 @@ func itemUpdateSet(columns []FieldSpec, name string, additionalFields map[string
 	if hasColumn(columns, "sr_updated") {
 		setParts = append(setParts, fmt.Sprintf("`sr_updated` = %s", nowExpr))
 	}
+	fieldParts, fieldArgs := additionalFieldUpdates(columns, additionalFields)
+	return append(setParts, fieldParts...), append(args, fieldArgs...)
+}
+
+// additionalFieldUpdates builds the SET clauses and arguments for the additional fields naming real columns.
+func additionalFieldUpdates(columns []FieldSpec, additionalFields map[string]string) (setParts []string, args []any) {
 	for fieldName, fieldValue := range additionalFields {
 		col := writableColumn(columns, fieldName)
 		if col == nil {
@@ -1179,44 +1215,51 @@ func configureSQLiteDB(db *sqlx.DB) error {
 }
 
 func (r *Repository) ListColumns(ctx context.Context, tc *TableConfig) ([]FieldSpec, error) {
-	driver := r.db.DriverName()
+	if r.db.DriverName() == "mysql" {
+		return r.listMySQLColumns(ctx, tc)
+	}
+	return r.listSQLiteColumns(ctx, tc)
+}
+
+func (r *Repository) listMySQLColumns(ctx context.Context, tc *TableConfig) ([]FieldSpec, error) {
 	specs := make([]FieldSpec, 0, 8)
-	switch driver {
-	case "mysql":
-		type row struct {
-			ColumnName string `db:"COLUMN_NAME"`
-			DataType   string `db:"DATA_TYPE"`
-			IsNullable string `db:"IS_NULLABLE"`
-		}
-		rows := []row{}
-		q := `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
-		if err := r.db.SelectContext(ctx, &rows, q, tc.Db, tc.Table); err != nil {
-			return nil, err
-		}
-		for _, r := range rows {
-			// Return the native database type instead of mapping to internal types
-			typ := r.DataType
-			specs = append(specs, FieldSpec{Name: r.ColumnName, Type: typ, Required: strings.ToUpper(r.IsNullable) == "NO"})
-		}
-	default: // sqlite
-		type srow struct {
-			DfltValue *string `db:"dflt_value"`
-			Name      string  `db:"name"`
-			Type      string  `db:"type"`
-			Cid       int     `db:"cid"`
-			NotNull   int     `db:"notnull"`
-			PK        int     `db:"pk"`
-		}
-		var rows []srow
-		q := fmt.Sprintf("PRAGMA table_info(%s)", tc.Table.String)
-		if err := r.db.SelectContext(ctx, &rows, q); err != nil {
-			return nil, err
-		}
-		for _, r := range rows {
-			// Return the native database type instead of mapping to internal types
-			typ := r.Type
-			specs = append(specs, FieldSpec{Name: r.Name, Type: typ, Required: r.NotNull == 1})
-		}
+	type row struct {
+		ColumnName string `db:"COLUMN_NAME"`
+		DataType   string `db:"DATA_TYPE"`
+		IsNullable string `db:"IS_NULLABLE"`
+	}
+	rows := []row{}
+	q := `SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`
+	if err := r.db.SelectContext(ctx, &rows, q, tc.Db, tc.Table); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		// Return the native database type instead of mapping to internal types
+		typ := r.DataType
+		specs = append(specs, FieldSpec{Name: r.ColumnName, Type: typ, Required: strings.ToUpper(r.IsNullable) == "NO"})
+	}
+	return specs, nil
+}
+
+func (r *Repository) listSQLiteColumns(ctx context.Context, tc *TableConfig) ([]FieldSpec, error) {
+	specs := make([]FieldSpec, 0, 8)
+	type srow struct {
+		DfltValue *string `db:"dflt_value"`
+		Name      string  `db:"name"`
+		Type      string  `db:"type"`
+		Cid       int     `db:"cid"`
+		NotNull   int     `db:"notnull"`
+		PK        int     `db:"pk"`
+	}
+	var rows []srow
+	q := fmt.Sprintf("PRAGMA table_info(%s)", tc.Table.String)
+	if err := r.db.SelectContext(ctx, &rows, q); err != nil {
+		return nil, err
+	}
+	for _, r := range rows {
+		// Return the native database type instead of mapping to internal types
+		typ := r.Type
+		specs = append(specs, FieldSpec{Name: r.Name, Type: typ, Required: r.NotNull == 1})
 	}
 	return specs, nil
 }
@@ -1357,19 +1400,10 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 	}).Infof("Creating table configuration")
 
 	// If table is empty, use name as table
-	if table == "" {
-		table = name
-	}
+	table = cmp.Or(table, name)
 
-	// Check if configuration already exists
-	var exists int
-	checkQuery := "SELECT COUNT(*) FROM table_configurations WHERE name = ?"
-	err := r.db.GetContext(ctx, &exists, checkQuery, name)
-	if err != nil {
-		return fmt.Errorf("failed to check existing configuration: %w", err)
-	}
-	if exists > 0 {
-		return fmt.Errorf("table configuration '%s' already exists", name)
+	if err := r.ensureTableConfigurationAbsent(ctx, name); err != nil {
+		return err
 	}
 
 	// Insert the new configuration
@@ -1392,6 +1426,20 @@ func (r *Repository) CreateTableConfiguration(ctx context.Context, name, databas
 	}
 
 	log.Infof("Created table configuration: %s (db: %s, table: %s, view: table)", name, database, table)
+	return nil
+}
+
+// ensureTableConfigurationAbsent returns an error when a table configuration with the name exists.
+func (r *Repository) ensureTableConfigurationAbsent(ctx context.Context, name string) error {
+	var exists int
+	checkQuery := "SELECT COUNT(*) FROM table_configurations WHERE name = ?"
+	err := r.db.GetContext(ctx, &exists, checkQuery, name)
+	if err != nil {
+		return fmt.Errorf("failed to check existing configuration: %w", err)
+	}
+	if exists > 0 {
+		return fmt.Errorf("table configuration '%s' already exists", name)
+	}
 	return nil
 }
 
@@ -1478,12 +1526,20 @@ func (r *Repository) UpdateSystemTableConfigurations(ctx context.Context) error 
 		}
 		log.Infof("Updated system table config: %s (db: %s)", c.name, dbName)
 
-		for _, previous := range c.previousRowActions {
-			if _, err := r.db.ExecContext(ctx,
-				`UPDATE table_configurations SET row_actions = ? WHERE name = ? AND row_actions = ?`,
-				c.rowActions, c.name, previous); err != nil {
-				return fmt.Errorf("update default row actions of %s: %w", c.name, err)
-			}
+		if err = r.updatePreviousRowActions(ctx, c); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// updatePreviousRowActions replaces unedited previous default row actions of a system table with the current default.
+func (r *Repository) updatePreviousRowActions(ctx context.Context, c systemTableConfig) error {
+	for _, previous := range c.previousRowActions {
+		if _, err := r.db.ExecContext(ctx,
+			`UPDATE table_configurations SET row_actions = ? WHERE name = ? AND row_actions = ?`,
+			c.rowActions, c.name, previous); err != nil {
+			return fmt.Errorf("update default row actions of %s: %w", c.name, err)
 		}
 	}
 	return nil
@@ -1553,9 +1609,7 @@ func (r *Repository) CreateTableView(ctx context.Context, tableName, viewName, v
 	t := sanitizeDatabaseIdentifier(tableName)
 
 	// Default to "table" if viewType is empty
-	if viewType == "" {
-		viewType = "table"
-	}
+	viewType = cmp.Or(viewType, "table")
 
 	// Start a transaction
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -1652,29 +1706,38 @@ func (r *Repository) GetTableViews(ctx context.Context, tableName string) ([]Tab
 		}
 
 		// Get columns for this view
-		columnRows, err := r.db.QueryxContext(ctx,
-			"SELECT column_name, is_visible, column_order, sort_order FROM table_view_columns WHERE view_id = ? ORDER BY column_order",
-			view.ID)
+		columns, err := r.listTableViewColumns(ctx, view.ID)
 		if err != nil {
 			return nil, err
 		}
-
-		var columns []TableViewColumn
-		for columnRows.Next() {
-			var col TableViewColumn
-			err := columnRows.Scan(&col.ColumnName, &col.IsVisible, &col.ColumnOrder, &col.SortOrder)
-			if err != nil {
-				_ = columnRows.Close()
-				return nil, err
-			}
-			columns = append(columns, col)
-		}
-		_ = columnRows.Close()
 		view.Columns = columns
 		views = append(views, view)
 	}
 
 	return views, rows.Err()
+}
+
+// listTableViewColumns returns a view's columns in display order.
+func (r *Repository) listTableViewColumns(ctx context.Context, viewID int) ([]TableViewColumn, error) {
+	columnRows, err := r.db.QueryxContext(ctx,
+		"SELECT column_name, is_visible, column_order, sort_order FROM table_view_columns WHERE view_id = ? ORDER BY column_order",
+		viewID)
+	if err != nil {
+		return nil, err
+	}
+
+	var columns []TableViewColumn
+	for columnRows.Next() {
+		var col TableViewColumn
+		err := columnRows.Scan(&col.ColumnName, &col.IsVisible, &col.ColumnOrder, &col.SortOrder)
+		if err != nil {
+			_ = columnRows.Close()
+			return nil, err
+		}
+		columns = append(columns, col)
+	}
+	_ = columnRows.Close()
+	return columns, nil
 }
 
 // GetTableViewTableName returns the table a view belongs to.
@@ -1738,6 +1801,19 @@ func (r *Repository) upsertUserDefaultTableView(ctx context.Context, userID int,
 	return err
 }
 
+// deleteTableViewDependents deletes the rows that reference a view: its columns and users' default choices.
+func deleteTableViewDependents(ctx context.Context, tx *sqlx.Tx, viewID int) error {
+	// Delete the view columns first (due to foreign key constraint)
+	_, err := tx.ExecContext(ctx, "DELETE FROM table_view_columns WHERE view_id = ?", viewID)
+	if err != nil {
+		return err
+	}
+
+	// Users who chose this view as their default fall back to the table default.
+	_, err = tx.ExecContext(ctx, "DELETE FROM table_view_user_defaults WHERE view_id = ?", viewID)
+	return err
+}
+
 // DeleteTableView deletes a table view and its associated columns
 func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 	// Start a transaction to ensure atomicity
@@ -1747,19 +1823,20 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	// Delete the view columns first (due to foreign key constraint)
-	_, err = tx.ExecContext(ctx, "DELETE FROM table_view_columns WHERE view_id = ?", viewID)
-	if err != nil {
+	if err = deleteTableViewDependents(ctx, tx, viewID); err != nil {
 		return err
 	}
 
-	// Users who chose this view as their default fall back to the table default.
-	_, err = tx.ExecContext(ctx, "DELETE FROM table_view_user_defaults WHERE view_id = ?", viewID)
-	if err != nil {
+	if err = deleteTableViewRow(ctx, tx, viewID); err != nil {
 		return err
 	}
 
-	// Delete the view
+	// Commit the transaction
+	return tx.Commit()
+}
+
+// deleteTableViewRow deletes the view row, failing when no such view exists.
+func deleteTableViewRow(ctx context.Context, tx *sqlx.Tx, viewID int) error {
 	result, err := tx.ExecContext(ctx, "DELETE FROM table_views WHERE id = ?", viewID)
 	if err != nil {
 		return err
@@ -1774,9 +1851,7 @@ func (r *Repository) DeleteTableView(ctx context.Context, viewID int) error {
 	if rowsAffected == 0 {
 		return fmt.Errorf("view with ID %d not found", viewID)
 	}
-
-	// Commit the transaction
-	return tx.Commit()
+	return nil
 }
 
 // ForeignKey represents a foreign key constraint
@@ -1940,6 +2015,11 @@ func (r *Repository) DropColumn(ctx context.Context, tableName, columnName strin
 	return r.DeleteColumnDisplay(ctx, tableName, columnName)
 }
 
+// isRenameProtectedColumn reports whether a column is a system column that must not be renamed.
+func isRenameProtectedColumn(col string) bool {
+	return col == "id" || col == "sr_created"
+}
+
 // ChangeColumnName renames a column in a table
 func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnName, newColumnName string) error {
 	tc, err := r.GetTableConfiguration(ctx, tableName)
@@ -1950,7 +2030,7 @@ func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnN
 	oldCol := sanitizeDatabaseIdentifier(oldColumnName)
 	newCol := sanitizeDatabaseIdentifier(newColumnName)
 
-	if oldCol == "id" || oldCol == "sr_created" {
+	if isRenameProtectedColumn(oldCol) {
 		return fmt.Errorf("cannot rename system columns (id, sr_created)")
 	}
 
@@ -1969,26 +2049,40 @@ func (r *Repository) ChangeColumnName(ctx context.Context, tableName, oldColumnN
 	return r.RenameColumnDisplay(ctx, tableName, oldColumnName, newColumnName)
 }
 
+// recentlyViewedArgsValid reports whether a user, table and item are all set.
+func recentlyViewedArgsValid(userID int, tableName, itemID string) bool {
+	return userID > 0 && tableName != "" && itemID != ""
+}
+
 // InsertRecentlyViewed adds a table and item ID to the recently viewed tracking table for one user.
 func (r *Repository) InsertRecentlyViewed(ctx context.Context, userID int, tableName, itemID string) error {
-	if userID <= 0 || tableName == "" || itemID == "" {
+	if !recentlyViewedArgsValid(userID, tableName, itemID) {
 		return nil
 	}
 	isMySQL := r.db.DriverName() == "mysql"
 
 	// First, try to update existing record if it exists
-	result, err := r.db.ExecContext(ctx, recentlyViewedUpdateSQL(isMySQL), userID, tableName, itemID)
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil || rowsAffected > 0 {
+	updated, err := r.touchRecentlyViewed(ctx, isMySQL, userID, tableName, itemID)
+	if err != nil || updated {
 		return err
 	}
 
 	// No existing record, so insert one
 	_, err = r.db.ExecContext(ctx, recentlyViewedInsertSQL(isMySQL), userID, tableName, itemID)
 	return err
+}
+
+// touchRecentlyViewed refreshes the timestamp of an existing recently viewed row, reporting whether one existed.
+func (r *Repository) touchRecentlyViewed(ctx context.Context, isMySQL bool, userID int, tableName, itemID string) (bool, error) {
+	result, err := r.db.ExecContext(ctx, recentlyViewedUpdateSQL(isMySQL), userID, tableName, itemID)
+	if err != nil {
+		return false, err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rowsAffected > 0, nil
 }
 
 func recentlyViewedUpdateSQL(isMySQL bool) string {
@@ -2051,6 +2145,13 @@ func (r *Repository) GetMostRecentlyViewed(ctx context.Context, userID, limit in
 	}
 
 	// Now fetch the item names for each item
+	r.fillRecentlyViewedItemNames(ctx, items)
+
+	return items, nil
+}
+
+// fillRecentlyViewedItemNames sets each item's ItemName, falling back to its table ID when the name cannot be read.
+func (r *Repository) fillRecentlyViewedItemNames(ctx context.Context, items []RecentlyViewedItem) {
 	for i := range items {
 		itemName, err := r.getItemName(ctx, items[i].Name, items[i].TableID)
 		if err != nil {
@@ -2064,8 +2165,6 @@ func (r *Repository) GetMostRecentlyViewed(ctx context.Context, userID, limit in
 			items[i].ItemName = itemName
 		}
 	}
-
-	return items, nil
 }
 
 // getItemName fetches the name field from a specific item in a table

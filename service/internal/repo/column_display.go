@@ -137,18 +137,23 @@ func (r *Repository) SetColumnDisplaySettings(ctx context.Context, tableConfigur
 		return fmt.Errorf("table configuration is required")
 	}
 	for _, raw := range settings {
-		in, err := normalizeColumnDisplayInput(raw)
-		if err != nil {
-			return err
-		}
-		if in.ColumnName, err = canonicalAllowedColumn(allowedColumns, in.ColumnName); err != nil {
-			return err
-		}
-		if err := r.upsertColumnDisplay(ctx, tableConfiguration, in); err != nil {
+		if err := r.applyColumnDisplaySetting(ctx, tableConfiguration, raw, allowedColumns); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// applyColumnDisplaySetting normalizes one column's display input, checks its column is allowed and stores it.
+func (r *Repository) applyColumnDisplaySetting(ctx context.Context, tableConfiguration string, raw ColumnDisplayInput, allowedColumns map[string]struct{}) error {
+	in, err := normalizeColumnDisplayInput(raw)
+	if err != nil {
+		return err
+	}
+	if in.ColumnName, err = canonicalAllowedColumn(allowedColumns, in.ColumnName); err != nil {
+		return err
+	}
+	return r.upsertColumnDisplay(ctx, tableConfiguration, in)
 }
 
 // canonicalAllowedColumn returns the allowed column matching name case-insensitively. A nil allowlist

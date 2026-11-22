@@ -7,7 +7,6 @@ import (
 	"errors"
 	"image"
 	"image/png"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -311,7 +310,7 @@ func TestShippedIndexHTMLLinksTheManifest(t *testing.T) {
 func serve(t *testing.T, h Handler, method string) *httptest.ResponseRecorder {
 	t.Helper()
 	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, httptest.NewRequest(method, Path, nil))
+	h.ServeHTTP(rec, httptest.NewRequestWithContext(t.Context(), method, Path, nil))
 	return rec
 }
 
@@ -404,17 +403,11 @@ func writeFile(t *testing.T, name, content string) {
 
 func copyFile(t *testing.T, from, to string) {
 	t.Helper()
-	in, err := os.Open(from)
+	data, err := os.ReadFile(from)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer in.Close()
-	out, err := os.Create(to)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer out.Close()
-	if _, err := io.Copy(out, in); err != nil {
+	if err := os.WriteFile(to, data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 }

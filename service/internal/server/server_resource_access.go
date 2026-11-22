@@ -59,20 +59,26 @@ func requireAPIKeyResource(ctx context.Context, resourceType, key, permission st
 
 // apiKeyTableAccess limits access to what the API key behind the request, if any, allows.
 func apiKeyTableAccess(ctx context.Context, tableName string, access *sickrockpb.GetTableAccessResponse) *sickrockpb.GetTableAccessResponse {
-	allows := func(action repo.ResourceGrantAction) bool {
-		perm, _ := repo.TableActionPermission(action)
-		return requireAPIKeyResource(ctx, iam.ResourceTypeTable, tableName, perm) == nil
-	}
-	readOnly := false
-	if au := armlayer.UserFromContext(ctx); au != nil {
-		readOnly = au.ReadOnly
-	}
+	readOnly := apiKeyReadOnly(ctx)
 	return &sickrockpb.GetTableAccessResponse{
-		CanView:   access.GetCanView() && allows(repo.ResourceActionView),
-		CanInsert: access.GetCanInsert() && !readOnly && allows(repo.ResourceActionInsert),
-		CanEdit:   access.GetCanEdit() && !readOnly && allows(repo.ResourceActionEdit),
-		CanDelete: access.GetCanDelete() && !readOnly && allows(repo.ResourceActionDelete),
+		CanView:   tableActionAllowed(ctx, tableName, access.GetCanView(), repo.ResourceActionView, false),
+		CanInsert: tableActionAllowed(ctx, tableName, access.GetCanInsert(), repo.ResourceActionInsert, readOnly),
+		CanEdit:   tableActionAllowed(ctx, tableName, access.GetCanEdit(), repo.ResourceActionEdit, readOnly),
+		CanDelete: tableActionAllowed(ctx, tableName, access.GetCanDelete(), repo.ResourceActionDelete, readOnly),
 	}
+}
+
+func apiKeyReadOnly(ctx context.Context) bool {
+	au := armlayer.UserFromContext(ctx)
+	return au != nil && au.ReadOnly
+}
+
+func tableActionAllowed(ctx context.Context, tableName string, base bool, action repo.ResourceGrantAction, blockIfReadOnly bool) bool {
+	if !base || blockIfReadOnly {
+		return false
+	}
+	perm, _ := repo.TableActionPermission(action)
+	return requireAPIKeyResource(ctx, iam.ResourceTypeTable, tableName, perm) == nil
 }
 
 // fullTableAccess grants every table action.
@@ -89,16 +95,28 @@ func (s *SickRockServer) GetTableAccess(ctx context.Context, req *connect.Reques
 	if !isAuthenticated(au) {
 		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
 	}
-	if access, handled, err := s.systemTableAccess(ctx, tableName); handled {
-		if err != nil {
-			return nil, err
-		}
-		return connect.NewResponse(access), nil
+	if access, err, handled := s.lookupSystemTableAccess(ctx, tableName); handled {
+		return access, err
 	}
 	if resourceSuperuser(ctx, au) {
 		return connect.NewResponse(apiKeyTableAccess(ctx, tableName, fullTableAccess())), nil
 	}
-	access, err := s.repo.GetUserTableAccess(ctx, au.User.ID, tableName)
+	return s.userTableAccessResponse(ctx, au.User.ID, tableName)
+}
+
+func (s *SickRockServer) lookupSystemTableAccess(ctx context.Context, tableName string) (*connect.Response[sickrockpb.GetTableAccessResponse], error, bool) {
+	access, handled, err := s.systemTableAccess(ctx, tableName)
+	if !handled {
+		return nil, nil, false
+	}
+	if err != nil {
+		return nil, err, true
+	}
+	return connect.NewResponse(access), nil, true
+}
+
+func (s *SickRockServer) userTableAccessResponse(ctx context.Context, userID int, tableName string) (*connect.Response[sickrockpb.GetTableAccessResponse], error) {
+	access, err := s.repo.GetUserTableAccess(ctx, userID, tableName)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("table access: %w", err))
 	}
@@ -159,12 +177,17 @@ func (s *SickRockServer) requireTableAccess(ctx context.Context, tableConfigurat
 	if err != nil {
 		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("invalid table action"))
 	}
+	return s.authorizeTableAccess(ctx, au, tableConfiguration, action, perm)
+}
+
+// authorizeTableAccess applies the API key scope, then lets superusers through, otherwise requires a table grant.
+func (s *SickRockServer) authorizeTableAccess(ctx context.Context, au *armlayer.AuthenticatedUser, tableConfiguration string, action repo.ResourceGrantAction, perm string) error {
 	if err := requireAPIKeyResource(ctx, iam.ResourceTypeTable, tableConfiguration, perm); err != nil {
-		s.auditTableAccess(ctx, tableConfiguration, action, "", false, err.Error())
+		s.auditTableAccess(ctx, tableConfiguration, action, false, err.Error())
 		return err
 	}
 	if resourceSuperuser(ctx, au) {
-		s.auditTableAccess(ctx, tableConfiguration, action, "", true, "allowed (superuser)")
+		s.auditTableAccess(ctx, tableConfiguration, action, true, "allowed (superuser)")
 		return nil
 	}
 	return s.requireTableGrant(ctx, au.User.ID, tableConfiguration, action)
@@ -195,10 +218,10 @@ func (s *SickRockServer) requireTableGrant(ctx context.Context, userID int, tabl
 	}
 	if !ok {
 		msg := fmt.Sprintf("no grant for table %s", tableConfiguration)
-		s.auditTableAccess(ctx, tableConfiguration, action, "", false, msg)
+		s.auditTableAccess(ctx, tableConfiguration, action, false, msg)
 		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("%s", msg))
 	}
-	s.auditTableAccess(ctx, tableConfiguration, action, "", true, "allowed")
+	s.auditTableAccess(ctx, tableConfiguration, action, true, "allowed")
 	return nil
 }
 
@@ -206,9 +229,9 @@ func (s *SickRockServer) requireDashboardAccess(ctx context.Context, dashboardNa
 	if dashboardName == "" {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("dashboard is required"))
 	}
-	au := s.authUserRBAC(ctx)
-	if !isAuthenticated(au) {
-		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
+	au, err := s.requireAuthenticatedRBAC(ctx)
+	if err != nil {
+		return err
 	}
 	if err := requireAPIKeyResource(ctx, iam.ResourceTypeDashboard, dashboardName, systemroles.PermissionDashboardView); err != nil {
 		return err
@@ -216,6 +239,18 @@ func (s *SickRockServer) requireDashboardAccess(ctx context.Context, dashboardNa
 	if resourceSuperuser(ctx, au) {
 		return nil
 	}
+	return s.requireDashboardGrant(ctx, au, dashboardName)
+}
+
+func (s *SickRockServer) requireAuthenticatedRBAC(ctx context.Context) (*armlayer.AuthenticatedUser, error) {
+	au := s.authUserRBAC(ctx)
+	if !isAuthenticated(au) {
+		return nil, connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
+	}
+	return au, nil
+}
+
+func (s *SickRockServer) requireDashboardGrant(ctx context.Context, au *armlayer.AuthenticatedUser, dashboardName string) error {
 	if !mayViewDashboards(au) {
 		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("missing permission %s", systemroles.PermissionDashboardView))
 	}
@@ -247,22 +282,30 @@ func (s *SickRockServer) requireWorkflowAccess(ctx context.Context, workflowID i
 	if workflowID <= 0 {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("workflow_id is required"))
 	}
-	au := s.authUserRBAC(ctx)
-	if !isAuthenticated(au) {
-		return connect.NewError(connect.CodeUnauthenticated, fmt.Errorf("authentication required"))
+	au, err := s.requireAuthenticatedRBAC(ctx)
+	if err != nil {
+		return err
 	}
 	perm, ok := workflowActionPermissions[action]
 	if !ok {
 		return connect.NewError(connect.CodePermissionDenied, fmt.Errorf("invalid workflow action"))
 	}
+	return s.authorizeWorkflowAccess(ctx, au, workflowID, action, perm)
+}
+
+// authorizeWorkflowAccess applies the API key scope, then lets superusers through, otherwise requires a workflow grant.
+func (s *SickRockServer) authorizeWorkflowAccess(ctx context.Context, au *armlayer.AuthenticatedUser, workflowID int, action repo.ResourceGrantAction, perm string) error {
 	if err := requireAPIKeyResource(ctx, iam.ResourceTypeWorkflow, strconv.Itoa(workflowID), perm); err != nil {
 		return err
 	}
 	if resourceSuperuser(ctx, au) {
 		return nil
 	}
+	return s.requireWorkflowGrant(ctx, au.User.ID, workflowID, action)
+}
 
-	ok, err := s.repo.UserHasWorkflowGrant(ctx, au.User.ID, workflowID, action)
+func (s *SickRockServer) requireWorkflowGrant(ctx context.Context, userID, workflowID int, action repo.ResourceGrantAction) error {
+	ok, err := s.repo.UserHasWorkflowGrant(ctx, userID, workflowID, action)
 	if err != nil {
 		return connect.NewError(connect.CodeInternal, err)
 	}
@@ -290,7 +333,7 @@ func (s *SickRockServer) canViewNavigationTarget(ctx context.Context, item repo.
 	tableName := nullStringOr(item.TableName, "")
 	dashboardName := nullStringOr(item.DashboardName, "")
 	switch {
-	case item.WorkflowID.Valid && item.WorkflowID.Int64 > 0 && tableName == "" && dashboardName == "":
+	case isWorkflowHubNav(item, tableName, dashboardName):
 		return s.requireWorkflowAccess(ctx, int(item.WorkflowID.Int64), repo.ResourceActionView) == nil
 	case dashboardName != "":
 		return s.requireDashboardAccess(ctx, dashboardName) == nil
@@ -298,4 +341,8 @@ func (s *SickRockServer) canViewNavigationTarget(ctx context.Context, item repo.
 		return s.requireTableAccess(ctx, tableName, repo.ResourceActionView) == nil
 	}
 	return false
+}
+
+func isWorkflowHubNav(item repo.NavigationItem, tableName, dashboardName string) bool {
+	return item.WorkflowID.Valid && item.WorkflowID.Int64 > 0 && tableName == "" && dashboardName == ""
 }
