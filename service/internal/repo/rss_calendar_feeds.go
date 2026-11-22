@@ -187,22 +187,26 @@ func (r *Repository) ListRssCalendarFeedsDueForRefresh(ctx context.Context, now 
 	}
 	out := make([]RssCalendarFeed, 0, len(feeds))
 	for _, feed := range feeds {
-		if !feed.Enabled {
-			continue
-		}
-		interval := time.Duration(feed.RefreshIntervalMinutes) * time.Minute
-		if interval <= 0 {
-			interval = time.Hour
-		}
-		if !feed.LastRefreshAt.Valid {
-			out = append(out, feed)
-			continue
-		}
-		if now.Sub(feed.LastRefreshAt.Time) >= interval {
+		if rssFeedDue(feed, now) {
 			out = append(out, feed)
 		}
 	}
 	return out, nil
+}
+
+// rssFeedDue reports whether an enabled feed has never been refreshed or is past its refresh interval.
+func rssFeedDue(feed RssCalendarFeed, now time.Time) bool {
+	if !feed.Enabled {
+		return false
+	}
+	interval := time.Duration(feed.RefreshIntervalMinutes) * time.Minute
+	if interval <= 0 {
+		interval = time.Hour
+	}
+	if !feed.LastRefreshAt.Valid {
+		return true
+	}
+	return now.Sub(feed.LastRefreshAt.Time) >= interval
 }
 
 func (r *Repository) RefreshRssCalendarFeedByID(ctx context.Context, id int) (RssRefreshResult, error) {
@@ -273,24 +277,39 @@ func (r *Repository) syncRssFeedItems(
 
 	result := RssRefreshResult{}
 	for _, item := range items {
-		itemValues := rsscalendar.ItemFields(item)
-		fields := rssFeedItemFields(feed, itemValues, mappings)
-		if len(fields) == 0 {
-			continue
-		}
-		updated, err := r.upsertRssFeedItem(ctx, tableConfiguration, uniqueColumn, itemValues["guid"], fields)
-		if err != nil {
+		if err := r.syncRssFeedItem(ctx, feed, tableConfiguration, uniqueColumn, mappings, item, &result); err != nil {
 			return result, err
-		}
-		if updated {
-			result.Updated++
-		} else {
-			result.Created++
 		}
 	}
 
 	result.Message = rssRefreshMessage(result)
 	return result, nil
+}
+
+// syncRssFeedItem upserts one feed item (skipping items with no mapped fields) and counts it in result.
+func (r *Repository) syncRssFeedItem(
+	ctx context.Context,
+	feed *RssCalendarFeed,
+	tableConfiguration, uniqueColumn string,
+	mappings []rsscalendar.FieldMapping,
+	item *gofeed.Item,
+	result *RssRefreshResult,
+) error {
+	itemValues := rsscalendar.ItemFields(item)
+	fields := rssFeedItemFields(feed, itemValues, mappings)
+	if len(fields) == 0 {
+		return nil
+	}
+	updated, err := r.upsertRssFeedItem(ctx, tableConfiguration, uniqueColumn, itemValues["guid"], fields)
+	if err != nil {
+		return err
+	}
+	if updated {
+		result.Updated++
+	} else {
+		result.Created++
+	}
+	return nil
 }
 
 // rssFeedItemFields maps a feed item's values to table fields and, when the feed has a feed ID column
@@ -332,19 +351,27 @@ func (r *Repository) upsertRssFeedItem(ctx context.Context, tableConfiguration, 
 	return true, err
 }
 
+// rssFeedUniqueValue returns the mapped unique value, or the guid (also written into fields) when it is empty.
+func rssFeedUniqueValue(uniqueColumn, guid string, fields map[string]string) string {
+	if uniqueValue := strings.TrimSpace(fields[uniqueColumn]); uniqueValue != "" {
+		return uniqueValue
+	}
+	uniqueValue := strings.TrimSpace(guid)
+	if uniqueValue != "" {
+		fields[uniqueColumn] = uniqueValue
+	}
+	return uniqueValue
+}
+
 // findRssFeedRow returns the existing row matching the item's unique value, or nil. When the mapped
 // unique value is empty the guid is used and also written into fields.
 func (r *Repository) findRssFeedRow(ctx context.Context, tableConfiguration, uniqueColumn, guid string, fields map[string]string) (*Item, error) {
 	if uniqueColumn == "" {
 		return nil, nil
 	}
-	uniqueValue := strings.TrimSpace(fields[uniqueColumn])
+	uniqueValue := rssFeedUniqueValue(uniqueColumn, guid, fields)
 	if uniqueValue == "" {
-		uniqueValue = strings.TrimSpace(guid)
-		if uniqueValue == "" {
-			return nil, nil
-		}
-		fields[uniqueColumn] = uniqueValue
+		return nil, nil
 	}
 	existing, err := r.ListItemsInTable(ctx, tableConfiguration, map[string]string{uniqueColumn: uniqueValue})
 	if err != nil || len(existing) == 0 {
@@ -451,13 +478,18 @@ func boolToInt(v bool) int {
 	return 0
 }
 
+// rssFeedRequiredFieldsSet reports whether the feed has a name, URL and table configuration.
+func rssFeedRequiredFieldsSet(feed *RssCalendarFeed) bool {
+	return feed.Name != "" && feed.FeedURL != "" && feed.TableConfiguration != ""
+}
+
 // normalizeRssCalendarFeed trims a feed's fields, checks the required ones are set and applies defaults
 // (60 minute refresh interval, empty field mapping).
 func normalizeRssCalendarFeed(feed *RssCalendarFeed) error {
 	feed.Name = strings.TrimSpace(feed.Name)
 	feed.FeedURL = strings.TrimSpace(feed.FeedURL)
 	feed.TableConfiguration = strings.TrimSpace(feed.TableConfiguration)
-	if feed.Name == "" || feed.FeedURL == "" || feed.TableConfiguration == "" {
+	if !rssFeedRequiredFieldsSet(feed) {
 		return fmt.Errorf("name, feed URL, and table configuration are required")
 	}
 	if feed.RefreshIntervalMinutes <= 0 {

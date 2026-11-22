@@ -29,6 +29,14 @@ func (c RelationsDanglingCheck) Run(ctx context.Context) ([]armhealth.Issue, err
 	}
 	columnsOf := c.cachedColumnsOf(ctx, targetByName)
 
+	return c.danglingIssues(relations, targetByName, columnsOf)
+}
+
+func (c RelationsDanglingCheck) danglingIssues(
+	relations []repo.TableRelation,
+	targetByName map[string]repo.TableConfigurationTarget,
+	columnsOf func(string) ([]string, error),
+) ([]armhealth.Issue, error) {
 	var issues []armhealth.Issue
 	for _, rel := range relations {
 		problem, err := c.relationProblem(rel, targetByName, columnsOf)

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/jmoiron/sqlx"
 )
 
 // DbTablePair identifies a physical table for table_configurations lookup.
@@ -52,6 +54,11 @@ func (r *Repository) LookupTableConfigNames(ctx context.Context, pairs []DbTable
 	}
 	defer func() { _ = rows.Close() }()
 
+	return scanTableConfigNames(rows)
+}
+
+// scanTableConfigNames reads (name, db, table) rows into a map keyed by the (db, table) lookup key.
+func scanTableConfigNames(rows *sqlx.Rows) (map[string]string, error) {
 	out := make(map[string]string)
 	for rows.Next() {
 		var name, dbName, tableName string
@@ -101,6 +108,14 @@ func trimmedValidString(valid bool, value string) string {
 	return strings.TrimSpace(value)
 }
 
+// nullableTrimmed returns the trimmed string, or nil when it is empty.
+func nullableTrimmed(s string) any {
+	if t := strings.TrimSpace(s); t != "" {
+		return t
+	}
+	return nil
+}
+
 // DisplayRowNamePlural returns the plural row label for list empty states (e.g. "Customers").
 // SetTableRowLabels updates singular and plural row labels on table_configurations.
 // Empty strings clear the stored value (NULL).
@@ -112,16 +127,9 @@ func (r *Repository) SetTableRowLabels(ctx context.Context, tableConfiguration, 
 	if _, err := r.GetTableConfiguration(ctx, tcName); err != nil {
 		return err
 	}
-	var rn, rnp any
-	if t := strings.TrimSpace(rowName); t != "" {
-		rn = t
-	}
-	if t := strings.TrimSpace(rowNamePlural); t != "" {
-		rnp = t
-	}
 	res, err := r.db.ExecContext(ctx,
 		`UPDATE table_configurations SET row_name = ?, row_name_plural = ? WHERE name = ?`,
-		rn, rnp, tcName,
+		nullableTrimmed(rowName), nullableTrimmed(rowNamePlural), tcName,
 	)
 	if err != nil {
 		return err
@@ -175,13 +183,17 @@ func (tc *TableConfig) PrimaryKeyColumnName() string {
 	return defaultTableKeyColumn
 }
 
-func (tc *TableConfig) SortColumnName(columnNames []string) string {
-	candidate := defaultTableKeyColumn
+func (tc *TableConfig) defaultSortCandidate() string {
 	if tc != nil && tc.DefaultSortColumn.Valid {
 		if col := strings.TrimSpace(tc.DefaultSortColumn.String); col != "" {
-			candidate = sanitizeDatabaseIdentifier(col)
+			return sanitizeDatabaseIdentifier(col)
 		}
 	}
+	return defaultTableKeyColumn
+}
+
+func (tc *TableConfig) SortColumnName(columnNames []string) string {
+	candidate := tc.defaultSortCandidate()
 	if slices.Contains(columnNames, candidate) {
 		return candidate
 	}
@@ -201,17 +213,30 @@ func itemIDFromRowValue(v any) string {
 	switch id := v.(type) {
 	case string:
 		return id
+	case []uint8:
+		return string(id)
+	default:
+		return intRowValueString(v)
+	}
+}
+
+// intRowValueString formats integer row values, falling back to fmt.Sprint for other types.
+func intRowValueString(v any) string {
+	switch id := v.(type) {
 	case int64:
 		return strconv.FormatInt(id, 10)
 	case int32:
 		return strconv.FormatInt(int64(id), 10)
 	case int:
 		return strconv.Itoa(id)
-	case []uint8:
-		return string(id)
 	default:
 		return fmt.Sprint(v)
 	}
+}
+
+// isReservedItemColumn reports whether a column is stored on Item itself rather than in Fields.
+func isReservedItemColumn(colName, pkColumn string) bool {
+	return colName == pkColumn || colName == "sr_created" || colName == "sr_updated"
 }
 
 func scanRowToItem(rowMap map[string]any, pkColumn string) Item {
@@ -224,7 +249,7 @@ func scanRowToItem(rowMap map[string]any, pkColumn string) Item {
 		item.ID = itemIDFromRowValue(pkVal)
 	}
 	for colName, value := range rowMap {
-		if colName == pkColumn || colName == "sr_created" || colName == "sr_updated" {
+		if isReservedItemColumn(colName, pkColumn) {
 			continue
 		}
 		item.Fields[colName] = bytesToString(value)

@@ -52,12 +52,9 @@ func (s *SickRockServer) UploadImage(ctx context.Context, req *connect.Request[s
 		return nil, err
 	}
 
-	meta, err := s.images.Save(req.Msg.GetData())
-	if errors.Is(err, images.ErrTooLarge) || errors.Is(err, images.ErrUnsupported) {
-		return nil, connect.NewError(connect.CodeInvalidArgument, err)
-	}
+	meta, err := s.saveImageData(req.Msg.GetData())
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, err
 	}
 
 	img, err := s.recordImage(ctx, meta, table, column, req.Msg.GetFilename())
@@ -66,6 +63,18 @@ func (s *SickRockServer) UploadImage(ctx context.Context, req *connect.Request[s
 	}
 	log.WithFields(log.Fields{"table": table, "column": column, "image": img.ID, "bytes": img.SizeBytes}).Info("Image uploaded")
 	return connect.NewResponse(&sickrockpb.UploadImageResponse{Image: imageToProto(img)}), nil
+}
+
+// saveImageData writes the uploaded bytes to storage, mapping storage errors to Connect errors.
+func (s *SickRockServer) saveImageData(data []byte) (images.Metadata, error) {
+	meta, err := s.images.Save(data)
+	if errors.Is(err, images.ErrTooLarge) || errors.Is(err, images.ErrUnsupported) {
+		return images.Metadata{}, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	if err != nil {
+		return images.Metadata{}, connect.NewError(connect.CodeInternal, err)
+	}
+	return meta, nil
 }
 
 // checkImageUpload rejects an upload when storage is off, the target is missing, the caller may
@@ -166,14 +175,25 @@ func (s *SickRockServer) viewableImage(r *http.Request) (repo.Image, bool) {
 	if !ok || s.images == nil {
 		return repo.Image{}, false
 	}
-	img, err := s.repo.GetImage(r.Context(), id)
+	img, ok := s.loadImage(r.Context(), id)
+	if !ok {
+		return repo.Image{}, false
+	}
+	return img, s.canViewImage(r.Context(), img)
+}
+
+// canViewImage reports whether the caller may view the table the image was uploaded for.
+func (s *SickRockServer) canViewImage(ctx context.Context, img repo.Image) bool {
+	return img.TableConfiguration == "" || s.requireDataTableAccess(ctx, img.TableConfiguration, repo.ResourceActionView) == nil
+}
+
+// loadImage fetches an image row, logging unexpected errors.
+func (s *SickRockServer) loadImage(ctx context.Context, id int64) (repo.Image, bool) {
+	img, err := s.repo.GetImage(ctx, id)
 	if err != nil {
 		if !errors.Is(err, repo.ErrImageNotFound) {
 			log.WithError(err).WithField("image", id).Error("Failed to load image")
 		}
-		return repo.Image{}, false
-	}
-	if img.TableConfiguration != "" && s.requireDataTableAccess(r.Context(), img.TableConfiguration, repo.ResourceActionView) != nil {
 		return repo.Image{}, false
 	}
 	return img, true

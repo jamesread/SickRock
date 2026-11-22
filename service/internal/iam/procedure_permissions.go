@@ -52,6 +52,7 @@ var writeProcedures = map[string]bool{
 	sickrockpbconnect.SickRockDeleteUserNotificationChannelProcedure:      true,
 	sickrockpbconnect.SickRockCreateUserNotificationSubscriptionProcedure: true,
 	sickrockpbconnect.SickRockDeleteUserNotificationSubscriptionProcedure: true,
+	sickrockpbconnect.SickRockNotifyUsersProcedure:                        true,
 	sickrockpbconnect.SickRockSetTickListCompletionProcedure:              true,
 	sickrockpbconnect.SickRockClearTickListStateProcedure:                 true,
 }
@@ -110,6 +111,8 @@ var procedurePermissions = map[string]string{
 	sickrockpbconnect.SickRockDeleteAPIKeyProcedure:                  PermissionAPIKeysUse,
 	sickrockpbconnect.SickRockDeactivateAPIKeyProcedure:              PermissionAPIKeysUse,
 	sickrockpbconnect.SickRockClaimDeviceCodeProcedure:               PermissionDeviceCodeClaim,
+	sickrockpbconnect.SickRockListNotifiableUsersProcedure:           PermissionNotificationsSend,
+	sickrockpbconnect.SickRockNotifyUsersProcedure:                   PermissionNotificationsSend,
 }
 
 // RequiredPermission maps Connect procedures to RBAC permission names.

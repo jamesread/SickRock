@@ -5,6 +5,9 @@ import {
   daysOfWeek,
   dayKey,
   filterPickerOptions,
+  notifyLinkPath,
+  notifyTitle,
+  weekFromQuery,
   defaultWeeklyPlanConfig,
   groupIntoCells,
   parseWallClock,
@@ -152,5 +155,35 @@ describe('filterPickerOptions', () => {
     ]
     expect(filterPickerOptions(withDetails, 'italian bol')).toEqual([withDetails[0]])
     expect(filterPickerOptions(withDetails, 'breakfast')).toEqual([withDetails[1]])
+  })
+})
+
+describe('notifying users about a week', () => {
+  it('keeps default recipients as positive whole ids, once each', () => {
+    const config = parseWeeklyPlanConfig('{"weeklyPlan":{"notifyUserIds":[3,"4",3,0,-2,1.5,"x",null]}}')
+    expect(config.notifyUserIds).toEqual([3, 4])
+    expect(parseWeeklyPlanConfig('{"weeklyPlan":{"notifyUserIds":"3"}}').notifyUserIds).toEqual([])
+    expect(parseWeeklyPlanConfig('').notifyUserIds).toEqual([])
+
+    const saved = withWeeklyPlanConfig('{"other":1}', mealConfig({ notifyUserIds: [5, 5, 2] }))
+    expect(JSON.parse(saved).other).toBe(1)
+    expect(parseWeeklyPlanConfig(saved).notifyUserIds).toEqual([5, 2])
+  })
+
+  it('reads the week from a link', () => {
+    expect(dayKey(weekFromQuery('2026-11-04', 1)!)).toBe('2026-11-02')
+    expect(dayKey(weekFromQuery('2026-11-04', 0)!)).toBe('2026-11-01')
+    for (const bad of ['2026-02-30', '2026-11-4', 'next week', '', undefined, ['2026-11-04']]) {
+      expect(weekFromQuery(bad, 1)).toBeNull()
+    }
+  })
+
+  it('titles and links the week', () => {
+    const week = new Date(2026, 10, 2)
+    expect(notifyTitle('Meal plan', week, 'en-GB')).toBe('Meal plan for 2 Nov – 8 Nov is ready')
+    expect(notifyTitle('  ', week, 'en-GB')).toBe('Weekly plan for 2 Nov – 8 Nov is ready')
+    expect(notifyLinkPath('meal plan', 7, week)).toBe('/table/meal%20plan?view=7&week=2026-11-02')
+    expect(notifyLinkPath('meals', undefined, week)).toBe('/table/meals?week=2026-11-02')
+    expect(weekFromQuery(new URLSearchParams(notifyLinkPath('meals', 7, week).split('?')[1]).get('week'), 1)).toEqual(week)
   })
 })

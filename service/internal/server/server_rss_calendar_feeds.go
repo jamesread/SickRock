@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/mmcdole/gofeed"
 	log "github.com/sirupsen/logrus"
 
 	"connectrpc.com/connect"
@@ -71,12 +72,10 @@ func rssFieldMappingsToProto(mappings []rsscalendar.FieldMapping) []*sickrockpb.
 	return out
 }
 
-func rssFeedFromProto(msg *sickrockpb.RssCalendarFeed) (*repo.RssCalendarFeed, string, error) {
-	if msg == nil {
-		return nil, "", fmt.Errorf("feed is required")
-	}
-	mappings := make([]rsscalendar.FieldMapping, 0, len(msg.GetFieldMappings()))
-	for _, m := range msg.GetFieldMappings() {
+// rssFieldMappingsFromProto converts protobuf mappings, skipping nil entries.
+func rssFieldMappingsFromProto(in []*sickrockpb.RssFieldMapping) []rsscalendar.FieldMapping {
+	mappings := make([]rsscalendar.FieldMapping, 0, len(in))
+	for _, m := range in {
 		if m == nil {
 			continue
 		}
@@ -85,14 +84,25 @@ func rssFeedFromProto(msg *sickrockpb.RssCalendarFeed) (*repo.RssCalendarFeed, s
 			Column:   m.GetColumn(),
 		})
 	}
-	cfg := rsscalendar.FieldMappingConfig{Mappings: mappings}
+	return mappings
+}
+
+// rssRefreshInterval returns the refresh interval in minutes, defaulting to 60 when unset.
+func rssRefreshInterval(minutes int32) int {
+	if minutes <= 0 {
+		return 60
+	}
+	return int(minutes)
+}
+
+func rssFeedFromProto(msg *sickrockpb.RssCalendarFeed) (*repo.RssCalendarFeed, string, error) {
+	if msg == nil {
+		return nil, "", fmt.Errorf("feed is required")
+	}
+	cfg := rsscalendar.FieldMappingConfig{Mappings: rssFieldMappingsFromProto(msg.GetFieldMappings())}
 	encoded, err := rsscalendar.EncodeFieldMappingConfig(cfg)
 	if err != nil {
 		return nil, "", err
-	}
-	interval := int(msg.GetRefreshIntervalMinutes())
-	if interval <= 0 {
-		interval = 60
 	}
 	feed := &repo.RssCalendarFeed{
 		ID:                     int(msg.GetId()),
@@ -102,7 +112,7 @@ func rssFeedFromProto(msg *sickrockpb.RssCalendarFeed) (*repo.RssCalendarFeed, s
 		FieldMappingJSON:       encoded,
 		UniqueColumn:           strings.TrimSpace(msg.GetUniqueColumn()),
 		FeedIDColumn:           strings.TrimSpace(msg.GetFeedIdColumn()),
-		RefreshIntervalMinutes: interval,
+		RefreshIntervalMinutes: rssRefreshInterval(msg.GetRefreshIntervalMinutes()),
 		Enabled:                msg.GetEnabled(),
 	}
 	return feed, encoded, nil
@@ -173,13 +183,9 @@ func (s *SickRockServer) SaveRssCalendarFeed(ctx context.Context, req *connect.R
 	if err = s.upsertRssCalendarFeed(ctx, feed); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-	saved, err := s.repo.GetRssCalendarFeedByID(ctx, feed.ID)
+	pb, err := s.rssFeedProtoByID(ctx, feed.ID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-	pb, err := rssFeedToProto(saved)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
+		return nil, err
 	}
 	return connect.NewResponse(&sickrockpb.SaveRssCalendarFeedResponse{Feed: pb}), nil
 }
@@ -237,22 +243,28 @@ func (s *SickRockServer) PreviewRssCalendarFeed(ctx context.Context, req *connec
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)
 	}
 	fields := rsscalendar.DiscoverFields(parsed.Items)
-	sample := make([]*sickrockpb.RssFieldMapping, 0)
-	if len(parsed.Items) > 0 {
-		values := rsscalendar.ItemFields(parsed.Items[0])
-		for _, name := range fields {
-			if v := strings.TrimSpace(values[name]); v != "" {
-				sample = append(sample, &sickrockpb.RssFieldMapping{
-					RssField: name,
-					Column:   v,
-				})
-			}
-		}
-	}
 	return connect.NewResponse(&sickrockpb.PreviewRssCalendarFeedResponse{
 		RssFields:    fields,
-		SampleValues: sample,
+		SampleValues: rssSampleValues(parsed.Items, fields),
 	}), nil
+}
+
+// rssSampleValues returns the non-empty values of the first item, as field/value pairs.
+func rssSampleValues(items []*gofeed.Item, fields []string) []*sickrockpb.RssFieldMapping {
+	sample := make([]*sickrockpb.RssFieldMapping, 0)
+	if len(items) == 0 {
+		return sample
+	}
+	values := rsscalendar.ItemFields(items[0])
+	for _, name := range fields {
+		if v := strings.TrimSpace(values[name]); v != "" {
+			sample = append(sample, &sickrockpb.RssFieldMapping{
+				RssField: name,
+				Column:   v,
+			})
+		}
+	}
+	return sample
 }
 
 // RefreshDueRssCalendarFeeds is called by the background scheduler.

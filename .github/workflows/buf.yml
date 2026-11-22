@@ -1,0 +1,37 @@
+---
+name: buf
+
+on:
+  pull_request:
+    paths:
+      - 'proto/**'
+      - 'service/gen/**'
+      - 'frontend/src/gen/**'
+      - '.github/workflows/buf.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  buf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: bufbuild/buf-action@v1
+        with:
+          setup_only: true
+
+      - name: buf lint
+        run: buf lint
+        working-directory: proto
+
+      - name: Regenerate sources
+        run: buf generate
+        working-directory: proto
+
+      - name: Generated sources are committed
+        run: git diff --exit-code
+
+      - name: No new untracked generated files
+        run: test -z "$(git status --porcelain)"

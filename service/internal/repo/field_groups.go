@@ -110,17 +110,22 @@ func (r *Repository) SetItemFieldGroups(ctx context.Context, tableConfiguration 
 	}
 
 	return r.inTx(ctx, func(tx *sqlx.Tx) error {
-		if _, err := tx.ExecContext(ctx, `
-			DELETE FROM table_field_groups WHERE table_configuration = ?`, tableConfiguration); err != nil {
+		return replaceFieldGroups(ctx, tx, tableConfiguration, groups)
+	})
+}
+
+// replaceFieldGroups deletes a table configuration's field groups and inserts the given ones.
+func replaceFieldGroups(ctx context.Context, tx *sqlx.Tx, tableConfiguration string, groups []FieldGroupInput) error {
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM table_field_groups WHERE table_configuration = ?`, tableConfiguration); err != nil {
+		return err
+	}
+	for i, g := range groups {
+		if err := insertFieldGroup(ctx, tx, tableConfiguration, ordinalOrPosition(g.Ordinal, i), g); err != nil {
 			return err
 		}
-		for i, g := range groups {
-			if err := insertFieldGroup(ctx, tx, tableConfiguration, ordinalOrPosition(g.Ordinal, i), g); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+	}
+	return nil
 }
 
 // fieldGroupAllowedColumns returns the column names a field group may reference: the table's
@@ -138,14 +143,18 @@ func (r *Repository) fieldGroupAllowedColumns(ctx context.Context, tableConfigur
 	if err != nil {
 		return nil, err
 	}
-	allowed := make(map[string]struct{}, len(cols)+len(syntheticKeys))
-	for _, c := range cols {
-		allowed[c.Name] = struct{}{}
+	return stringSet(fieldSpecNames(cols), syntheticKeys), nil
+}
+
+// stringSet returns the set of all names in the given lists.
+func stringSet(lists ...[]string) map[string]struct{} {
+	set := make(map[string]struct{})
+	for _, list := range lists {
+		for _, name := range list {
+			set[name] = struct{}{}
+		}
 	}
-	for _, key := range syntheticKeys {
-		allowed[key] = struct{}{}
-	}
-	return allowed, nil
+	return set
 }
 
 func insertFieldGroup(ctx context.Context, tx *sqlx.Tx, tableConfiguration string, ordinal int, g FieldGroupInput) error {

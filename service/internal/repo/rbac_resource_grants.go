@@ -42,7 +42,11 @@ func (r *Repository) UserHasResourceGrant(ctx context.Context, userID int, resou
 	if err != nil {
 		return false, err
 	}
+	return r.resourceGrantExists(ctx, col, userID, resourceType, resourceKey)
+}
 
+// resourceGrantExists reports whether any of the user's groups holds the grant column for the resource.
+func (r *Repository) resourceGrantExists(ctx context.Context, col string, userID int, resourceType, resourceKey string) (bool, error) {
 	query := fmt.Sprintf(`
 		SELECT 1
 		FROM rbac_resource_grants g
@@ -54,7 +58,7 @@ func (r *Repository) UserHasResourceGrant(ctx context.Context, userID int, resou
 		LIMIT 1`, col)
 
 	var one int
-	err = r.db.GetContext(ctx, &one, query, userID, resourceType, resourceKey)
+	err := r.db.GetContext(ctx, &one, query, userID, resourceType, resourceKey)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}

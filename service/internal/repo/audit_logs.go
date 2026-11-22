@@ -20,17 +20,25 @@ type AuditLogEntry struct {
 	Success       bool
 }
 
+// auditDetailsJSON encodes an audit entry's details, using "{}" when there are none.
+func auditDetailsJSON(details map[string]string) (string, error) {
+	if len(details) == 0 {
+		return "{}", nil
+	}
+	b, err := json.Marshal(details)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
 func (r *Repository) InsertAuditLog(ctx context.Context, e AuditLogEntry) error {
 	if e.EventType == "" {
 		return fmt.Errorf("event_type is required")
 	}
-	detailsJSON := "{}"
-	if len(e.Details) > 0 {
-		b, err := json.Marshal(e.Details)
-		if err != nil {
-			return err
-		}
-		detailsJSON = string(b)
+	detailsJSON, err := auditDetailsJSON(e.Details)
+	if err != nil {
+		return err
 	}
 	success := 0
 	if e.Success {
@@ -40,7 +48,7 @@ func (r *Repository) InsertAuditLog(ctx context.Context, e AuditLogEntry) error 
 	if e.ActorUserID > 0 {
 		actorID = e.ActorUserID
 	}
-	_, err := r.db.ExecContext(ctx, `
+	_, err = r.db.ExecContext(ctx, `
 		INSERT INTO audit_logs (
 			event_type, message, actor_user_id, actor_username,
 			related_user, related_tc, related_row_id,

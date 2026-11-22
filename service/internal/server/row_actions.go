@@ -30,16 +30,23 @@ func rowActionsToProto(tcName, raw string) []*sickrockpb.RowAction {
 	}
 	out := make([]*sickrockpb.RowAction, 0, len(parsed))
 	for _, a := range parsed {
-		label, path := strings.TrimSpace(a.Label), strings.TrimSpace(a.Path)
-		if label == "" || path == "" {
-			continue
+		if action := a.toProto(); action != nil {
+			out = append(out, action)
 		}
-		out = append(out, &sickrockpb.RowAction{
-			Label: label,
-			Path:  path,
-			Query: a.Query,
-			Icon:  strings.TrimSpace(a.Icon),
-		})
 	}
 	return out
+}
+
+// toProto converts the entry, or returns nil when it has no label or path.
+func (a rowActionJSON) toProto() *sickrockpb.RowAction {
+	label, path := strings.TrimSpace(a.Label), strings.TrimSpace(a.Path)
+	if label == "" || path == "" {
+		return nil
+	}
+	return &sickrockpb.RowAction{
+		Label: label,
+		Path:  path,
+		Query: a.Query,
+		Icon:  strings.TrimSpace(a.Icon),
+	}
 }

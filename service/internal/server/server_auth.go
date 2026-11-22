@@ -22,7 +22,7 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 	username := strings.TrimSpace(req.Msg.GetUsername())
 	password := req.Msg.GetPassword()
 
-	if username == "" || password == "" {
+	if missingLoginCredentials(username, password) {
 		return connect.NewResponse(&sickrockpb.LoginResponse{
 			Success: false,
 			Message: "Username and password are required",
@@ -51,21 +51,10 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 		}), nil
 	}
 
-	sid := uuid.New().String()
-	if err := s.auth.Store.CreateSession(ctx, sid, user.ID, nil); err != nil {
+	sid, err := s.startLoginSession(ctx, user.ID, username, userAgent, ipAddress)
+	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
-
-	s.recordAudit(ctx, repo.AuditLogEntry{
-		EventType:     audit.EventLogin,
-		Message:       "login successful",
-		ActorUserID:   user.ID,
-		ActorUsername: username,
-		RelatedUser:   username,
-		IPAddress:     ipAddress,
-		UserAgent:     userAgent,
-		Success:       true,
-	})
 
 	s.notifyLogin(ctx, username, userAgent, ipAddress)
 
@@ -78,6 +67,31 @@ func (s *SickRockServer) Login(ctx context.Context, req *connect.Request[sickroc
 	sessionCookie := s.auth.NewSessionCookie(sid)
 	res.Header().Add("Set-Cookie", (&sessionCookie).String())
 	return res, nil
+}
+
+// missingLoginCredentials reports whether the username or password is empty.
+func missingLoginCredentials(username, password string) bool {
+	return username == "" || password == ""
+}
+
+// startLoginSession creates a session for the user and audits the successful login.
+func (s *SickRockServer) startLoginSession(ctx context.Context, userID int, username, userAgent, ipAddress string) (string, error) {
+	sid := uuid.New().String()
+	if err := s.auth.Store.CreateSession(ctx, sid, userID, nil); err != nil {
+		return "", err
+	}
+
+	s.recordAudit(ctx, repo.AuditLogEntry{
+		EventType:     audit.EventLogin,
+		Message:       "login successful",
+		ActorUserID:   userID,
+		ActorUsername: username,
+		RelatedUser:   username,
+		IPAddress:     ipAddress,
+		UserAgent:     userAgent,
+		Success:       true,
+	})
+	return sid, nil
 }
 
 // verifyLoginCredentials returns the user when the username exists and the password matches, or nil
@@ -206,15 +220,20 @@ func (s *SickRockServer) ResetUserPassword(ctx context.Context, req *connect.Req
 		return connect.NewResponse(&sickrockpb.ResetUserPasswordResponse{Success: false, Message: "user not found"}), nil
 	}
 
-	hash, err := iam.HashPassword(newPassword)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-	if err := s.auth.Store.UpdateUserPassword(ctx, user.ID, hash); err != nil {
+	if err := s.storeUserPassword(ctx, user.ID, newPassword); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
 
 	return connect.NewResponse(&sickrockpb.ResetUserPasswordResponse{Success: true, Message: "password updated"}), nil
+}
+
+// storeUserPassword hashes newPassword and saves it for the user.
+func (s *SickRockServer) storeUserPassword(ctx context.Context, userID int, newPassword string) error {
+	hash, err := iam.HashPassword(newPassword)
+	if err != nil {
+		return err
+	}
+	return s.auth.Store.UpdateUserPassword(ctx, userID, hash)
 }
 
 // passwordResetProblem returns why a password reset request is invalid, or "".
