@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import type { IconData } from '../utils/hugeicons'
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Table from 'picocrank/vue/components/Table.vue'
@@ -37,7 +38,7 @@ import {
   fieldDefsForInsertForm,
 } from '../utils/insertRowViewFields'
 import { useIamUsers } from '../composables/useIamUsers'
-import { hasImageValue, isImageFieldType, isUserRefColumn as columnIsUserRef, isUserRefFieldType } from '../utils/fieldTypes'
+import { hasImageValue, isImageFieldType, isUserRefColumn as columnIsUserRef, isUserRefFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
 import InsertRow from './InsertRow.vue'
 import RowActionsDropdown from './RowActionsDropdown.vue'
 import TableComponentToolbar from './TableComponentToolbar.vue'
@@ -1265,14 +1266,15 @@ onUnmounted(() => {
 
             <template v-else-if="isEditingRow(row, header.key)">
               <div class="inline-edit" data-row-click-ignore>
-                <input
+                <RadioGroup
                   v-if="isTinyintColumn(header.key)"
-                  type="checkbox"
-                  :checked="getBooleanValue(sourceItemForRow(row), header.key)"
+                  variant="boolean"
+                  :options="YES_NO_OPTIONS"
+                  :model-value="getBooleanValue(sourceItemForRow(row), header.key)"
                   :disabled="saving"
-                  class="edit-checkbox"
-                  @change="event => {
-                    editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+                  :aria-label="header.label"
+                  @update:model-value="value => {
+                    editingValue = value ? '1' : '0'
                     saveEditRow(row)
                   }"
                 />
@@ -1577,14 +1579,15 @@ onUnmounted(() => {
 
             <template v-else-if="isEditingRow(row, header.key)">
               <div class="inline-edit" data-row-click-ignore>
-                <input
+                <RadioGroup
                   v-if="isTinyintColumn(header.key)"
-                  type="checkbox"
-                  :checked="getBooleanValue(sourceItemForRow(row), header.key)"
+                  variant="boolean"
+                  :options="YES_NO_OPTIONS"
+                  :model-value="getBooleanValue(sourceItemForRow(row), header.key)"
                   :disabled="saving"
-                  class="edit-checkbox"
-                  @change="event => {
-                    editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+                  :aria-label="header.label"
+                  @update:model-value="value => {
+                    editingValue = value ? '1' : '0'
                     saveEditRow(row)
                   }"
                 />
@@ -1872,15 +1875,7 @@ onUnmounted(() => {
 }
 
 .edit-input:disabled,
-.edit-checkbox:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
 
-.edit-checkbox {
-  cursor: pointer;
-  transform: scale(1.2);
-}
 
 .boolean-display {
   display: flex;

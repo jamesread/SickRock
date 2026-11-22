@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import { ref, shallowRef, onMounted, onUnmounted, computed, inject, provide, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -35,6 +36,7 @@ import {
   isImageFieldType,
   isUserRefColumn as columnIsUserRef,
   isUserRefFieldType,
+  YES_NO_OPTIONS,
 } from '../utils/fieldTypes'
 import { appTitle, formatDocumentTitle } from '../appTitle'
 import { rowEditActionLabel, rowNamePluralLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
@@ -1655,12 +1657,13 @@ function cancelDelete() {
       <p class="muted">
         Show the related row inside this item's main section, as if its fields were part of the item, instead of as a separate section.
       </p>
-      <FormField label="Absorb into item" for="relation-absorb" :disabled="savingRelation">
-        <input
-          id="relation-absorb"
+      <FormField label="Absorb into item" component-has-label :disabled="savingRelation">
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
           v-model="relationAbsorbDraft"
-          type="checkbox"
           :disabled="savingRelation"
+          aria-label="Absorb into item"
         />
       </FormField>
       <FormField label="Absorb type" for="relation-absorb-type" :disabled="savingRelation || !relationAbsorbDraft">
@@ -1910,9 +1913,5 @@ function cancelDelete() {
   outline: none;
 }
 
-.edit-checkbox {
-  width: 1.25rem;
-  height: 1.25rem;
-}
 
 </style>

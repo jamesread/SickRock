@@ -69,6 +69,7 @@ const referencedCreateLabel = ref('')
 // Extra fields on the picker's tiles: the detail columns of the referenced table's Cards view.
 const referencedDetailColumns = ref<string[]>([])
 const referencedFieldTypes = ref<Record<string, string>>({})
+const referencedFieldLabels = ref<Record<string, string>>({})
 const loading = ref(true)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -98,7 +99,7 @@ const pickerOptions = computed<WeeklyPlanPickerOption[]>(() => referencedRows.va
     value: String(row.id),
     label: referencedLabel(row),
     imageId: referencedImageId(row),
-    details: cardDetails(row, referencedDetailColumns.value, referencedFieldTypes.value),
+    details: cardDetails(row, referencedDetailColumns.value, referencedFieldTypes.value, referencedFieldLabels.value),
   }))
   .sort((a, b) => a.label.localeCompare(b.label)))
 const pickerTitle = computed(() => {
@@ -177,6 +178,7 @@ async function loadReferencedTable() {
   const cards = cardsView ? parseCardsConfig(cardsView.layoutJson) : null
   referencedDetailColumns.value = cards?.detailColumns ?? []
   referencedFieldTypes.value = Object.fromEntries((refStructure.fields ?? []).map(field => [field.name, field.type]))
+  referencedFieldLabels.value = Object.fromEntries((refStructure.fields ?? []).map(field => [field.name, field.displayLabel ?? '']))
   referencedImageColumn.value = cards?.imageColumn
     || (refStructure.fields?.find(f => isImageFieldType(f.type))?.name ?? '')
   referencedRows.value = refItems.items ?? []

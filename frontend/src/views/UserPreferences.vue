@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
+import { YES_NO_OPTIONS } from '../utils/fieldTypes'
 import { ref, onMounted, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { HugeiconsIcon } from '@hugeicons/vue'
@@ -69,12 +71,22 @@ onMounted(async () => {
           </select>
         </FormField>
 
-        <FormField label="Enable notifications" for="notifications">
-          <input id="notifications" type="checkbox" v-model="preferences.notifications" />
+        <FormField label="Enable notifications" component-has-label>
+          <RadioGroup
+            variant="boolean"
+            :options="YES_NO_OPTIONS"
+            v-model="preferences.notifications"
+            aria-label="Enable notifications"
+          />
         </FormField>
 
-        <FormField label="Email updates" for="email-updates">
-          <input id="email-updates" type="checkbox" v-model="preferences.emailUpdates" />
+        <FormField label="Email updates" component-has-label>
+          <RadioGroup
+            variant="boolean"
+            :options="YES_NO_OPTIONS"
+            v-model="preferences.emailUpdates"
+            aria-label="Email updates"
+          />
         </FormField>
 
         <template #actions>
