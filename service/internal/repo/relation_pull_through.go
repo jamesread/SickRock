@@ -32,13 +32,19 @@ func (r *Repository) ListRelationSyntheticColumnKeys(ctx context.Context, source
 		if err != nil {
 			return nil, err
 		}
-		for index, col := range cols {
-			if key := relationSyntheticColumnKey(col, index); key != "" && !slices.Contains(out, key) {
-				out = append(out, key)
-			}
-		}
+		out = appendSyntheticColumnKeys(out, cols)
 	}
 	return out, nil
+}
+
+// appendSyntheticColumnKeys appends the storage keys of cols that are not already in out.
+func appendSyntheticColumnKeys(out []string, cols []RelationPullThroughField) []string {
+	for index, col := range cols {
+		if key := relationSyntheticColumnKey(col, index); key != "" && !slices.Contains(out, key) {
+			out = append(out, key)
+		}
+	}
+	return out
 }
 
 // relationSyntheticColumnKey returns the storage key of a calculated or pull-through column, or "".
@@ -103,12 +109,9 @@ func validateRelationPullThroughFields(ctx context.Context, r *Repository, sourc
 		r:               r,
 		sourceTableKey:  sourceTableKey,
 		scopes:          scopes,
-		refKeyByColumn:  make(map[string]string, len(relations)),
+		refKeyByColumn:  refKeysBySourceColumn(relations),
 		seenPullThrough: make(map[string]struct{}, len(fields)),
 		seenCalculated:  make(map[string]struct{}, len(fields)),
-	}
-	for _, rel := range relations {
-		v.refKeyByColumn[strings.ToLower(rel.SourceColumn)] = rel.ReferencedTableKey
 	}
 	for i, pt := range fields {
 		if err := v.validate(ctx, i, pt); err != nil {
@@ -116,6 +119,15 @@ func validateRelationPullThroughFields(ctx context.Context, r *Repository, sourc
 		}
 	}
 	return nil
+}
+
+// refKeysBySourceColumn maps each relation's lower-cased source column to its referenced table key.
+func refKeysBySourceColumn(relations []TableRelation) map[string]string {
+	m := make(map[string]string, len(relations))
+	for _, rel := range relations {
+		m[strings.ToLower(rel.SourceColumn)] = rel.ReferencedTableKey
+	}
+	return m
 }
 
 // relationFieldValidator validates a relation's pull-through and calculated entries, tracking duplicates.
@@ -170,6 +182,11 @@ func validatePullThroughEntry(ctx context.Context, r *Repository, sourceTableKey
 	if !ok {
 		return fmt.Errorf("pull-through fk_column %q is not a foreign key on table %q", fkCol, sourceTableKey)
 	}
+	return requirePullThroughFieldOnTable(ctx, r, refKey, fkCol, field)
+}
+
+// requirePullThroughFieldOnTable checks field is a column of the table referenced through fkCol.
+func requirePullThroughFieldOnTable(ctx context.Context, r *Repository, refKey, fkCol, field string) error {
 	refTC, err := r.GetTableConfiguration(ctx, refKey)
 	if err != nil {
 		return fmt.Errorf("pull-through %s: referenced table: %w", fkCol, err)
@@ -190,14 +207,7 @@ func (r *Repository) UpdateTableRelation(ctx context.Context, constraintName, di
 	if constraintName == "" {
 		return fmt.Errorf("constraint name is required")
 	}
-	rel, err := r.getTableRelationByConstraintName(ctx, constraintName)
-	if err != nil {
-		return err
-	}
-	if err = validateRelationPullThroughFields(ctx, r, rel.SourceTableKey, pullThrough); err != nil {
-		return err
-	}
-	pullArg, err := marshalRelationPullThroughJSON(pullThrough)
+	pullArg, err := r.validatedPullThroughArg(ctx, constraintName, pullThrough)
 	if err != nil {
 		return err
 	}
@@ -208,6 +218,18 @@ func (r *Repository) UpdateTableRelation(ctx context.Context, constraintName, di
 		return err
 	}
 	return requireRowsAffected(res, "table relation not found")
+}
+
+// validatedPullThroughArg validates pullThrough against the relation's source table and returns its JSON column value.
+func (r *Repository) validatedPullThroughArg(ctx context.Context, constraintName string, pullThrough []RelationPullThroughField) (any, error) {
+	rel, err := r.getTableRelationByConstraintName(ctx, constraintName)
+	if err != nil {
+		return nil, err
+	}
+	if err = validateRelationPullThroughFields(ctx, r, rel.SourceTableKey, pullThrough); err != nil {
+		return nil, err
+	}
+	return marshalRelationPullThroughJSON(pullThrough)
 }
 
 // requireRowsAffected fails with notFound when a statement changed no rows.

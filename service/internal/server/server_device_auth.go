@@ -91,14 +91,21 @@ func (s *SickRockServer) CheckDeviceCode(ctx context.Context, req *connect.Reque
 	}
 
 	if claimedBy != "" {
-		// Best effort: the polling device picks the session up on a later check if this fails.
-		if user, sid, failure, err := s.claimantSession(ctx, claimedBy); err == nil && failure == "" {
-			response.Token = sid
-			response.Username = user.Username
-		}
+		s.attachClaimantSession(ctx, response, claimedBy)
 	}
 
 	return connect.NewResponse(response), nil
+}
+
+// attachClaimantSession adds the claimant's session to a check response. Best effort: the polling
+// device picks the session up on a later check if this fails.
+func (s *SickRockServer) attachClaimantSession(ctx context.Context, response *sickrockpb.CheckDeviceCodeResponse, claimedBy string) {
+	user, sid, failure, err := s.claimantSession(ctx, claimedBy)
+	if err != nil || failure != "" {
+		return
+	}
+	response.Token = sid
+	response.Username = user.Username
 }
 
 func (s *SickRockServer) GetDeviceCodeSession(ctx context.Context, req *connect.Request[sickrockpb.GetDeviceCodeSessionRequest]) (*connect.Response[sickrockpb.GetDeviceCodeSessionResponse], error) {
@@ -110,26 +117,7 @@ func (s *SickRockServer) GetDeviceCodeSession(ctx context.Context, req *connect.
 		}), nil
 	}
 
-	deviceCode, err := s.repo.GetDeviceCode(ctx, code)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, err)
-	}
-	if deviceCode == nil {
-		return connect.NewResponse(&sickrockpb.GetDeviceCodeSessionResponse{
-			Success: false,
-			Message: "Device code not found or expired",
-		}), nil
-	}
-
-	claimedBy := nullStringOr(deviceCode.ClaimedBy, "")
-	if claimedBy == "" {
-		return connect.NewResponse(&sickrockpb.GetDeviceCodeSessionResponse{
-			Success: false,
-			Message: "Device code not yet claimed",
-		}), nil
-	}
-
-	user, sid, failure, err := s.claimantSession(ctx, claimedBy)
+	user, sid, failure, err := s.claimedDeviceCodeSession(ctx, code)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, err)
 	}
@@ -147,6 +135,33 @@ func (s *SickRockServer) GetDeviceCodeSession(ctx context.Context, req *connect.
 		ExpiresAt: sessionExpiresAt(),
 		Username:  user.Username,
 	}), nil
+}
+
+// claimedDeviceCodeSession returns the user who claimed a device code and their latest session ID,
+// or a user-facing failure message when the code is not claimed or the session cannot be found.
+func (s *SickRockServer) claimedDeviceCodeSession(ctx context.Context, code string) (user *armstore.UserAccountRow, sid, failure string, err error) {
+	claimedBy, failure, err := s.deviceCodeClaimant(ctx, code)
+	if err != nil || failure != "" {
+		return nil, "", failure, err
+	}
+	return s.claimantSession(ctx, claimedBy)
+}
+
+// deviceCodeClaimant returns the username that claimed a device code, or a user-facing failure
+// message when the code is unknown, expired or not yet claimed.
+func (s *SickRockServer) deviceCodeClaimant(ctx context.Context, code string) (claimedBy, failure string, err error) {
+	deviceCode, err := s.repo.GetDeviceCode(ctx, code)
+	if err != nil {
+		return "", "", err
+	}
+	if deviceCode == nil {
+		return "", "Device code not found or expired", nil
+	}
+	claimedBy = nullStringOr(deviceCode.ClaimedBy, "")
+	if claimedBy == "" {
+		return "", "Device code not yet claimed", nil
+	}
+	return claimedBy, "", nil
 }
 
 // claimantSession returns the user who claimed a device code and their latest session ID, or a

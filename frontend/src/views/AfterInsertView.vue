@@ -12,6 +12,7 @@ const tableId = route.params.tableName as string
 const fromTable = route.query.fromTable as string | undefined
 const fromRowId = route.query.fromRowId as string | undefined
 const dashboardName = route.query.dashboardName as string | undefined
+const createdRowId = route.query.createdRowId as string | undefined
 
 const client = createApiClient()
 const rowLabel = ref('Row')
@@ -60,6 +61,12 @@ function insertAnother() {
   }
 }
 
+function viewCreatedRow() {
+  if (createdRowId) {
+    router.push({ name: 'row', params: { tableName: tableId, rowId: createdRowId } })
+  }
+}
+
 function returnToTable() {
   router.push({ name: 'table', params: { tableName: tableId } })
 }
@@ -85,6 +92,9 @@ function returnToDashboard() {
     </div>
 
     <div class="action-row center action-buttons">
+      <button v-if="createdRowId && !isFromColumnAddition" type="button" class="button neutral" @click="viewCreatedRow">
+        👁️ View {{ rowLabel }}
+      </button>
       <button type="button" class="button neutral" @click="returnToTable">
         📋 {{ returnToTableLabel }}
       </button>

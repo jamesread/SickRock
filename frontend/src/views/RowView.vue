@@ -31,6 +31,7 @@ import { useIamUsers } from '../composables/useIamUsers'
 import {
   findFieldDef,
   hasStoredUserRefValue,
+  isBooleanFieldType,
   isImageFieldType,
   isUserRefColumn as columnIsUserRef,
   isUserRefFieldType,
@@ -244,8 +245,7 @@ function isUserRefColumn(column: string): boolean {
 }
 
 function isTinyintColumn(column: string): boolean {
-  const type = fieldType(column).toLowerCase()
-  return type.startsWith('tinyint') || type === 'bool' || type === 'boolean'
+  return isBooleanFieldType(fieldType(column))
 }
 
 function isDatetimeColumn(column: string): boolean {

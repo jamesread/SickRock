@@ -36,18 +36,11 @@ type APIKeyResource struct {
 // APIKeyScope narrows what an API key can do. Its owner's current access is always the ceiling:
 // a scope can only take access away.
 type APIKeyScope struct {
-	// When RestrictPermissions is false the key has every permission its owner has.
-	RestrictPermissions bool
 	Permissions         []string
-
-	// When RestrictResources is false the key can use every table, dashboard and workflow its
-	// owner can.
-	RestrictResources bool
-	Resources         []APIKeyResource
-
-	// OwnerIsSuperuser is set per request, before the owner's RBAC is narrowed, so resource checks
-	// can still let a superuser's key reach every resource the scope allows.
-	OwnerIsSuperuser bool
+	Resources           []APIKeyResource
+	RestrictPermissions bool
+	RestrictResources   bool
+	OwnerIsSuperuser    bool
 }
 
 // AllowsPermission reports whether the scope lets the key use a permission its owner holds.
@@ -66,8 +59,8 @@ func (s *APIKeyScope) AllowsResource(resourceType, key string) bool {
 
 // APIKeyDetails is what is stored about a key beyond armature-iam's columns.
 type APIKeyDetails struct {
-	ExpiresAt int64 // Unix seconds; 0 never expires
 	Scope     APIKeyScope
+	ExpiresAt int64
 }
 
 // Expired reports whether the key has passed its expiry time.
@@ -186,15 +179,20 @@ func UpdateAPIKey(ctx context.Context, db *sql.DB, keyID, userID int, u APIKeyUp
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrAPIKeyNotFound
 	}
-	if u.Scope != nil {
-		if err := replaceAPIKeyPermissions(ctx, tx, keyID, u.Scope); err != nil {
-			return err
-		}
-		if err := replaceAPIKeyResources(ctx, tx, keyID, u.Scope); err != nil {
-			return err
-		}
+	if err := replaceAPIKeyScope(ctx, tx, keyID, u.Scope); err != nil {
+		return err
 	}
 	return tx.Commit()
+}
+
+func replaceAPIKeyScope(ctx context.Context, tx *sql.Tx, keyID int, scope *APIKeyScope) error {
+	if scope == nil {
+		return nil
+	}
+	if err := replaceAPIKeyPermissions(ctx, tx, keyID, scope); err != nil {
+		return err
+	}
+	return replaceAPIKeyResources(ctx, tx, keyID, scope)
 }
 
 // apiKeyUpdateSet returns the SET clauses for an update. updated_at is always set, so the
@@ -229,17 +227,24 @@ func replaceAPIKeyPermissions(ctx context.Context, tx *sql.Tx, keyID int, scope 
 		return nil
 	}
 	for _, name := range uniqueSorted(scope.Permissions) {
-		var known int
-		if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM rbac_permissions WHERE name = ?`, name).Scan(&known); err != nil {
-			return fmt.Errorf("check permission %s: %w", name, err)
+		if err := insertAPIKeyPermission(ctx, tx, keyID, name); err != nil {
+			return err
 		}
-		if known == 0 {
-			return &InvalidScopeError{fmt.Sprintf("unknown permission %q", name)}
-		}
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO api_key_permissions (api_key_id, permission_name) VALUES (?, ?)`, keyID, name); err != nil {
-			return fmt.Errorf("add api key permission %s: %w", name, err)
-		}
+	}
+	return nil
+}
+
+func insertAPIKeyPermission(ctx context.Context, tx *sql.Tx, keyID int, name string) error {
+	var known int
+	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM rbac_permissions WHERE name = ?`, name).Scan(&known); err != nil {
+		return fmt.Errorf("check permission %s: %w", name, err)
+	}
+	if known == 0 {
+		return &InvalidScopeError{fmt.Sprintf("unknown permission %q", name)}
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO api_key_permissions (api_key_id, permission_name) VALUES (?, ?)`, keyID, name); err != nil {
+		return fmt.Errorf("add api key permission %s: %w", name, err)
 	}
 	return nil
 }
@@ -253,19 +258,26 @@ func replaceAPIKeyResources(ctx context.Context, tx *sql.Tx, keyID int, scope *A
 	}
 	seen := map[APIKeyResource]bool{}
 	for _, r := range scope.Resources {
-		r.Key = strings.TrimSpace(r.Key)
-		if !IsAPIKeyResourceType(r.Type) {
-			return &InvalidScopeError{fmt.Sprintf("unknown resource type %q", r.Type)}
+		if err := insertAPIKeyResource(ctx, tx, keyID, r, seen); err != nil {
+			return err
 		}
-		if r.Key == "" || seen[r] {
-			continue
-		}
-		seen[r] = true
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO api_key_resources (api_key_id, resource_type, resource_key) VALUES (?, ?, ?)`,
-			keyID, r.Type, r.Key); err != nil {
-			return fmt.Errorf("add api key resource %s %s: %w", r.Type, r.Key, err)
-		}
+	}
+	return nil
+}
+
+func insertAPIKeyResource(ctx context.Context, tx *sql.Tx, keyID int, r APIKeyResource, seen map[APIKeyResource]bool) error {
+	r.Key = strings.TrimSpace(r.Key)
+	if !IsAPIKeyResourceType(r.Type) {
+		return &InvalidScopeError{fmt.Sprintf("unknown resource type %q", r.Type)}
+	}
+	if r.Key == "" || seen[r] {
+		return nil
+	}
+	seen[r] = true
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO api_key_resources (api_key_id, resource_type, resource_key) VALUES (?, ?, ?)`,
+		keyID, r.Type, r.Key); err != nil {
+		return fmt.Errorf("add api key resource %s %s: %w", r.Type, r.Key, err)
 	}
 	return nil
 }
@@ -291,17 +303,25 @@ func (e *InvalidScopeError) Error() string { return e.msg }
 // NarrowRBAC returns the permissions an API key request really has: the owner's effective
 // permissions limited by the key's scope. A permission-restricted key never counts as superuser.
 func NarrowRBAC(owner *rbac.EffectiveRBAC, scope *APIKeyScope) *rbac.EffectiveRBAC {
-	if scope == nil || !scope.RestrictPermissions || owner == nil {
+	if !shouldNarrowRBAC(owner, scope) {
 		return owner
 	}
 	out := &rbac.EffectiveRBAC{Permissions: map[string]bool{}, RoleNames: owner.RoleNames}
 	for p, ok := range owner.Permissions {
 		// A superuser's map holds every permission (armature-iam loads them all).
-		if (ok || owner.IsSuperuser) && scope.AllowsPermission(p) {
+		if ownerHoldsPermission(owner, ok) && scope.AllowsPermission(p) {
 			out.Permissions[p] = true
 		}
 	}
 	return out
+}
+
+func shouldNarrowRBAC(owner *rbac.EffectiveRBAC, scope *APIKeyScope) bool {
+	return scope != nil && scope.RestrictPermissions && owner != nil
+}
+
+func ownerHoldsPermission(owner *rbac.EffectiveRBAC, listed bool) bool {
+	return listed || owner.IsSuperuser
 }
 
 type apiKeyScopeCtxKey struct{}

@@ -66,6 +66,11 @@ func fetchFeedBody(ctx context.Context, feedURL string) ([]byte, string, error) 
 	}
 	defer func() { _ = resp.Body.Close() }()
 
+	return readFeedResponse(feedURL, resp)
+}
+
+// readFeedResponse reads and validates a feed HTTP response, returning its body and content type.
+func readFeedResponse(feedURL string, resp *http.Response) ([]byte, string, error) {
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxFeedBodyBytes))
 	if err != nil {
 		log.WithError(err).WithFields(log.Fields{

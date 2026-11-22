@@ -61,7 +61,7 @@ func (s *SickRockServer) auditActorFromContext(ctx context.Context) (userID int,
 	return au.User.ID, au.User.Username
 }
 
-func (s *SickRockServer) auditTableAccess(ctx context.Context, tcName string, action repo.ResourceGrantAction, rowID string, success bool, message string) {
+func (s *SickRockServer) auditTableAccess(ctx context.Context, tcName string, action repo.ResourceGrantAction, success bool, message string) {
 	if tcName == "" || tcName == audit.TableConfiguration {
 		return
 	}
@@ -72,7 +72,6 @@ func (s *SickRockServer) auditTableAccess(ctx context.Context, tcName string, ac
 		ActorUserID:   actorID,
 		ActorUsername: actorName,
 		RelatedTC:     tcName,
-		RelatedRowID:  rowID,
 		Success:       success,
 	})
 }

@@ -1469,6 +1469,39 @@ message DeleteUserNotificationSubscriptionResponse {
   string message = 2;
 }
 
+// User-to-user notifications. The sender may notify users who share an IAM group with them;
+// each recipient gets it on their channels subscribed to the user.notified event.
+message ListNotifiableUsersRequest {}
+
+message NotifiableUser {
+  int32 id = 1;
+  string username = 2;
+}
+
+message ListNotifiableUsersResponse {
+  repeated NotifiableUser users = 1;
+}
+
+message NotifyUsersRequest {
+  repeated int32 recipient_user_ids = 1;
+  string title = 2;
+  string message = 3;
+  // A path on this site, e.g. /table/meals?view=3; sent as an absolute link.
+  string link_path = 4;
+}
+
+message NotifyUserResult {
+  int32 user_id = 1;
+  string username = 2;
+  // "sent", "not_subscribed" (no active channel subscribed to user.notified) or "failed".
+  string status = 3;
+  int32 delivered_channels = 4;
+}
+
+message NotifyUsersResponse {
+  repeated NotifyUserResult results = 1;
+}
+
 // Tick list state (server-side, shared across clients)
 message GetTickListStateRequest {
   string tc_name = 1;  // Table configuration name
@@ -1645,6 +1678,8 @@ service SickRock {
   rpc GetUserNotificationSubscriptions(GetUserNotificationSubscriptionsRequest) returns (GetUserNotificationSubscriptionsResponse);
   rpc CreateUserNotificationSubscription(CreateUserNotificationSubscriptionRequest) returns (CreateUserNotificationSubscriptionResponse);
   rpc DeleteUserNotificationSubscription(DeleteUserNotificationSubscriptionRequest) returns (DeleteUserNotificationSubscriptionResponse);
+  rpc ListNotifiableUsers(ListNotifiableUsersRequest) returns (ListNotifiableUsersResponse);
+  rpc NotifyUsers(NotifyUsersRequest) returns (NotifyUsersResponse);
 
   // Tick list state (shared across clients)
   rpc GetTickListState(GetTickListStateRequest) returns (GetTickListStateResponse);

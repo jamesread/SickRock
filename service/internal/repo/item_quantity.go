@@ -30,83 +30,128 @@ type AddItemQuantityResult struct {
 // value matches NULL), or, when no row matches and delta is positive, inserts a row with match, fields
 // and quantityColumn = delta. The lookup and write run in one transaction.
 func (r *Repository) AddItemQuantity(ctx context.Context, table string, match map[string]string, quantityColumn string, delta int64, fields map[string]string) (AddItemQuantityResult, error) {
-	tc, err := r.GetTableConfiguration(ctx, table)
+	q, err := r.newQuantityUpdate(ctx, table, quantityColumn)
 	if err != nil {
-		return AddItemQuantityResult{}, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
+		return AddItemQuantityResult{}, err
 	}
-	columns, err := r.ListColumns(ctx, tc)
-	if err != nil {
-		return AddItemQuantityResult{}, fmt.Errorf("failed to get columns for table %s: %w", table, err)
-	}
-	qtyCol := writableColumn(columns, quantityColumn)
-	if qtyCol == nil {
-		return AddItemQuantityResult{}, fmt.Errorf("unknown quantity column %q", quantityColumn)
-	}
-	whereSQL, whereArgs, err := itemMatchWhere(columns, match)
+	whereSQL, whereArgs, err := itemMatchWhere(q.columns, match)
 	if err != nil {
 		return AddItemQuantityResult{}, err
 	}
 
-	tx, err := r.db.BeginTxx(ctx, nil)
+	q.tx, err = r.db.BeginTxx(ctx, nil)
 	if err != nil {
 		return AddItemQuantityResult{}, err
 	}
-	defer func() { _ = tx.Rollback() }()
+	defer func() { _ = q.tx.Rollback() }()
 
-	pkColumn := tc.PrimaryKeyColumnName()
-	tableRef := fmt.Sprintf("`%s`.`%s`", tc.Db.String, tc.Table.String)
-	lock := ""
-	if r.db.DriverName() == "mysql" {
-		lock = " FOR UPDATE"
-	}
-	selectQuery := fmt.Sprintf("SELECT `%s`, COALESCE(`%s`, 0) FROM %s WHERE %s ORDER BY `%s` DESC LIMIT 1%s",
-		pkColumn, qtyCol.Name, tableRef, whereSQL, pkColumn, lock)
+	return r.addToNewestMatch(ctx, q, match, fields, delta, whereSQL, whereArgs)
+}
 
-	var id string
-	var current int64
-	err = tx.QueryRowxContext(ctx, selectQuery, whereArgs...).Scan(&id, &current)
+// addToNewestMatch adds delta to the newest matching row, or inserts a new row when none matches.
+func (r *Repository) addToNewestMatch(ctx context.Context, q *quantityUpdate, match map[string]string, fields map[string]string, delta int64, whereSQL string, whereArgs []any) (AddItemQuantityResult, error) {
+	id, current, err := q.newestMatch(ctx, r.db.DriverName(), whereSQL, whereArgs)
 	switch {
 	case err == nil:
-		total := current + delta
-		if total < 0 {
-			return AddItemQuantityResult{}, ErrNegativeQuantity
-		}
-		set, args := itemUpdateSet(columns, "", map[string]string{qtyCol.Name: strconv.FormatInt(total, 10)}, r.sqlCurrentTimestampExpr())
-		updateQuery := fmt.Sprintf("UPDATE %s SET %s WHERE `%s` = ?", tableRef, strings.Join(set, ", "), pkColumn)
-		if _, err = tx.ExecContext(ctx, updateQuery, append(args, id)...); err != nil {
-			return AddItemQuantityResult{}, err
-		}
-		return r.commitItemQuantity(ctx, tx, tc, id, total, false)
+		return r.updateItemQuantity(ctx, q, id, current+delta)
 	case errors.Is(err, sql.ErrNoRows):
-		if delta <= 0 {
-			return AddItemQuantityResult{}, ErrNoMatchingItem
-		}
-		values := maps.Clone(fields)
-		if values == nil {
-			values = map[string]string{}
-		}
-		for k, v := range match {
-			if v == "" {
-				delete(values, k)
-			} else {
-				values[k] = v
-			}
-		}
-		values[qtyCol.Name] = strconv.FormatInt(delta, 10)
-		insertColumns, placeholders, args := itemInsertColumns(columns, values, r.sqlCurrentTimestampExpr())
-		insertQuery := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", tableRef, strings.Join(insertColumns, ", "), strings.Join(placeholders, ", "))
-		res, err := tx.ExecContext(ctx, insertQuery, args...)
-		if err != nil {
-			return AddItemQuantityResult{}, err
-		}
-		lastID, err := res.LastInsertId()
-		if err != nil {
-			return AddItemQuantityResult{}, err
-		}
-		return r.commitItemQuantity(ctx, tx, tc, strconv.FormatInt(lastID, 10), delta, true)
+		return r.insertItemQuantity(ctx, q, match, fields, delta)
 	default:
 		return AddItemQuantityResult{}, err
 	}
+}
+
+// quantityUpdate is one AddItemQuantity call's table and transaction.
+type quantityUpdate struct {
+	tx        *sqlx.Tx
+	tc        *TableConfig
+	tableRef  string
+	pkColumn  string
+	qtyColumn string
+	columns   []FieldSpec
+}
+
+func (r *Repository) newQuantityUpdate(ctx context.Context, table, quantityColumn string) (*quantityUpdate, error) {
+	tc, err := r.GetTableConfiguration(ctx, table)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get table configuration for table %s: %w", table, err)
+	}
+	columns, err := r.ListColumns(ctx, tc)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+	}
+	qtyCol := writableColumn(columns, quantityColumn)
+	if qtyCol == nil {
+		return nil, fmt.Errorf("unknown quantity column %q", quantityColumn)
+	}
+	return &quantityUpdate{
+		tc:        tc,
+		columns:   columns,
+		tableRef:  fmt.Sprintf("`%s`.`%s`", tc.Db.String, tc.Table.String),
+		pkColumn:  tc.PrimaryKeyColumnName(),
+		qtyColumn: qtyCol.Name,
+	}, nil
+}
+
+// newestMatch returns the id and quantity of the newest matching row (locked on MySQL), or
+// sql.ErrNoRows.
+func (q *quantityUpdate) newestMatch(ctx context.Context, driver, whereSQL string, whereArgs []any) (id string, current int64, err error) {
+	lock := ""
+	if driver == "mysql" {
+		lock = " FOR UPDATE"
+	}
+	selectQuery := fmt.Sprintf("SELECT `%s`, COALESCE(`%s`, 0) FROM %s WHERE %s ORDER BY `%s` DESC LIMIT 1%s",
+		q.pkColumn, q.qtyColumn, q.tableRef, whereSQL, q.pkColumn, lock)
+	err = q.tx.QueryRowxContext(ctx, selectQuery, whereArgs...).Scan(&id, &current)
+	return id, current, err
+}
+
+func (r *Repository) updateItemQuantity(ctx context.Context, q *quantityUpdate, id string, total int64) (AddItemQuantityResult, error) {
+	if total < 0 {
+		return AddItemQuantityResult{}, ErrNegativeQuantity
+	}
+	set, args := itemUpdateSet(q.columns, "", map[string]string{q.qtyColumn: strconv.FormatInt(total, 10)}, r.sqlCurrentTimestampExpr())
+	updateQuery := fmt.Sprintf("UPDATE %s SET %s WHERE `%s` = ?", q.tableRef, strings.Join(set, ", "), q.pkColumn)
+	if _, err := q.tx.ExecContext(ctx, updateQuery, append(args, id)...); err != nil {
+		return AddItemQuantityResult{}, err
+	}
+	return r.commitItemQuantity(ctx, q.tx, q.tc, id, total, false)
+}
+
+func (r *Repository) insertItemQuantity(ctx context.Context, q *quantityUpdate, match, fields map[string]string, delta int64) (AddItemQuantityResult, error) {
+	if delta <= 0 {
+		return AddItemQuantityResult{}, ErrNoMatchingItem
+	}
+	values := newQuantityRowValues(match, fields)
+	values[q.qtyColumn] = strconv.FormatInt(delta, 10)
+	insertColumns, placeholders, args := itemInsertColumns(q.columns, values, r.sqlCurrentTimestampExpr())
+	insertQuery := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", q.tableRef, strings.Join(insertColumns, ", "), strings.Join(placeholders, ", "))
+	res, err := q.tx.ExecContext(ctx, insertQuery, args...)
+	if err != nil {
+		return AddItemQuantityResult{}, err
+	}
+	lastID, err := res.LastInsertId()
+	if err != nil {
+		return AddItemQuantityResult{}, err
+	}
+	return r.commitItemQuantity(ctx, q.tx, q.tc, strconv.FormatInt(lastID, 10), delta, true)
+}
+
+// newQuantityRowValues returns fields overlaid with match, leaving out match columns that are
+// empty (they stay NULL).
+func newQuantityRowValues(match, fields map[string]string) map[string]string {
+	values := maps.Clone(fields)
+	if values == nil {
+		values = map[string]string{}
+	}
+	for k, v := range match {
+		if v == "" {
+			delete(values, k)
+		} else {
+			values[k] = v
+		}
+	}
+	return values
 }
 
 func (r *Repository) commitItemQuantity(ctx context.Context, tx *sqlx.Tx, tc *TableConfig, id string, total int64, created bool) (AddItemQuantityResult, error) {

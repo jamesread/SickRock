@@ -3,7 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
-import { SickRock } from '../gen/sickrock_pb'
+import { SickRock, type Item } from '../gen/sickrock_pb'
 import InsertRow from '../components/InsertRow.vue'
 import {
   applyViewToInsertFieldDefs,
@@ -84,7 +84,7 @@ onMounted(async () => {
 
 // Recompute display fields when selection or definitions change
 watch([selectedViewId, fieldDefs], applyViewToFields)
-function handleCreated() {
+function handleCreated(item?: Item) {
   // If this insert was initiated from a related row context, propagate origin for return link
   const fromTable = route.query.fromTable as string | undefined
   const fromRowId = route.query.fromRowId as string | undefined
@@ -95,6 +95,7 @@ function handleCreated() {
   if (fromRowId) q.fromRowId = fromRowId
   if (dashboard) q.dashboard = dashboard
   if (dashboardName) q.dashboardName = dashboardName
+  if (item?.id) q.createdRowId = item.id
   router.push({ name: 'after-insert', params: { tableName: tableId }, query: q })
 }
 

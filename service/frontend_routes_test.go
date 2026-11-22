@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -58,23 +57,16 @@ func newFrontendTestRouter(t *testing.T, title string) *gin.Engine {
 }
 
 func copyFileForTest(from, to string) error {
-	in, err := os.Open(from)
+	data, err := os.ReadFile(from)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
-	out, err := os.Create(to)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
+	return os.WriteFile(to, data, 0o600)
 }
 
 func get(router http.Handler, method, target string) *httptest.ResponseRecorder {
 	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, httptest.NewRequest(method, target, nil))
+	router.ServeHTTP(rec, httptest.NewRequestWithContext(context.Background(), method, target, nil))
 	return rec
 }
 

@@ -20,6 +20,20 @@ export function isImageFieldType(fieldType: string | undefined): boolean {
   return (fieldType ?? '').toLowerCase() === IMAGE_FIELD_TYPE
 }
 
+/** A boolean column: MySQL tinyint (TINYINT(1)), or a SQLite column declared BOOLEAN/BOOL/TINYINT. */
+export function isBooleanFieldType(fieldType: string | undefined): boolean {
+  const type = (fieldType ?? '').trim().toLowerCase()
+  return type.startsWith('tinyint') || type === 'bool' || type === 'boolean'
+}
+
+/** Whether a stored boolean column value is true ("1", "true", "yes"; NULL, "" and "0" are false). */
+export function isTrueBooleanValue(raw: unknown): boolean {
+  if (typeof raw === 'boolean') return raw
+  if (typeof raw === 'number') return raw !== 0
+  const value = String(raw ?? '').trim().toLowerCase()
+  return value !== '' && value !== '0' && value !== 'false' && value !== 'no' && value !== 'null'
+}
+
 /** Whether a stored image column value refers to an image (NULL, empty and 0 mean none). */
 export function hasImageValue(raw: unknown): boolean {
   if (raw == null) return false
