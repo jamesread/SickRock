@@ -22,10 +22,10 @@ func testJWTAuthYAMLWithCookie() map[string]any {
 	return y
 }
 
-func newJWTRequest(t *testing.T, email string) *http.Request {
+func newJWTRequest(t *testing.T) *http.Request {
 	t.Helper()
 	req := httptest.NewRequestWithContext(context.Background(), "POST", sickrockpbconnect.SickRockInitProcedure, nil)
-	tok := signTestJWT(t, email)
+	tok := signTestJWT(t, "alice@example.com")
 	req.Header.Set(testJWTHeader, tok)
 	req.AddCookie(&http.Cookie{Name: testJWTCookie, Value: tok})
 	return req
@@ -35,7 +35,7 @@ func TestStripJWTIfOptedOut(t *testing.T) {
 	j := jwtSourcesFromAuthYAML(testJWTAuthYAMLWithCookie())
 	require.True(t, j.configured())
 
-	req := newJWTRequest(t, "alice@example.com")
+	req := newJWTRequest(t)
 	assert.Same(t, req, j.stripJWTIfOptedOut(req), "no opt-out cookie: request unchanged")
 
 	req.AddCookie(&http.Cookie{Name: SSOOptOutCookieName, Value: "1"})
@@ -54,7 +54,7 @@ func TestStripJWTIfOptedOut(t *testing.T) {
 func TestStripJWTIfOptedOut_NotConfigured(t *testing.T) {
 	j := jwtSourcesFromAuthYAML(nil)
 	assert.False(t, j.configured())
-	req := newJWTRequest(t, "alice@example.com")
+	req := newJWTRequest(t)
 	req.AddCookie(&http.Cookie{Name: SSOOptOutCookieName, Value: "1"})
 	assert.Same(t, req, j.stripJWTIfOptedOut(req))
 }
@@ -69,13 +69,13 @@ func TestSSOOptOut_IgnoresJWTEndToEnd(t *testing.T) {
 	layer, err := NewAuthLayer(st, nil, testJWTAuthYAMLWithCookie())
 	require.NoError(t, err)
 
-	req := newJWTRequest(t, "alice@example.com")
+	req := newJWTRequest(t)
 	req.AddCookie(&http.Cookie{Name: SSOOptOutCookieName, Value: "1"})
 	info, err := layer.Handle(ctx, layer.jwt.stripJWTIfOptedOut(req))
 	require.NoError(t, err, "Init is allowed unauthenticated")
 	assert.Nil(t, info, "opted-out browser is not signed in by the JWT")
 
-	info, err = layer.Handle(ctx, newJWTRequest(t, "alice@example.com"))
+	info, err = layer.Handle(ctx, newJWTRequest(t))
 	require.NoError(t, err)
 	au, ok := info.(*armlayer.AuthenticatedUser)
 	require.True(t, ok, "without the opt-out cookie the JWT still signs in")
@@ -90,7 +90,7 @@ func TestSSOOptOutCookie(t *testing.T) {
 	layer, err := NewAuthLayer(st, nil, testJWTAuthYAML())
 	require.NoError(t, err)
 
-	c, ok := layer.SSOOptOutCookie(newJWTRequest(t, "alice@example.com").Header)
+	c, ok := layer.SSOOptOutCookie(newJWTRequest(t).Header)
 	require.True(t, ok)
 	assert.Equal(t, SSOOptOutCookieName, c.Name)
 	assert.Equal(t, "/", c.Path)
@@ -102,6 +102,6 @@ func TestSSOOptOutCookie(t *testing.T) {
 
 	noJWT, err := NewAuthLayer(st, nil, nil)
 	require.NoError(t, err)
-	_, ok = noJWT.SSOOptOutCookie(newJWTRequest(t, "alice@example.com").Header)
+	_, ok = noJWT.SSOOptOutCookie(newJWTRequest(t).Header)
 	assert.False(t, ok, "JWT not configured")
 }

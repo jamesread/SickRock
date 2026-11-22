@@ -18,6 +18,9 @@ const envPrefix = "SICKROCK_"
 
 // Config holds application configuration loaded via koanf.
 type Config struct {
+	// Auth is the "auth" block of config.yaml, passed to armature-iam (httpauthshim).
+	// Supports auth.jwt.* (eg Cloudflare Access) the same way as Starloom.
+	Auth      map[string]any
 	Port      string
 	LogLevel  string
 	LogFormat string
@@ -28,9 +31,6 @@ type Config struct {
 	ImagesDir string
 	// UIUsageDir is where each user's opt-in UI usage log (JSONL) is stored.
 	UIUsageDir string
-	// Auth is the "auth" block of config.yaml, passed to armature-iam (httpauthshim).
-	// Supports auth.jwt.* (eg Cloudflare Access) the same way as Starloom.
-	Auth map[string]any
 }
 
 // Load builds configuration from -configdir, config file, and environment.

@@ -110,29 +110,44 @@ func quickJumpConstraintNames(configJSON string) ([]string, error) {
 	return []string{}, nil
 }
 
+// countQuickJumpBlock adds blockType to the running quick_jump count, failing on a second one.
+func countQuickJumpBlock(blockType string, count int) (int, error) {
+	if blockType == PageBlockTypeQuickJump {
+		count++
+	}
+	if count > 1 {
+		return count, fmt.Errorf("only one quick_jump block is allowed per layout")
+	}
+	return count, nil
+}
+
 func validatePageLayoutBlocks(blocks []PageLayoutBlockInput, allowedConstraints map[string]struct{}) error {
 	seen := make(map[string]struct{})
 	quickJumpCount := 0
 	for i, b := range blocks {
-		blockType := strings.TrimSpace(b.BlockType)
-		if blockType == "" {
-			return fmt.Errorf("block %d: block_type is required", i+1)
-		}
-		if blockType == PageBlockTypeQuickJump {
-			quickJumpCount++
-		}
-		if quickJumpCount > 1 {
-			return fmt.Errorf("only one quick_jump block is allowed per layout")
-		}
-		names, err := constraintNamesFromBlock(blockType, b.ConfigJSON)
-		if err != nil {
-			return fmt.Errorf("block %d: %w", i+1, err)
-		}
-		if err := claimLayoutConstraints(i, names, allowedConstraints, seen); err != nil {
+		var err error
+		if quickJumpCount, err = validatePageLayoutBlock(i, b, quickJumpCount, allowedConstraints, seen); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// validatePageLayoutBlock validates block i and returns the updated quick_jump count.
+func validatePageLayoutBlock(i int, b PageLayoutBlockInput, quickJumpCount int, allowedConstraints, seen map[string]struct{}) (int, error) {
+	blockType := strings.TrimSpace(b.BlockType)
+	if blockType == "" {
+		return quickJumpCount, fmt.Errorf("block %d: block_type is required", i+1)
+	}
+	quickJumpCount, err := countQuickJumpBlock(blockType, quickJumpCount)
+	if err != nil {
+		return quickJumpCount, err
+	}
+	names, err := constraintNamesFromBlock(blockType, b.ConfigJSON)
+	if err != nil {
+		return quickJumpCount, fmt.Errorf("block %d: %w", i+1, err)
+	}
+	return quickJumpCount, claimLayoutConstraints(i, names, allowedConstraints, seen)
 }
 
 // claimLayoutConstraints checks block i's relation constraints are allowed and not used by an earlier block.
@@ -208,11 +223,7 @@ func (r *Repository) SetItemPageLayoutBlocks(ctx context.Context, tableConfigura
 	if tableConfiguration == "" {
 		return fmt.Errorf("table configuration is required")
 	}
-	allowed, err := r.allowedRelationConstraintNames(ctx, tableConfiguration)
-	if err != nil {
-		return err
-	}
-	if err = validatePageLayoutBlocks(blocks, allowed); err != nil {
+	if err := r.validateItemPageLayoutBlocks(ctx, tableConfiguration, blocks); err != nil {
 		return err
 	}
 
@@ -223,6 +234,15 @@ func (r *Repository) SetItemPageLayoutBlocks(ctx context.Context, tableConfigura
 		}
 		return writePageLayoutBlocks(ctx, tx, layoutID, blocks)
 	})
+}
+
+// validateItemPageLayoutBlocks checks blocks only reference relations of the table configuration.
+func (r *Repository) validateItemPageLayoutBlocks(ctx context.Context, tableConfiguration string, blocks []PageLayoutBlockInput) error {
+	allowed, err := r.allowedRelationConstraintNames(ctx, tableConfiguration)
+	if err != nil {
+		return err
+	}
+	return validatePageLayoutBlocks(blocks, allowed)
 }
 
 // ensureItemPageLayout returns the id of the table's item-view page layout, creating it when it is

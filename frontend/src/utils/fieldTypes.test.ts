@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import type { Field } from '../gen/sickrock_pb'
 import {
+  isBooleanFieldType,
+  isTrueBooleanValue,
   hasStoredUserRefValue,
   isLikelyIamUsersTable,
   isUserRefColumn,
@@ -32,4 +34,20 @@ describe('fieldTypes', () => {
     expect(isLikelyIamUsersTable('users')).toBe(true)
     expect(isLikelyIamUsersTable('customers')).toBe(false)
   })
+})
+
+describe('boolean fields', () => {
+  it.each(['tinyint', 'TINYINT(1)', 'tinyint(4)', 'BOOLEAN', 'bool', ' Boolean '])('%s is a boolean column', (type) => {
+    expect(isBooleanFieldType(type)).toBe(true)
+  })
+
+  it.each(['int', 'INTEGER', 'bigint', 'varchar', 'text', '', undefined])('%s is not a boolean column', (type) => {
+    expect(isBooleanFieldType(type)).toBe(false)
+  })
+
+  it.each([['1', true], [1, true], [true, true], ['true', true], ['TRUE', true], ['yes', true], ['2', true],
+    ['0', false], [0, false], [false, false], ['', false], [null, false], [undefined, false], ['false', false], ['no', false], ['null', false]])(
+    '%j is %s', (raw, want) => {
+      expect(isTrueBooleanValue(raw)).toBe(want)
+    })
 })

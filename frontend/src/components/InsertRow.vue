@@ -6,7 +6,7 @@ import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import { SickRock } from '../gen/sickrock_pb'
 import { useIamUsers } from '../composables/useIamUsers'
-import { isIconFieldType, isImageFieldType, isUserRefFieldType } from '../utils/fieldTypes'
+import { isBooleanFieldType, isIconFieldType, isImageFieldType, isTrueBooleanValue, isUserRefFieldType } from '../utils/fieldTypes'
 import IconPickerField from './IconPickerField.vue'
 import ImageField from './ImageField.vue'
 import { fieldDisplayLabel } from '../utils/fieldColumnDisplay'
@@ -649,6 +649,11 @@ async function submit() {
   for (const f of props.fieldDefs) {
     if (f.name === 'id') continue
     const v = form.value[f.name]
+    if (isBooleanFieldType(f.type)) {
+      // An unticked box is false, so it is sent rather than left to the column default.
+      payload[f.name] = isTrueBooleanValue(v) ? '1' : '0'
+      continue
+    }
     if (v == null || v === '') {
       if (shouldSendClearedFieldOnEdit(f.name, v)) {
         payload[f.name] = clearedFieldPayloadValue(f)
@@ -865,6 +870,14 @@ function cancel() {
               </div>
             </div>
 
+            <!-- Boolean (tinyint) checkbox -->
+            <input
+              v-else-if="isBooleanFieldType(f.type)"
+              :id="'field-' + f.name"
+              type="checkbox"
+              :checked="isTrueBooleanValue(form[f.name])"
+              @change="form[f.name] = ($event.target as HTMLInputElement).checked ? '1' : '0'"
+            />
             <!-- Regular text input -->
             <input
               v-else-if="f.type === 'string' || f.type === 'varchar' || f.type === 'text'"

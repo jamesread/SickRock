@@ -146,25 +146,12 @@ func (r *Repository) UpdateTableRelationDisplayName(ctx context.Context, constra
 	if constraintName == "" {
 		return fmt.Errorf("constraint name is required")
 	}
-	displayName = strings.TrimSpace(displayName)
-	var arg any
-	if displayName == "" {
-		arg = nil
-	} else {
-		arg = displayName
-	}
+	arg := nilIfEmpty(strings.TrimSpace(displayName))
 	res, err := r.db.ExecContext(ctx, `UPDATE table_relations SET display_name = ? WHERE constraint_name = ?`, arg, constraintName)
 	if err != nil {
 		return err
 	}
-	n, err := res.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if n == 0 {
-		return fmt.Errorf("table relation not found")
-	}
-	return nil
+	return requireRowsAffected(res, "table relation not found")
 }
 
 func (r *Repository) tableRelationsToForeignKeys(ctx context.Context, relations []TableRelation) ([]ForeignKey, error) {
@@ -209,31 +196,37 @@ func (r *Repository) backfillTableRelations(ctx context.Context, tc *TableConfig
 		return
 	}
 	for _, fk := range physicalFKs {
-		refKey, err := r.lookupTableConfigKeyByPhysical(ctx, fk.ReferencedSchema, fk.ReferencedTable)
-		if err != nil || refKey == "" {
-			log.WithFields(log.Fields{
-				"source":    tc.Name,
-				"ref_table": fk.ReferencedTable,
-			}).Debug("skip backfill FK: referenced table has no configuration")
-			continue
-		}
-		rel := TableRelation{
-			ConstraintName:     fk.ConstraintName,
-			SourceTableKey:     tc.Name,
-			SourceColumn:       fk.ColumnName,
-			ReferencedTableKey: refKey,
-			ReferencedColumn:   fk.ReferencedColumn,
-			OnDeleteAction:     fk.OnDeleteAction,
-			OnUpdateAction:     fk.OnUpdateAction,
-		}
-		if rel.ConstraintName == "" {
-			rel.ConstraintName = makeForeignKeyConstraintName(
-				rel.SourceTableKey, rel.SourceColumn, rel.ReferencedTableKey, rel.ReferencedColumn,
-			)
-		}
-		if err := r.insertTableRelation(ctx, rel); err != nil {
-			log.WithError(err).WithField("constraint", rel.ConstraintName).Debug("backfill insert relation")
-		}
+		r.backfillForeignKeyRelation(ctx, tc, fk)
+	}
+}
+
+// backfillForeignKeyRelation records a relation for one physical foreign key when its referenced
+// table has a configuration.
+func (r *Repository) backfillForeignKeyRelation(ctx context.Context, tc *TableConfig, fk ForeignKey) {
+	refKey, err := r.lookupTableConfigKeyByPhysical(ctx, fk.ReferencedSchema, fk.ReferencedTable)
+	if err != nil || refKey == "" {
+		log.WithFields(log.Fields{
+			"source":    tc.Name,
+			"ref_table": fk.ReferencedTable,
+		}).Debug("skip backfill FK: referenced table has no configuration")
+		return
+	}
+	rel := TableRelation{
+		ConstraintName:     fk.ConstraintName,
+		SourceTableKey:     tc.Name,
+		SourceColumn:       fk.ColumnName,
+		ReferencedTableKey: refKey,
+		ReferencedColumn:   fk.ReferencedColumn,
+		OnDeleteAction:     fk.OnDeleteAction,
+		OnUpdateAction:     fk.OnUpdateAction,
+	}
+	if rel.ConstraintName == "" {
+		rel.ConstraintName = makeForeignKeyConstraintName(
+			rel.SourceTableKey, rel.SourceColumn, rel.ReferencedTableKey, rel.ReferencedColumn,
+		)
+	}
+	if err := r.insertTableRelation(ctx, rel); err != nil {
+		log.WithError(err).WithField("constraint", rel.ConstraintName).Debug("backfill insert relation")
 	}
 }
 
@@ -331,18 +324,26 @@ func absorbTypeOrDefault(absorb bool, absorbType string) string {
 	return RelationAbsorbFirstRow
 }
 
+// absorbTypeArg returns the absorb_type column value: nil when not absorbing, else the validated type.
+func absorbTypeArg(absorb bool, absorbType string) (any, error) {
+	if !absorb {
+		return nil, nil
+	}
+	absorbType = strings.TrimSpace(absorbType)
+	if absorbType == "" {
+		absorbType = RelationAbsorbFirstRow
+	}
+	if !relationAbsorbTypes[absorbType] {
+		return nil, fmt.Errorf("unsupported absorb type %q", absorbType)
+	}
+	return absorbType, nil
+}
+
 // SetTableRelationAbsorb sets whether (and how) a relation's rows are absorbed into the item view.
 func (r *Repository) SetTableRelationAbsorb(ctx context.Context, constraintName string, absorb bool, absorbType string) error {
-	absorbType = strings.TrimSpace(absorbType)
-	var typeArg any
-	if absorb {
-		if absorbType == "" {
-			absorbType = RelationAbsorbFirstRow
-		}
-		if !relationAbsorbTypes[absorbType] {
-			return fmt.Errorf("unsupported absorb type %q", absorbType)
-		}
-		typeArg = absorbType
+	typeArg, err := absorbTypeArg(absorb, absorbType)
+	if err != nil {
+		return err
 	}
 	res, err := r.db.ExecContext(ctx,
 		"UPDATE table_relations SET absorb_into_item = ?, absorb_type = ? WHERE constraint_name = ?",

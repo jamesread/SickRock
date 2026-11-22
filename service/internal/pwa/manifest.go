@@ -12,7 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"iter"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -131,63 +131,108 @@ func Validate(manifest []byte) []string {
 	if err != nil {
 		return []string{err.Error()}
 	}
-	var problems []string
-	add := func(format string, args ...any) { problems = append(problems, fmt.Sprintf(format, args...)) }
+	var p problemList
+	p.checkAppearance(m)
+	p.checkPaths(m)
+	p.checkIcons(m)
+	p.checkScreenshots(m)
+	return p
+}
 
+// problemList collects the problems Validate finds.
+type problemList []string
+
+func (p *problemList) add(format string, args ...any) {
+	*p = append(*p, fmt.Sprintf(format, args...))
+}
+
+func (p *problemList) checkAppearance(m Manifest) {
 	if strings.TrimSpace(m.Name) == "" {
-		add("name is empty")
+		p.add("name is empty")
 	}
 	if strings.TrimSpace(m.ShortName) == "" {
-		add("short_name is empty")
-	}
-	for field, value := range map[string]string{"id": m.ID, "start_url": m.StartURL, "scope": m.Scope} {
-		if !isSitePath(value) {
-			add("%s %q is not a path on this site (it must start with a single /)", field, value)
-		}
-	}
-	if isSitePath(m.StartURL) && isSitePath(m.Scope) && !strings.HasPrefix(m.StartURL, m.Scope) {
-		add("start_url %q is outside scope %q", m.StartURL, m.Scope)
+		p.add("short_name is empty")
 	}
 	if !validDisplays[m.Display] {
-		add("display %q is not one of fullscreen, standalone, minimal-ui or browser", m.Display)
+		p.add("display %q is not one of fullscreen, standalone, minimal-ui or browser", m.Display)
 	}
+	p.checkColors(m)
+}
+
+func (p *problemList) checkColors(m Manifest) {
 	if !colorPattern.MatchString(m.ThemeColor) {
-		add("theme_color %q is not a #rgb or #rrggbb colour", m.ThemeColor)
+		p.add("theme_color %q is not a #rgb or #rrggbb colour", m.ThemeColor)
 	}
 	if !colorPattern.MatchString(m.BackgroundColor) {
-		add("background_color %q is not a #rgb or #rrggbb colour", m.BackgroundColor)
+		p.add("background_color %q is not a #rgb or #rrggbb colour", m.BackgroundColor)
 	}
+}
 
+func (p *problemList) checkPaths(m Manifest) {
+	for _, field := range []struct{ name, value string }{{"id", m.ID}, {"start_url", m.StartURL}, {"scope", m.Scope}} {
+		if !isSitePath(field.value) {
+			p.add("%s %q is not a path on this site (it must start with a single /)", field.name, field.value)
+		}
+	}
+	if startURLOutsideScope(m) {
+		p.add("start_url %q is outside scope %q", m.StartURL, m.Scope)
+	}
+}
+
+// startURLOutsideScope reports whether start_url and scope are both site paths but start_url is not under scope.
+func startURLOutsideScope(m Manifest) bool {
+	return isSitePath(m.StartURL) && isSitePath(m.Scope) && !strings.HasPrefix(m.StartURL, m.Scope)
+}
+
+func (p *problemList) checkIcons(m Manifest) {
 	if len(m.Icons) == 0 {
-		add("there are no icons")
+		p.add("there are no icons")
 	}
-	pngSizes := map[string]bool{}
-	for i, icon := range m.Icons {
-		problems = append(problems, validateImage(fmt.Sprintf("icons[%d]", i), icon)...)
-		for _, purpose := range strings.Fields(icon.Purpose) {
-			if !validIconPurposes[purpose] {
-				add("icons[%d] purpose %q is not any, maskable or monochrome", i, purpose)
-			}
-		}
-		if icon.Type == "image/png" && (icon.Purpose == "" || strings.Contains(icon.Purpose, "any")) {
-			for _, size := range strings.Fields(icon.Sizes) {
-				pngSizes[size] = true
-			}
-		}
-	}
+	pngSizes := p.checkIconEntries(m.Icons)
 	for _, size := range requiredIconSizes {
 		if !pngSizes[size] {
-			add("there is no %s PNG icon (browsers need one to install the app)", size)
+			p.add("there is no %s PNG icon (browsers need one to install the app)", size)
 		}
 	}
+}
 
-	for i, shot := range m.Screenshots {
-		problems = append(problems, validateImage(fmt.Sprintf("screenshots[%d]", i), shot)...)
-		if shot.FormFactor != "" && !validFormFactors[shot.FormFactor] {
-			add("screenshots[%d] form_factor %q is not wide or narrow", i, shot.FormFactor)
+// checkIconEntries validates each icon and returns the set of sizes the icons offer for installing the app.
+func (p *problemList) checkIconEntries(icons []Image) map[string]bool {
+	pngSizes := map[string]bool{}
+	for i, icon := range icons {
+		*p = append(*p, validateImage(fmt.Sprintf("icons[%d]", i), icon)...)
+		p.checkIconPurposes(i, icon)
+		for size := range installableSizes(icon) {
+			pngSizes[size] = true
 		}
 	}
-	return problems
+	return pngSizes
+}
+
+func (p *problemList) checkIconPurposes(i int, icon Image) {
+	for purpose := range strings.FieldsSeq(icon.Purpose) {
+		if !validIconPurposes[purpose] {
+			p.add("icons[%d] purpose %q is not any, maskable or monochrome", i, purpose)
+		}
+	}
+}
+
+// installableSizes returns the sizes an icon offers for installing the app: those of a PNG
+// whose purpose includes "any" (the default).
+func installableSizes(icon Image) iter.Seq[string] {
+	if icon.Type != "image/png" || (icon.Purpose != "" && !strings.Contains(icon.Purpose, "any")) {
+		return func(func(string) bool) {}
+	}
+	return strings.FieldsSeq(icon.Sizes)
+}
+
+func (p *problemList) checkScreenshots(m Manifest) {
+	for i, shot := range m.Screenshots {
+		*p = append(*p, validateImage(fmt.Sprintf("screenshots[%d]", i), shot)...)
+		if shot.FormFactor != "" && !validFormFactors[shot.FormFactor] {
+			p.add("screenshots[%d] form_factor %q is not wide or narrow", i, shot.FormFactor)
+		}
+	}
 }
 
 func validateImage(where string, image Image) []string {
@@ -198,7 +243,12 @@ func validateImage(where string, image Image) []string {
 	if !validImageTypes[image.Type] {
 		problems = append(problems, fmt.Sprintf("%s type %q is not image/png, image/webp or image/svg+xml", where, image.Type))
 	}
-	sizes := strings.Fields(image.Sizes)
+	return append(problems, validateImageSizes(where, image.Sizes)...)
+}
+
+func validateImageSizes(where, imageSizes string) []string {
+	var problems []string
+	sizes := strings.Fields(imageSizes)
 	if len(sizes) == 0 {
 		problems = append(problems, fmt.Sprintf("%s has no sizes", where))
 	}
@@ -224,37 +274,49 @@ func CheckFiles(manifest []byte, root string) []string {
 		return []string{err.Error()}
 	}
 	var problems []string
-	check := func(where string, image Image) {
-		if !isSitePath(image.Src) {
-			return // reported by Validate
-		}
-		file := filepath.Join(root, filepath.FromSlash(path.Clean(image.Src)))
-		data, err := os.ReadFile(file)
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("%s %s is missing from the frontend", where, image.Src))
-			return
-		}
-		if image.Type != "image/png" {
-			return
-		}
-		width, height, err := pngSize(data)
-		if err != nil {
-			problems = append(problems, fmt.Sprintf("%s %s is not a PNG: %v", where, image.Src, err))
-			return
-		}
-		declared := strings.Fields(image.Sizes)
-		actual := strconv.Itoa(width) + "x" + strconv.Itoa(height)
-		if len(declared) == 1 && declared[0] != "any" && declared[0] != actual {
-			problems = append(problems, fmt.Sprintf("%s %s is %s, but the manifest says %s", where, image.Src, actual, declared[0]))
-		}
-	}
 	for i, icon := range m.Icons {
-		check(fmt.Sprintf("icons[%d]", i), icon)
+		problems = appendNonEmpty(problems, checkImageFile(root, fmt.Sprintf("icons[%d]", i), icon))
 	}
 	for i, shot := range m.Screenshots {
-		check(fmt.Sprintf("screenshots[%d]", i), shot)
+		problems = appendNonEmpty(problems, checkImageFile(root, fmt.Sprintf("screenshots[%d]", i), shot))
 	}
 	return problems
+}
+
+func appendNonEmpty(list []string, item string) []string {
+	if item == "" {
+		return list
+	}
+	return append(list, item)
+}
+
+// checkImageFile returns what is wrong with the file an image references, or "".
+func checkImageFile(root, where string, image Image) string {
+	if !isSitePath(image.Src) {
+		return "" // reported by Validate
+	}
+	data, err := readFrontendFile(root, filepath.FromSlash(strings.TrimPrefix(path.Clean(image.Src), "/")))
+	if err != nil {
+		return fmt.Sprintf("%s %s is missing from the frontend", where, image.Src)
+	}
+	if image.Type != "image/png" {
+		return ""
+	}
+	return pngSizeProblem(where, image, data)
+}
+
+// pngSizeProblem returns "" when data is a PNG of the size the manifest declares for it.
+func pngSizeProblem(where string, image Image, data []byte) string {
+	width, height, err := pngSize(data)
+	if err != nil {
+		return fmt.Sprintf("%s %s is not a PNG: %v", where, image.Src, err)
+	}
+	declared := strings.Fields(image.Sizes)
+	actual := strconv.Itoa(width) + "x" + strconv.Itoa(height)
+	if len(declared) == 1 && declared[0] != "any" && declared[0] != actual {
+		return fmt.Sprintf("%s %s is %s, but the manifest says %s", where, image.Src, actual, declared[0])
+	}
+	return ""
 }
 
 var pngSignature = []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n'}

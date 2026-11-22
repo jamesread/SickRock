@@ -2,7 +2,6 @@ package health
 
 import (
 	"context"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +47,8 @@ func TestPWACheckPassesForTheShippedFrontend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := copyTestFile(filepath.Join("..", "..", "..", "frontend", "index.html"), filepath.Join(dir, "index.html")); err != nil {
+	err = copyTestFile(filepath.Join("..", "..", "..", "frontend", "index.html"), filepath.Join(dir, "index.html"))
+	if err != nil {
 		t.Fatal(err)
 	}
 
@@ -59,16 +59,9 @@ func TestPWACheckPassesForTheShippedFrontend(t *testing.T) {
 }
 
 func copyTestFile(from, to string) error {
-	in, err := os.Open(from)
+	data, err := os.ReadFile(from)
 	if err != nil {
 		return err
 	}
-	defer in.Close()
-	out, err := os.Create(to)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-	_, err = io.Copy(out, in)
-	return err
+	return os.WriteFile(to, data, 0o600)
 }

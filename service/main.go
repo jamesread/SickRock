@@ -33,11 +33,11 @@ import (
 	"github.com/jamesread/SickRock/internal/health"
 	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/images"
-	"github.com/jamesread/SickRock/internal/uiusage"
 	"github.com/jamesread/SickRock/internal/mcp"
 	"github.com/jamesread/SickRock/internal/pwa"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
+	"github.com/jamesread/SickRock/internal/uiusage"
 	armhealth "github.com/jamesread/armature-health"
 	"github.com/jamesread/armature-health/errorlog"
 	"github.com/jamesread/armature-health/store/sqlstore"
@@ -89,13 +89,17 @@ func applyEnvFile(envFile string) {
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if key, value, ok := strings.Cut(line, "="); ok {
-			_ = os.Setenv(key, value)
-		}
+		applyEnvLine(strings.TrimSpace(scanner.Text()))
+	}
+}
+
+// applyEnvLine sets the environment variable of a KEY=value line, ignoring blanks, # comments and lines without "=".
+func applyEnvLine(line string) {
+	if line == "" || strings.HasPrefix(line, "#") {
+		return
+	}
+	if key, value, ok := strings.Cut(line, "="); ok {
+		_ = os.Setenv(key, value)
 	}
 }
 
@@ -171,6 +175,14 @@ func resetAdminPassword(ctx context.Context, iamStore armstore.Store) error {
 	return nil
 }
 
+// createDefaultAdminAccount creates the admin user with the given password hash and bootstraps its RBAC.
+func createDefaultAdminAccount(ctx context.Context, iamStore armstore.Store, hash string) error {
+	if _, err := iamStore.CreateUserAccount(ctx, "admin", hash, armstore.UserCreatedByAdmin); err != nil {
+		return err
+	}
+	return iamStore.EnsureRBACBootstrap(ctx)
+}
+
 // ensureDefaultAdmin creates an admin/admin user when there are no user accounts at all.
 func ensureDefaultAdmin(ctx context.Context, iamStore armstore.Store) error {
 	count, err := iamStore.CountUserAccounts(ctx)
@@ -182,10 +194,7 @@ func ensureDefaultAdmin(ctx context.Context, iamStore armstore.Store) error {
 	if err != nil {
 		return err
 	}
-	if _, err := iamStore.CreateUserAccount(ctx, "admin", hash, armstore.UserCreatedByAdmin); err != nil {
-		return err
-	}
-	if err := iamStore.EnsureRBACBootstrap(ctx); err != nil {
+	if err := createDefaultAdminAccount(ctx, iamStore, hash); err != nil {
 		return err
 	}
 	log.Info("Default admin user created (username: admin, password: admin)")
@@ -265,20 +274,25 @@ func openDatabase() (*sqlx.DB, *repo.Repository) {
 		log.Fatalf("migrations failed: %v", err)
 	}
 
-	if err = repository.UpdateSystemTableConfigurations(context.Background()); err != nil {
-		log.Fatalf("update system table configurations: %v", err)
-	}
-
-	if err = repository.BackfillTableRelationsFromPhysicalFKs(context.Background()); err != nil {
-		log.Fatalf("backfill table_relations: %v", err)
-	}
-
-	if err = repository.EnsureSystemTableRelations(context.Background()); err != nil {
-		log.Fatalf("ensure system table relations: %v", err)
-	}
+	refreshSystemMetadata(repository)
 
 	logDatabaseEngineVersion(db)
 	return db, repository
+}
+
+// refreshSystemMetadata updates system table configurations and relations, exiting on failure.
+func refreshSystemMetadata(repository *repo.Repository) {
+	if err := repository.UpdateSystemTableConfigurations(context.Background()); err != nil {
+		log.Fatalf("update system table configurations: %v", err)
+	}
+
+	if err := repository.BackfillTableRelationsFromPhysicalFKs(context.Background()); err != nil {
+		log.Fatalf("backfill table_relations: %v", err)
+	}
+
+	if err := repository.EnsureSystemTableRelations(context.Background()); err != nil {
+		log.Fatalf("ensure system table relations: %v", err)
+	}
 }
 
 // newRouter serves the Connect API under /api, the AI discovery endpoints, MCP, metrics and the frontend.
@@ -306,7 +320,7 @@ func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer, frontendDir
 	router.Use(ginLogrusLogger())
 	router.Use(gin.Recovery())
 	router.Use(corsMiddleware)
-	router.Any("/api/*any", gin.WrapH(http.StripPrefix("/api", mux)))
+	router.Any("/api/*any", gin.WrapH(srvpkg.WithRequestOrigin(http.StripPrefix("/api", mux))))
 
 	router.GET("/openapi", func(c *gin.Context) {
 		c.Header("Content-Type", "application/json")
@@ -321,8 +335,8 @@ func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer, frontendDir
 	router.GET("/metrics", gin.WrapH(metricsHandler()))
 
 	mcpHandler := mcp.NewHandler(srv)
-	router.Any("/mcp", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
-	router.Any("/mcp/*path", gin.WrapH(authLayer.WrapMCPHandler(mcpHandler)))
+	router.Any("/mcp", gin.WrapH(srvpkg.WithRequestOrigin(authLayer.WrapMCPHandler(mcpHandler))))
+	router.Any("/mcp/*path", gin.WrapH(srvpkg.WithRequestOrigin(authLayer.WrapMCPHandler(mcpHandler))))
 
 	registerFrontendRoutes(router, frontendDir, appTitle)
 	return router

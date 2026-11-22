@@ -108,13 +108,27 @@ func validateChannelValue(channelType, channelValue string) error {
 	if channelValue == "" {
 		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("channel value is required"))
 	}
-	if channelType == "email" && !strings.Contains(channelValue, "@") {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid email address"))
+	if err := validateEmailChannelValue(channelType, channelValue); err != nil {
+		return err
 	}
-	if channelType == "webhook" && !strings.HasPrefix(channelValue, "http://") && !strings.HasPrefix(channelValue, "https://") {
-		return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("webhook URL must start with http:// or https://"))
+	return validateWebhookChannelValue(channelType, channelValue)
+}
+
+func validateEmailChannelValue(channelType, channelValue string) error {
+	if channelType != "email" || strings.Contains(channelValue, "@") {
+		return nil
 	}
-	return nil
+	return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("invalid email address"))
+}
+
+func validateWebhookChannelValue(channelType, channelValue string) error {
+	if channelType != "webhook" {
+		return nil
+	}
+	if strings.HasPrefix(channelValue, "http://") || strings.HasPrefix(channelValue, "https://") {
+		return nil
+	}
+	return connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("webhook URL must start with http:// or https://"))
 }
 
 // optionalString trims value, returning nil when it is empty.
@@ -126,19 +140,22 @@ func optionalString(value string) *string {
 	return &value
 }
 
-// UpdateUserNotificationChannel updates a notification channel
-func (s *SickRockServer) UpdateUserNotificationChannel(ctx context.Context, req *connect.Request[sickrockpb.UpdateUserNotificationChannelRequest]) (*connect.Response[sickrockpb.UpdateUserNotificationChannelResponse], error) {
+// ownedChannelFromRequest requires a valid channel ID and returns the channel when the caller owns it.
+func (s *SickRockServer) ownedChannelFromRequest(ctx context.Context, channelID int) (*repo.UserNotificationChannel, error) {
 	userID, err := s.getUserIDFromContext(ctx)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
-
-	channelID := int(req.Msg.GetChannelId())
 	if channelID <= 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("channel ID is required"))
 	}
+	return s.ownedUserNotificationChannel(ctx, userID, channelID)
+}
 
-	channel, err := s.ownedUserNotificationChannel(ctx, userID, channelID)
+// UpdateUserNotificationChannel updates a notification channel
+func (s *SickRockServer) UpdateUserNotificationChannel(ctx context.Context, req *connect.Request[sickrockpb.UpdateUserNotificationChannelRequest]) (*connect.Response[sickrockpb.UpdateUserNotificationChannelResponse], error) {
+	channelID := int(req.Msg.GetChannelId())
+	channel, err := s.ownedChannelFromRequest(ctx, channelID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,16 +188,8 @@ func (s *SickRockServer) DeleteUserNotificationChannel(ctx context.Context, req 
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("channel ID is required"))
 	}
 
-	// Verify the channel belongs to the user
-	channel, err := s.repo.GetUserNotificationChannelByID(ctx, channelID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve channel: %w", err))
-	}
-	if channel == nil {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("channel not found"))
-	}
-	if channel.User != userID {
-		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("channel does not belong to user"))
+	if _, err = s.ownedUserNotificationChannel(ctx, userID, channelID); err != nil {
+		return nil, err
 	}
 
 	err = s.repo.DeleteUserNotificationChannel(ctx, channelID)
@@ -262,48 +271,47 @@ func (s *SickRockServer) CreateUserNotificationSubscription(ctx context.Context,
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, err)
 	}
-
-	eventCode := strings.TrimSpace(req.Msg.GetEventCode())
-	channelID := int(req.Msg.GetChannelId())
-
-	if err = validateSubscriptionRequest(eventCode, channelID); err != nil {
-		return nil, err
-	}
-
-	event, err := s.notificationEventByCode(ctx, eventCode)
+	event, channel, err := s.prepareNotificationSubscription(ctx, userID, req.Msg)
 	if err != nil {
 		return nil, err
 	}
-
-	channel, err := s.activeUserNotificationChannel(ctx, userID, channelID)
-	if err != nil {
-		return nil, err
-	}
-
-	if err = s.requireNoNotificationSubscription(ctx, userID, event.ID, channelID); err != nil {
-		return nil, err
-	}
-
-	subscription, err := s.repo.CreateUserNotificationSubscription(ctx, userID, event.ID, channelID)
+	subscription, err := s.repo.CreateUserNotificationSubscription(ctx, userID, event.ID, channel.ID)
 	if err != nil {
 		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to create subscription: %w", err))
 	}
-
-	pbSub := &sickrockpb.UserNotificationSubscription{
-		Id:        toInt32(subscription.ID),
-		UserId:    toInt32(subscription.User),
-		EventId:   toInt32(subscription.EventID),
-		ChannelId: toInt32(subscription.ChannelID),
-		SrCreated: subscription.SrCreated.Unix(),
-		Event:     notificationEventToProto(event),
-		Channel:   notificationChannelToProto(*channel),
-	}
-
 	return connect.NewResponse(&sickrockpb.CreateUserNotificationSubscriptionResponse{
-		Success:      true,
-		Message:      "Notification subscription created successfully",
-		Subscription: pbSub,
+		Success: true,
+		Message: "Notification subscription created successfully",
+		Subscription: &sickrockpb.UserNotificationSubscription{
+			Id:        toInt32(subscription.ID),
+			UserId:    toInt32(subscription.User),
+			EventId:   toInt32(subscription.EventID),
+			ChannelId: toInt32(subscription.ChannelID),
+			SrCreated: subscription.SrCreated.Unix(),
+			Event:     notificationEventToProto(event),
+			Channel:   notificationChannelToProto(*channel),
+		},
 	}), nil
+}
+
+func (s *SickRockServer) prepareNotificationSubscription(ctx context.Context, userID int, msg *sickrockpb.CreateUserNotificationSubscriptionRequest) (*repo.NotificationEvent, *repo.UserNotificationChannel, error) {
+	eventCode := strings.TrimSpace(msg.GetEventCode())
+	channelID := int(msg.GetChannelId())
+	if err := validateSubscriptionRequest(eventCode, channelID); err != nil {
+		return nil, nil, err
+	}
+	event, err := s.notificationEventByCode(ctx, eventCode)
+	if err != nil {
+		return nil, nil, err
+	}
+	channel, err := s.activeUserNotificationChannel(ctx, userID, channelID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if err := s.requireNoNotificationSubscription(ctx, userID, event.ID, channelID); err != nil {
+		return nil, nil, err
+	}
+	return event, channel, nil
 }
 
 // activeUserNotificationChannel loads a channel, verifying it belongs to the user and is active.
@@ -359,16 +367,8 @@ func (s *SickRockServer) DeleteUserNotificationSubscription(ctx context.Context,
 		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("subscription ID is required"))
 	}
 
-	// Verify the subscription belongs to the user
-	subscription, err := s.repo.GetUserNotificationSubscriptionByID(ctx, subscriptionID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve subscription: %w", err))
-	}
-	if subscription == nil {
-		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("subscription not found"))
-	}
-	if subscription.User != userID {
-		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("subscription does not belong to user"))
+	if _, err = s.ownedUserNotificationSubscription(ctx, userID, subscriptionID); err != nil {
+		return nil, err
 	}
 
 	err = s.repo.DeleteUserNotificationSubscription(ctx, subscriptionID)
@@ -380,6 +380,20 @@ func (s *SickRockServer) DeleteUserNotificationSubscription(ctx context.Context,
 		Success: true,
 		Message: "Notification subscription deleted successfully",
 	}), nil
+}
+
+func (s *SickRockServer) ownedUserNotificationSubscription(ctx context.Context, userID, subscriptionID int) (*repo.UserNotificationSubscription, error) {
+	subscription, err := s.repo.GetUserNotificationSubscriptionByID(ctx, subscriptionID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("failed to retrieve subscription: %w", err))
+	}
+	if subscription == nil {
+		return nil, connect.NewError(connect.CodeNotFound, fmt.Errorf("subscription not found"))
+	}
+	if subscription.User != userID {
+		return nil, connect.NewError(connect.CodePermissionDenied, fmt.Errorf("subscription does not belong to user"))
+	}
+	return subscription, nil
 }
 
 func validateSubscriptionRequest(eventCode string, channelID int) error {

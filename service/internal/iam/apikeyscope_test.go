@@ -71,12 +71,12 @@ func TestIsReadProcedure(t *testing.T) {
 func TestAuthorizeAPIKeyProcedure(t *testing.T) {
 	scope := &APIKeyScope{RestrictPermissions: true, Permissions: []string{PermissionAppRead}}
 
-	assert.NoError(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockListItemsProcedure, false, scope))
+	require.NoError(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockListItemsProcedure, false, scope))
 	assertDenied(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockCreateItemProcedure, false, scope), "app.access")
 	assertDenied(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockCreateItemProcedure, true, nil), "read-only")
 	assertDenied(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockCreateAPIKeyProcedure, false, &APIKeyScope{}), "cannot manage API keys")
-	assert.NoError(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockPingProcedure, true, scope), "allow-listed procedures always pass")
-	assert.NoError(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockCreateItemProcedure, false, nil), "sessions are not limited here")
+	require.NoError(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockPingProcedure, true, scope), "allow-listed procedures always pass")
+	require.NoError(t, AuthorizeAPIKeyProcedure(sickrockpbconnect.SickRockCreateItemProcedure, false, nil), "sessions are not limited here")
 }
 
 func assertDenied(t *testing.T, err error, contains string) {

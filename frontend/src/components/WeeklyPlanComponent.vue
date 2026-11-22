@@ -3,11 +3,11 @@
 // placed in them (see utils/weeklyPlan.ts). Entries can be added to a slot, removed, and dragged
 // to another slot. For a relation, new entries are picked in a dialog of image tiles.
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon, Calendar03Icon, Cancel01Icon, Copy01Icon, Delete02Icon, LinkSquare02Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Calendar03Icon, Cancel01Icon, Copy01Icon, Delete02Icon, LinkSquare02Icon, Notification03Icon } from '@hugeicons/core-free-icons'
 import { createApiClient } from '../stores/api'
 import { useTableAccess } from '../composables/useTableAccess'
 import { useDesignMode } from '../composables/useDesignMode'
@@ -15,6 +15,8 @@ import ViewsButton from './ViewsButton.vue'
 import ImageThumb from './ImageThumb.vue'
 import RowPickerDialog from './RowPickerDialog.vue'
 import ContextMenu from './ContextMenu.vue'
+import NotifyUsersDialog from './NotifyUsersDialog.vue'
+import { useAuthStore } from '../stores/auth'
 import type { ForeignKey, Item } from '../gen/sickrock_pb'
 import { getItemNameFieldValue } from '../utils/itemViewSectionTitle'
 import { fieldDefsForInsertForm, type InsertFieldDef } from '../utils/insertRowViewFields'
@@ -28,9 +30,12 @@ import {
   dayKey,
   daysOfWeek,
   groupIntoCells,
+  notifyLinkPath,
+  notifyTitle,
   parseWeeklyPlanConfig,
   placementFields,
   startOfWeek,
+  weekFromQuery,
   weeklyPlanConfigProblems,
   type WeeklyPlanConfig,
   type WeeklyPlanPickerOption,
@@ -47,7 +52,9 @@ const emit = defineEmits<{
 }>()
 
 const client = createApiClient()
+const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const { designModeEnabled } = useDesignMode()
 const { access } = useTableAccess(computed(() => props.tableId))
 
@@ -75,6 +82,8 @@ const pickingFor = ref<{ day: Date; slotIndex: number } | null>(null)
 const entryMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
 const menuRow = ref<Item | null>(null)
 let draggedRowId: string | null = null
+const notifyDialog = ref<InstanceType<typeof NotifyUsersDialog> | null>(null)
+const canNotify = computed(() => auth.hasPermission('notifications.send'))
 
 const problems = computed(() => weeklyPlanConfigProblems(config.value))
 const days = computed(() => daysOfWeek(weekStart.value))
@@ -141,7 +150,9 @@ async function loadConfig() {
   const view = res.views.find(v => v.id === props.viewId)
     ?? res.views.find(v => v.viewType === WEEKLY_PLAN_VIEW_TYPE)
   config.value = parseWeeklyPlanConfig(view?.layoutJson)
-  weekStart.value = startOfWeek(weekStart.value, config.value.weekStartsOn)
+  // A ?week=YYYY-MM-DD link (as sent by Notify) opens that week.
+  weekStart.value = weekFromQuery(route.query.week, config.value.weekStartsOn)
+    ?? startOfWeek(weekStart.value, config.value.weekStartsOn)
 }
 
 async function loadReferencedTable() {
@@ -341,6 +352,16 @@ onMounted(load)
         <strong class="weekly-plan-week-label">{{ weekLabel }}</strong>
         <button type="button" class="button neutral" title="Next week" aria-label="Next week" @click="weekStart = addDays(weekStart, 7)">›</button>
       </div>
+      <button
+        v-if="canNotify && problems.length === 0"
+        type="button"
+        class="button inline-icon neutral"
+        title="Notify people about this week"
+        @click="notifyDialog?.open()"
+      >
+        <HugeiconsIcon :icon="Notification03Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Notify…</span>
+      </button>
     </template>
 
     <p v-if="loading" class="padding">Loading…</p>
@@ -471,6 +492,12 @@ onMounted(load)
           </li>
         </template>
       </ContextMenu>
+      <NotifyUsersDialog
+        ref="notifyDialog"
+        :title="notifyTitle(viewName || tableId, weekStart)"
+        :link-path="notifyLinkPath(tableId, viewId, weekStart)"
+        :default-recipient-ids="config.notifyUserIds"
+      />
       <RowPickerDialog
         ref="picker"
         :title="pickerTitle"

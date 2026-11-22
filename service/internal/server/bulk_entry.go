@@ -45,43 +45,61 @@ func bulkEntryToProto(tcName, raw string, columnNames []string) *sickrockpb.Bulk
 	if known(parsed.QuantityColumn) {
 		cfg.QuantityColumn = parsed.QuantityColumn
 	}
-	for _, c := range parsed.MatchColumns {
-		if known(c) && c != cfg.ScanColumn && !slices.Contains(cfg.MatchColumns, c) {
-			cfg.MatchColumns = append(cfg.MatchColumns, c)
-		}
-	}
-	for _, c := range parsed.Fields {
-		if known(c) && c != cfg.ScanColumn && c != cfg.QuantityColumn && !slices.Contains(cfg.MatchColumns, c) && !slices.Contains(cfg.Fields, c) {
-			cfg.Fields = append(cfg.Fields, c)
-		}
-	}
+	cfg.MatchColumns = knownColumns(parsed.MatchColumns, columnNames, []string{cfg.ScanColumn})
+	taken := append([]string{cfg.ScanColumn, cfg.QuantityColumn}, cfg.MatchColumns...)
+	cfg.Fields = knownColumns(parsed.Fields, columnNames, taken)
 	return cfg
+}
+
+// knownColumns returns names that are in columnNames and not in exclude, without duplicates,
+// in their original order.
+func knownColumns(names, columnNames, exclude []string) []string {
+	var out []string
+	for _, c := range names {
+		if slices.Contains(columnNames, c) && !slices.Contains(exclude, c) && !slices.Contains(out, c) {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 // AddItemQuantity adds to (or takes from) a matching row's quantity, creating the row when none matches.
 func (s *SickRockServer) AddItemQuantity(ctx context.Context, req *connect.Request[sickrockpb.AddItemQuantityRequest]) (*connect.Response[sickrockpb.AddItemQuantityResponse], error) {
 	table := cmp.Or(req.Msg.GetPageId(), "items")
-	for _, action := range []repo.ResourceGrantAction{repo.ResourceActionInsert, repo.ResourceActionEdit} {
-		if err := s.requireItemWriteAccess(ctx, table, action); err != nil {
-			return nil, err
-		}
+	if err := s.requireItemQuantityAccess(ctx, table); err != nil {
+		return nil, err
 	}
 	if req.Msg.GetQuantity() == 0 {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("quantity must not be zero"))
 	}
 
 	res, err := s.repo.AddItemQuantity(ctx, table, req.Msg.GetMatch(), req.Msg.GetQuantityColumn(), req.Msg.GetQuantity(), req.Msg.GetFields())
-	switch {
-	case errors.Is(err, repo.ErrNoMatchingItem):
-		return nil, connect.NewError(connect.CodeNotFound, err)
-	case errors.Is(err, repo.ErrNegativeQuantity):
-		return nil, connect.NewError(connect.CodeFailedPrecondition, err)
-	case err != nil:
-		return nil, err
+	if err != nil {
+		return nil, addItemQuantityError(err)
 	}
 	return connect.NewResponse(&sickrockpb.AddItemQuantityResponse{
 		Item:     itemRepoToProto(res.Item, itemFieldsToStrings(res.Item.Fields, true)),
 		Created:  res.Created,
 		Quantity: res.Quantity,
 	}), nil
+}
+
+func (s *SickRockServer) requireItemQuantityAccess(ctx context.Context, table string) error {
+	for _, action := range []repo.ResourceGrantAction{repo.ResourceActionInsert, repo.ResourceActionEdit} {
+		if err := s.requireItemWriteAccess(ctx, table, action); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addItemQuantityError(err error) error {
+	switch {
+	case errors.Is(err, repo.ErrNoMatchingItem):
+		return connect.NewError(connect.CodeNotFound, err)
+	case errors.Is(err, repo.ErrNegativeQuantity):
+		return connect.NewError(connect.CodeFailedPrecondition, err)
+	default:
+		return err
+	}
 }

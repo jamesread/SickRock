@@ -12,6 +12,7 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jamesread/SickRock/internal/iam"
 	armlayer "github.com/jamesread/armature-iam/layer"
+	"github.com/jamesread/armature-iam/rbac"
 )
 
 func (s *SickRockServer) authUser(ctx context.Context) *armlayer.AuthenticatedUser {
@@ -57,7 +58,11 @@ func (s *SickRockServer) resolveSessionUser(ctx context.Context, req connect.Any
 	if err != nil || sess == nil {
 		return nil, err
 	}
-	user, err := s.auth.Store.GetUserByID(ctx, sess.UserAccountID)
+	return s.authenticatedUserFromID(ctx, sess.UserAccountID)
+}
+
+func (s *SickRockServer) authenticatedUserFromID(ctx context.Context, userID int) (*armlayer.AuthenticatedUser, error) {
+	user, err := s.auth.Store.GetUserByID(ctx, userID)
 	if err != nil || user == nil {
 		return nil, err
 	}
@@ -82,21 +87,25 @@ func rbacPermissionNames(au *armlayer.AuthenticatedUser) []string {
 	if au == nil || au.RBAC == nil {
 		return nil
 	}
-	if au.RBAC.IsSuperuser {
-		names := make([]string, 0, len(au.RBAC.Permissions))
-		for n := range au.RBAC.Permissions {
+	names := collectRBACPermissionNames(au.RBAC)
+	sort.Strings(names)
+	return names
+}
+
+func collectRBACPermissionNames(rb *rbac.EffectiveRBAC) []string {
+	if rb.IsSuperuser {
+		names := make([]string, 0, len(rb.Permissions))
+		for n := range rb.Permissions {
 			names = append(names, n)
 		}
-		sort.Strings(names)
 		return names
 	}
-	names := make([]string, 0, len(au.RBAC.Permissions))
-	for n, ok := range au.RBAC.Permissions {
+	names := make([]string, 0, len(rb.Permissions))
+	for n, ok := range rb.Permissions {
 		if ok {
 			names = append(names, n)
 		}
 	}
-	sort.Strings(names)
 	return names
 }
 
