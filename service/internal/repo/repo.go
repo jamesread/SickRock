@@ -787,7 +787,9 @@ func addColumnSQLType(field FieldSpec, isMySQL bool) (typ, defaultClause string)
 		if isMySQL {
 			return "TINYINT(1)", ""
 		}
-		return "INTEGER", ""
+		// BOOLEAN (numeric affinity) rather than INTEGER, so the column is reported as a yes/no
+		// column and edited as one.
+		return "BOOLEAN", ""
 	case "datetime":
 		// Declare DATETIME on SQLite too so the column is reported as a datetime.
 		// ISO-8601 values are not integer literals, so SQLite still stores them as text.
@@ -1086,12 +1088,18 @@ func itemUpdateSet(columns []FieldSpec, name string, additionalFields map[string
 
 // updateClearsToNull reports whether an empty or "0" value should be stored as NULL instead: for
 // nullable columns, and always for the navigation workflow_id/dashboard_id FKs (explicit names for
-// reliable clears from the UI).
+// reliable clears from the UI). On a yes/no column "0" means no, so only an empty value clears it.
 func updateClearsToNull(col *FieldSpec, fieldName, fieldValue string) bool {
-	if fieldValue != "" && fieldValue != "0" {
+	if fieldValue != "" && (fieldValue != "0" || IsBooleanTypeName(col.Type)) {
 		return false
 	}
 	return fieldName == "workflow_id" || fieldName == "dashboard_id" || !col.Required
+}
+
+// IsBooleanTypeName reports whether a column type holds a yes/no value (TINYINT, BOOL, BOOLEAN).
+func IsBooleanTypeName(typeName string) bool {
+	t := strings.ToLower(strings.TrimSpace(typeName))
+	return strings.HasPrefix(t, "tinyint") || t == "bool" || t == "boolean"
 }
 
 func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id string) (bool, error) {

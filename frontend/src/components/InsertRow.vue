@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import { ref, computed, watch, onMounted } from 'vue'
 
 import { createApiClient } from '../stores/api'
@@ -6,9 +7,10 @@ import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
 import { SickRock } from '../gen/sickrock_pb'
 import { useIamUsers } from '../composables/useIamUsers'
-import { isIconFieldType, isImageFieldType, isUserRefFieldType } from '../utils/fieldTypes'
+import { booleanFromStored, booleanToStored, isBarcodeFieldType, isBooleanFieldType, isIconFieldType, isImageFieldType, isUserRefFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
 import IconPickerField from './IconPickerField.vue'
 import ImageField from './ImageField.vue'
+import BarcodeField from './BarcodeField.vue'
 import { fieldDisplayLabel } from '../utils/fieldColumnDisplay'
 import { toSqlDateTime } from '../utils/dateFormatting'
 import UserRefChip from './UserRefChip.vue'
@@ -739,6 +741,26 @@ function cancel() {
               :table-id="tableId"
               :column-name="f.name"
               :clearable="!f.required"
+            />
+
+            <!-- Barcode: type, barcode scanner or camera -->
+            <BarcodeField
+              v-else-if="isBarcodeFieldType(f.type)"
+              :id="'field-' + f.name"
+              v-model="form[f.name]"
+              :placeholder="fieldLabel(f)"
+              @enter="submit"
+            />
+
+            <!-- Yes / no -->
+            <RadioGroup
+              v-else-if="isBooleanFieldType(f.type)"
+              variant="boolean"
+              :options="YES_NO_OPTIONS"
+              :id="'field-' + f.name"
+              :model-value="booleanFromStored(form[f.name])"
+              :aria-label="fieldLabel(f)"
+              @update:model-value="value => { form[f.name] = value === null ? '' : booleanToStored(value) }"
             />
 
             <!-- User reference picker -->

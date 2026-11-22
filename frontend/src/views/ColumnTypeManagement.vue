@@ -16,6 +16,7 @@ import TableRowLabelsEditor from '../components/TableRowLabelsEditor.vue'
 import { useDesignMode } from '../composables/useDesignMode'
 import TableShareSection from '../components/TableShareSection.vue'
 import AddColumn from '../components/AddColumn.vue'
+import { isStandardFieldName, type NewColumnType } from '../utils/addColumn'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { tableListLinkLabel } from '../utils/rowInsertLabel'
 import { syntheticColumnNamesForSourceTable } from '../utils/relationPullThrough'
@@ -25,7 +26,6 @@ import {
   Edit03Icon,
   Delete01Icon,
   Settings01Icon,
-  AddCircleIcon,
   Add01Icon,
   RefreshIcon,
   LayoutIcon,
@@ -47,7 +47,7 @@ const tableId = route.params.tableName as string
 const client = createApiClient()
 
 // State
-const columns = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const columns = ref<Array<{ name: string; type: string; required: boolean; displayLabel?: string }>>([])
 const tableRowName = ref<string | null>(null)
 const tableRowNamePlural = ref<string | null>(null)
 const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.value, tableRowName.value))
@@ -61,7 +61,7 @@ const showDropConfirm = ref<string | null>(null)
 const dropping = ref(false)
 const createColumnDialog = ref<DialogApi | null>(null)
 const createColumnName = ref<string | undefined>()
-const createColumnType = ref<'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image' | undefined>()
+const createColumnType = ref<NewColumnType | undefined>()
 
 // Row id of this table's entry in table_configurations (for the edit link); null if not visible to the user.
 const tableConfigurationRowId = ref<string | null>(null)
@@ -90,6 +90,10 @@ const sortedColumns = computed(() => {
 })
 
 const structureForeignKeys = ref<ForeignKey[]>([])
+
+const columnLabelsByName = computed(() => Object.fromEntries(
+  columns.value.filter(c => c.displayLabel?.trim()).map(c => [c.name, c.displayLabel!.trim()]),
+))
 
 const columnNamesForGrouping = computed(() => {
   const physical = sortedColumns.value.map(c => c.name)
@@ -164,40 +168,6 @@ const columnTypes = [
   { value: 'TIMESTAMP', label: 'TIMESTAMP', description: 'Timestamp with timezone' }
 ]
 
-// Standard fields definition
-const standardFields = [
-  {
-    name: 'name',
-    type: 'string' as const,
-    description: 'Recommended for better table organization and display. Used as the primary identifier for rows.',
-    recommended: true
-  },
-  {
-    name: 'sr_created',
-    type: 'datetime' as const,
-    description: 'Automatically tracks when a row was created. Useful for auditing and sorting by creation time.',
-    recommended: true
-  },
-  {
-    name: 'sr_updated',
-    type: 'datetime' as const,
-    description: 'Automatically tracks when a row was last updated. Useful for auditing and tracking changes.',
-    recommended: true
-  },
-  {
-    name: 'uuid',
-    type: 'string' as const,
-    description: 'Universally unique identifier. Useful for distributed systems and external integrations.',
-    recommended: false
-  },
-  {
-    name: 'owner_id',
-    type: 'user_ref' as const,
-    description: 'References a SickRock user account id. Shown as a username chip in tables and insert forms.',
-    recommended: false
-  }
-]
-
 // Computed
 const canChangeType = computed(() => {
   const currentType = getCurrentColumnType(editingColumn.value)
@@ -205,17 +175,9 @@ const canChangeType = computed(() => {
   return editingColumn.value && selectedType && selectedType !== currentType
 })
 
-const missingStandardFields = computed(() => {
-  return standardFields.filter(field => {
-    const exists = columns.value.some(col => col.name === field.name)
-    return !exists
-  })
-})
-
 const canDropColumn = (columnName: string) => {
   // Prevent dropping system columns and standard fields
-  const isStandardField = standardFields.some(f => f.name === columnName)
-  return columnName !== 'id' && !isStandardField
+  return columnName !== 'id' && !isStandardFieldName(columnName)
 }
 
 // Methods
@@ -228,7 +190,8 @@ async function loadColumns() {
     columns.value = response.fields?.map(field => ({
       name: field.name,
       type: field.type,
-      required: !!field.required
+      required: !!field.required,
+      displayLabel: field.displayLabel ?? '',
     })) || []
   } catch (err) {
     error.value = `Error loading columns: ${err}`
@@ -377,7 +340,7 @@ async function dropForeignKey(constraintName: string) {
 }
 
 
-function openCreateColumn(name?: string, type?: 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image') {
+function openCreateColumn(name?: string, type?: NewColumnType) {
   createColumnName.value = name
   createColumnType.value = type
   nextTick(() => createColumnDialog.value?.show())
@@ -417,7 +380,6 @@ const QUICK_JUMP_SECTIONS = [
   { id: 'row-labels', label: 'Row labels', icon: TextIcon },
   { id: 'column-display', label: 'Column labels & formatting', icon: Edit03Icon },
   { id: 'field-grouping', label: 'Field grouping', icon: GridIcon },
-  { id: 'standard-fields', label: 'Standard fields', icon: AddCircleIcon },
   { id: 'share', label: 'Share', icon: Share08Icon },
   { id: 'conditional-formatting', label: 'Conditional formatting', icon: PaintBrushIcon },
 ]
@@ -451,8 +413,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Dialog ref="createColumnDialog" title="Create column" class="create-column-dialog" @close="closeCreateColumn">
-    <p>Add a new column to this table. Choose a name and database type.</p>
+  <Dialog ref="createColumnDialog" title="Add column" class="create-column-dialog" @close="closeCreateColumn">
     <AddColumn
       :key="`${createColumnName ?? ''}:${createColumnType ?? ''}`"
       :table-id="tableId"
@@ -520,7 +481,7 @@ onMounted(async () => {
         v-if="designModeEnabled"
         type="button"
         class="inline-icon design-only"
-        aria-label="Create column"
+        aria-label="Add column"
         :disabled="loading"
         @click="openCreateColumn()"
       >
@@ -752,6 +713,7 @@ onMounted(async () => {
       v-if="!loading && columns.length > 0"
       :table-id="tableId"
       :column-names="columnNamesForGrouping"
+      :column-labels="columnLabelsByName"
       :client="client"
     />
   </div>
@@ -761,6 +723,7 @@ onMounted(async () => {
       v-if="designModeEnabled && !loading && columns.length > 0"
       :table-id="tableId"
       :column-names="columnNamesForGrouping"
+      :column-labels="columnLabelsByName"
       :client="client"
     />
   </div>
@@ -789,29 +752,6 @@ onMounted(async () => {
       </button>
     </template>
   </Dialog>
-
-  <!-- Standard Fields Section -->
-  <div id="standard-fields" class="quick-jump-anchor">
-  <Section
-    v-if="designModeEnabled && !loading && missingStandardFields.length > 0 && columns.length > 0"
-    title="Standard Fields"
-    :icon="AddCircleIcon"
-  >
-    <p class="section-description">Standard fields are recommended columns that improve table organization and functionality.</p>
-    <div class="standard-fields-list">
-      <div v-for="field in missingStandardFields" :key="field.name" class="standard-field-item">
-        <div class="field-info">
-          <strong class="field-name">{{ field.name }}</strong>
-          <p class="field-description">{{ field.description }}</p>
-        </div>
-        <button type="button" class="button design-only" @click="openCreateColumn(field.name, field.type)">
-          <HugeiconsIcon :icon="Edit03Icon" />
-          Create "{{ field.name }}" Column
-        </button>
-      </div>
-    </div>
-  </Section>
-  </div>
 
   <div id="share" class="quick-jump-anchor">
     <TableShareSection :table-key="tableId" />
@@ -896,48 +836,6 @@ onMounted(async () => {
 
 .rename-input {
   min-width: 10rem;
-}
-
-.section-description {
-  margin: 0 0 1rem 0;
-  color: #666;
-  font-size: 0.9rem;
-}
-
-.standard-fields-list {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.standard-field-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  background: var(--background-color);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 1rem;
-  gap: 1rem;
-}
-
-.field-info {
-  flex: 1;
-}
-
-.field-name {
-  display: block;
-  color: var(--text-color);
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
-}
-
-.field-description {
-  margin: 0;
-  color: #666;
-  font-size: 0.9rem;
-  line-height: 1.4;
 }
 
 .fk-info {

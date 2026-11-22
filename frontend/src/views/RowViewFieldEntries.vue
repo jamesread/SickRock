@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import { inject } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Edit03Icon, FileEditIcon, QuestionIcon, SquareLock01Icon } from '@hugeicons/core-free-icons'
@@ -6,8 +7,9 @@ import UserRefChip from '../components/UserRefChip.vue'
 import HugeIcon from '../components/HugeIcon.vue'
 import IconPickerField from '../components/IconPickerField.vue'
 import ImageField from '../components/ImageField.vue'
+import BarcodeField from '../components/BarcodeField.vue'
 import ImageThumb from '../components/ImageThumb.vue'
-import { hasImageValue, isIconFieldType, isImageFieldType } from '../utils/fieldTypes'
+import { booleanFromStored, booleanToStored, hasImageValue, isBarcodeFieldType, isIconFieldType, isImageFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
 import { rowViewFieldUiKey, type RowViewFieldUi } from './rowViewFieldUi'
 
 export type FieldEntry = {
@@ -60,14 +62,26 @@ const { editingField, editingValue, savingField, users } = ui
             />
             <button type="button" class="button neutral" :disabled="savingField" @click="ui.cancelEdit">Done</button>
           </template>
-          <input
+          <template v-else-if="isBarcodeFieldType(ui.getFieldDef(entry.key)?.type)">
+            <BarcodeField
+              v-model="editingValue"
+              :disabled="savingField"
+              @scanned="ui.saveField()"
+              @enter="ui.saveField()"
+              @escape="ui.cancelEdit"
+            />
+            <button type="button" class="button neutral" :disabled="savingField" @click="ui.saveField()">Save</button>
+          </template>
+          <RadioGroup
             v-else-if="ui.isTinyintColumn(entry.key)"
-            type="checkbox"
-            :checked="editingValue === '1'"
+            variant="boolean"
+            :options="YES_NO_OPTIONS"
+            :model-value="booleanFromStored(editingValue)"
             :disabled="savingField"
-            class="edit-checkbox"
-            @change="event => {
-              editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+            :aria-label="ui.displayFieldLabel(entry.key)"
+            @update:model-value="value => {
+              if (value === null) return
+              editingValue = booleanToStored(value)
               ui.saveField()
             }"
           />

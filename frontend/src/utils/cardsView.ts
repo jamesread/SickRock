@@ -123,9 +123,21 @@ export function cardDetailValue(row: Item, column: string, fieldType = ''): stri
   return value
 }
 
-/** The details a card shows for a row: the detail columns that have a value. */
-export function cardDetails(row: Item, columns: string[], fieldTypes: Record<string, string> = {}): CardDetail[] {
+/**
+ * The details a card shows for a row: the detail columns that have a value, each named by its
+ * display label (Column labels & formatting) when it has one.
+ */
+export function cardDetails(
+  row: Item,
+  columns: string[],
+  fieldTypes: Record<string, string> = {},
+  labels: Record<string, string> = {},
+): CardDetail[] {
   return columns
-    .map(column => ({ column, label: cardDetailLabel(column), value: cardDetailValue(row, column, fieldTypes[column]) }))
+    .map(column => ({
+      column,
+      label: labels[column]?.trim() || cardDetailLabel(column),
+      value: cardDetailValue(row, column, fieldTypes[column]),
+    }))
     .filter(detail => detail.value !== '')
 }

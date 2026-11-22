@@ -69,6 +69,8 @@ func TestPasswordProblems(t *testing.T) {
 func TestColumnSemanticForType(t *testing.T) {
 	assert.Equal(t, repo.SemanticTypeUserRef, columnSemanticForType(repo.SemanticTypeUserRef))
 	assert.Equal(t, repo.SemanticTypeDatetime, columnSemanticForType("datetime"))
+	assert.Equal(t, repo.SemanticTypeIcon, columnSemanticForType("icon"))
+	assert.Equal(t, repo.SemanticTypeBarcode, columnSemanticForType("barcode"))
 	assert.Empty(t, columnSemanticForType("string"))
 }
 

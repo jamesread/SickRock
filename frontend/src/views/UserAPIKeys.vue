@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
+import { YES_NO_OPTIONS } from '../utils/fieldTypes'
 import { ref, onMounted, inject, nextTick } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import {
@@ -255,15 +257,16 @@ onMounted(loadAPIKeys)
 
       <FormField
         label="Read-only access"
-        for="api-key-readonly"
+        component-has-label
         description="Read-only keys cannot change anything, whatever their permissions."
         :disabled="saving"
       >
-        <input
-          id="api-key-readonly"
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
           v-model="formReadOnly"
-          type="checkbox"
           :disabled="saving"
+          aria-label="Read-only access"
         />
       </FormField>
 

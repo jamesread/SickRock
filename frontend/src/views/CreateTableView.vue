@@ -117,16 +117,16 @@ function onDragEnd() {
 }
 
 function buildColumnCatalog(
-  fields: Array<{ name: string; type: string }>,
+  fields: Array<{ name: string; type: string; displayLabel?: string }>,
   foreignKeys: ForeignKey[],
 ): CatalogColumn[] {
+  const displayByName = columnDisplaySettingsByName(columnDisplaySettings.value)
   const physical: CatalogColumn[] = fields.map(field => ({
     name: field.name,
     type: field.type,
     synthetic: false,
-    label: field.name,
+    label: displayByName.get(field.name)?.displayLabel?.trim() || field.displayLabel?.trim() || field.name,
   }))
-  const displayByName = columnDisplaySettingsByName(columnDisplaySettings.value)
   const syntheticNames = syntheticColumnNamesForSourceTable(tableId, foreignKeys)
   const synthetic: CatalogColumn[] = syntheticNames.map(name => {
     const customLabel = displayByName.get(name)?.displayLabel?.trim()
@@ -500,7 +500,8 @@ async function deleteTableView() {
                   <code class="synthetic-key">{{ column.name }}</code>
                 </template>
                 <template v-else>
-                  {{ column.name }}
+                  {{ columnListLabel(column.name) }}
+                  <code v-if="columnListLabel(column.name) !== column.name" class="synthetic-key">{{ column.name }}</code>
                 </template>
                 <span class="column-type">({{ columnTypeHint(column.name) }})</span>
               </label>

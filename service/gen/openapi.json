@@ -6752,7 +6752,13 @@
           },
           "field": {
             "title": "field",
+            "description": "field.type is a storage type (string, int64, tinyint, datetime) or a column semantic stored on\n one (user_ref, image, icon, barcode).",
             "$ref": "#/components/schemas/sickrock.Field"
+          },
+          "useForBulkEntry": {
+            "type": "boolean",
+            "title": "use_for_bulk_entry",
+            "description": "For a barcode column: make it the table's bulk entry scan column (turning bulk entry on)."
           }
         },
         "title": "AddTableColumnRequest",

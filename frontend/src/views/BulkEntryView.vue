@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // Bulk entry: scan (or type) codes in quick succession. Each entry adds to the quantity of the row with
 // the same code and match columns, or creates that row (see table_configurations.bulk_entry_json).
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
@@ -16,6 +17,8 @@ import { tableListLinkLabel } from '../utils/rowInsertLabel'
 import { bulkEntryInputType, buildBulkEntryValues, orderBulkEntryColumns } from '../utils/bulkEntry'
 import { useInsertFormViews } from '../composables/useInsertFormViews'
 import { useBarcodeCamera } from '../composables/useBarcodeCamera'
+import BarcodeField from '../components/BarcodeField.vue'
+import { isBarcodeFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
 
 type LogEntry = {
   id: string
@@ -319,7 +322,14 @@ function logText(entry: LogEntry): string {
             :for="`bulk-${column}`"
             :description="config.matchColumns.includes(column) ? 'Kept between scans; a different value starts a new row' : undefined"
           >
+            <BarcodeField
+              v-if="isBarcodeFieldType(field(column)?.type)"
+              :id="`bulk-${column}`"
+              v-model="values[column]"
+              :disabled="saving"
+            />
             <input
+              v-else
               :id="`bulk-${column}`"
               v-model="values[column]"
               :type="bulkEntryInputType(field(column)?.type)"
@@ -329,8 +339,13 @@ function logText(entry: LogEntry): string {
           </FormField>
         </template>
 
-        <FormField label="Save as soon as a code is scanned" for="bulk-save-on-scan">
-          <input id="bulk-save-on-scan" v-model="saveOnScan" type="checkbox">
+        <FormField label="Save as soon as a code is scanned" component-has-label>
+          <RadioGroup
+            variant="boolean"
+            :options="YES_NO_OPTIONS"
+            v-model="saveOnScan"
+            aria-label="Save as soon as a code is scanned"
+          />
         </FormField>
 
         <div role="toolbar">

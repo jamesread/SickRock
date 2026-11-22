@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { columnChoiceLabel } from '../utils/fieldColumnDisplay'
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
+import { YES_NO_OPTIONS } from '../utils/fieldTypes'
 import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 
@@ -292,7 +295,7 @@ onMounted(async () => {
       <FormField label="Unique column (for updates)">
         <select v-model="uniqueColumn" class="input">
           <option value="">None (always insert)</option>
-          <option v-for="col in tableColumns" :key="col.name" :value="col.name">{{ col.name }}</option>
+          <option v-for="col in tableColumns" :key="col.name" :value="col.name">{{ columnChoiceLabel(col.name, col.displayLabel) }}</option>
         </select>
         <span class="text-sm muted">Usually map <code>guid</code> to this column to avoid duplicates.</span>
       </FormField>
@@ -300,7 +303,7 @@ onMounted(async () => {
       <FormField label="Feed ID column (for tracing)">
         <select v-model="feedIdColumn" class="input">
           <option value="">None</option>
-          <option v-for="col in tableColumns" :key="col.name" :value="col.name">{{ col.name }}</option>
+          <option v-for="col in tableColumns" :key="col.name" :value="col.name">{{ columnChoiceLabel(col.name, col.displayLabel) }}</option>
         </select>
         <span class="text-sm muted">Each imported event stores this feed's ID here, so events can be traced back to their feed.</span>
       </FormField>
@@ -309,11 +312,10 @@ onMounted(async () => {
         <input v-model.number="refreshIntervalMinutes" type="number" min="5" class="input" />
       </FormField>
 
-      <FormField label="Enabled">
-        <label class="checkbox-row">
-          <input v-model="enabled" type="checkbox" />
-          <span>Run scheduled refresh</span>
-        </label>
+      <FormField label="Enabled" component-has-label description="Run scheduled refresh.">
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS" v-model="enabled" aria-label="Enabled" />
       </FormField>
 
       <h3>Field mapping</h3>
@@ -355,7 +357,7 @@ onMounted(async () => {
               @dragover.prevent
               @drop.prevent="onDropColumn(col.name)"
             >
-              <span class="column-name">{{ col.name }}</span>
+              <span class="column-name">{{ columnChoiceLabel(col.name, col.displayLabel) }}</span>
               <span class="field-kind">{{ columnFieldKind(col.type) }}</span>
               <span v-if="mappingForColumn(col.name)" class="mapped-from">
                 ← {{ mappingForColumn(col.name)?.rssField }}
@@ -467,11 +469,6 @@ onMounted(async () => {
   line-height: 1;
 }
 
-.checkbox-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
 
 @media (max-width: 768px) {
   .mapping-grid {

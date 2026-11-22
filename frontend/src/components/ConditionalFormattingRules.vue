@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { columnChoiceLabel } from '../utils/fieldColumnDisplay'
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -25,7 +26,7 @@ const showEditRuleForm = ref(false)
 const editingRuleId = ref<number | null>(null)
 const loading = ref(false)
 const error = ref<string | null>(null)
-const columns = ref<Array<{ name: string; type: string; required: boolean }>>([])
+const columns = ref<Array<{ name: string; type: string; required: boolean; displayLabel: string }>>([])
 const tableRowName = ref<string | null>(null)
 const tableRowNamePlural = ref<string | null>(null)
 const backToTableLabel = computed(() => tableListLinkLabel(tableRowNamePlural.value, tableRowName.value))
@@ -49,7 +50,8 @@ async function loadColumns() {
     columns.value = response.fields?.map(field => ({
       name: field.name,
       type: field.type,
-      required: !!field.required
+      required: !!field.required,
+      displayLabel: field.displayLabel ?? '',
     })) || []
   } catch (err) {
     console.error('Failed to load columns:', err)
@@ -300,7 +302,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
           <select v-model="newRule.columnName">
             <option value="">Select a column</option>
             <option v-for="column in columns" :key="column.name" :value="column.name">
-              {{ column.name }}
+              {{ columnChoiceLabel(column.name, column.displayLabel) }}
             </option>
           </select>
         </div>
@@ -376,7 +378,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
           <select v-model="newRule.columnName">
             <option value="">Select a column</option>
             <option v-for="column in columns" :key="column.name" :value="column.name">
-              {{ column.name }}
+              {{ columnChoiceLabel(column.name, column.displayLabel) }}
             </option>
           </select>
         </div>

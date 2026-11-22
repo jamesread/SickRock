@@ -5,10 +5,11 @@ import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, ArrowDown01Icon, ArrowUp01Icon, Delete02Icon } from '@hugeicons/core-free-icons'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import type { ForeignKey } from '../gen/sickrock_pb'
+import { columnChoiceLabel } from '../utils/fieldColumnDisplay'
 import { weeklyPlanConfigProblems, type WeeklyPlanConfig, type WeeklyPlanSlot } from '../utils/weeklyPlan'
 
 const props = defineProps<{
-  fields: Array<{ name: string; type: string }>
+  fields: Array<{ name: string; type: string; displayLabel?: string }>
   foreignKeys: ForeignKey[]
 }>()
 
@@ -23,7 +24,8 @@ const itemColumns = computed(() => props.fields
   .map(field => {
     const fk = props.foreignKeys.find(f => f.columnName === field.name)
     const target = fk ? (fk.referencedTableTcName || fk.referencedTable) : ''
-    return { name: field.name, label: target ? `${field.name} → ${target}` : field.name }
+    const name = columnChoiceLabel(field.name, field.displayLabel)
+    return { name: field.name, label: target ? `${name} → ${target}` : name }
   }))
 const problems = computed(() => weeklyPlanConfigProblems(config.value))
 
@@ -58,7 +60,7 @@ function addSlot() {
     <div>
       <select id="wp-date-column" :value="config.dateColumn" @change="update({ dateColumn: ($event.target as HTMLSelectElement).value })">
         <option value="">Choose…</option>
-        <option v-for="field in dateColumns" :key="field.name" :value="field.name">{{ field.name }}</option>
+        <option v-for="field in dateColumns" :key="field.name" :value="field.name">{{ columnChoiceLabel(field.name, field.displayLabel) }}</option>
       </select>
       <small>The day each row is planned for.</small>
     </div>
@@ -76,7 +78,7 @@ function addSlot() {
     <div>
       <select id="wp-slot-column" :value="config.slotColumn" @change="update({ slotColumn: ($event.target as HTMLSelectElement).value })">
         <option value="">None: place rows by the time of day in the date column</option>
-        <option v-for="field in textColumns" :key="field.name" :value="field.name">{{ field.name }}</option>
+        <option v-for="field in textColumns" :key="field.name" :value="field.name">{{ columnChoiceLabel(field.name, field.displayLabel) }}</option>
       </select>
       <small>Without one, each slot's time is stored in the date column and decides which slot a row is in.</small>
     </div>

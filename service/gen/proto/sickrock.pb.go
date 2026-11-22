@@ -4573,11 +4573,15 @@ func (x *SetItemPageLayoutResponse) GetMessage() string {
 }
 
 type AddTableColumnRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PageId        string                 `protobuf:"bytes,1,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
-	Field         *Field                 `protobuf:"bytes,2,opt,name=field,proto3" json:"field,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	PageId string                 `protobuf:"bytes,1,opt,name=page_id,json=pageId,proto3" json:"page_id,omitempty"`
+	// field.type is a storage type (string, int64, tinyint, datetime) or a column semantic stored on
+	// one (user_ref, image, icon, barcode).
+	Field *Field `protobuf:"bytes,2,opt,name=field,proto3" json:"field,omitempty"`
+	// For a barcode column: make it the table's bulk entry scan column (turning bulk entry on).
+	UseForBulkEntry bool `protobuf:"varint,3,opt,name=use_for_bulk_entry,json=useForBulkEntry,proto3" json:"use_for_bulk_entry,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AddTableColumnRequest) Reset() {
@@ -4622,6 +4626,13 @@ func (x *AddTableColumnRequest) GetField() *Field {
 		return x.Field
 	}
 	return nil
+}
+
+func (x *AddTableColumnRequest) GetUseForBulkEntry() bool {
+	if x != nil {
+		return x.UseForBulkEntry
+	}
+	return false
 }
 
 // Table Views
@@ -15319,10 +15330,11 @@ const file_sickrock_proto_rawDesc = "" +
 	"\x06blocks\x18\x02 \x03(\v2\x19.sickrock.PageLayoutBlockR\x06blocks\"O\n" +
 	"\x19SetItemPageLayoutResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage\"W\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\"\x84\x01\n" +
 	"\x15AddTableColumnRequest\x12\x17\n" +
 	"\apage_id\x18\x01 \x01(\tR\x06pageId\x12%\n" +
-	"\x05field\x18\x02 \x01(\v2\x0f.sickrock.FieldR\x05field\"\x93\x01\n" +
+	"\x05field\x18\x02 \x01(\v2\x0f.sickrock.FieldR\x05field\x12+\n" +
+	"\x12use_for_bulk_entry\x18\x03 \x01(\bR\x0fuseForBulkEntry\"\x93\x01\n" +
 	"\x0fTableViewColumn\x12\x1f\n" +
 	"\vcolumn_name\x18\x01 \x01(\tR\n" +
 	"columnName\x12\x1d\n" +
