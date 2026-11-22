@@ -1200,6 +1200,20 @@ message UserBookmark {
   string title = 5; // navigation name from table_navigation
 }
 
+// Home page layout: each user's own order and visibility of home sections and the bookmarks shown
+// as quick access buttons, as a JSON object the frontend reads (utils/homeLayout.ts).
+message GetHomeLayoutRequest {}
+
+message GetHomeLayoutResponse {
+  string layout_json = 1; // empty for the default layout
+}
+
+message SetHomeLayoutRequest {
+  string layout_json = 1; // empty resets to the default layout
+}
+
+message SetHomeLayoutResponse {}
+
 // API Key Management
 message CreateAPIKeyRequest {
   string name = 1;
@@ -1604,6 +1618,8 @@ service SickRock {
 
   // User Bookmarks
   rpc GetUserBookmarks(GetUserBookmarksRequest) returns (GetUserBookmarksResponse);
+  rpc GetHomeLayout(GetHomeLayoutRequest) returns (GetHomeLayoutResponse);
+  rpc SetHomeLayout(SetHomeLayoutRequest) returns (SetHomeLayoutResponse);
   rpc CreateUserBookmark(CreateUserBookmarkRequest) returns (CreateUserBookmarkResponse);
   rpc DeleteUserBookmark(DeleteUserBookmarkRequest) returns (DeleteUserBookmarkResponse);
 

@@ -66,7 +66,10 @@ var procedurePermissions = map[string]string{
 	sickrockpbconnect.SickRockCreateUserProcedure:                 rbac.PermissionUsersCreate,
 	sickrockpbconnect.SickRockDeleteUserProcedure:                 rbac.PermissionUsersDelete,
 	// Self-service: any authenticated user may inspect their own effective permissions.
-	sickrockpbconnect.SickRockGetMyPermissionsAuditProcedure:         "",
+	sickrockpbconnect.SickRockGetMyPermissionsAuditProcedure: "",
+	// Self-service: a user's own home page layout.
+	sickrockpbconnect.SickRockGetHomeLayoutProcedure:                 "",
+	sickrockpbconnect.SickRockSetHomeLayoutProcedure:                 "",
 	sickrockpbconnect.SickRockListRbacPermissionsProcedure:           rbac.PermissionRbacView,
 	sickrockpbconnect.SickRockListRbacRolesProcedure:                 rbac.PermissionRbacView,
 	sickrockpbconnect.SickRockGetUserRbacRolesProcedure:              rbac.PermissionRbacView,

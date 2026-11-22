@@ -267,6 +267,10 @@ const (
 	// SickRockGetUserBookmarksProcedure is the fully-qualified name of the SickRock's GetUserBookmarks
 	// RPC.
 	SickRockGetUserBookmarksProcedure = "/sickrock.SickRock/GetUserBookmarks"
+	// SickRockGetHomeLayoutProcedure is the fully-qualified name of the SickRock's GetHomeLayout RPC.
+	SickRockGetHomeLayoutProcedure = "/sickrock.SickRock/GetHomeLayout"
+	// SickRockSetHomeLayoutProcedure is the fully-qualified name of the SickRock's SetHomeLayout RPC.
+	SickRockSetHomeLayoutProcedure = "/sickrock.SickRock/SetHomeLayout"
 	// SickRockCreateUserBookmarkProcedure is the fully-qualified name of the SickRock's
 	// CreateUserBookmark RPC.
 	SickRockCreateUserBookmarkProcedure = "/sickrock.SickRock/CreateUserBookmark"
@@ -440,6 +444,8 @@ type SickRockClient interface {
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 	// User Bookmarks
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
+	GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error)
+	SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 	// API Key Management
@@ -1007,6 +1013,18 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("GetUserBookmarks")),
 			connect.WithClientOptions(opts...),
 		),
+		getHomeLayout: connect.NewClient[proto.GetHomeLayoutRequest, proto.GetHomeLayoutResponse](
+			httpClient,
+			baseURL+SickRockGetHomeLayoutProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetHomeLayout")),
+			connect.WithClientOptions(opts...),
+		),
+		setHomeLayout: connect.NewClient[proto.SetHomeLayoutRequest, proto.SetHomeLayoutResponse](
+			httpClient,
+			baseURL+SickRockSetHomeLayoutProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetHomeLayout")),
+			connect.WithClientOptions(opts...),
+		),
 		createUserBookmark: connect.NewClient[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse](
 			httpClient,
 			baseURL+SickRockCreateUserBookmarkProcedure,
@@ -1232,6 +1250,8 @@ type sickRockClient struct {
 	createDashboardComponentRule       *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
 	getSystemInfo                      *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
 	getUserBookmarks                   *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
+	getHomeLayout                      *connect.Client[proto.GetHomeLayoutRequest, proto.GetHomeLayoutResponse]
+	setHomeLayout                      *connect.Client[proto.SetHomeLayoutRequest, proto.SetHomeLayoutResponse]
 	createUserBookmark                 *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
 	deleteUserBookmark                 *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
 	createAPIKey                       *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
@@ -1696,6 +1716,16 @@ func (c *sickRockClient) GetUserBookmarks(ctx context.Context, req *connect.Requ
 	return c.getUserBookmarks.CallUnary(ctx, req)
 }
 
+// GetHomeLayout calls sickrock.SickRock.GetHomeLayout.
+func (c *sickRockClient) GetHomeLayout(ctx context.Context, req *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error) {
+	return c.getHomeLayout.CallUnary(ctx, req)
+}
+
+// SetHomeLayout calls sickrock.SickRock.SetHomeLayout.
+func (c *sickRockClient) SetHomeLayout(ctx context.Context, req *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error) {
+	return c.setHomeLayout.CallUnary(ctx, req)
+}
+
 // CreateUserBookmark calls sickrock.SickRock.CreateUserBookmark.
 func (c *sickRockClient) CreateUserBookmark(ctx context.Context, req *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error) {
 	return c.createUserBookmark.CallUnary(ctx, req)
@@ -1915,6 +1945,8 @@ type SickRockHandler interface {
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 	// User Bookmarks
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
+	GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error)
+	SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 	// API Key Management
@@ -2478,6 +2510,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("GetUserBookmarks")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetHomeLayoutHandler := connect.NewUnaryHandler(
+		SickRockGetHomeLayoutProcedure,
+		svc.GetHomeLayout,
+		connect.WithSchema(sickRockMethods.ByName("GetHomeLayout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetHomeLayoutHandler := connect.NewUnaryHandler(
+		SickRockSetHomeLayoutProcedure,
+		svc.SetHomeLayout,
+		connect.WithSchema(sickRockMethods.ByName("SetHomeLayout")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockCreateUserBookmarkHandler := connect.NewUnaryHandler(
 		SickRockCreateUserBookmarkProcedure,
 		svc.CreateUserBookmark,
@@ -2788,6 +2832,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetSystemInfoHandler.ServeHTTP(w, r)
 		case SickRockGetUserBookmarksProcedure:
 			sickRockGetUserBookmarksHandler.ServeHTTP(w, r)
+		case SickRockGetHomeLayoutProcedure:
+			sickRockGetHomeLayoutHandler.ServeHTTP(w, r)
+		case SickRockSetHomeLayoutProcedure:
+			sickRockSetHomeLayoutHandler.ServeHTTP(w, r)
 		case SickRockCreateUserBookmarkProcedure:
 			sickRockCreateUserBookmarkHandler.ServeHTTP(w, r)
 		case SickRockDeleteUserBookmarkProcedure:
@@ -3191,6 +3239,14 @@ func (UnimplementedSickRockHandler) GetSystemInfo(context.Context, *connect.Requ
 
 func (UnimplementedSickRockHandler) GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserBookmarks is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetHomeLayout is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetHomeLayout is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error) {
