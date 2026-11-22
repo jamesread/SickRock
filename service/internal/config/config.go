@@ -26,6 +26,8 @@ type Config struct {
 	HealthCheckInterval string
 	// ImagesDir is where uploaded image files are stored.
 	ImagesDir string
+	// UIUsageDir is where each user's opt-in UI usage log (JSONL) is stored.
+	UIUsageDir string
 	// Auth is the "auth" block of config.yaml, passed to armature-iam (httpauthshim).
 	// Supports auth.jwt.* (eg Cloudflare Access) the same way as Starloom.
 	Auth map[string]any
@@ -77,7 +79,11 @@ func Load() (*Config, error) {
 		}),
 		ImagesDir: coalesceString("images_dir", []stringCandidate{
 			{`koanf key "images_dir" (SICKROCK_IMAGES_DIR env and/or config.yaml, env loaded before file)`, k.String("images_dir")},
-			{"default", defaultImagesDir(dir)},
+			{"default", defaultDataDir(dir, "images")},
+		}),
+		UIUsageDir: coalesceString("ui_usage_dir", []stringCandidate{
+			{`koanf key "ui_usage_dir" (SICKROCK_UI_USAGE_DIR env and/or config.yaml, env loaded before file)`, k.String("ui_usage_dir")},
+			{"default", defaultDataDir(dir, "ui-usage")},
 		}),
 		ConfigDir: dir,
 		Auth:      auth,
@@ -99,16 +105,17 @@ func loadAuthConfig(k *koanf.Koanf) (map[string]any, error) {
 	return auth, nil
 }
 
-// defaultImagesDir keeps images in the config directory (the /config volume in the container), or
-// beside the default SQLite database when there is none.
-func defaultImagesDir(configDir string) string {
+// defaultDataDir keeps files (uploaded images, UI usage logs) in a subdirectory of the config
+// directory (the /config volume in the container), or beside the default SQLite database when
+// there is none.
+func defaultDataDir(configDir, name string) string {
 	if configDir == "" && dirExists("/config") {
 		configDir = "/config"
 	}
 	if configDir == "" {
-		return filepath.Join("..", "tmp", "images")
+		return filepath.Join("..", "tmp", name)
 	}
-	return filepath.Join(configDir, "images")
+	return filepath.Join(configDir, name)
 }
 
 func dirExists(path string) bool {

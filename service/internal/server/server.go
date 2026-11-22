@@ -25,6 +25,7 @@ import (
 	"github.com/jamesread/SickRock/internal/buildinfo"
 	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/images"
+	"github.com/jamesread/SickRock/internal/uiusage"
 	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
 	log "github.com/sirupsen/logrus"
@@ -36,6 +37,7 @@ type SickRockServer struct {
 	auth                *iam.AuthLayer
 	health              *armhealth.Service
 	images              *images.Store
+	uiUsage             *uiusage.Store
 }
 
 // markdownRenderer is a configured goldmark instance for rendering markdown

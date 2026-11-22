@@ -1200,6 +1200,48 @@ message UserBookmark {
   string title = 5; // navigation name from table_navigation
 }
 
+// UI usage tracking (opt-in, per user): navigation through routes, the sidebar and the header,
+// appended to the user's own JSONL file on the server for offline analysis.
+message UIUsageEvent {
+  string kind = 1;          // "route", "sidebar" or "header"
+  string from_path = 2;     // the route the user was on
+  string to_path = 3;       // the route navigated to, or the clicked link's path
+  string label = 4;         // the clicked link or button's label
+  int64 timestamp_ms = 5;   // when it happened (client clock, Unix milliseconds)
+  string session_id = 6;   // random per page load, to follow one tab's path
+  string app_version = 7;   // the app version the client loaded
+}
+
+message RecordUIUsageRequest {
+  repeated UIUsageEvent events = 1;
+}
+
+message RecordUIUsageResponse {
+  int32 accepted = 1;
+  // false when the user has not opted in; the client then stops tracking.
+  bool tracking_enabled = 2;
+}
+
+message GetUIUsageSettingsRequest {}
+
+message GetUIUsageSettingsResponse {
+  bool tracking_enabled = 1;
+  int32 line_count = 2;
+  int32 max_lines = 3;
+}
+
+message SetUIUsageTrackingRequest {
+  bool enabled = 1;
+}
+
+message SetUIUsageTrackingResponse {
+  bool tracking_enabled = 1;
+}
+
+message ClearUIUsageLogRequest {}
+
+message ClearUIUsageLogResponse {}
+
 // API Key Management
 message CreateAPIKeyRequest {
   string name = 1;
@@ -1611,6 +1653,10 @@ service SickRock {
   rpc CreateAPIKey(CreateAPIKeyRequest) returns (CreateAPIKeyResponse);
   rpc GetAPIKeys(GetAPIKeysRequest) returns (GetAPIKeysResponse);
   rpc UpdateAPIKey(UpdateAPIKeyRequest) returns (UpdateAPIKeyResponse);
+  rpc GetUIUsageSettings(GetUIUsageSettingsRequest) returns (GetUIUsageSettingsResponse);
+  rpc SetUIUsageTracking(SetUIUsageTrackingRequest) returns (SetUIUsageTrackingResponse);
+  rpc RecordUIUsage(RecordUIUsageRequest) returns (RecordUIUsageResponse);
+  rpc ClearUIUsageLog(ClearUIUsageLogRequest) returns (ClearUIUsageLogResponse);
   rpc DeleteAPIKey(DeleteAPIKeyRequest) returns (DeleteAPIKeyResponse);
   rpc DeactivateAPIKey(DeactivateAPIKeyRequest) returns (DeactivateAPIKeyResponse);
 

@@ -33,6 +33,7 @@ import (
 	"github.com/jamesread/SickRock/internal/health"
 	"github.com/jamesread/SickRock/internal/iam"
 	"github.com/jamesread/SickRock/internal/images"
+	"github.com/jamesread/SickRock/internal/uiusage"
 	"github.com/jamesread/SickRock/internal/mcp"
 	"github.com/jamesread/SickRock/internal/pwa"
 	repo "github.com/jamesread/SickRock/internal/repo"
@@ -225,6 +226,7 @@ func main() {
 
 	srv := srvpkg.NewSickRockServer(repository, authLayer)
 	configureImageStore(cfg, srv)
+	configureUIUsageStore(cfg, srv)
 
 	frontendDir := findFrontendDir()
 
@@ -297,6 +299,7 @@ func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer, frontendDir
 	mux := http.NewServeMux()
 	mux.Handle(path, handler)
 	mux.Handle(srvpkg.ImagesPathPrefix, authLayer.WrapHandler(srv.ImageHandler()))
+	mux.Handle(srvpkg.UIUsageLogPath, authLayer.WrapHandler(srv.UIUsageLogHandler()))
 
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
@@ -323,6 +326,18 @@ func newRouter(srv *srvpkg.SickRockServer, authLayer *iam.AuthLayer, frontendDir
 
 	registerFrontendRoutes(router, frontendDir, appTitle)
 	return router
+}
+
+// configureUIUsageStore keeps opt-in UI usage logs in cfg.UIUsageDir. When the directory cannot be
+// created, tracking cannot be turned on and everything else still works.
+func configureUIUsageStore(cfg *config.Config, srv *srvpkg.SickRockServer) {
+	store, err := uiusage.NewStore(cfg.UIUsageDir)
+	if err != nil {
+		log.WithError(err).WithField("dir", cfg.UIUsageDir).Error("UI usage logs cannot be stored; tracking is unavailable")
+		return
+	}
+	srv.SetUIUsageStore(store)
+	log.Infof("Storing UI usage logs in %s", cfg.UIUsageDir)
 }
 
 // configureImageStore keeps uploaded images in cfg.ImagesDir. When the directory cannot be created,
