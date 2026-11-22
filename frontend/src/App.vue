@@ -25,6 +25,7 @@ import { pagesFromNavigationItems, registerMainSidebarNavigation, updateSidebarH
 import { HEALTH_CHANGED_EVENT } from './utils/health'
 import { appTitle, setAppTitle, syncAppTitleMeta } from './appTitle'
 import { useDesignMode } from './composables/useDesignMode'
+import { useUiUsageTracking } from './composables/useUiUsageTracking'
 
 const { designModeEnabled, toggleDesignMode } = useDesignMode()
 
@@ -42,6 +43,10 @@ const isOffline = ref(false)
 // Create global API client once and provide it to all components
 const apiClient = createApiClient()
 provide('apiClient', apiClient)
+
+// Opt-in UI usage tracking (user control panel → UI usage); off until configured for a user who opted in.
+const uiUsage = useUiUsageTracking()
+uiUsage.install(router, apiClient)
 
 router.afterEach(() => {
     // Close QuickSearch when navigation occurs (e.g., item selected)
@@ -333,6 +338,7 @@ async function loadAppData() {
 
     try {
         version.value = initResponse.version
+        void uiUsage.configure(authStore.user?.username || initResponse.currentUsername || '', initResponse.version)
 
         // Load appTitle setting from table_settings
         try {
@@ -470,6 +476,7 @@ watch(isAuthenticated, (newValue) => {
         // Clear data when logged out
         pages.value = []
         version.value = ''
+        void uiUsage.configure('', '')
         if (navigation.value && typeof navigation.value.clearNavigationLinks === 'function') {
             navigation.value.clearNavigationLinks()
         }
