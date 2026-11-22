@@ -2853,6 +2853,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/GetHomeLayout": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "GetHomeLayout",
+        "operationId": "sickrock.SickRock.GetHomeLayout",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetHomeLayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetHomeLayoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/GetItem": {
       "post": {
         "tags": [
@@ -5701,6 +5759,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.SetGroupTableRoleGrantsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetHomeLayout": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetHomeLayout",
+        "operationId": "sickrock.SickRock.SetHomeLayout",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetHomeLayoutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetHomeLayoutResponse"
                 }
               }
             }
@@ -8932,6 +9048,24 @@
         "title": "GetHealthSummaryResponse",
         "additionalProperties": false
       },
+      "sickrock.GetHomeLayoutRequest": {
+        "type": "object",
+        "title": "GetHomeLayoutRequest",
+        "additionalProperties": false,
+        "description": "Home page layout: each user's own order and visibility of home sections and the bookmarks shown\n as quick access buttons, as a JSON object the frontend reads (utils/homeLayout.ts)."
+      },
+      "sickrock.GetHomeLayoutResponse": {
+        "type": "object",
+        "properties": {
+          "layoutJson": {
+            "type": "string",
+            "title": "layout_json",
+            "description": "empty for the default layout"
+          }
+        },
+        "title": "GetHomeLayoutResponse",
+        "additionalProperties": false
+      },
       "sickrock.GetItemRequest": {
         "type": "object",
         "properties": {
@@ -11311,6 +11445,23 @@
           }
         },
         "title": "SetGroupTableRoleGrantsResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetHomeLayoutRequest": {
+        "type": "object",
+        "properties": {
+          "layoutJson": {
+            "type": "string",
+            "title": "layout_json",
+            "description": "empty resets to the default layout"
+          }
+        },
+        "title": "SetHomeLayoutRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetHomeLayoutResponse": {
+        "type": "object",
+        "title": "SetHomeLayoutResponse",
         "additionalProperties": false
       },
       "sickrock.SetItemFieldGroupsRequest": {

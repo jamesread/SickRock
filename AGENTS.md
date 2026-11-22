@@ -140,6 +140,10 @@ The `ListItems` API automatically includes synthetic fields to enhance data anal
 - `ChangeColumnName` - Rename columns
 - `CreateForeignKey` - Add relationships
 
+## Home page layout
+
+Each user can customise their own home page: in design mode, **Edit home** at the bottom of the home page (`HomeView.vue`, editor `HomeLayoutEditor.vue`, logic in `frontend/src/utils/homeLayout.ts`) reorders the sections (picocrank `ReorderList`), shows or hides each one, and chooses bookmarks to show as **Quick access** buttons. Sections: `quick-access`, `welcome`, `shared-calendars`, `workflows`, `recently-viewed`, and the extra `bookmarks` (all bookmarks) and `pages` (every sidebar page), which start hidden. The layout is stored as JSON in `user_accounts.home_layout_json` (migration 0065; NULL is the default) via **`GetHomeLayout`** / **`SetHomeLayout`** (self-service), e.g. `{"sections":[{"id":"quick-access","visible":true},{"id":"welcome","visible":false}],"quickAccess":[3,1]}`, where `quickAccess` holds bookmarked navigation item ids. Unknown sections are dropped and sections a stored layout does not mention appear in their default place, so add new sections to `HOME_SECTIONS`.
+
 ## Health checks
 
 SickRock runs **health checks** in the background (shortly after startup, then every `health_check_interval`, default `15m`, set via `SICKROCK_HEALTH_CHECK_INTERVAL` or `config.yaml`) and shows the issues they find to admins (`system.settings`) on **Control Panel → Health** (`/admin/health`), with an issue count on the sidebar's System → Health link. Issues are stored in `health_issues` (check runs in `health_check_runs`). A new warning or error sends the opt-in `health.issue_raised` notification event once.
