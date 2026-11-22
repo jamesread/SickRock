@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
+import { YES_NO_OPTIONS } from '../utils/fieldTypes'
 import { ref, watch, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import FormLayout from 'picocrank/vue/components/FormLayout.vue'
@@ -167,8 +169,13 @@ function close() {
         </select>
       </FormField>
 
-      <FormField label="Weekends only" for="export-weekends">
-        <input id="export-weekends" v-model="weekendsOnly" type="checkbox" />
+      <FormField label="Weekends only" component-has-label>
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
+          v-model="weekendsOnly"
+          aria-label="Weekends only"
+        />
       </FormField>
 
       <FormField

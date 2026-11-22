@@ -1184,6 +1184,11 @@ func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Reques
 	if err := s.saveNewColumnSemantic(ctx, req.Msg.GetPageId(), f.GetName(), f.GetType()); err != nil {
 		return nil, err
 	}
+	if req.Msg.GetUseForBulkEntry() && f.GetType() == repo.SemanticTypeBarcode {
+		if err := s.repo.SetBulkEntryScanColumn(ctx, req.Msg.GetPageId(), f.GetName()); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("set bulk entry scan column: %w", err))
+		}
+	}
 	return s.GetTableStructure(ctx, &connect.Request[sickrockpb.GetTableStructureRequest]{Msg: &sickrockpb.GetTableStructureRequest{PageId: req.Msg.GetPageId()}})
 }
 
@@ -1206,6 +1211,10 @@ func columnSemanticForType(fieldType string) string {
 		return repo.SemanticTypeUserRef
 	case fieldType == repo.SemanticTypeImage:
 		return repo.SemanticTypeImage
+	case fieldType == repo.SemanticTypeIcon:
+		return repo.SemanticTypeIcon
+	case fieldType == repo.SemanticTypeBarcode:
+		return repo.SemanticTypeBarcode
 	case repo.IsDatetimeTypeName(fieldType):
 		return repo.SemanticTypeDatetime
 	}

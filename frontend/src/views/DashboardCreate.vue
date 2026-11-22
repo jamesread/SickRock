@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
+import { YES_NO_OPTIONS } from '../utils/fieldTypes'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -75,15 +77,16 @@ async function submit() {
 
       <FormField
         label="Create navigation entry"
-        for="create-navigation-entry"
+        component-has-label
         description="Adds a link in the main navigation menu for this dashboard"
         :disabled="loading"
       >
-        <input
-          id="create-navigation-entry"
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
           v-model="createNavigationEntry"
-          type="checkbox"
           :disabled="loading"
+          aria-label="Create navigation entry"
         />
       </FormField>
 

@@ -41,6 +41,7 @@ const { access } = useTableAccess(computed(() => props.tableId))
 const config = ref<CardsConfig>(parseCardsConfig(''))
 const rows = ref<Item[]>([])
 const fieldTypes = ref<Record<string, string>>({})
+const fieldLabels = ref<Record<string, string>>({})
 const loading = ref(true)
 const error = ref<string | null>(null)
 const query = ref('')
@@ -56,7 +57,7 @@ const cards = computed<Card[]>(() => rows.value.map(row => ({
   id: String(row.id),
   title: titleOf(row),
   imageId: imageOf(row),
-  details: cardDetails(row, config.value.detailColumns, fieldTypes.value),
+  details: cardDetails(row, config.value.detailColumns, fieldTypes.value, fieldLabels.value),
 })))
 // The search covers everything shown on a card: its title and its details.
 const shownCards = computed(() => filterByText(cards.value, query.value, card => [
@@ -64,7 +65,10 @@ const shownCards = computed(() => filterByText(cards.value, query.value, card =>
   ...card.details.map(detail => detail.value),
 ]))
 const searchPlaceholder = computed(() => {
-  const fields = ['name', ...config.value.detailColumns.map(column => cardDetailLabel(column).toLowerCase())]
+  // A label the user set keeps its case (e.g. "EAN code"); generated ones are lower-cased.
+  const label = (column: string) => fieldLabels.value[column]?.trim() || cardDetailLabel(column).toLowerCase()
+  const title = config.value.titleColumn ? label(config.value.titleColumn) : 'name'
+  const fields = [title, ...config.value.detailColumns.map(label)]
   return `Search ${fields.join(', ')}…`
 })
 
@@ -100,6 +104,7 @@ async function load() {
       ?? views.views.find(v => v.viewType === CARDS_VIEW_TYPE)
     config.value = parseCardsConfig(view?.layoutJson)
     fieldTypes.value = Object.fromEntries((structure.fields ?? []).map(field => [field.name, field.type]))
+    fieldLabels.value = Object.fromEntries((structure.fields ?? []).map(field => [field.name, field.displayLabel ?? '']))
     rows.value = items.items ?? []
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)

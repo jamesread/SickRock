@@ -103,6 +103,10 @@ describe('chooseCardsView', () => {
 describe('cardDetails', () => {
   const row = { id: '7', srCreated: 0n, srUpdated: 0n, additionalFields: { type: 'Dinner', keywords: '  ', cook_time: '20' } } as unknown as Item
 
+  it('uses display labels when the columns have them', () => {
+    expect(cardDetails(row, ['type', 'cook_time'], {}, { cook_time: ' Minutes ', type: '' }).map(d => d.label)).toEqual(['Type', 'Minutes'])
+  })
+
   it('labels the columns and leaves out empty values', () => {
     expect(cardDetails(row, ['type', 'keywords', 'cook_time', 'id'])).toEqual([
       { column: 'type', label: 'Type', value: 'Dinner' },

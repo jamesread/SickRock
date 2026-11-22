@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 import AddColumn from '../components/AddColumn.vue'
+import { isNewColumnType } from '../utils/addColumn'
 
 const route = useRoute()
 const tableId = route.params.tableName as string
 
 // Get query parameters for pre-filling the form
 const initialName = route.query.name as string | undefined
-const initialType = route.query.type as 'string' | 'int64' | 'tinyint' | 'datetime' | 'user_ref' | 'image' | undefined
+const initialType = isNewColumnType(route.query.type) ? route.query.type : undefined
 </script>
 
 <template>
