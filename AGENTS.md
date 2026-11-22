@@ -155,6 +155,10 @@ SickRock runs **health checks** in the background (shortly after startup, then e
 - **Logged errors:** a logrus hook (`errorlog.ErrorLog` from armature-health) groups error-level log lines by fingerprint for the `logs.recent_errors` check.
 - **API:** `ListHealthIssues`, `GetHealthSummary`, `RunHealthChecks`, `AcknowledgeHealthIssue` (all require `system.settings`).
 
+## UI usage tracking
+
+Users can opt in to logging their own navigation, for offline analysis of navigation loops, hot spots and places to optimise: **user control panel → UI usage** (`/user-ui-usage`, `UserUiUsage.vue`), option **Track and log UI usage** (`user_accounts.ui_usage_tracking`, migration 0064). While it is on, the client (`frontend/src/composables/useUiUsageTracking.ts`, logic in `frontend/src/utils/uiUsage.ts`, installed in `App.vue`) records route changes (`router.afterEach`) and clicks on links and buttons in picocrank's sidebar (`#picocrank-sidebar`) and header (`<header>`), never page content or anything typed. Events wait in `localStorage` (per user, at most 500) and are sent with **`RecordUIUsage`** every 30 seconds and when the page is hidden. The server (`service/internal/uiusage`) appends them to `<ui_usage_dir>/user-<id>.jsonl` (`SICKROCK_UI_USAGE_DIR`; default `<configdir>/ui-usage`, `/config/ui-usage` in the container, else `../tmp/ui-usage`), keeping the newest 1000 lines. Each line is a JSON object: `ts`, `version` (the app version the client loaded, else the server's), `session` (random per page load), `kind` (`route`, `sidebar` or `header`), `from`, `to` and `label`. Events from a user who has not opted in are dropped and the client is told to stop. **`GET /api/ui-usage.jsonl`** downloads the signed-in user's own log (same auth as the API); `GetUIUsageSettings`, `SetUIUsageTracking` and `ClearUIUsageLog` manage it. All four RPCs are self-service (no permission beyond being signed in).
+
 ## Installable app (PWA)
 
 SickRock installs as a Progressive Web App.

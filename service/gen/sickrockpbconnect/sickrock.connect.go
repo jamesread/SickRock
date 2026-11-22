@@ -283,6 +283,17 @@ const (
 	SickRockGetAPIKeysProcedure = "/sickrock.SickRock/GetAPIKeys"
 	// SickRockUpdateAPIKeyProcedure is the fully-qualified name of the SickRock's UpdateAPIKey RPC.
 	SickRockUpdateAPIKeyProcedure = "/sickrock.SickRock/UpdateAPIKey"
+	// SickRockGetUIUsageSettingsProcedure is the fully-qualified name of the SickRock's
+	// GetUIUsageSettings RPC.
+	SickRockGetUIUsageSettingsProcedure = "/sickrock.SickRock/GetUIUsageSettings"
+	// SickRockSetUIUsageTrackingProcedure is the fully-qualified name of the SickRock's
+	// SetUIUsageTracking RPC.
+	SickRockSetUIUsageTrackingProcedure = "/sickrock.SickRock/SetUIUsageTracking"
+	// SickRockRecordUIUsageProcedure is the fully-qualified name of the SickRock's RecordUIUsage RPC.
+	SickRockRecordUIUsageProcedure = "/sickrock.SickRock/RecordUIUsage"
+	// SickRockClearUIUsageLogProcedure is the fully-qualified name of the SickRock's ClearUIUsageLog
+	// RPC.
+	SickRockClearUIUsageLogProcedure = "/sickrock.SickRock/ClearUIUsageLog"
 	// SickRockDeleteAPIKeyProcedure is the fully-qualified name of the SickRock's DeleteAPIKey RPC.
 	SickRockDeleteAPIKeyProcedure = "/sickrock.SickRock/DeleteAPIKey"
 	// SickRockDeactivateAPIKeyProcedure is the fully-qualified name of the SickRock's DeactivateAPIKey
@@ -457,6 +468,10 @@ type SickRockClient interface {
 	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
 	UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error)
+	GetUIUsageSettings(context.Context, *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error)
+	SetUIUsageTracking(context.Context, *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error)
+	RecordUIUsage(context.Context, *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error)
+	ClearUIUsageLog(context.Context, *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 	// Conditional Formatting Rules
@@ -1062,6 +1077,30 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("UpdateAPIKey")),
 			connect.WithClientOptions(opts...),
 		),
+		getUIUsageSettings: connect.NewClient[proto.GetUIUsageSettingsRequest, proto.GetUIUsageSettingsResponse](
+			httpClient,
+			baseURL+SickRockGetUIUsageSettingsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUIUsageSettings")),
+			connect.WithClientOptions(opts...),
+		),
+		setUIUsageTracking: connect.NewClient[proto.SetUIUsageTrackingRequest, proto.SetUIUsageTrackingResponse](
+			httpClient,
+			baseURL+SickRockSetUIUsageTrackingProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetUIUsageTracking")),
+			connect.WithClientOptions(opts...),
+		),
+		recordUIUsage: connect.NewClient[proto.RecordUIUsageRequest, proto.RecordUIUsageResponse](
+			httpClient,
+			baseURL+SickRockRecordUIUsageProcedure,
+			connect.WithSchema(sickRockMethods.ByName("RecordUIUsage")),
+			connect.WithClientOptions(opts...),
+		),
+		clearUIUsageLog: connect.NewClient[proto.ClearUIUsageLogRequest, proto.ClearUIUsageLogResponse](
+			httpClient,
+			baseURL+SickRockClearUIUsageLogProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ClearUIUsageLog")),
+			connect.WithClientOptions(opts...),
+		),
 		deleteAPIKey: connect.NewClient[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse](
 			httpClient,
 			baseURL+SickRockDeleteAPIKeyProcedure,
@@ -1276,6 +1315,10 @@ type sickRockClient struct {
 	createAPIKey                       *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
 	getAPIKeys                         *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
 	updateAPIKey                       *connect.Client[proto.UpdateAPIKeyRequest, proto.UpdateAPIKeyResponse]
+	getUIUsageSettings                 *connect.Client[proto.GetUIUsageSettingsRequest, proto.GetUIUsageSettingsResponse]
+	setUIUsageTracking                 *connect.Client[proto.SetUIUsageTrackingRequest, proto.SetUIUsageTrackingResponse]
+	recordUIUsage                      *connect.Client[proto.RecordUIUsageRequest, proto.RecordUIUsageResponse]
+	clearUIUsageLog                    *connect.Client[proto.ClearUIUsageLogRequest, proto.ClearUIUsageLogResponse]
 	deleteAPIKey                       *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
 	deactivateAPIKey                   *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
 	getConditionalFormattingRules      *connect.Client[proto.GetConditionalFormattingRulesRequest, proto.GetConditionalFormattingRulesResponse]
@@ -1772,6 +1815,26 @@ func (c *sickRockClient) UpdateAPIKey(ctx context.Context, req *connect.Request[
 	return c.updateAPIKey.CallUnary(ctx, req)
 }
 
+// GetUIUsageSettings calls sickrock.SickRock.GetUIUsageSettings.
+func (c *sickRockClient) GetUIUsageSettings(ctx context.Context, req *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error) {
+	return c.getUIUsageSettings.CallUnary(ctx, req)
+}
+
+// SetUIUsageTracking calls sickrock.SickRock.SetUIUsageTracking.
+func (c *sickRockClient) SetUIUsageTracking(ctx context.Context, req *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error) {
+	return c.setUIUsageTracking.CallUnary(ctx, req)
+}
+
+// RecordUIUsage calls sickrock.SickRock.RecordUIUsage.
+func (c *sickRockClient) RecordUIUsage(ctx context.Context, req *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error) {
+	return c.recordUIUsage.CallUnary(ctx, req)
+}
+
+// ClearUIUsageLog calls sickrock.SickRock.ClearUIUsageLog.
+func (c *sickRockClient) ClearUIUsageLog(ctx context.Context, req *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error) {
+	return c.clearUIUsageLog.CallUnary(ctx, req)
+}
+
 // DeleteAPIKey calls sickrock.SickRock.DeleteAPIKey.
 func (c *sickRockClient) DeleteAPIKey(ctx context.Context, req *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error) {
 	return c.deleteAPIKey.CallUnary(ctx, req)
@@ -1984,6 +2047,10 @@ type SickRockHandler interface {
 	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
 	UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error)
+	GetUIUsageSettings(context.Context, *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error)
+	SetUIUsageTracking(context.Context, *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error)
+	RecordUIUsage(context.Context, *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error)
+	ClearUIUsageLog(context.Context, *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 	// Conditional Formatting Rules
@@ -2585,6 +2652,30 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("UpdateAPIKey")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetUIUsageSettingsHandler := connect.NewUnaryHandler(
+		SickRockGetUIUsageSettingsProcedure,
+		svc.GetUIUsageSettings,
+		connect.WithSchema(sickRockMethods.ByName("GetUIUsageSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetUIUsageTrackingHandler := connect.NewUnaryHandler(
+		SickRockSetUIUsageTrackingProcedure,
+		svc.SetUIUsageTracking,
+		connect.WithSchema(sickRockMethods.ByName("SetUIUsageTracking")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockRecordUIUsageHandler := connect.NewUnaryHandler(
+		SickRockRecordUIUsageProcedure,
+		svc.RecordUIUsage,
+		connect.WithSchema(sickRockMethods.ByName("RecordUIUsage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockClearUIUsageLogHandler := connect.NewUnaryHandler(
+		SickRockClearUIUsageLogProcedure,
+		svc.ClearUIUsageLog,
+		connect.WithSchema(sickRockMethods.ByName("ClearUIUsageLog")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockDeleteAPIKeyHandler := connect.NewUnaryHandler(
 		SickRockDeleteAPIKeyProcedure,
 		svc.DeleteAPIKey,
@@ -2891,6 +2982,14 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetAPIKeysHandler.ServeHTTP(w, r)
 		case SickRockUpdateAPIKeyProcedure:
 			sickRockUpdateAPIKeyHandler.ServeHTTP(w, r)
+		case SickRockGetUIUsageSettingsProcedure:
+			sickRockGetUIUsageSettingsHandler.ServeHTTP(w, r)
+		case SickRockSetUIUsageTrackingProcedure:
+			sickRockSetUIUsageTrackingHandler.ServeHTTP(w, r)
+		case SickRockRecordUIUsageProcedure:
+			sickRockRecordUIUsageHandler.ServeHTTP(w, r)
+		case SickRockClearUIUsageLogProcedure:
+			sickRockClearUIUsageLogHandler.ServeHTTP(w, r)
 		case SickRockDeleteAPIKeyProcedure:
 			sickRockDeleteAPIKeyHandler.ServeHTTP(w, r)
 		case SickRockDeactivateAPIKeyProcedure:
@@ -3316,6 +3415,22 @@ func (UnimplementedSickRockHandler) GetAPIKeys(context.Context, *connect.Request
 
 func (UnimplementedSickRockHandler) UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateAPIKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUIUsageSettings(context.Context, *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUIUsageSettings is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetUIUsageTracking(context.Context, *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetUIUsageTracking is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) RecordUIUsage(context.Context, *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.RecordUIUsage is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ClearUIUsageLog(context.Context, *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ClearUIUsageLog is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error) {

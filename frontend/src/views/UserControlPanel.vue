@@ -7,7 +7,7 @@ import Section from 'picocrank/vue/components/Section.vue'
 import Navigation from 'picocrank/vue/components/Navigation.vue'
 import NavigationGrid from 'picocrank/vue/components/NavigationGrid.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { UserIcon, BookmarkIcon, SettingsIcon, KeyIcon, NotificationIcon, Download01Icon, LogoutIcon, ShieldKeyIcon } from '@hugeicons/core-free-icons'
+import { UserIcon, BookmarkIcon, SettingsIcon, KeyIcon, NotificationIcon, Download01Icon, LogoutIcon, ShieldKeyIcon, Analytics01Icon } from '@hugeicons/core-free-icons'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -82,6 +82,17 @@ onMounted(() => {
       icon: ShieldKeyIcon,
       type: 'route',
       description: 'Review your group membership and effective permissions',
+    })
+
+    // UI usage tracking (opt-in)
+    localNavigation.value.addNavigationLink({
+      id: 'user-ui-usage',
+      name: 'user-ui-usage',
+      title: 'UI usage',
+      path: '/user-ui-usage',
+      icon: Analytics01Icon,
+      type: 'route',
+      description: 'Track and log your UI usage, and download the log',
     })
 
     // PWA & Service Worker

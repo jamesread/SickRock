@@ -27,6 +27,7 @@ import (
 	"github.com/jamesread/SickRock/internal/images"
 	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
+	"github.com/jamesread/SickRock/internal/uiusage"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,6 +37,7 @@ type SickRockServer struct {
 	auth                *iam.AuthLayer
 	health              *armhealth.Service
 	images              *images.Store
+	uiUsage             *uiusage.Store
 	notifyLimiter       notifyLimiter
 }
 

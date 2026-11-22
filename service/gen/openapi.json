@@ -526,6 +526,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/ClearUIUsageLog": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "ClearUIUsageLog",
+        "operationId": "sickrock.SickRock.ClearUIUsageLog",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ClearUIUsageLogRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ClearUIUsageLogResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/CreateAPIKey": {
       "post": {
         "tags": [
@@ -3789,6 +3847,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/GetUIUsageSettings": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "GetUIUsageSettings",
+        "operationId": "sickrock.SickRock.GetUIUsageSettings",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.GetUIUsageSettingsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.GetUIUsageSettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/GetUser": {
       "post": {
         "tags": [
@@ -5244,6 +5360,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/RecordUIUsage": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "RecordUIUsage",
+        "operationId": "sickrock.SickRock.RecordUIUsage",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.RecordUIUsageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.RecordUIUsageResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/RefreshRssCalendarFeed": {
       "post": {
         "tags": [
@@ -5933,6 +6107,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.SetTickListCompletionResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetUIUsageTracking": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetUIUsageTracking",
+        "operationId": "sickrock.SickRock.SetUIUsageTracking",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetUIUsageTrackingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetUIUsageTrackingResponse"
                 }
               }
             }
@@ -7227,6 +7459,16 @@
       "sickrock.ClearTickListStateResponse": {
         "type": "object",
         "title": "ClearTickListStateResponse",
+        "additionalProperties": false
+      },
+      "sickrock.ClearUIUsageLogRequest": {
+        "type": "object",
+        "title": "ClearUIUsageLogRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ClearUIUsageLogResponse": {
+        "type": "object",
+        "title": "ClearUIUsageLogResponse",
         "additionalProperties": false
       },
       "sickrock.ColumnDisplaySettingInput": {
@@ -9367,6 +9609,32 @@
         "title": "CompletedByItemIdEntry",
         "additionalProperties": false
       },
+      "sickrock.GetUIUsageSettingsRequest": {
+        "type": "object",
+        "title": "GetUIUsageSettingsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.GetUIUsageSettingsResponse": {
+        "type": "object",
+        "properties": {
+          "trackingEnabled": {
+            "type": "boolean",
+            "title": "tracking_enabled"
+          },
+          "lineCount": {
+            "type": "integer",
+            "title": "line_count",
+            "format": "int32"
+          },
+          "maxLines": {
+            "type": "integer",
+            "title": "max_lines",
+            "format": "int32"
+          }
+        },
+        "title": "GetUIUsageSettingsResponse",
+        "additionalProperties": false
+      },
       "sickrock.GetUserBookmarksRequest": {
         "type": "object",
         "title": "GetUserBookmarksRequest",
@@ -10801,6 +11069,37 @@
         "title": "RecentlyViewedItem",
         "additionalProperties": false
       },
+      "sickrock.RecordUIUsageRequest": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.UIUsageEvent"
+            },
+            "title": "events"
+          }
+        },
+        "title": "RecordUIUsageRequest",
+        "additionalProperties": false
+      },
+      "sickrock.RecordUIUsageResponse": {
+        "type": "object",
+        "properties": {
+          "accepted": {
+            "type": "integer",
+            "title": "accepted",
+            "format": "int32"
+          },
+          "trackingEnabled": {
+            "type": "boolean",
+            "title": "tracking_enabled",
+            "description": "false when the user has not opted in; the client then stops tracking."
+          }
+        },
+        "title": "RecordUIUsageResponse",
+        "additionalProperties": false
+      },
       "sickrock.RefreshRssCalendarFeedRequest": {
         "type": "object",
         "properties": {
@@ -11312,6 +11611,28 @@
         "title": "SetTickListCompletionResponse",
         "additionalProperties": false
       },
+      "sickrock.SetUIUsageTrackingRequest": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "enabled"
+          }
+        },
+        "title": "SetUIUsageTrackingRequest",
+        "additionalProperties": false
+      },
+      "sickrock.SetUIUsageTrackingResponse": {
+        "type": "object",
+        "properties": {
+          "trackingEnabled": {
+            "type": "boolean",
+            "title": "tracking_enabled"
+          }
+        },
+        "title": "SetUIUsageTrackingResponse",
+        "additionalProperties": false
+      },
       "sickrock.SetUserDefaultTableViewRequest": {
         "type": "object",
         "properties": {
@@ -11517,6 +11838,53 @@
         "title": "TableViewColumn",
         "additionalProperties": false,
         "description": "Table Views"
+      },
+      "sickrock.UIUsageEvent": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "kind",
+            "description": "\"route\", \"sidebar\" or \"header\""
+          },
+          "fromPath": {
+            "type": "string",
+            "title": "from_path",
+            "description": "the route the user was on"
+          },
+          "toPath": {
+            "type": "string",
+            "title": "to_path",
+            "description": "the route navigated to, or the clicked link's path"
+          },
+          "label": {
+            "type": "string",
+            "title": "label",
+            "description": "the clicked link or button's label"
+          },
+          "timestampMs": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "timestamp_ms",
+            "format": "int64",
+            "description": "when it happened (client clock, Unix milliseconds)"
+          },
+          "sessionId": {
+            "type": "string",
+            "title": "session_id",
+            "description": "random per page load, to follow one tab's path"
+          },
+          "appVersion": {
+            "type": "string",
+            "title": "app_version",
+            "description": "the app version the client loaded"
+          }
+        },
+        "title": "UIUsageEvent",
+        "additionalProperties": false,
+        "description": "UI usage tracking (opt-in, per user): navigation through routes, the sidebar and the header,\n appended to the user's own JSONL file on the server for offline analysis."
       },
       "sickrock.UpdateAPIKeyRequest": {
         "type": "object",
