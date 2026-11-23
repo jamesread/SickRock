@@ -387,11 +387,23 @@ func (r *Repository) RunRollup(ctx context.Context, ru *Rollup, filter RollupSou
 		return RollupResult{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
+	if err := lockRollup(ctx, tx, ru.ID); err != nil {
+		return RollupResult{}, fmt.Errorf("lock rollup: %w", err)
+	}
 	res, err := r.runRollupTx(ctx, tx, ru.ID, p, filter)
 	if err != nil {
 		return RollupResult{}, err
 	}
 	return res, tx.Commit()
+}
+
+// lockRollup writes first in the run's transaction, so it holds the write lock before reading.
+// SQLite cannot wait for a writer (busy_timeout) once a transaction has read: upgrading then fails
+// at once with SQLITE_BUSY while another connection writes (e.g. an audit log entry). On MySQL it
+// locks the rollup's row, so two runs of one rollup take turns.
+func lockRollup(ctx context.Context, tx *sqlx.Tx, rollupID int64) error {
+	_, err := tx.ExecContext(ctx, `UPDATE rollups SET rows_tracked = rows_tracked WHERE id = ?`, rollupID)
+	return err
 }
 
 func (r *Repository) runRollupTx(ctx context.Context, tx *sqlx.Tx, rollupID int64, p *rollupPlan, filter RollupSourceFilter) (RollupResult, error) {
