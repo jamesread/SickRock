@@ -44,7 +44,7 @@ require (
 require (
 	connectrpc.com/authn v0.2.0
 	filippo.io/edwards25519 v1.2.0 // indirect
-	github.com/MicahParks/jwkset v0.11.4 // indirect
+	github.com/MicahParks/jwkset v0.12.0 // indirect
 	github.com/MicahParks/keyfunc/v3 v3.9.2 // indirect
 	github.com/alexedwards/argon2id v1.0.0 // indirect
 	github.com/bytedance/gopkg v0.1.4 // indirect
@@ -85,14 +85,14 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.2 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	go.mongodb.org/mongo-driver/v2 v2.10.0 // indirect
+	go.mongodb.org/mongo-driver/v2 v2.10.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
 	golang.org/x/arch v0.33.0 // indirect
-	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/net v0.63.0 // indirect
 	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
-	modernc.org/libc v1.81.2 // indirect
+	modernc.org/libc v1.82.12 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.13.0 // indirect
 )
