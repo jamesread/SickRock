@@ -38,9 +38,9 @@ import (
 	repo "github.com/jamesread/SickRock/internal/repo"
 	srvpkg "github.com/jamesread/SickRock/internal/server"
 	"github.com/jamesread/SickRock/internal/uiusage"
-	armhealth "github.com/jamesread/armature-health"
-	"github.com/jamesread/armature-health/errorlog"
-	"github.com/jamesread/armature-health/store/sqlstore"
+	armhealth "github.com/jamesread/armature-health/v2"
+	"github.com/jamesread/armature-health/v2/errorlog"
+	"github.com/jamesread/armature-health/v2/store/sqlstore"
 	armstore "github.com/jamesread/armature-iam/store"
 )
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/jamesread/SickRock/internal/repo"
-	armhealth "github.com/jamesread/armature-health"
+	armhealth "github.com/jamesread/armature-health/v2"
 )
 
 // NavigationBrokenLinksCheck finds navigation links whose table configuration, dashboard or

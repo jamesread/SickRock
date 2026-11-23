@@ -10,11 +10,12 @@ require (
 	github.com/go-sql-driver/mysql v1.10.2
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/google/uuid v1.6.0
+	github.com/jamesread/armature-health/v2 v2.0.0
 	github.com/jamesread/armature-iam v1.0.2
 	github.com/jamesread/golure v0.0.0-20261111213547-dc225fc15a30
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/knadh/koanf/parsers/yaml v1.1.1
-	github.com/knadh/koanf/providers/env v1.1.0
+	github.com/knadh/koanf/providers/env/v2 v2.0.2
 	github.com/knadh/koanf/providers/file v1.2.1
 	github.com/knadh/koanf/v2 v2.4.1
 	github.com/mark3labs/mcp-go v1.6.0
@@ -22,7 +23,7 @@ require (
 	github.com/prometheus/client_golang v1.25.0
 	github.com/sirupsen/logrus v1.10.2
 	github.com/stretchr/testify v1.12.1
-	github.com/yuin/goldmark v1.8.7
+	github.com/yuin/goldmark/v2 v2.1.16
 	go.akshayshah.org/connectproto v0.6.0
 	golang.org/x/crypto v0.59.0
 	golang.org/x/image v0.48.0
@@ -63,7 +64,6 @@ require (
 	github.com/goccy/go-yaml v1.19.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/jsonschema-go v0.4.3 // indirect
-	github.com/jamesread/armature-health v1.0.0
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.2 // indirect
 	github.com/knadh/koanf/maps v0.1.3 // indirect

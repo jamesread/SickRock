@@ -15,11 +15,10 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/expr-lang/expr"
-	armhealth "github.com/jamesread/armature-health"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer/html"
+	armhealth "github.com/jamesread/armature-health/v2"
+	"github.com/yuin/goldmark/v2/extension"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/renderer/html"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/buildinfo"
@@ -41,16 +40,17 @@ type SickRockServer struct {
 	notifyLimiter       notifyLimiter
 }
 
-// markdownRenderer is a configured goldmark instance for rendering markdown
-var markdownRenderer = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
-	goldmark.WithParserOptions(
+// markdownParser and markdownRenderer are the configured goldmark parser and HTML renderer for markdown.
+var (
+	markdownParser = parser.New(
+		parser.WithExtensions(extension.NewGFMParser()),
 		parser.WithAutoHeadingID(),
-	),
-	goldmark.WithRendererOptions(
+	)
+	markdownRenderer = html.New(
+		html.WithExtensions(extension.NewGFMHTMLRenderer()),
 		html.WithHardWraps(),
 		html.WithXHTML(),
-	),
+	)
 )
 
 // renderMarkdown converts markdown content to HTML
@@ -59,8 +59,9 @@ func renderMarkdown(content string) string {
 		return ""
 	}
 
+	source := []byte(content)
 	var buf strings.Builder
-	if err := markdownRenderer.Convert([]byte(content), &buf); err != nil {
+	if err := markdownRenderer.Render(&buf, source, markdownParser.Parse(source)); err != nil {
 		log.WithError(err).Error("Failed to render markdown")
 		return content // Return original content if rendering fails
 	}

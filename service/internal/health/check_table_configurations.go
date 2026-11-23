@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jamesread/SickRock/internal/repo"
-	armhealth "github.com/jamesread/armature-health"
+	armhealth "github.com/jamesread/armature-health/v2"
 )
 
 // TableConfigurationDuplicateNamesCheck finds table configuration names used more than once
