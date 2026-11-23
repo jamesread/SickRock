@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import { ref, shallowRef, onMounted, onUnmounted, computed, inject, provide, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
-import type { Field, ForeignKey, GetTableStructureResponse, Item } from '../gen/sickrock_pb'
+import type { Field, GetTableStructureResponse, Item } from '../gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import {
   ArrowLeft01Icon,
@@ -22,10 +21,8 @@ import LoadingArea from 'picocrank/vue/components/LoadingArea.vue'
 import Tabs from 'picocrank/vue/components/Tabs.vue'
 import RelatedRelationPanel, { type RelatedTableEntry } from './RelatedRelationPanel.vue'
 import DangerZone from 'picocrank/vue/components/DangerZone.vue'
-import FormField from 'picocrank/vue/components/FormField.vue'
-import CheckGroup from 'picocrank/vue/components/CheckGroup.vue'
-import { defaultQuickAddConfig, parseQuickAddConfig, quickAddCandidateColumns, serializeQuickAddConfig } from '../utils/quickAdd'
 import Dialog from 'picocrank/vue/components/Dialog.vue'
+import ManageRelationDialog from '../components/ManageRelationDialog.vue'
 import type { DialogApi } from '../utils/dialog'
 import type { createApiClient } from '../stores/api'
 import { formatUnixTimestamp } from '../utils/dateFormatting'
@@ -38,7 +35,6 @@ import {
   isImageFieldType,
   isUserRefColumn as columnIsUserRef,
   isUserRefFieldType,
-  YES_NO_OPTIONS,
 } from '../utils/fieldTypes'
 import { appTitle, formatDocumentTitle } from '../appTitle'
 import { rowEditActionLabel, rowNamePluralLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
@@ -54,7 +50,6 @@ import {
   buildRelationExtraFieldDefs,
   enrichItemsWithPullThrough,
   pullThroughSpecsFromRelationColumns,
-  type CalculatedColumnSpec,
   type ReferencedPullThroughContext,
 } from '../utils/relationPullThrough'
 import {
@@ -161,25 +156,6 @@ const foreignKeys = ref<Array<{
 const relatedChildStructures = ref<Record<string, GetTableStructureResponse>>({})
 const relatedPullThroughExtraFields = ref<Record<string, Field[]>>({})
 const fkReferencedItems = ref<Record<string, Item[]>>({})
-const relationDialog = ref<DialogApi | null>(null)
-const managingConstraintName = ref('')
-const relationDisplayNameDraft = ref('')
-const relationAbsorbDraft = ref(false)
-const relationAbsorbTypeDraft = ref('first_row')
-const relationQuickAddDraft = ref(defaultQuickAddConfig())
-// Related table columns the quick add row can offer (all but the link back to this row).
-const relationQuickAddOptions = computed(() => quickAddCandidateColumns(
-  relationChildFields.value,
-  managingRelationFk.value?.columnName ?? '',
-).map(field => ({ value: field.name, label: field.displayLabel?.trim() || field.name })))
-const relationPullThroughDraft = ref<Array<{ fkColumn: string; field: string }>>([])
-const relationCalculatedDraft = ref<CalculatedColumnSpec[]>([])
-const relationChildForeignKeys = ref<ForeignKey[]>([])
-const relationChildFields = ref<Field[]>([])
-const relationReferencedFieldsByFk = ref<Record<string, Field[]>>({})
-const relationDialogLoading = ref(false)
-const savingRelation = ref(false)
-const relationSaveError = ref<string | null>(null)
 const relatedRows = ref<Record<string, any[]>>({})
 const relatedTableRowNames = ref<Record<string, string>>({})
 // Loaded icons of related table configurations (by tc name); missing until loaded or when unset.
@@ -1141,153 +1117,16 @@ function onRelatedRowDeleted(table: RelatedTableEntry, id: string) {
   }
 }
 
-const managingRelationFk = computed(() =>
-  foreignKeys.value.find(fk => fk.constraintName === managingConstraintName.value),
-)
-
-function relationEndpointLabel(table: string, tcName: string | undefined, column: string): string {
-  const tableLabel = (tcName?.trim() || table).trim()
-  return `${tableLabel}.${column}`
-}
-
-async function loadRelationDialogContext() {
-  const fk = managingRelationFk.value
-  if (!fk) return
-  relationDialogLoading.value = true
-  relationSaveError.value = null
-  try {
-    const childTc = relationSourceTableTcName(fk)
-    const childStructure = await ensureChildTableStructure(childTc)
-    relationChildFields.value = childStructure.fields ?? []
-    relationChildForeignKeys.value = childStructure.foreignKeys ?? []
-    relationReferencedFieldsByFk.value = {}
-    for (const row of relationPullThroughDraft.value) {
-      if (!row.fkColumn || relationReferencedFieldsByFk.value[row.fkColumn]) continue
-      const childFk = relationChildForeignKeys.value.find(entry => entry.columnName === row.fkColumn)
-      if (!childFk) continue
-      const refTc = childFk.referencedTableTcName || childFk.referencedTable
-      const refStructure = await ensureChildTableStructure(refTc)
-      relationReferencedFieldsByFk.value[row.fkColumn] = refStructure.fields ?? []
-    }
-  } catch (e) {
-    relationSaveError.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    relationDialogLoading.value = false
-  }
-}
-
-async function onRelationPullThroughFkChange(index: number) {
-  const row = relationPullThroughDraft.value[index]
-  if (!row?.fkColumn) return
-  row.field = ''
-  const childFk = relationChildForeignKeys.value.find(entry => entry.columnName === row.fkColumn)
-  if (!childFk) return
-  const refTc = childFk.referencedTableTcName || childFk.referencedTable
-  const refStructure = await ensureChildTableStructure(refTc)
-  relationReferencedFieldsByFk.value = {
-    ...relationReferencedFieldsByFk.value,
-    [row.fkColumn]: refStructure.fields ?? [],
-  }
-}
-
-function addRelationPullThroughRow() {
-  relationPullThroughDraft.value.push({ fkColumn: '', field: '' })
-}
-
-function removeRelationPullThroughRow(index: number) {
-  relationPullThroughDraft.value.splice(index, 1)
-}
-
-function addRelationCalculatedRow() {
-  relationCalculatedDraft.value.push({ displayLabel: '', expr: '' })
-}
-
-function removeRelationCalculatedRow(index: number) {
-  relationCalculatedDraft.value.splice(index, 1)
-}
+const manageRelationDialog = ref<InstanceType<typeof ManageRelationDialog> | null>(null)
 
 function openManageRelation(constraintName: string, displayName?: string) {
-  if (!constraintName) return
-  managingConstraintName.value = constraintName
-  relationDisplayNameDraft.value = displayName ?? ''
   const fk = foreignKeys.value.find(entry => entry.constraintName === constraintName)
-  relationAbsorbDraft.value = !!fk?.absorbIntoItem
-  relationAbsorbTypeDraft.value = fk?.absorbType || 'first_row'
-  relationQuickAddDraft.value = parseQuickAddConfig(fk?.quickAddJson)
-  const columns = fk?.pullThroughFields ?? []
-  relationPullThroughDraft.value = columns
-    .filter(pt => !pt.expr?.trim())
-    .map(pt => ({ fkColumn: pt.fkColumn, field: pt.field }))
-  relationCalculatedDraft.value = columns
-    .filter(pt => pt.expr?.trim())
-    .map(pt => ({
-      displayLabel: pt.displayLabel?.trim() ?? '',
-      expr: pt.expr.trim(),
-    }))
-  relationSaveError.value = null
-  nextTick(async () => {
-    relationDialog.value?.show()
-    await loadRelationDialogContext()
-  })
+  if (fk) manageRelationDialog.value?.open(fk, displayName)
 }
 
-function closeManageRelation() {
-  relationDialog.value?.close()
-  managingConstraintName.value = ''
-  relationDisplayNameDraft.value = ''
-  relationAbsorbDraft.value = false
-  relationAbsorbTypeDraft.value = 'first_row'
-  relationQuickAddDraft.value = defaultQuickAddConfig()
-  relationPullThroughDraft.value = []
-  relationCalculatedDraft.value = []
-  relationChildForeignKeys.value = []
-  relationChildFields.value = []
-  relationReferencedFieldsByFk.value = {}
-  relationSaveError.value = null
-}
-
-async function saveRelationDisplayName() {
-  if (!managingConstraintName.value || savingRelation.value) return
-  savingRelation.value = true
-  relationSaveError.value = null
-  try {
-    const pullThroughFields: RelationPullThroughField[] = [
-      ...relationPullThroughDraft.value
-        .filter(row => row.fkColumn.trim() && row.field.trim())
-        .map(row => ({
-          fkColumn: row.fkColumn.trim(),
-          field: row.field.trim(),
-          displayLabel: '',
-          expr: '',
-        })),
-      ...relationCalculatedDraft.value
-        .filter(row => row.displayLabel.trim() && row.expr.trim())
-        .map(row => ({
-          fkColumn: '',
-          field: '',
-          displayLabel: row.displayLabel.trim(),
-          expr: row.expr.trim(),
-        })),
-    ]
-    const res = await client.updateTableRelation({
-      constraintName: managingConstraintName.value,
-      displayName: relationDisplayNameDraft.value.trim(),
-      pullThroughFields,
-      absorbIntoItem: relationAbsorbDraft.value,
-      absorbType: relationAbsorbDraft.value ? relationAbsorbTypeDraft.value : '',
-      quickAddJson: serializeQuickAddConfig(relationQuickAddDraft.value),
-    })
-    if (!res.success) {
-      throw new Error(res.message || 'Failed to update relation')
-    }
-    closeManageRelation()
-    await loadTableStructure()
-    await loadRelatedRows()
-  } catch (e) {
-    relationSaveError.value = e instanceof Error ? e.message : String(e)
-  } finally {
-    savingRelation.value = false
-  }
+async function onRelationSaved() {
+  await loadTableStructure()
+  await loadRelatedRows()
 }
 
 const sectionTitle = computed(() =>
@@ -1628,218 +1467,12 @@ function cancelDelete() {
       />
     </Dialog>
 
-    <Dialog ref="relationDialog" title="Manage relation" class="relation-dialog" @close="closeManageRelation">
-      <dl v-if="managingRelationFk" class="relation-endpoints">
-        <dt>Relation ID</dt>
-        <dd>
-          <code v-if="managingRelationFk.relationId">{{ managingRelationFk.relationId }}</code>
-          <span v-else class="muted">—</span>
-        </dd>
-        <dt>Constraint name</dt>
-        <dd><code>{{ managingRelationFk.constraintName }}</code></dd>
-        <dt>Source</dt>
-        <dd>
-          <code>{{
-            relationEndpointLabel(
-              managingRelationFk.tableName,
-              managingRelationFk.tableTcName,
-              managingRelationFk.columnName,
-            )
-          }}</code>
-        </dd>
-        <dt>Destination</dt>
-        <dd>
-          <code>{{
-            relationEndpointLabel(
-              managingRelationFk.referencedTable,
-              managingRelationFk.referencedTableTcName,
-              managingRelationFk.referencedColumn,
-            )
-          }}</code>
-        </dd>
-      </dl>
-      <p class="muted">Give this related list a friendly name shown in the section title.</p>
-      <FormField label="Friendly name" for="relation-display-name" :disabled="savingRelation">
-        <input
-          id="relation-display-name"
-          v-model="relationDisplayNameDraft"
-          type="text"
-          placeholder="e.g. Orders, Tasks, Line items"
-          autocomplete="off"
-          :disabled="savingRelation"
-        />
-      </FormField>
-      <h3 class="relation-dialog-subheading">Absorb into item</h3>
-      <p class="muted">
-        Show the related row inside this item's main section, as if its fields were part of the item, instead of as a separate section.
-      </p>
-      <FormField label="Absorb into item" component-has-label :disabled="savingRelation">
-        <RadioGroup
-          variant="boolean"
-          :options="YES_NO_OPTIONS"
-          v-model="relationAbsorbDraft"
-          :disabled="savingRelation"
-          aria-label="Absorb into item"
-        />
-      </FormField>
-      <FormField label="Absorb type" for="relation-absorb-type" :disabled="savingRelation || !relationAbsorbDraft">
-        <select
-          id="relation-absorb-type"
-          v-model="relationAbsorbTypeDraft"
-          :disabled="savingRelation || !relationAbsorbDraft"
-        >
-          <option value="first_row">First row</option>
-        </select>
-      </FormField>
-      <h3 class="relation-dialog-subheading">Quick add</h3>
-      <p class="muted">
-        Add a row under the related list for typing in related rows one after another (for example, a recipe's ingredients), without leaving this page.
-      </p>
-      <FormField label="Quick add" component-has-label :disabled="savingRelation">
-        <RadioGroup
-          variant="boolean"
-          :options="YES_NO_OPTIONS"
-          v-model="relationQuickAddDraft.enabled"
-          :disabled="savingRelation"
-          aria-label="Quick add"
-        />
-      </FormField>
-      <FormField label="Columns" component-has-label :disabled="savingRelation || !relationQuickAddDraft.enabled">
-        <CheckGroup
-          v-model="relationQuickAddDraft.columns"
-          :options="relationQuickAddOptions"
-          aria-label="Quick add columns"
-          :disabled="savingRelation || !relationQuickAddDraft.enabled"
-        />
-        <small class="muted">In the order you tick them. None ticked shows every column.</small>
-      </FormField>
-      <FormField label="Create missing" component-has-label :disabled="savingRelation || !relationQuickAddDraft.enabled">
-        <RadioGroup
-          variant="boolean"
-          :options="YES_NO_OPTIONS"
-          v-model="relationQuickAddDraft.createMissing"
-          :disabled="savingRelation || !relationQuickAddDraft.enabled"
-          aria-label="Create missing"
-        />
-        <small class="muted">Typing a name that matches no row in a linked table (e.g. a new ingredient) creates that row.</small>
-      </FormField>
-      <h3 class="relation-dialog-subheading">Pull-through columns</h3>
-      <p class="muted">
-        Show fields from rows linked by foreign keys on the related table (for example, currency name on each opportunity).
-      </p>
-      <p v-if="relationDialogLoading" class="muted">Loading relation fields…</p>
-      <template v-else>
-        <div
-          v-for="(row, index) in relationPullThroughDraft"
-          :key="`pt-${index}`"
-          class="relation-pull-through-row"
-        >
-          <FormField label="Foreign key column" :for="`pt-fk-${index}`" :disabled="savingRelation">
-            <select
-              :id="`pt-fk-${index}`"
-              v-model="row.fkColumn"
-              :disabled="savingRelation"
-              @change="onRelationPullThroughFkChange(index)"
-            >
-              <option value="">— Select —</option>
-              <option
-                v-for="childFk in relationChildForeignKeys"
-                :key="childFk.constraintName || childFk.columnName"
-                :value="childFk.columnName"
-              >
-                {{ childFk.columnName }} → {{ childFk.referencedTableTcName || childFk.referencedTable }}
-              </option>
-            </select>
-          </FormField>
-          <FormField label="Field on linked row" :for="`pt-field-${index}`" :disabled="savingRelation">
-            <select
-              :id="`pt-field-${index}`"
-              v-model="row.field"
-              :disabled="savingRelation || !row.fkColumn"
-            >
-              <option value="">— Select —</option>
-              <option
-                v-for="field in (relationReferencedFieldsByFk[row.fkColumn] ?? [])"
-                :key="field.name"
-                :value="field.name"
-              >
-                {{ field.displayLabel || field.name }}
-              </option>
-            </select>
-          </FormField>
-          <button
-            type="button"
-            class="neutral inline-icon"
-            :disabled="savingRelation"
-            @click="removeRelationPullThroughRow(index)"
-          >
-            Remove
-          </button>
-        </div>
-        <button
-          type="button"
-          class="neutral inline-icon"
-          :disabled="savingRelation || relationChildForeignKeys.length === 0"
-          @click="addRelationPullThroughRow"
-        >
-          Add pull-through column
-        </button>
-      </template>
-      <h3 class="relation-dialog-subheading">Calculated columns</h3>
-      <p class="muted">
-        Expressions use <code>{table.column}</code> placeholders (table configuration or physical table name).
-        Values are computed on the server when related rows load, e.g.
-        <code>{skus.value} * {quote_lines.quantity}</code>.
-      </p>
-      <div
-        v-for="(row, index) in relationCalculatedDraft"
-        :key="`calc-${index}`"
-        class="relation-pull-through-row"
-      >
-        <FormField label="Column label" :for="`calc-label-${index}`" :disabled="savingRelation">
-          <input
-            :id="`calc-label-${index}`"
-            v-model="row.displayLabel"
-            type="text"
-            placeholder="e.g. Line total"
-            autocomplete="off"
-            :disabled="savingRelation"
-          />
-        </FormField>
-        <FormField label="Expression (expr)" :for="`calc-expr-${index}`" :disabled="savingRelation">
-          <input
-            :id="`calc-expr-${index}`"
-            v-model="row.expr"
-            type="text"
-            placeholder="{skus.value} * {quote_lines.quantity}"
-            autocomplete="off"
-            :disabled="savingRelation"
-          />
-        </FormField>
-        <button
-          type="button"
-          class="neutral inline-icon"
-          :disabled="savingRelation"
-          @click="removeRelationCalculatedRow(index)"
-        >
-          Remove
-        </button>
-      </div>
-      <button
-        type="button"
-        class="neutral inline-icon"
-        :disabled="savingRelation"
-        @click="addRelationCalculatedRow"
-      >
-        Add calculated column
-      </button>
-      <p v-if="relationSaveError" class="inline-notification error">{{ relationSaveError }}</p>
-      <template #actions>
-        <button type="button" class="good" :disabled="savingRelation" @click="saveRelationDisplayName">
-          {{ savingRelation ? 'Saving…' : 'Save' }}
-        </button>
-      </template>
-    </Dialog>
+    <ManageRelationDialog
+      ref="manageRelationDialog"
+      :client="client"
+      :load-structure="ensureChildTableStructure"
+      @saved="onRelationSaved"
+    />
 
     <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
       <p>Are you sure you want to delete this row? This action cannot be undone.</p>
@@ -1933,18 +1566,7 @@ function cancelDelete() {
   margin-top: 0;
 }
 
-.relation-dialog-subheading {
-  margin: 1rem 0 0.25rem;
-  font-size: 1.05em;
-}
 
-.relation-pull-through-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: flex-end;
-  margin-bottom: 0.75rem;
-}
 
 .inline-edit {
   padding: 0;

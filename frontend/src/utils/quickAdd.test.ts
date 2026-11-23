@@ -7,6 +7,8 @@ import {
   quickAddColumns,
   quickAddInputType,
   quickAddValue,
+  hasQuickAddValue,
+  referenceText,
   serializeQuickAddConfig,
 } from './quickAdd'
 
@@ -55,6 +57,22 @@ describe('inputs and values', () => {
     expect(quickAddValue('text', ' 2 ')).toBe('2')
     expect(quickAddValue('tinyint(1)', true)).toBe('1')
   })
+
+  it('accepts the numbers number inputs give', () => {
+    expect(quickAddValue('decimal(10,2)', 200)).toBe('200')
+    expect(quickAddValue('decimal(10,2)', 0.5)).toBe('0.5')
+    expect(quickAddValue('decimal(10,2)', '')).toBe('')
+  })
+
+  it('knows which inputs hold something to add', () => {
+    expect(hasQuickAddValue(' x ')).toBe(true)
+    expect(hasQuickAddValue('  ')).toBe(false)
+    expect(hasQuickAddValue(0)).toBe(true)
+    expect(hasQuickAddValue(Number.NaN)).toBe(false)
+    expect(hasQuickAddValue(true)).toBe(true)
+    expect(hasQuickAddValue(false)).toBe(false)
+    expect(hasQuickAddValue(undefined)).toBe(false)
+  })
 })
 
 describe('referenced rows', () => {
@@ -68,6 +86,18 @@ describe('referenced rows', () => {
     expect(matchReferencedRow(rows, '#7')?.id).toBe('7')
     expect(matchReferencedRow(rows, 'Leek')).toBeUndefined()
     expect(matchReferencedRow(rows, '')).toBeUndefined()
+  })
+
+  it('types a picked row as its name, or #id when the name would find another row', () => {
+    const twins = [
+      { id: '1', additionalFields: { name: 'Onion' } },
+      { id: '2', additionalFields: { name: 'onion' } },
+      { id: '3', additionalFields: {} },
+    ] as unknown as Item[]
+    expect(referenceText(twins, twins[0])).toBe('Onion')
+    expect(referenceText(twins, twins[1])).toBe('#2')
+    expect(referenceText(twins, twins[2])).toBe('#3')
+    for (const row of twins) expect(matchReferencedRow(twins, referenceText(twins, row))?.id).toBe(row.id)
   })
 
   it('finds where a new row name goes', () => {

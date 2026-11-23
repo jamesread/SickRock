@@ -7,7 +7,7 @@ import {
   MoreVerticalSquare01Icon,
   ViewIcon,
 } from '@hugeicons/core-free-icons'
-import TableRowContextMenu from 'picocrank/vue/components/TableRowContextMenu.vue'
+import ContextMenu from 'picocrank/vue/components/ContextMenu.vue'
 
 import { createApiClient } from '../stores/api'
 
@@ -71,12 +71,12 @@ async function onSelect(item: { id?: string }) {
       aria-hidden="true"
     />
   </button>
-  <TableRowContextMenu
+  <ContextMenu
     v-model:open="open"
+    aria-label="Row actions"
     :items="menuItems"
     :client-x="clientX"
     :client-y="clientY"
-    :target-count="1"
     @select="onSelect"
   />
 </template>

@@ -38,6 +38,7 @@ type SickRockServer struct {
 	images              *images.Store
 	uiUsage             *uiusage.Store
 	notifyLimiter       notifyLimiter
+	testNotifyLimiter   notifyLimiter
 }
 
 // markdownParser and markdownRenderer are the configured goldmark parser and HTML renderer for markdown.
@@ -73,6 +74,7 @@ func NewSickRockServer(r *repo.Repository, authLayer *iam.AuthLayer) *SickRockSe
 		repo:                r,
 		notificationService: notifications.NewNotificationService(r),
 		auth:                authLayer,
+		testNotifyLimiter:   notifyLimiter{limit: TestNotificationRateLimit, window: TestNotificationRateWindow},
 	}
 }
 

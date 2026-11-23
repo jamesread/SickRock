@@ -1494,6 +1494,17 @@ message DeleteUserNotificationChannelResponse {
   string message = 2;
 }
 
+// Sends a test notification to one of the caller's own channels (active or not), to check it works.
+message SendTestNotificationRequest {
+  int32 channel_id = 1;
+}
+
+// success is false when delivery failed; message then says why.
+message SendTestNotificationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 message GetUserNotificationSubscriptionsRequest {}
 
 message GetUserNotificationSubscriptionsResponse {
@@ -1776,6 +1787,7 @@ service SickRock {
   rpc CreateUserNotificationChannel(CreateUserNotificationChannelRequest) returns (CreateUserNotificationChannelResponse);
   rpc UpdateUserNotificationChannel(UpdateUserNotificationChannelRequest) returns (UpdateUserNotificationChannelResponse);
   rpc DeleteUserNotificationChannel(DeleteUserNotificationChannelRequest) returns (DeleteUserNotificationChannelResponse);
+  rpc SendTestNotification(SendTestNotificationRequest) returns (SendTestNotificationResponse);
   rpc GetUserNotificationSubscriptions(GetUserNotificationSubscriptionsRequest) returns (GetUserNotificationSubscriptionsResponse);
   rpc CreateUserNotificationSubscription(CreateUserNotificationSubscriptionRequest) returns (CreateUserNotificationSubscriptionResponse);
   rpc DeleteUserNotificationSubscription(DeleteUserNotificationSubscriptionRequest) returns (DeleteUserNotificationSubscriptionResponse);

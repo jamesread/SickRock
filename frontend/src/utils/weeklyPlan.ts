@@ -7,7 +7,7 @@
  * when one is set, otherwise from the time of day in dateColumn: the last slot whose time is not
  * after the row's time.
  */
-import { filterByText } from './cardsView'
+import { filterPickerOptions, type RowPickerOption } from './rowPicker'
 
 export const WEEKLY_PLAN_VIEW_TYPE = 'weeklyplan'
 
@@ -258,21 +258,7 @@ export function groupIntoCells<T>(
   return cells
 }
 
-export type WeeklyPlanPickerOption = {
-  value: string
-  label: string
-  imageId: string
-  /** Extra fields shown on the tile, from the referenced table's Cards view. */
-  details?: Array<{ label: string; value: string }>
-}
+/** An option in the weekly plan's picker (see utils/rowPicker.ts). */
+export type WeeklyPlanPickerOption = RowPickerOption
 
-/**
- * Picker options whose label (the referenced row's name) and details together contain every word
- * of query, ignoring case and accents.
- */
-export function filterPickerOptions<T extends { label: string; details?: Array<{ value: string }> }>(
-  options: T[],
-  query: string,
-): T[] {
-  return filterByText(options, query, option => [option.label, ...(option.details ?? []).map(detail => detail.value)])
-}
+export { filterPickerOptions }

@@ -18,6 +18,7 @@ import HugeIcon from './components/HugeIcon.vue'
 import { useKeyboardShortcuts, type KeyboardShortcut } from './composables/useKeyboardShortcuts'
 import KeyboardShortcutsHelp from './components/KeyboardShortcutsHelp.vue'
 import PWAInstallPrompt from './components/PWAInstallPrompt.vue'
+import NotificationPopups from 'picocrank/vue/components/NotificationPopups.vue'
 import { usePWAInstall } from './composables/usePWAInstall'
 import { isOnline } from './utils/indexedDB'
 import { resolveNavigationIcon } from './utils/navigationIcon'
@@ -1211,6 +1212,8 @@ onMounted(async () => {
 
     <!-- PWA Install Prompt -->
     <PWAInstallPrompt v-if="isAuthenticated" />
+    <!-- picocrank's popup stack, for showNotificationPopup (e.g. quick add's "Added …"). -->
+    <NotificationPopups />
 </template>
 
 <style scoped>

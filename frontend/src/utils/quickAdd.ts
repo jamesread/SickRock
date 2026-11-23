@@ -78,16 +78,34 @@ export function matchReferencedRow(rows: Item[], typed: string): Item | undefine
     ?? rows.find(row => String(row.id) === typed.trim().replace(/^#/, ''))
 }
 
+/**
+ * What to type to pick row: its name, or "#id" when it has no name or an earlier row has the same
+ * name (so matchReferencedRow finds this row again).
+ */
+export function referenceText(rows: Item[], row: Item): string {
+  const name = rowName(row)
+  return matchReferencedRow(rows, name)?.id === row.id ? name : `#${row.id}`
+}
+
 /** The column a new referenced row's name goes in ("name", else "title"), or "" when it has neither. */
 export function nameColumnOf(fields: QuickAddField[]): string {
   return ['name', 'title'].find(name => fields.some(field => field.name === name)) ?? ''
 }
 
 /** Datetime-local input value ("2026-11-22T18:00") as the server's "2026-11-22 18:00:00". */
-export function quickAddValue(type: string, value: string | boolean): string {
+export function quickAddValue(type: string, value: string | number | boolean): string {
   if (typeof value === 'boolean') return value ? '1' : '0'
-  if (quickAddInputType(type) === 'datetime-local' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) {
-    return value.replace('T', ' ') + ':00'
+  // Number inputs' v-model gives a number (or '' when empty).
+  const text = String(value).trim()
+  if (quickAddInputType(type) === 'datetime-local' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) {
+    return text.replace('T', ' ') + ':00'
   }
-  return value.trim()
+  return text
+}
+
+/** Whether an input holds something to add: text that is not blank, any number, or a ticked box. */
+export function hasQuickAddValue(value: string | number | boolean | undefined): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value)
+  return (value ?? '').trim() !== ''
 }

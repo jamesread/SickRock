@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -156,6 +158,26 @@ func healthIssueMessage(data map[string]any) string {
 	return message
 }
 
+// TestNotificationMessage is the text of a test notification.
+const TestNotificationMessage = "Test notification from SickRock: this channel works."
+
+// SendTest sends a test notification to channel (whether or not it is active), so its owner can
+// check it is set up correctly. The error says why delivery failed; it never holds secrets such as
+// the Telegram bot token.
+func (ns *NotificationService) SendTest(ctx context.Context, channel repo.UserNotificationChannel) error {
+	return ns.sendToChannel(ctx, channel, TestNotificationMessage, map[string]any{"event": "test"})
+}
+
+// withoutURL drops the request URL from an HTTP client error: the Telegram API URL holds the bot
+// token, and errors can reach users (SendTest) and logs.
+func withoutURL(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		return urlErr.Err
+	}
+	return err
+}
+
 // sendToChannel sends a notification to a specific channel
 func (ns *NotificationService) sendToChannel(ctx context.Context, channel repo.UserNotificationChannel, message string, data map[string]any) error {
 	switch channel.ChannelType {
@@ -185,7 +207,7 @@ func (ns *NotificationService) sendTelegram(ctx context.Context, telegramID stri
 
 	resp, err := postJSON(ctx, url, payload)
 	if err != nil {
-		return fmt.Errorf("failed to send telegram message: %w", err)
+		return fmt.Errorf("failed to send telegram message: %w", withoutURL(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 

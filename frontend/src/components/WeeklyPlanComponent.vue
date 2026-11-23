@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // The WeeklyPlan view type: a week of days split into the view's slots, with the table's rows
 // placed in them (see utils/weeklyPlan.ts). Entries can be added to a slot, removed, and dragged
-// to another slot. For a relation, new entries are picked in a dialog of image tiles.
+// to another slot. For a relation, new entries are picked in a dialog of image tiles (RowPickerDialog).
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Section from 'picocrank/vue/components/Section.vue'
@@ -10,20 +10,16 @@ import { HugeiconsIcon } from '@hugeicons/vue'
 import { Add01Icon, Calendar03Icon, Cancel01Icon, Copy01Icon, Delete02Icon, LinkSquare02Icon, Notification03Icon } from '@hugeicons/core-free-icons'
 import { createApiClient } from '../stores/api'
 import { useTableAccess } from '../composables/useTableAccess'
+import { useRowPicker } from '../composables/useRowPicker'
 import { useDesignMode } from '../composables/useDesignMode'
 import ViewsButton from './ViewsButton.vue'
 import ImageThumb from './ImageThumb.vue'
 import RowPickerDialog from './RowPickerDialog.vue'
-import ContextMenu from './ContextMenu.vue'
+import ContextMenu from 'picocrank/vue/components/ContextMenu.vue'
 import NotifyUsersDialog from './NotifyUsersDialog.vue'
 import RollupButtons from './RollupButtons.vue'
 import { useAuthStore } from '../stores/auth'
 import type { ForeignKey, Item } from '../gen/sickrock_pb'
-import { getItemNameFieldValue } from '../utils/itemViewSectionTitle'
-import { fieldDefsForInsertForm, type InsertFieldDef } from '../utils/insertRowViewFields'
-import { rowInsertActionLabel } from '../utils/rowInsertLabel'
-import { cardDetails, chooseCardsView, parseCardsConfig } from '../utils/cardsView'
-import { hasImageValue, isImageFieldType } from '../utils/fieldTypes'
 import {
   WEEKLY_PLAN_VIEW_TYPE,
   addDays,
@@ -62,15 +58,7 @@ const { access } = useTableAccess(computed(() => props.tableId))
 const config = ref<WeeklyPlanConfig>(parseWeeklyPlanConfig(''))
 const rows = ref<Item[]>([])
 const itemForeignKey = ref<ForeignKey | null>(null)
-const referencedRows = ref<Item[]>([])
-const referencedImageColumn = ref('')
 const tableColumns = ref<string[]>([])
-const referencedFieldDefs = ref<InsertFieldDef[]>([])
-const referencedCreateLabel = ref('')
-// Extra fields on the picker's tiles: the detail columns of the referenced table's Cards view.
-const referencedDetailColumns = ref<string[]>([])
-const referencedFieldTypes = ref<Record<string, string>>({})
-const referencedFieldLabels = ref<Record<string, string>>({})
 const loading = ref(true)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -81,8 +69,16 @@ const addValue = ref('')
 const dragOverCell = ref<string | null>(null)
 const picker = ref<InstanceType<typeof RowPickerDialog> | null>(null)
 const pickingFor = ref<{ day: Date; slotIndex: number } | null>(null)
-const entryMenu = ref<InstanceType<typeof ContextMenu> | null>(null)
+// The right-click menu of a planned entry (picocrank ContextMenu).
+const entryMenuOpen = ref(false)
+const entryMenuX = ref(0)
+const entryMenuY = ref(0)
 const menuRow = ref<Item | null>(null)
+const entryMenuItems = computed(() => [
+  ...(access.value.canInsert ? [{ id: 'duplicate', label: 'Duplicate', icon: Copy01Icon, disabled: busy.value }] : []),
+  { id: 'open', label: 'Open', icon: LinkSquare02Icon },
+  ...(access.value.canDelete ? [{ id: 'remove', label: 'Remove', icon: Delete02Icon, disabled: busy.value }] : []),
+])
 let draggedRowId: string | null = null
 const notifyDialog = ref<InstanceType<typeof NotifyUsersDialog> | null>(null)
 const canNotify = computed(() => auth.hasPermission('notifications.send'))
@@ -91,18 +87,10 @@ const problems = computed(() => weeklyPlanConfigProblems(config.value))
 const days = computed(() => daysOfWeek(weekStart.value))
 const todayKey = dayKey(new Date())
 const referencedTable = computed(() => itemForeignKey.value?.referencedTableTcName || itemForeignKey.value?.referencedTable || '')
-const { access: referencedAccess } = useTableAccess(referencedTable)
+// The referenced table's rows, and the picker's options for them (see composables/useRowPicker.ts).
+const referenced = useRowPicker(referencedTable)
 const cells = computed(() => groupIntoCells(config.value, weekStart.value, rows.value, columnValue))
 const plannedCount = computed(() => [...cells.value.values()].reduce((total, cell) => total + cell.length, 0))
-const referencedById = computed(() => new Map(referencedRows.value.map(row => [String(row.id), row])))
-const pickerOptions = computed<WeeklyPlanPickerOption[]>(() => referencedRows.value
-  .map(row => ({
-    value: String(row.id),
-    label: referencedLabel(row),
-    imageId: referencedImageId(row),
-    details: cardDetails(row, referencedDetailColumns.value, referencedFieldTypes.value, referencedFieldLabels.value),
-  }))
-  .sort((a, b) => a.label.localeCompare(b.label)))
 const pickerTitle = computed(() => {
   const target = pickingFor.value
   if (!target) return 'Choose'
@@ -121,29 +109,17 @@ function columnValue(row: Item, column: string): unknown {
   return row.additionalFields?.[column]
 }
 
-function referencedLabel(row: Item): string {
-  const fields = row.additionalFields ?? {}
-  return getItemNameFieldValue(row as unknown as Record<string, unknown>)
-    || fields.title?.trim()
-    || `#${row.id}`
-}
-
-function referencedImageId(row: Item | undefined): string {
-  const image = row && referencedImageColumn.value ? row.additionalFields?.[referencedImageColumn.value] : ''
-  return hasImageValue(image) ? String(image) : ''
-}
-
 /** What an entry shows: the referenced row (for a relation) or the item column's own value. */
 function entryOf(row: Item) {
   const value = columnValue(row, config.value.itemColumn)
   if (!referencedTable.value) {
     return { label: String(value ?? '').trim() || `#${row.id}`, to: `/table/${props.tableId}/${row.id}`, imageId: '' }
   }
-  const target = referencedById.value.get(String(value ?? ''))
+  const target = referenced.rowsById.value.get(String(value ?? ''))
   return {
-    label: target ? referencedLabel(target) : `#${value ?? '?'}`,
+    label: target ? referenced.labelOf(target) : `#${value ?? '?'}`,
     to: target ? `/table/${referencedTable.value}/${target.id}` : `/table/${props.tableId}/${row.id}`,
-    imageId: referencedImageId(target),
+    imageId: referenced.imageIdOf(target),
   }
 }
 
@@ -159,33 +135,12 @@ async function loadConfig() {
 
 async function loadReferencedTable() {
   itemForeignKey.value = null
-  referencedRows.value = []
-  referencedImageColumn.value = ''
-  referencedFieldDefs.value = []
-  referencedCreateLabel.value = ''
-  referencedDetailColumns.value = []
   const structure = await client.getTableStructure({ pageId: props.tableId })
   tableColumns.value = (structure.fields ?? []).map(field => field.name)
   const fk = structure.foreignKeys?.find(f => f.columnName === config.value.itemColumn) ?? null
   itemForeignKey.value = fk
-  const refTable = fk ? (fk.referencedTableTcName || fk.referencedTable) : ''
-  if (!refTable) return
-  const [refStructure, refItems, refViews] = await Promise.all([
-    client.getTableStructure({ pageId: refTable }),
-    client.listItems({ tcName: refTable }),
-    client.getTableViews({ tableName: refTable }),
-  ])
-  const cardsView = chooseCardsView(refViews.views, refViews.userDefaultViewId)
-  const cards = cardsView ? parseCardsConfig(cardsView.layoutJson) : null
-  referencedDetailColumns.value = cards?.detailColumns ?? []
-  referencedFieldTypes.value = Object.fromEntries((refStructure.fields ?? []).map(field => [field.name, field.type]))
-  referencedFieldLabels.value = Object.fromEntries((refStructure.fields ?? []).map(field => [field.name, field.displayLabel ?? '']))
-  referencedImageColumn.value = cards?.imageColumn
-    || (refStructure.fields?.find(f => isImageFieldType(f.type))?.name ?? '')
-  referencedRows.value = refItems.items ?? []
-  referencedFieldDefs.value = fieldDefsForInsertForm(refStructure.fields ?? [])
-  // A table with a create_delegate has its own create page, which a dialog can't stand in for.
-  referencedCreateLabel.value = refStructure.createDelegate ? '' : rowInsertActionLabel(refStructure.rowName)
+  await referenced.load()
+  if (referenced.error.value) throw new Error(referenced.error.value)
 }
 
 async function loadRows() {
@@ -251,17 +206,18 @@ async function onPickerCreated(item: Item | undefined) {
   const target = pickingFor.value
   pickingFor.value = null
   try {
-    const refItems = await client.listItems({ tcName: referencedTable.value })
-    referencedRows.value = refItems.items ?? []
+    await referenced.reloadRows()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   }
+  if (item) referenced.remember(String(item.id))
   if (target && item) await addEntry(target.day, target.slotIndex, String(item.id))
 }
 
 async function onPicked(option: WeeklyPlanPickerOption) {
   const target = pickingFor.value
   pickingFor.value = null
+  referenced.remember(option.value)
   if (target) await addEntry(target.day, target.slotIndex, option.value)
 }
 
@@ -278,8 +234,20 @@ async function duplicateEntry(row: Item) {
 }
 
 function openEntryMenu(row: Item, event: MouseEvent) {
+  event.preventDefault()
+  event.stopPropagation()
   menuRow.value = row
-  entryMenu.value?.open(event)
+  entryMenuX.value = event.clientX
+  entryMenuY.value = event.clientY
+  entryMenuOpen.value = true
+}
+
+async function onEntryMenuSelect(item: { id?: string }) {
+  const row = menuRow.value
+  if (!row) return
+  if (item.id === 'duplicate') await duplicateEntry(row)
+  else if (item.id === 'open') await router.push(entryOf(row).to)
+  else if (item.id === 'remove') await removeEntry(row)
 }
 
 async function removeEntry(row: Item) {
@@ -480,28 +448,14 @@ onMounted(load)
         <span>{{ plannedCount }} {{ plannedCount === 1 ? 'entry' : 'entries' }} planned this week.</span>
         <span v-if="access.canEdit">Drag an entry to move it, or right-click it to duplicate or remove it.</span>
       </div>
-      <ContextMenu ref="entryMenu" label="Entry actions">
-        <template v-if="menuRow">
-          <li v-if="access.canInsert">
-            <button type="button" role="menuitem" class="inline-icon" :disabled="busy" @click="duplicateEntry(menuRow)">
-              <HugeiconsIcon :icon="Copy01Icon" width="1em" height="1em" aria-hidden="true" />
-              <span>Duplicate</span>
-            </button>
-          </li>
-          <li>
-            <button type="button" role="menuitem" class="inline-icon" @click="router.push(entryOf(menuRow).to)">
-              <HugeiconsIcon :icon="LinkSquare02Icon" width="1em" height="1em" aria-hidden="true" />
-              <span>Open</span>
-            </button>
-          </li>
-          <li v-if="access.canDelete">
-            <button type="button" role="menuitem" class="inline-icon" :disabled="busy" @click="removeEntry(menuRow)">
-              <HugeiconsIcon :icon="Delete02Icon" width="1em" height="1em" aria-hidden="true" />
-              <span>Remove</span>
-            </button>
-          </li>
-        </template>
-      </ContextMenu>
+      <ContextMenu
+        v-model:open="entryMenuOpen"
+        aria-label="Entry actions"
+        :items="entryMenuItems"
+        :client-x="entryMenuX"
+        :client-y="entryMenuY"
+        @select="onEntryMenuSelect"
+      />
       <NotifyUsersDialog
         ref="notifyDialog"
         :title="notifyTitle(viewName || tableId, weekStart)"
@@ -511,10 +465,11 @@ onMounted(load)
       <RowPickerDialog
         ref="picker"
         :title="pickerTitle"
-        :options="pickerOptions"
-        :create-label="referencedAccess.canInsert ? referencedCreateLabel : ''"
+        :options="referenced.options.value"
+        :recent-values="referenced.recent.value"
+        :create-label="referenced.createLabel.value"
         :create-table-id="referencedTable"
-        :create-field-defs="referencedFieldDefs"
+        :create-field-defs="referenced.settings.value.fieldDefs"
         @pick="onPicked"
         @created="onPickerCreated"
       />
@@ -524,18 +479,6 @@ onMounted(load)
 
 <style scoped>
 /* Follows the calendar view: picocrank's --calendar-* colours, borders and shading. */
-/* On narrow screens the week navigation drops below the title rather than overlapping it. */
-.weekly-plan-section :deep(.section-header),
-.weekly-plan-section :deep([role='toolbar']) {
-  flex-wrap: wrap;
-}
-
-.weekly-plan-section :deep([role='toolbar'] > .weekly-plan-toolbar-nav) {
-  flex: 0 0 auto;
-  width: fit-content;
-  align-items: center;
-}
-
 .weekly-plan-week-label {
   white-space: nowrap;
 }

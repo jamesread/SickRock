@@ -5767,6 +5767,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/SendTestNotification": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SendTestNotification",
+        "operationId": "sickrock.SickRock.SendTestNotification",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SendTestNotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SendTestNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/SetColumnDisplaySettings": {
       "post": {
         "tags": [
@@ -11673,6 +11731,35 @@
         },
         "title": "SaveRssCalendarFeedResponse",
         "additionalProperties": false
+      },
+      "sickrock.SendTestNotificationRequest": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "integer",
+            "title": "channel_id",
+            "format": "int32"
+          }
+        },
+        "title": "SendTestNotificationRequest",
+        "additionalProperties": false,
+        "description": "Sends a test notification to one of the caller's own channels (active or not), to check it works."
+      },
+      "sickrock.SendTestNotificationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SendTestNotificationResponse",
+        "additionalProperties": false,
+        "description": "success is false when delivery failed; message then says why."
       },
       "sickrock.SetColumnDisplaySettingsRequest": {
         "type": "object",

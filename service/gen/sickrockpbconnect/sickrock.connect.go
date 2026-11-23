@@ -326,6 +326,9 @@ const (
 	// SickRockDeleteUserNotificationChannelProcedure is the fully-qualified name of the SickRock's
 	// DeleteUserNotificationChannel RPC.
 	SickRockDeleteUserNotificationChannelProcedure = "/sickrock.SickRock/DeleteUserNotificationChannel"
+	// SickRockSendTestNotificationProcedure is the fully-qualified name of the SickRock's
+	// SendTestNotification RPC.
+	SickRockSendTestNotificationProcedure = "/sickrock.SickRock/SendTestNotification"
 	// SickRockGetUserNotificationSubscriptionsProcedure is the fully-qualified name of the SickRock's
 	// GetUserNotificationSubscriptions RPC.
 	SickRockGetUserNotificationSubscriptionsProcedure = "/sickrock.SickRock/GetUserNotificationSubscriptions"
@@ -489,6 +492,7 @@ type SickRockClient interface {
 	CreateUserNotificationChannel(context.Context, *connect.Request[proto.CreateUserNotificationChannelRequest]) (*connect.Response[proto.CreateUserNotificationChannelResponse], error)
 	UpdateUserNotificationChannel(context.Context, *connect.Request[proto.UpdateUserNotificationChannelRequest]) (*connect.Response[proto.UpdateUserNotificationChannelResponse], error)
 	DeleteUserNotificationChannel(context.Context, *connect.Request[proto.DeleteUserNotificationChannelRequest]) (*connect.Response[proto.DeleteUserNotificationChannelResponse], error)
+	SendTestNotification(context.Context, *connect.Request[proto.SendTestNotificationRequest]) (*connect.Response[proto.SendTestNotificationResponse], error)
 	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
 	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
 	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
@@ -1174,6 +1178,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationChannel")),
 			connect.WithClientOptions(opts...),
 		),
+		sendTestNotification: connect.NewClient[proto.SendTestNotificationRequest, proto.SendTestNotificationResponse](
+			httpClient,
+			baseURL+SickRockSendTestNotificationProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SendTestNotification")),
+			connect.WithClientOptions(opts...),
+		),
 		getUserNotificationSubscriptions: connect.NewClient[proto.GetUserNotificationSubscriptionsRequest, proto.GetUserNotificationSubscriptionsResponse](
 			httpClient,
 			baseURL+SickRockGetUserNotificationSubscriptionsProcedure,
@@ -1349,6 +1359,7 @@ type sickRockClient struct {
 	createUserNotificationChannel      *connect.Client[proto.CreateUserNotificationChannelRequest, proto.CreateUserNotificationChannelResponse]
 	updateUserNotificationChannel      *connect.Client[proto.UpdateUserNotificationChannelRequest, proto.UpdateUserNotificationChannelResponse]
 	deleteUserNotificationChannel      *connect.Client[proto.DeleteUserNotificationChannelRequest, proto.DeleteUserNotificationChannelResponse]
+	sendTestNotification               *connect.Client[proto.SendTestNotificationRequest, proto.SendTestNotificationResponse]
 	getUserNotificationSubscriptions   *connect.Client[proto.GetUserNotificationSubscriptionsRequest, proto.GetUserNotificationSubscriptionsResponse]
 	createUserNotificationSubscription *connect.Client[proto.CreateUserNotificationSubscriptionRequest, proto.CreateUserNotificationSubscriptionResponse]
 	deleteUserNotificationSubscription *connect.Client[proto.DeleteUserNotificationSubscriptionRequest, proto.DeleteUserNotificationSubscriptionResponse]
@@ -1911,6 +1922,11 @@ func (c *sickRockClient) DeleteUserNotificationChannel(ctx context.Context, req 
 	return c.deleteUserNotificationChannel.CallUnary(ctx, req)
 }
 
+// SendTestNotification calls sickrock.SickRock.SendTestNotification.
+func (c *sickRockClient) SendTestNotification(ctx context.Context, req *connect.Request[proto.SendTestNotificationRequest]) (*connect.Response[proto.SendTestNotificationResponse], error) {
+	return c.sendTestNotification.CallUnary(ctx, req)
+}
+
 // GetUserNotificationSubscriptions calls sickrock.SickRock.GetUserNotificationSubscriptions.
 func (c *sickRockClient) GetUserNotificationSubscriptions(ctx context.Context, req *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error) {
 	return c.getUserNotificationSubscriptions.CallUnary(ctx, req)
@@ -2095,6 +2111,7 @@ type SickRockHandler interface {
 	CreateUserNotificationChannel(context.Context, *connect.Request[proto.CreateUserNotificationChannelRequest]) (*connect.Response[proto.CreateUserNotificationChannelResponse], error)
 	UpdateUserNotificationChannel(context.Context, *connect.Request[proto.UpdateUserNotificationChannelRequest]) (*connect.Response[proto.UpdateUserNotificationChannelResponse], error)
 	DeleteUserNotificationChannel(context.Context, *connect.Request[proto.DeleteUserNotificationChannelRequest]) (*connect.Response[proto.DeleteUserNotificationChannelResponse], error)
+	SendTestNotification(context.Context, *connect.Request[proto.SendTestNotificationRequest]) (*connect.Response[proto.SendTestNotificationResponse], error)
 	GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error)
 	CreateUserNotificationSubscription(context.Context, *connect.Request[proto.CreateUserNotificationSubscriptionRequest]) (*connect.Response[proto.CreateUserNotificationSubscriptionResponse], error)
 	DeleteUserNotificationSubscription(context.Context, *connect.Request[proto.DeleteUserNotificationSubscriptionRequest]) (*connect.Response[proto.DeleteUserNotificationSubscriptionResponse], error)
@@ -2776,6 +2793,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("DeleteUserNotificationChannel")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockSendTestNotificationHandler := connect.NewUnaryHandler(
+		SickRockSendTestNotificationProcedure,
+		svc.SendTestNotification,
+		connect.WithSchema(sickRockMethods.ByName("SendTestNotification")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockGetUserNotificationSubscriptionsHandler := connect.NewUnaryHandler(
 		SickRockGetUserNotificationSubscriptionsProcedure,
 		svc.GetUserNotificationSubscriptions,
@@ -3058,6 +3081,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockUpdateUserNotificationChannelHandler.ServeHTTP(w, r)
 		case SickRockDeleteUserNotificationChannelProcedure:
 			sickRockDeleteUserNotificationChannelHandler.ServeHTTP(w, r)
+		case SickRockSendTestNotificationProcedure:
+			sickRockSendTestNotificationHandler.ServeHTTP(w, r)
 		case SickRockGetUserNotificationSubscriptionsProcedure:
 			sickRockGetUserNotificationSubscriptionsHandler.ServeHTTP(w, r)
 		case SickRockCreateUserNotificationSubscriptionProcedure:
@@ -3525,6 +3550,10 @@ func (UnimplementedSickRockHandler) UpdateUserNotificationChannel(context.Contex
 
 func (UnimplementedSickRockHandler) DeleteUserNotificationChannel(context.Context, *connect.Request[proto.DeleteUserNotificationChannelRequest]) (*connect.Response[proto.DeleteUserNotificationChannelResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.DeleteUserNotificationChannel is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SendTestNotification(context.Context, *connect.Request[proto.SendTestNotificationRequest]) (*connect.Response[proto.SendTestNotificationResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SendTestNotification is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) GetUserNotificationSubscriptions(context.Context, *connect.Request[proto.GetUserNotificationSubscriptionsRequest]) (*connect.Response[proto.GetUserNotificationSubscriptionsResponse], error) {

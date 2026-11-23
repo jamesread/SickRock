@@ -51,6 +51,7 @@ var writeProcedures = map[string]bool{
 	sickrockpbconnect.SickRockCreateUserNotificationChannelProcedure:      true,
 	sickrockpbconnect.SickRockUpdateUserNotificationChannelProcedure:      true,
 	sickrockpbconnect.SickRockDeleteUserNotificationChannelProcedure:      true,
+	sickrockpbconnect.SickRockSendTestNotificationProcedure:               true,
 	sickrockpbconnect.SickRockCreateUserNotificationSubscriptionProcedure: true,
 	sickrockpbconnect.SickRockDeleteUserNotificationSubscriptionProcedure: true,
 	sickrockpbconnect.SickRockNotifyUsersProcedure:                        true,

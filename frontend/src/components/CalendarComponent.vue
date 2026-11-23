@@ -967,7 +967,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Section :title="sectionTitle" :icon="Calendar03Icon" :padding="false" class="calendar-section">
+  <Section :title="sectionTitle" :icon="Calendar03Icon" :padding="false" fill class="calendar-section">
     <template #toolbar>
       <ViewsButton
         v-if="!readOnly && effectiveTableId && viewManager"
@@ -1147,21 +1147,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Layout only — calendar chrome/borders come from picocrank. */
+/* Layout only — calendar chrome/borders come from picocrank (Section fill lays out its body). */
 .calendar-section {
-  display: flex;
-  flex-direction: column;
   height: 100%;
-  min-height: 0;
-}
-
-.calendar-section :deep(.section-content),
-.calendar-section :deep(.section-body) {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .calendar-content {
@@ -1169,11 +1157,6 @@ onMounted(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-
-.calendar-section :deep([role='toolbar'] > .calendar-toolbar-nav) {
-  flex: 0 0 auto;
-  width: fit-content;
 }
 
 .date-picker-input {

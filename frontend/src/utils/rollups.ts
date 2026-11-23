@@ -1,7 +1,6 @@
 // Rollups (system table table_rollups) group and sum the detail rows owned by a table's rows, for
 // example the ingredients of the recipes planned in a week, and replace a target table's rows with
 // the result. See RunRollup in proto/sickrock.proto.
-import { applyFilterQuery, buildFilterQuery, isFilterQueryActive } from 'picocrank/vue/composables/tableFilterQuery.js'
 import { addDays, dayKey } from './weeklyPlan'
 
 export type RollupRunRequest = {
@@ -34,17 +33,14 @@ export function weekRollupRequest(rollupId: bigint, dateColumn: string, weekStar
 }
 
 /**
- * The ids of the rows a table's filters leave, matched the way picocrank's Table matches them, or
- * undefined when no filter is active (every row counts).
+ * The source ids for a run from a table, from its Table's filtered-rows-change event: the ids of the
+ * rows the filters leave, or undefined when no filter is active (every row counts).
  */
-export function filteredRowIds(
-  rows: Array<Record<string, unknown>>,
-  headers: Array<{ key: string }>,
-  filters: Record<string, unknown>,
+export function rollupSourceIdsFrom(
+  rows: Array<{ id?: unknown }>,
+  { filtersActive }: { filtersActive: boolean },
 ): string[] | undefined {
-  const query = buildFilterQuery(filters, headers, rows)
-  if (!isFilterQueryActive(query, headers, rows)) return undefined
-  return (applyFilterQuery(rows, headers, query) as Array<Record<string, unknown>>).map(row => String(row.id))
+  return filtersActive ? rows.map(row => String(row.id)) : undefined
 }
 
 /** One line saying what a finished run did. */
