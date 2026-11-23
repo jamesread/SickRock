@@ -26,6 +26,7 @@ export const SYSTEM_SETTINGS_TABLE_CONFIGURATIONS = new Set([
   'table_workflows',
   'table_dashboards',
   'table_dashboard_components',
+  'table_rollups',
   'device_codes',
 ])
 

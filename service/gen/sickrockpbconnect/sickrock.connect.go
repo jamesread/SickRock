@@ -349,6 +349,10 @@ const (
 	// SickRockClearTickListStateProcedure is the fully-qualified name of the SickRock's
 	// ClearTickListState RPC.
 	SickRockClearTickListStateProcedure = "/sickrock.SickRock/ClearTickListState"
+	// SickRockListRollupsProcedure is the fully-qualified name of the SickRock's ListRollups RPC.
+	SickRockListRollupsProcedure = "/sickrock.SickRock/ListRollups"
+	// SickRockRunRollupProcedure is the fully-qualified name of the SickRock's RunRollup RPC.
+	SickRockRunRollupProcedure = "/sickrock.SickRock/RunRollup"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -494,6 +498,9 @@ type SickRockClient interface {
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
 	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
+	// Rollups: group and sum related rows into a target table, replacing its rows
+	ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error)
+	RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -1215,6 +1222,18 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("ClearTickListState")),
 			connect.WithClientOptions(opts...),
 		),
+		listRollups: connect.NewClient[proto.ListRollupsRequest, proto.ListRollupsResponse](
+			httpClient,
+			baseURL+SickRockListRollupsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListRollups")),
+			connect.WithClientOptions(opts...),
+		),
+		runRollup: connect.NewClient[proto.RunRollupRequest, proto.RunRollupResponse](
+			httpClient,
+			baseURL+SickRockRunRollupProcedure,
+			connect.WithSchema(sickRockMethods.ByName("RunRollup")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -1338,6 +1357,8 @@ type sickRockClient struct {
 	getTickListState                   *connect.Client[proto.GetTickListStateRequest, proto.GetTickListStateResponse]
 	setTickListCompletion              *connect.Client[proto.SetTickListCompletionRequest, proto.SetTickListCompletionResponse]
 	clearTickListState                 *connect.Client[proto.ClearTickListStateRequest, proto.ClearTickListStateResponse]
+	listRollups                        *connect.Client[proto.ListRollupsRequest, proto.ListRollupsResponse]
+	runRollup                          *connect.Client[proto.RunRollupRequest, proto.RunRollupResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -1930,6 +1951,16 @@ func (c *sickRockClient) ClearTickListState(ctx context.Context, req *connect.Re
 	return c.clearTickListState.CallUnary(ctx, req)
 }
 
+// ListRollups calls sickrock.SickRock.ListRollups.
+func (c *sickRockClient) ListRollups(ctx context.Context, req *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error) {
+	return c.listRollups.CallUnary(ctx, req)
+}
+
+// RunRollup calls sickrock.SickRock.RunRollup.
+func (c *sickRockClient) RunRollup(ctx context.Context, req *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error) {
+	return c.runRollup.CallUnary(ctx, req)
+}
+
 // SickRockHandler is an implementation of the sickrock.SickRock service.
 type SickRockHandler interface {
 	Init(context.Context, *connect.Request[proto.InitRequest]) (*connect.Response[proto.InitResponse], error)
@@ -2073,6 +2104,9 @@ type SickRockHandler interface {
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
 	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
+	// Rollups: group and sum related rows into a target table, replacing its rows
+	ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error)
+	RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -2790,6 +2824,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("ClearTickListState")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockListRollupsHandler := connect.NewUnaryHandler(
+		SickRockListRollupsProcedure,
+		svc.ListRollups,
+		connect.WithSchema(sickRockMethods.ByName("ListRollups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockRunRollupHandler := connect.NewUnaryHandler(
+		SickRockRunRollupProcedure,
+		svc.RunRollup,
+		connect.WithSchema(sickRockMethods.ByName("RunRollup")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case SickRockInitProcedure:
@@ -3028,6 +3074,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockSetTickListCompletionHandler.ServeHTTP(w, r)
 		case SickRockClearTickListStateProcedure:
 			sickRockClearTickListStateHandler.ServeHTTP(w, r)
+		case SickRockListRollupsProcedure:
+			sickRockListRollupsHandler.ServeHTTP(w, r)
+		case SickRockRunRollupProcedure:
+			sickRockRunRollupHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -3507,4 +3557,12 @@ func (UnimplementedSickRockHandler) SetTickListCompletion(context.Context, *conn
 
 func (UnimplementedSickRockHandler) ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ClearTickListState is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListRollups is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.RunRollup is not implemented"))
 }

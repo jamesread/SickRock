@@ -7,20 +7,22 @@ import (
 	"connectrpc.com/connect"
 	"github.com/jamesread/SickRock/internal/audit"
 	"github.com/jamesread/SickRock/internal/iam"
+	"github.com/jamesread/SickRock/internal/repo"
 	"github.com/jamesread/armature-iam/rbac"
 )
 
 var systemSettingsTableConfigurations = map[string]bool{
-	"table_settings":             true,
-	"table_navigation":           true,
-	"table_apps":                 true,
-	"table_app_navigation_links": true,
-	"table_configurations":       true,
-	"table_workflows":            true,
-	"table_dashboards":           true,
-	"table_dashboard_components": true,
-	"device_codes":               true,
-	"table_images":               true,
+	"table_settings":               true,
+	"table_navigation":             true,
+	"table_apps":                   true,
+	"table_app_navigation_links":   true,
+	"table_configurations":         true,
+	"table_workflows":              true,
+	"table_dashboards":             true,
+	"table_dashboard_components":   true,
+	"device_codes":                 true,
+	"table_images":                 true,
+	repo.RollupsTableConfiguration: true,
 }
 
 func isSystemSettingsTableConfiguration(tcName string) bool {

@@ -647,6 +647,9 @@ message ForeignKey {
   repeated RelationPullThroughField pull_through_fields = 12;
   bool absorb_into_item = 13; // Show related rows inside the item view instead of their own section
   string absorb_type = 14; // "first_row" when absorb_into_item is set
+  // Quick add settings for the related rows panel (table_relations.quick_add_json), e.g.
+  // {"enabled":true,"columns":["ingredient","quantity","unit"],"createMissing":true}; empty when unset.
+  string quick_add_json = 15;
 }
 
 message RelationPullThroughField {
@@ -663,6 +666,8 @@ message UpdateTableRelationRequest {
   // Absorb settings change only when absorb_into_item is sent (other editors leave them alone).
   optional bool absorb_into_item = 4;
   optional string absorb_type = 5; // "first_row" (default)
+  // Quick add settings change only when sent; an empty string clears them.
+  optional string quick_add_json = 6;
 }
 
 message UpdateTableRelationResponse {
@@ -1571,6 +1576,52 @@ message ClearTickListStateRequest {
 
 message ClearTickListStateResponse {}
 
+// Rollup is a configured rollup (system table table_rollups): the detail rows owned by a set of
+// source rows, grouped and summed into a target table whose rows each run replaces.
+message Rollup {
+  int64 id = 1;
+  string name = 2;
+  string source_table = 3;
+  string detail_table = 4;
+  string target_table = 5;
+}
+
+message ListRollupsRequest {
+  // When set, only rollups that start from this table configuration.
+  string source_table = 1;
+}
+
+message ListRollupsResponse {
+  repeated Rollup rollups = 1;
+}
+
+// RunRollupRequest runs a rollup over the source rows matching every filter. Tables and the
+// rollup's columns come from its stored definition; the filters only narrow its source rows.
+message RunRollupRequest {
+  int64 rollup_id = 1;
+  // Source column whose value must lie in [from, to); empty for no date range.
+  string date_column = 2;
+  // Wall-clock bounds "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"; empty for an open end.
+  string from = 3;
+  string to = 4;
+  // Exact-match filters on source columns.
+  map<string, string> where = 5;
+  // With limit_to_source_ids, only source rows whose primary key is listed (e.g. the rows a table's
+  // filters leave); an empty list then matches nothing.
+  repeated string source_ids = 6;
+  bool limit_to_source_ids = 7;
+}
+
+message RunRollupResponse {
+  // Table configuration whose rows were replaced.
+  string target_table = 1;
+  int64 rows_written = 2;
+  int64 source_rows = 3;
+  int64 detail_rows = 4;
+  // Values that could not be summed (not numbers).
+  repeated string skipped = 5;
+}
+
 service SickRock {
   rpc Init(InitRequest) returns (InitResponse);
   rpc Ping(PingRequest) returns (PingResponse);
@@ -1735,4 +1786,8 @@ service SickRock {
   rpc GetTickListState(GetTickListStateRequest) returns (GetTickListStateResponse);
   rpc SetTickListCompletion(SetTickListCompletionRequest) returns (SetTickListCompletionResponse);
   rpc ClearTickListState(ClearTickListStateRequest) returns (ClearTickListStateResponse);
+
+  // Rollups: group and sum related rows into a target table, replacing its rows
+  rpc ListRollups(ListRollupsRequest) returns (ListRollupsResponse);
+  rpc RunRollup(RunRollupRequest) returns (RunRollupResponse);
 }

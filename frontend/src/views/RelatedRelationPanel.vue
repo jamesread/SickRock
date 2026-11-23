@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import type { Field } from '../gen/sickrock_pb'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { DatabaseIcon, Link01Icon } from '@hugeicons/core-free-icons'
@@ -7,6 +7,9 @@ import Table from '../components/TableComponent.vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import { rowInsertActionLabel } from '../utils/rowInsertLabel'
 import type { IconData } from '../utils/hugeicons'
+import QuickAddRow from '../components/QuickAddRow.vue'
+import { parseQuickAddConfig } from '../utils/quickAdd'
+import { useTableAccess } from '../composables/useTableAccess'
 
 export type RelatedTableEntry = {
   tableName: string
@@ -23,6 +26,8 @@ export type RelatedTableEntry = {
   /** Shown inside the item's main section instead of as its own section. */
   absorbIntoItem?: boolean
   absorbType?: string
+  /** The relation's quick add settings (table_relations.quick_add_json). */
+  quickAddJson?: string
 }
 
 const props = defineProps<{
@@ -49,6 +54,19 @@ const relatedInsertRoute = computed(() => ({
 
 const embedInTabs = computed(() => props.embedInTabs === true)
 
+const tableRef = ref<{ reloadForeignKeys: () => Promise<void> } | null>(null)
+
+/** After a quick add: reload the rows, and the relation names when it created a referenced row. */
+function onQuickAdded(createdReferences: boolean) {
+  emit('rowsUpdated')
+  if (createdReferences) void tableRef.value?.reloadForeignKeys()
+}
+
+const { access } = useTableAccess(computed(() => props.table.tableName))
+const quickAdd = computed(() => parseQuickAddConfig(props.table.quickAddJson))
+// Rows are added under the parent, so the panel needs the parent's key.
+const showQuickAdd = computed(() => quickAdd.value.enabled && access.value.canInsert && props.table.filterValue !== '')
+
 const emit = defineEmits<{
   rowsUpdated: []
   rowDeleted: [id: string]
@@ -63,6 +81,7 @@ const emit = defineEmits<{
   <p v-else-if="loadingRelated && embedInTabs" class="loading-related">Loading related rows…</p>
   <Table
     v-else
+    ref="tableRef"
     :title="embedInTabs ? '' : table.title"
     :wrap-in-section="!embedInTabs"
     :table-id="table.tableName"
@@ -102,6 +121,15 @@ const emit = defineEmits<{
         <HugeiconsIcon :icon="Link01Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Manage relation</span>
       </button>
+    </template>
+    <template v-if="showQuickAdd" #footer>
+      <QuickAddRow
+        :table-name="table.tableName"
+        :link-column="table.filterColumn"
+        :link-value="table.filterValue"
+        :config="quickAdd"
+        @added="onQuickAdded"
+      />
     </template>
     <template #toolbar-suffix>
       <router-link

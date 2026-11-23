@@ -1499,6 +1499,7 @@ var systemTableConfigs = []systemTableConfig{
 	{name: "table_read_only_exports", title: "Read-only calendar exports", table: "read_only_calendar_exports", ordinal: 5, createButtonText: "Add Export", rowName: "Calendar export"},
 	{name: "table_rss_calendar_feeds", title: "Calendar feeds", table: "rss_calendar_feeds", ordinal: 7, createDelegate: "/admin/rss-calendar-feeds/new", createButtonText: "Add feed", rowName: "Calendar feed"},
 	{name: "table_images", title: "Images", table: "images", ordinal: 11, createButtonText: "Add image", rowName: "Image"},
+	{name: RollupsTableConfiguration, title: "Rollups", table: "rollups", ordinal: 12, createButtonText: "Add rollup", rowName: "Rollup"},
 	{name: "table_logs", title: "Audit logs", table: "audit_logs", ordinal: 6, createButtonText: "Insert Row", rowName: "Audit log entry"},
 }
 
@@ -1864,6 +1865,7 @@ type ForeignKey struct {
 	ReferencedSchema  string                     `db:"referenced_schema"`
 	OnDeleteAction    string                     `db:"on_delete_action"`
 	AbsorbType        string                     `db:"-"`
+	QuickAddJSON      string                     `db:"-"`
 	ConstraintName    string                     `db:"constraint_name"`
 	OnUpdateAction    string                     `db:"on_update_action"`
 	ReferencedColumn  string                     `db:"referenced_column"`

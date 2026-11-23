@@ -49,6 +49,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'workflow.start': 'Use workflow actions',
   'exports.view': 'View read-only calendar exports',
   'exports.manage': 'Manage read-only calendar exports',
+  'rollup.run': 'Run rollups (replaces the rows of their target table)',
   'audit.view': 'View audit logs',
   'system.settings': 'View and change system settings, tables and columns',
   'system.logs': 'View logs and run maintenance',

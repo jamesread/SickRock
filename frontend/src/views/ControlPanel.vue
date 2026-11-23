@@ -163,6 +163,16 @@ onMounted(async () => {
         type: 'route',
         description: 'Group sidebar links into collapsible sections',
       })
+
+      localNavigation.value.addNavigationLink({
+        id: 'rollups',
+        name: 'rollups',
+        title: 'Rollups',
+        path: '/table/table_rollups',
+        icon: DatabaseSettingIcon,
+        type: 'route',
+        description: 'Group and sum related rows into a table, e.g. a shopping list from a week of planned meals',
+      })
     }
 
     if (canManageExports(perms, superuser)) {

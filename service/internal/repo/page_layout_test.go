@@ -42,7 +42,7 @@ func setupPageLayoutTestDB(t *testing.T) *Repository {
 			display_name TEXT,
 			pull_through_json TEXT,
 			absorb_into_item INTEGER NOT NULL DEFAULT 0,
-			absorb_type TEXT
+			absorb_type TEXT, quick_add_json TEXT
 		);
 		INSERT INTO table_relations (
 			constraint_name, source_table_key, source_column,

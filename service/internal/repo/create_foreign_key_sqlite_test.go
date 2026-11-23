@@ -71,6 +71,7 @@ func TestCreateForeignKeySQLite(t *testing.T) {
 			pull_through_json TEXT,
 			absorb_into_item INTEGER NOT NULL DEFAULT 0,
 			absorb_type TEXT,
+			quick_add_json TEXT,
 			created_at TEXT NOT NULL DEFAULT (datetime('now'))
 		)`)
 	if err != nil {

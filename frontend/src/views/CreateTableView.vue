@@ -12,6 +12,8 @@ import { tableListLinkLabel } from '../utils/rowInsertLabel'
 import TablePullThroughSection from '../components/TablePullThroughSection.vue'
 import WeeklyPlanSettings from '../components/WeeklyPlanSettings.vue'
 import CardsSettings from '../components/CardsSettings.vue'
+import TickListSettings from '../components/TickListSettings.vue'
+import { parseTickListConfig, withTickListConfig } from '../utils/tickList'
 import { parseCardsConfig, suggestedCardsConfig, withCardsConfig } from '../utils/cardsView'
 import {
   defaultWeeklyPlanConfig,
@@ -43,6 +45,7 @@ const viewType = ref<ViewType>('table')
 const existingLayoutJson = ref('')
 const weeklyPlanConfig = ref(defaultWeeklyPlanConfig())
 const cardsConfig = ref(parseCardsConfig(''))
+const tickListConfig = ref(parseTickListConfig(''))
 const structureFields = ref<Array<{ name: string; type: string }>>([])
 type CatalogColumn = { name: string; type: string; synthetic: boolean; label: string }
 
@@ -239,6 +242,7 @@ async function loadExistingView() {
       existingLayoutJson.value = view.layoutJson ?? ''
       weeklyPlanConfig.value = parseWeeklyPlanConfig(view.layoutJson)
       cardsConfig.value = parseCardsConfig(view.layoutJson)
+      tickListConfig.value = parseTickListConfig(view.layoutJson)
       selectedColumns.value = selectedColumnsFromView(
         availableColumns.value,
         view.columns,
@@ -295,6 +299,7 @@ async function saveTableView() {
   let layoutJson = existingLayoutJson.value
   if (viewType.value === 'weeklyplan') layoutJson = withWeeklyPlanConfig(layoutJson, weeklyPlanConfig.value)
   if (viewType.value === 'cards') layoutJson = withCardsConfig(layoutJson, cardsConfig.value)
+  if (viewType.value === 'ticklist') layoutJson = withTickListConfig(layoutJson, tickListConfig.value)
 
   loading.value = true
   error.value = null
@@ -455,6 +460,12 @@ async function deleteTableView() {
           :foreign-keys="structureForeignKeys"
         />
         <CardsSettings v-if="viewType === 'cards'" v-model="cardsConfig" :fields="structureFields" />
+        <TickListSettings
+          v-if="viewType === 'ticklist'"
+          v-model="tickListConfig"
+          :fields="structureFields"
+          :foreign-keys="structureForeignKeys"
+        />
 
         <div v-if="viewType === 'table'">
           <label>Column Configuration</label>

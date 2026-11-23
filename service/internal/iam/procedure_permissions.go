@@ -24,6 +24,7 @@ var writeProcedures = map[string]bool{
 	sickrockpbconnect.SickRockCreateDashboardProcedure:                    true,
 	sickrockpbconnect.SickRockCreateItemProcedure:                         true,
 	sickrockpbconnect.SickRockAddItemQuantityProcedure:                    true,
+	sickrockpbconnect.SickRockRunRollupProcedure:                          true,
 	sickrockpbconnect.SickRockUploadImageProcedure:                        true,
 	sickrockpbconnect.SickRockEditItemProcedure:                           true,
 	sickrockpbconnect.SickRockDeleteItemProcedure:                         true,
@@ -121,6 +122,7 @@ var procedurePermissions = map[string]string{
 	sickrockpbconnect.SickRockClaimDeviceCodeProcedure:               PermissionDeviceCodeClaim,
 	sickrockpbconnect.SickRockListNotifiableUsersProcedure:           PermissionNotificationsSend,
 	sickrockpbconnect.SickRockNotifyUsersProcedure:                   PermissionNotificationsSend,
+	sickrockpbconnect.SickRockRunRollupProcedure:                     PermissionRollupRun,
 }
 
 // RequiredPermission maps Connect procedures to RBAC permission names.

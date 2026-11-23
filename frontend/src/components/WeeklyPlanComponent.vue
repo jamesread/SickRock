@@ -16,6 +16,7 @@ import ImageThumb from './ImageThumb.vue'
 import RowPickerDialog from './RowPickerDialog.vue'
 import ContextMenu from './ContextMenu.vue'
 import NotifyUsersDialog from './NotifyUsersDialog.vue'
+import RollupButtons from './RollupButtons.vue'
 import { useAuthStore } from '../stores/auth'
 import type { ForeignKey, Item } from '../gen/sickrock_pb'
 import { getItemNameFieldValue } from '../utils/itemViewSectionTitle'
@@ -364,6 +365,13 @@ onMounted(load)
         <HugeiconsIcon :icon="Notification03Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Notify…</span>
       </button>
+      <RollupButtons
+        v-if="problems.length === 0"
+        :table-id="tableId"
+        :date-column="config.dateColumn"
+        :week-start="weekStart"
+        :scope-label="weekLabel"
+      />
     </template>
 
     <p v-if="loading" class="padding">Loading…</p>

@@ -947,6 +947,7 @@ func (s *SickRockServer) tableForeignKeysToProto(ctx context.Context, tc *repo.T
 			PullThroughFields:     pullThroughFieldsToProto(fk.PullThroughFields),
 			AbsorbIntoItem:        fk.AbsorbIntoItem,
 			AbsorbType:            fk.AbsorbType,
+			QuickAddJson:          fk.QuickAddJSON,
 		})
 	}
 	return pbForeignKeys
@@ -1525,6 +1526,7 @@ func (s *SickRockServer) GetForeignKeys(ctx context.Context, req *connect.Reques
 			DisplayName:      fk.DisplayName,
 			AbsorbIntoItem:   fk.AbsorbIntoItem,
 			AbsorbType:       fk.AbsorbType,
+			QuickAddJson:     fk.QuickAddJSON,
 		})
 	}
 
@@ -1545,6 +1547,11 @@ func (s *SickRockServer) applyRelationAbsorb(ctx context.Context, constraintName
 func (s *SickRockServer) saveTableRelationUpdate(ctx context.Context, constraintName string, msg *sickrockpb.UpdateTableRelationRequest) error {
 	if err := s.applyRelationAbsorb(ctx, constraintName, msg); err != nil {
 		return err
+	}
+	if msg.QuickAddJson != nil {
+		if err := s.repo.SetTableRelationQuickAdd(ctx, constraintName, msg.GetQuickAddJson()); err != nil {
+			return err
+		}
 	}
 	pullThrough := pullThroughFieldsFromProto(msg.GetPullThroughFields())
 	if err := s.repo.UpdateTableRelation(ctx, constraintName, msg.GetDisplayName(), pullThrough); err != nil {

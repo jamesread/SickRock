@@ -22,6 +22,7 @@ type TableRelation struct {
 	DisplayName        sql.NullString `db:"display_name"`
 	PullThroughJSON    sql.NullString `db:"pull_through_json"`
 	AbsorbType         sql.NullString `db:"absorb_type"`
+	QuickAddJSON       sql.NullString `db:"quick_add_json"`
 	ID                 int            `db:"id"`
 	AbsorbIntoItem     bool           `db:"absorb_into_item"`
 }
@@ -76,7 +77,7 @@ func (r *Repository) getTableRelationByConstraintName(ctx context.Context, const
 	err := r.db.GetContext(ctx, &rel, `
 		SELECT id, constraint_name, source_table_key, source_column,
 			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json,
-			absorb_into_item, absorb_type
+			absorb_into_item, absorb_type, quick_add_json
 		FROM table_relations WHERE constraint_name = ?`, constraintName)
 	if err != nil {
 		return nil, err
@@ -89,7 +90,7 @@ func (r *Repository) listTableRelationsForConfiguration(ctx context.Context, tab
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, constraint_name, source_table_key, source_column,
 			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json,
-			absorb_into_item, absorb_type
+			absorb_into_item, absorb_type, quick_add_json
 		FROM table_relations
 		WHERE source_table_key = ? OR referenced_table_key = ?
 		ORDER BY constraint_name`, tableConfigName, tableConfigName)
@@ -101,7 +102,7 @@ func (r *Repository) listTableRelationsForSourceConfiguration(ctx context.Contex
 	err := r.db.SelectContext(ctx, &rows, `
 		SELECT id, constraint_name, source_table_key, source_column,
 			referenced_table_key, referenced_column, on_delete_action, on_update_action, display_name, pull_through_json,
-			absorb_into_item, absorb_type
+			absorb_into_item, absorb_type, quick_add_json
 		FROM table_relations
 		WHERE source_table_key = ?
 		ORDER BY constraint_name`, sourceTableKey)
@@ -137,6 +138,7 @@ func (r *Repository) tableRelationToForeignKey(ctx context.Context, rel TableRel
 		PullThroughFields: pullThrough,
 		AbsorbIntoItem:    rel.AbsorbIntoItem,
 		AbsorbType:        absorbTypeOrDefault(rel.AbsorbIntoItem, rel.AbsorbType.String),
+		QuickAddJSON:      rel.QuickAddJSON.String,
 	}, nil
 }
 
@@ -151,7 +153,7 @@ func (r *Repository) UpdateTableRelationDisplayName(ctx context.Context, constra
 	if err != nil {
 		return err
 	}
-	return requireRowsAffected(res, "table relation not found")
+	return r.requireRelationUpdated(ctx, res, constraintName)
 }
 
 func (r *Repository) tableRelationsToForeignKeys(ctx context.Context, relations []TableRelation) ([]ForeignKey, error) {
@@ -351,8 +353,5 @@ func (r *Repository) SetTableRelationAbsorb(ctx context.Context, constraintName 
 	if err != nil {
 		return err
 	}
-	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return fmt.Errorf("table relation not found")
-	}
-	return nil
+	return r.requireRelationUpdated(ctx, res, strings.TrimSpace(constraintName))
 }

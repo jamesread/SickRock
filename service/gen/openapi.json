@@ -4836,6 +4836,65 @@
         }
       }
     },
+    "/api/sickrock.SickRock/ListRollups": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "Rollups: group and sum related rows into a target table, replacing its rows",
+        "description": "Rollups: group and sum related rows into a target table, replacing its rows",
+        "operationId": "sickrock.SickRock.ListRollups",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.ListRollupsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.ListRollupsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/ListRssCalendarFeeds": {
       "post": {
         "tags": [
@@ -5585,6 +5644,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.RunHealthChecksResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/RunRollup": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "RunRollup",
+        "operationId": "sickrock.SickRock.RunRollup",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.RunRollupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.RunRollupResponse"
                 }
               }
             }
@@ -8789,6 +8906,11 @@
             "type": "string",
             "title": "absorb_type",
             "description": "\"first_row\" when absorb_into_item is set"
+          },
+          "quickAddJson": {
+            "type": "string",
+            "title": "quick_add_json",
+            "description": "Quick add settings for the related rows panel (table_relations.quick_add_json), e.g.\n {\"enabled\":true,\"columns\":[\"ingredient\",\"quantity\",\"unit\"],\"createMissing\":true}; empty when unset."
           }
         },
         "title": "ForeignKey",
@@ -10434,6 +10556,32 @@
         "title": "ListRbacRolesResponse",
         "additionalProperties": false
       },
+      "sickrock.ListRollupsRequest": {
+        "type": "object",
+        "properties": {
+          "sourceTable": {
+            "type": "string",
+            "title": "source_table",
+            "description": "When set, only rollups that start from this table configuration."
+          }
+        },
+        "title": "ListRollupsRequest",
+        "additionalProperties": false
+      },
+      "sickrock.ListRollupsResponse": {
+        "type": "object",
+        "properties": {
+          "rollups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/sickrock.Rollup"
+            },
+            "title": "rollups"
+          }
+        },
+        "title": "ListRollupsResponse",
+        "additionalProperties": false
+      },
       "sickrock.ListRssCalendarFeedsRequest": {
         "type": "object",
         "title": "ListRssCalendarFeedsRequest",
@@ -11200,6 +11348,38 @@
         "title": "ResetUserPasswordResponse",
         "additionalProperties": false
       },
+      "sickrock.Rollup": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "id",
+            "format": "int64"
+          },
+          "name": {
+            "type": "string",
+            "title": "name"
+          },
+          "sourceTable": {
+            "type": "string",
+            "title": "source_table"
+          },
+          "detailTable": {
+            "type": "string",
+            "title": "detail_table"
+          },
+          "targetTable": {
+            "type": "string",
+            "title": "target_table"
+          }
+        },
+        "title": "Rollup",
+        "additionalProperties": false,
+        "description": "Rollup is a configured rollup (system table table_rollups): the detail rows owned by a set of\n source rows, grouped and summed into a target table whose rows each run replaces."
+      },
       "sickrock.RowAction": {
         "type": "object",
         "properties": {
@@ -11360,6 +11540,116 @@
           }
         },
         "title": "RunHealthChecksResponse",
+        "additionalProperties": false
+      },
+      "sickrock.RunRollupRequest": {
+        "type": "object",
+        "properties": {
+          "rollupId": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "rollup_id",
+            "format": "int64"
+          },
+          "dateColumn": {
+            "type": "string",
+            "title": "date_column",
+            "description": "Source column whose value must lie in [from, to); empty for no date range."
+          },
+          "from": {
+            "type": "string",
+            "title": "from",
+            "description": "Wall-clock bounds \"YYYY-MM-DD\" or \"YYYY-MM-DD HH:MM:SS\"; empty for an open end."
+          },
+          "to": {
+            "type": "string",
+            "title": "to"
+          },
+          "where": {
+            "type": "object",
+            "title": "where",
+            "additionalProperties": {
+              "type": "string",
+              "title": "value"
+            },
+            "description": "Exact-match filters on source columns."
+          },
+          "sourceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "source_ids",
+            "description": "With limit_to_source_ids, only source rows whose primary key is listed (e.g. the rows a table's\n filters leave); an empty list then matches nothing."
+          },
+          "limitToSourceIds": {
+            "type": "boolean",
+            "title": "limit_to_source_ids"
+          }
+        },
+        "title": "RunRollupRequest",
+        "additionalProperties": false,
+        "description": "RunRollupRequest runs a rollup over the source rows matching every filter. Tables and the\n rollup's columns come from its stored definition; the filters only narrow its source rows."
+      },
+      "sickrock.RunRollupRequest.WhereEntry": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "key"
+          },
+          "value": {
+            "type": "string",
+            "title": "value"
+          }
+        },
+        "title": "WhereEntry",
+        "additionalProperties": false
+      },
+      "sickrock.RunRollupResponse": {
+        "type": "object",
+        "properties": {
+          "targetTable": {
+            "type": "string",
+            "title": "target_table",
+            "description": "Table configuration whose rows were replaced."
+          },
+          "rowsWritten": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "rows_written",
+            "format": "int64"
+          },
+          "sourceRows": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "source_rows",
+            "format": "int64"
+          },
+          "detailRows": {
+            "type": [
+              "integer",
+              "string"
+            ],
+            "title": "detail_rows",
+            "format": "int64"
+          },
+          "skipped": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "title": "skipped",
+            "description": "Values that could not be summed (not numbers)."
+          }
+        },
+        "title": "RunRollupResponse",
         "additionalProperties": false
       },
       "sickrock.SaveRssCalendarFeedRequest": {
@@ -12082,6 +12372,14 @@
             ],
             "title": "absorb_type",
             "description": "\"first_row\" (default)"
+          },
+          "quickAddJson": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "title": "quick_add_json",
+            "description": "Quick add settings change only when sent; an empty string clears them."
           }
         },
         "title": "UpdateTableRelationRequest",

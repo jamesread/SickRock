@@ -7,11 +7,23 @@ import ViewsButton from './ViewsButton.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { Cancel01Icon, CheckListIcon, CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
 import { useDesignMode } from '../composables/useDesignMode'
+import type { Item as ApiItem } from '../gen/sickrock_pb'
+import {
+  TICK_LIST_VIEW_TYPE,
+  groupTickListRows,
+  parseTickListConfig,
+  relationColumnsUsed,
+  tileDetails,
+  tileLabel,
+  type ReferencedRows,
+  type TickListConfig,
+} from '../utils/tickList'
 
 const { designModeEnabled } = useDesignMode()
 
 const props = defineProps<{
   tableId: string
+  viewId?: number
 }>()
 
 const emit = defineEmits<{
@@ -21,6 +33,10 @@ const emit = defineEmits<{
 type Item = Record<string, unknown>
 
 const items = ref<Item[]>([])
+// The view's label, details, sort and grouping settings (layout_json "tickList").
+const config = ref<TickListConfig>(parseTickListConfig(''))
+const referencedRows = ref<ReferencedRows>(new Map())
+const groups = computed(() => groupTickListRows(items.value as unknown as ApiItem[], config.value, referencedRows.value))
 const loading = ref(false)
 const error = ref<string | null>(null)
 
@@ -119,15 +135,20 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    const [listRes, configsRes, structureRes, tickStateRes] = await Promise.all([
+    const [listRes, configsRes, structureRes, tickStateRes, viewsRes] = await Promise.all([
       client.listItems({ tcName: props.tableId }),
       client.getTableConfigurations({}),
       client.getTableStructure({ pageId: props.tableId }),
       client.getTickListState({ tcName: props.tableId }).catch(() => ({ completedByItemId: {} })),
+      client.getTableViews({ tableName: props.tableId }).catch(() => ({ views: [] })),
     ])
+    const view = viewsRes.views.find(v => v.id === props.viewId)
+      ?? viewsRes.views.find(v => v.viewType === TICK_LIST_VIEW_TYPE)
+    config.value = parseTickListConfig(view?.layoutJson)
+    referencedRows.value = await loadReferencedRows(structureRes.foreignKeys ?? [])
     items.value = Array.isArray(listRes.items) ? (listRes.items as Item[]) : []
-    const config = configsRes.pages?.find((p: any) => p.id === props.tableId)
-    tableTitle.value = config?.title ? String(config.title) : `Table: ${props.tableId}`
+    const page = configsRes.pages?.find((p: any) => p.id === props.tableId)
+    tableTitle.value = page?.title ? String(page.title) : `Table: ${props.tableId}`
     tableStructure.value = structureRes
     const m = tickStateRes.completedByItemId ?? {}
     completionState.value = new Map(Object.entries(m))
@@ -136,6 +157,30 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+/** Rows of the tables referenced by the relation columns the view's settings use. */
+async function loadReferencedRows(foreignKeys: Array<{ columnName: string; referencedTable: string; referencedTableTcName?: string }>): Promise<ReferencedRows> {
+  const used = relationColumnsUsed(config.value, foreignKeys.map(fk => fk.columnName))
+  const entries = await Promise.all(used.map(async (column) => {
+    const fk = foreignKeys.find(f => f.columnName === column)!
+    try {
+      const res = await client.listItems({ tcName: fk.referencedTableTcName || fk.referencedTable })
+      return [column, new Map((res.items ?? []).map(row => [String(row.id), row]))] as const
+    } catch {
+      return [column, new Map<string, ApiItem>()] as const
+    }
+  }))
+  return new Map(entries)
+}
+
+function itemLabel(item: Item): string {
+  if (!config.value.labelColumn) return getItemDisplayText(item)
+  return tileLabel(item as unknown as ApiItem, config.value, referencedRows.value)
+}
+
+function itemDetails(item: Item): string {
+  return tileDetails(item as unknown as ApiItem, config.value, referencedRows.value)
 }
 
 // Toggle completion state (server-side, shared across clients)
@@ -180,7 +225,7 @@ function isCompleted(item: any): boolean {
   return getBooleanValue(item, completionField.value)
 }
 
-watch(() => props.tableId, () => {
+watch(() => [props.tableId, props.viewId], () => {
   load()
 })
 
@@ -221,9 +266,11 @@ onMounted(() => {
     <div v-if="loading" class="loading">Loading...</div>
     <NotificationBlock v-else-if="error" type="error" :message="error" />
     <div v-else>
+      <template v-for="group in groups" :key="group.label">
+      <h3 v-if="group.label" class="ticklist-group-heading">{{ group.label }}</h3>
       <div class="ticklist-container">
         <div
-          v-for="item in items"
+          v-for="item in (group.rows as unknown as Item[])"
           :key="String(item.id)"
           class="ticklist-item"
           :class="{ completed: isCompleted(item) }"
@@ -238,10 +285,14 @@ onMounted(() => {
             <div v-else class="checkbox-empty"></div>
           </div>
           <div class="ticklist-content">
-            <div class="ticklist-title">{{ getItemDisplayText(item) }}</div>
+            <div class="ticklist-title">{{ itemLabel(item) }}</div>
+            <div v-if="itemDetails(item)" class="ticklist-details">{{ itemDetails(item) }}</div>
           </div>
         </div>
-        <div v-if="items.length === 0" class="empty-state">
+      </div>
+      </template>
+      <div v-if="items.length === 0" class="ticklist-container">
+        <div class="empty-state">
           <p>No items yet. <router-link :to="`/table/${props.tableId}/insert-row`">Add your first item</router-link></p>
         </div>
       </div>
@@ -291,6 +342,17 @@ onMounted(() => {
   color: #6c757d;
 }
 
+.ticklist-group-heading {
+  margin: 0;
+  padding: 16px 20px 0;
+}
+
+.ticklist-details {
+  width: 100%;
+  font-size: 14px;
+  color: #6c757d;
+}
+
 .ticklist-checkbox {
   flex-shrink: 0;
   width: 32px;
@@ -322,6 +384,8 @@ onMounted(() => {
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
+  gap: 4px;
   align-items: center;
   justify-content: center;
   text-align: center;

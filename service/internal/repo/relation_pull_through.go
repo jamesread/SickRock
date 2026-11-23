@@ -217,7 +217,7 @@ func (r *Repository) UpdateTableRelation(ctx context.Context, constraintName, di
 	if err != nil {
 		return err
 	}
-	return requireRowsAffected(res, "table relation not found")
+	return r.requireRelationUpdated(ctx, res, constraintName)
 }
 
 // validatedPullThroughArg validates pullThrough against the relation's source table and returns its JSON column value.
@@ -232,14 +232,20 @@ func (r *Repository) validatedPullThroughArg(ctx context.Context, constraintName
 	return marshalRelationPullThroughJSON(pullThrough)
 }
 
-// requireRowsAffected fails with notFound when a statement changed no rows.
-func requireRowsAffected(res sql.Result, notFound string) error {
+// requireRelationUpdated fails when an UPDATE of the relation named constraintName matched no row.
+// MySQL counts only rows whose values changed, so 0 rows affected is checked against the table
+// before saving the same settings again is reported as a missing relation.
+func (r *Repository) requireRelationUpdated(ctx context.Context, res sql.Result, constraintName string) error {
 	n, err := res.RowsAffected()
-	if err != nil {
+	if err != nil || n > 0 {
 		return err
 	}
-	if n == 0 {
-		return errors.New(notFound)
+	var count int
+	if err = r.db.GetContext(ctx, &count, `SELECT COUNT(*) FROM table_relations WHERE constraint_name = ?`, constraintName); err != nil {
+		return err
+	}
+	if count == 0 {
+		return errors.New("table relation not found")
 	}
 	return nil
 }

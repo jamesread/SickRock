@@ -57,6 +57,7 @@ import { urlConditionalFormatLink } from '../utils/conditionalFormattingUrl'
 import { initialTableView, parseViewLayout, tableViewFromProto } from '../utils/serverTableViews'
 import { useServerTableViewSettings } from '../composables/useServerTableViewSettings'
 import { useTableAccess } from '../composables/useTableAccess'
+import { filteredRowIds } from '../utils/rollups'
 
 const { designModeEnabled } = useDesignMode()
 
@@ -278,7 +279,15 @@ const tableToolbarBindings = computed(() => ({
   selectedViewId: selectedViewId.value,
   currentView: currentView.value,
   multiSelectEnabled: multiSelectEnabled.value,
+  rollupSourceIds: rollupSourceIds.value,
 }))
+
+// Rollups run from the toolbar cover the rows the table's filters leave (all rows when unfiltered).
+const rollupSourceIds = computed(() => filteredRowIds(
+  flattenedRows.value as Array<Record<string, unknown>>,
+  tableHeaders.value,
+  tableFilters.value,
+))
 
 // Server table views remain the source of truth. PicoCrank changes the
 // controlled state below for this component session only; views saved from
@@ -1162,6 +1171,9 @@ onMounted(async () => {
   }
 })
 
+// Lets a parent refresh the names shown for relation columns, e.g. after a referenced row was created.
+defineExpose({ reloadForeignKeys: loadForeignKeys })
+
 onUnmounted(() => {
   window.removeEventListener('open-quick-add', handleOpenQuickAdd)
   window.removeEventListener('save-current-edit', handleSaveCurrentEdit)
@@ -1438,6 +1450,8 @@ onUnmounted(() => {
           🗑️ Delete Selected ({{ selectedKeys.length }})
         </button>
       </div>
+      <!-- Under the table, inside its section (e.g. a related rows panel's quick add row). -->
+      <slot name="footer" />
     </div>
 
     <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
@@ -1751,6 +1765,8 @@ onUnmounted(() => {
           🗑️ Delete Selected ({{ selectedKeys.length }})
         </button>
       </div>
+      <!-- Under the table, inside its section (e.g. a related rows panel's quick add row). -->
+      <slot name="footer" />
     </div>
 
     <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
