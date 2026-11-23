@@ -7,6 +7,7 @@ import { Add01Icon, Edit03Icon, Settings01Icon } from '@hugeicons/core-free-icon
 import Dialog from 'picocrank/vue/components/Dialog.vue'
 import type { DialogApi } from '../utils/dialog'
 import { useDesignMode } from '../composables/useDesignMode'
+import { viewTypeLabel } from '../utils/viewTypes'
 
 const { designModeEnabled } = useDesignMode()
 
@@ -18,7 +19,6 @@ const props = withDefaults(defineProps<{
   showStructureLink?: boolean
   externalViews?: TableView[]
   externalSelectedViewId?: number | null
-  externalCurrentView?: TableView | null
 }>(), {
   showViewCreate: true,
   showViewEdit: true,
@@ -71,13 +71,6 @@ const selectedViewId = computed({
   },
 })
 
-const currentView = computed(() => {
-  if (useExternalState.value) {
-    return props.externalCurrentView ?? null
-  }
-  return internalManager.currentView.value
-})
-
 const dialogRef = ref<DialogApi | null>(null)
 
 function openViewsDialog() {
@@ -104,16 +97,15 @@ function createTableView() {
   closeViewsDialog()
 }
 
-function editTableView() {
-  if (useExternalState.value) {
-    if (currentView.value && currentView.value.id !== -1) {
-      const viewId = encodeURIComponent(currentView.value.id.toString())
-      const tableName = encodeURIComponent(props.tableId)
-      router.push(`/table/${tableName}/edit-view/${viewId}`)
-    }
-  } else {
-    internalManager.editTableView()
-  }
+/** Saved views can be edited; "All Columns" (id -1) is built in. */
+function isEditableView(view: TableView): boolean {
+  return view.id !== -1
+}
+
+function editView(view: TableView) {
+  if (!isEditableView(view)) return
+  // Path-based navigation avoids issues with special characters in route params.
+  router.push(`/table/${encodeURIComponent(props.tableId)}/edit-view/${encodeURIComponent(String(view.id))}`)
   closeViewsDialog()
 }
 
@@ -127,9 +119,7 @@ const allowViewCreate = computed(() => props.showViewCreate && designModeEnabled
 const allowViewEdit = computed(() => props.showViewEdit && designModeEnabled.value)
 const allowStructureLink = computed(() => props.showStructureLink && designModeEnabled.value)
 
-const hasFooterActions = computed(
-  () => allowViewCreate.value || allowViewEdit.value || allowStructureLink.value,
-)
+const hasFooterActions = computed(() => allowViewCreate.value || allowStructureLink.value)
 
 const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' : 'Views'))
 </script>
@@ -153,6 +143,8 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
         <thead>
           <tr>
             <th scope="col">View</th>
+            <th scope="col">Type</th>
+            <th v-if="allowViewEdit" scope="col" class="views-picker-actions"><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -169,6 +161,21 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
               <span class="views-picker-name">{{ view.viewName }}</span>
               <span v-if="view.isDefault" class="tag note">Default</span>
             </td>
+            <td class="views-picker-type subtle">{{ viewTypeLabel(view.viewType) }}</td>
+            <td v-if="allowViewEdit" class="views-picker-actions">
+              <button
+                v-if="isEditableView(view)"
+                type="button"
+                class="button inline-icon neutral small design-only"
+                :aria-label="`Edit view ${view.viewName}`"
+                title="Edit view"
+                @click.stop="editView(view)"
+                @keydown.enter.stop
+              >
+                <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
+                <span>Edit</span>
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -183,15 +190,6 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
       >
         <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Create view</span>
-      </button>
-      <button
-        v-if="allowViewEdit && currentView && currentView.id !== -1"
-        type="button"
-        class="button inline-icon neutral design-only"
-        @click="editTableView"
-      >
-        <HugeiconsIcon :icon="Edit03Icon" width="1em" height="1em" aria-hidden="true" />
-        <span>Edit view</span>
       </button>
       <router-link
         v-if="allowStructureLink"
@@ -221,6 +219,28 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
 
 .views-picker-name {
   margin-right: 0.5rem;
+}
+
+.views-picker-type {
+  white-space: nowrap;
+}
+
+.views-picker-actions {
+  width: 1%;
+  text-align: end;
+  white-space: nowrap;
+}
+
+.views-picker-actions .button {
+  margin: 0;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
 }
 
 .views-picker-selected td {

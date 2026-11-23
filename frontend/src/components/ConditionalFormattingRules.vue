@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { columnChoiceLabel } from '../utils/fieldColumnDisplay'
+import { CONDITION_TYPES } from '../utils/conditionalFormatting'
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -309,11 +310,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
         <div class="form-group">
           <label>Condition Type:</label>
           <select v-model="newRule.conditionType">
-            <option value="always">Always</option>
-            <option value="equals">Equals</option>
-            <option value="contains">Contains</option>
-            <option value="greater_than">Greater Than</option>
-            <option value="less_than">Less Than</option>
+            <option v-for="condition in CONDITION_TYPES" :key="condition.value" :value="condition.value">{{ condition.label }}</option>
           </select>
         </div>
         <div class="form-group">
@@ -385,11 +382,7 @@ watch(() => newRule.value.formatType, (newFormatType) => {
         <div class="form-group">
           <label>Condition Type:</label>
           <select v-model="newRule.conditionType">
-            <option value="always">Always</option>
-            <option value="equals">Equals</option>
-            <option value="contains">Contains</option>
-            <option value="greater_than">Greater Than</option>
-            <option value="less_than">Less Than</option>
+            <option v-for="condition in CONDITION_TYPES" :key="condition.value" :value="condition.value">{{ condition.label }}</option>
           </select>
         </div>
         <div class="form-group">

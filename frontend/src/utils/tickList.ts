@@ -1,7 +1,8 @@
 /**
  * The Tick List view type: rows as tiles that are ticked off (shared tick state on the server).
  * Settings live in the view's layout_json under "tickList": the column each tile is labelled with,
- * detail columns shown under it, sort columns and an optional group-by column.
+ * detail columns shown under it, an optional image column, sort columns and an optional group-by
+ * column.
  *
  * Every column setting is a column path: a column of the table ("quantity"), or for a relation
  * column, a column of the row it references ("ingredient.aisle"). A relation column on its own
@@ -10,6 +11,7 @@
 import type { Item } from '../gen/sickrock_pb'
 import { cardDetailValue } from './cardsView'
 import { getItemNameFieldValue } from './itemViewSectionTitle'
+import { hasImageValue } from './fieldTypes'
 
 export const TICK_LIST_VIEW_TYPE = 'ticklist'
 
@@ -22,6 +24,10 @@ export type TickListConfig = {
   sortColumns: string[]
   /** Path tiles are grouped under headings by; empty for no groups. */
   groupColumn: string
+  /** Path of an image column shown on each tile (e.g. "ingredient.picture"); empty for none. */
+  imageColumn: string
+  /** Show how many tiles are ticked ("12 of 30 ticked") with a progress bar. */
+  showProgress: boolean
 }
 
 export const MAX_TICK_LIST_DETAILS = 4
@@ -31,7 +37,7 @@ export const MAX_TICK_LIST_SORTS = 3
 export type ReferencedRows = Map<string, Map<string, Item>>
 
 export function defaultTickListConfig(): TickListConfig {
-  return { labelColumn: '', detailColumns: [], sortColumns: [], groupColumn: '' }
+  return { labelColumn: '', detailColumns: [], sortColumns: [], groupColumn: '', imageColumn: '', showProgress: false }
 }
 
 function parseLayout(layoutJson: string | undefined): Record<string, unknown> {
@@ -60,6 +66,8 @@ export function parseTickListConfig(layoutJson: string | undefined): TickListCon
     detailColumns: pathList(stored.detailColumns, MAX_TICK_LIST_DETAILS),
     sortColumns: pathList(stored.sortColumns, MAX_TICK_LIST_SORTS),
     groupColumn: text(stored.groupColumn),
+    imageColumn: text(stored.imageColumn),
+    showProgress: stored.showProgress === true,
   }
 }
 
@@ -71,13 +79,15 @@ export function withTickListConfig(layoutJson: string | undefined, config: TickL
     detailColumns: pathList(config.detailColumns, MAX_TICK_LIST_DETAILS),
     sortColumns: pathList(config.sortColumns, MAX_TICK_LIST_SORTS),
     groupColumn: config.groupColumn.trim(),
+    imageColumn: config.imageColumn.trim(),
+    showProgress: config.showProgress,
   }
   return JSON.stringify(layout)
 }
 
 /** The relation columns a config's paths need the referenced rows of. */
 export function relationColumnsUsed(config: TickListConfig, relationColumns: string[]): string[] {
-  const paths = [config.labelColumn, ...config.detailColumns, ...config.sortColumns, config.groupColumn]
+  const paths = [config.labelColumn, ...config.detailColumns, ...config.sortColumns, config.groupColumn, config.imageColumn]
   const used = new Set(paths.filter(Boolean).map(path => path.split('.')[0]))
   return relationColumns.filter(column => used.has(column))
 }
@@ -116,6 +126,22 @@ export function tileLabel(row: Item, config: TickListConfig, refs: ReferencedRow
 /** A tile's detail line, e.g. "550 g". */
 export function tileDetails(row: Item, config: TickListConfig, refs: ReferencedRows): string {
   return config.detailColumns.map(path => pathValue(row, path, refs)).filter(Boolean).join(' ')
+}
+
+/** The image a tile shows: the image column's value (an images table id), or "" for none. */
+export function tileImageId(row: Item, config: TickListConfig, refs: ReferencedRows): string {
+  if (!config.imageColumn) return ''
+  const value = pathValue(row, config.imageColumn, refs)
+  return hasImageValue(value) ? value : ''
+}
+
+export type TickListProgress = { ticked: number; total: number; percent: number; label: string }
+
+/** How many of the rows are ticked, e.g. { ticked: 3, total: 4, percent: 75, label: "3 of 4 ticked" }. */
+export function tickListProgress<T>(rows: T[], isTicked: (row: T) => boolean): TickListProgress {
+  const total = rows.length
+  const ticked = rows.filter(isTicked).length
+  return { ticked, total, percent: total ? Math.round((ticked / total) * 100) : 0, label: `${ticked} of ${total} ticked` }
 }
 
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' })

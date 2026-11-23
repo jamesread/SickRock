@@ -8,6 +8,8 @@ const LEGACY_TOKEN_KEY = 'auth_token'
 
 export interface User {
   username: string
+  /** The name the user chose to be shown (User preferences); empty when unset. */
+  displayName: string
   token: string
   expiresAt: number
   rbacPermissions: string[]
@@ -45,12 +47,21 @@ export const useAuthStore = defineStore('auth', () => {
     const storedToken = token ?? localStorage.getItem(SESSION_TOKEN_KEY) ?? ''
     user.value = {
       username: response.currentUsername,
+      displayName: response.currentDisplayName ?? '',
       token: storedToken,
       expiresAt: 0,
       rbacPermissions: [...(response.rbacPermissions ?? [])],
       rbacIsSuperuser: response.rbacIsSuperuser ?? false,
     }
   }
+
+  /** Updates the signed-in user's display name after it was saved (e.g. from User preferences). */
+  const setDisplayName = (displayName: string) => {
+    if (user.value) user.value = { ...user.value, displayName }
+  }
+
+  /** What to call the signed-in user: their display name, else their username. */
+  const shownName = computed(() => user.value?.displayName?.trim() || user.value?.username || '')
 
   const login = async (username: string, password: string) => {
     isLoading.value = true
@@ -66,6 +77,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (response.success) {
         const userData: User = {
           username,
+          displayName: '',
           token: response.token,
           expiresAt: Number(response.expiresAt),
           rbacPermissions: [],
@@ -121,6 +133,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (response.valid) {
         user.value = {
           username: response.username,
+          displayName: response.displayName ?? '',
           token: token ?? '',
           expiresAt: Number(response.expiresAt),
           rbacPermissions: [...(response.rbacPermissions ?? [])],
@@ -169,6 +182,8 @@ export const useAuthStore = defineStore('auth', () => {
     initResponse,
     hasPermission,
     setUserFromInit,
+    setDisplayName,
+    shownName,
     login,
     logout,
     validateToken,

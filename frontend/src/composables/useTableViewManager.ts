@@ -136,15 +136,6 @@ export function useTableViewManager(tableId: string, onViewChange?: (view: Table
     router.push({ name: 'create-table-view', params: { tableName: tableId } })
   }
 
-  function editTableView() {
-    if (currentView.value && currentView.value.id !== -1) {
-      // Use path-based navigation to avoid issues with special characters in route params
-      const viewId = encodeURIComponent(currentView.value.id.toString())
-      const tableName = encodeURIComponent(tableId)
-      router.push(`/table/${tableName}/edit-view/${viewId}`)
-    }
-  }
-
   return {
     tableViews,
     selectedViewId,
@@ -156,7 +147,6 @@ export function useTableViewManager(tableId: string, onViewChange?: (view: Table
     openViewsDialog,
     closeViewsDialog,
     selectView,
-    createTableView,
-    editTableView
+    createTableView
   }
 }

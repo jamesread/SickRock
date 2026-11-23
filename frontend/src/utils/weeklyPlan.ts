@@ -7,6 +7,7 @@
  * when one is set, otherwise from the time of day in dateColumn: the last slot whose time is not
  * after the row's time.
  */
+import type { Item } from '../gen/sickrock_pb'
 import { filterPickerOptions, type RowPickerOption } from './rowPicker'
 
 export const WEEKLY_PLAN_VIEW_TYPE = 'weeklyplan'
@@ -30,6 +31,10 @@ export type WeeklyPlanConfig = {
   weekStartsOn: number
   /** Users pre-ticked in the Notify dialog. */
   notifyUserIds: number[]
+  /** Columns shown under each entry, e.g. a note such as "James: cooking". */
+  detailColumns: string[]
+  /** Columns filled in when adding an entry (e.g. who a meal is for), offering recently used values. */
+  askColumns: string[]
 }
 
 export const DEFAULT_WEEKLY_PLAN_SLOTS: WeeklyPlanSlot[] = [
@@ -57,6 +62,8 @@ export function defaultWeeklyPlanConfig(): WeeklyPlanConfig {
     slots: DEFAULT_WEEKLY_PLAN_SLOTS.map(slot => ({ ...slot })),
     weekStartsOn: 1,
     notifyUserIds: [],
+    detailColumns: [],
+    askColumns: [],
   }
 }
 
@@ -82,7 +89,50 @@ export function parseWeeklyPlanConfig(layoutJson: string | undefined): WeeklyPla
     config.weekStartsOn = weekStartsOn
   }
   config.notifyUserIds = cleanUserIds(stored.notifyUserIds)
+  config.detailColumns = cleanColumns(stored.detailColumns)
+  config.askColumns = cleanColumns(stored.askColumns)
   return config
+}
+
+/** Column names, trimmed, once each, in order; anything else is dropped. */
+function cleanColumns(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return [...new Set(value.filter((column): column is string => typeof column === 'string').map(column => column.trim()).filter(Boolean))]
+}
+
+/** An entry's details: the values of the detail columns that have one, in order. */
+export function entryDetails(config: WeeklyPlanConfig, getValue: (column: string) => unknown): string[] {
+  return config.detailColumns
+    .map(column => String(getValue(column) ?? '').trim())
+    .filter(Boolean)
+}
+
+/** Most recent values offered for a column asked about when adding. */
+export const MAX_RECENT_ASK_VALUES = 6
+
+/**
+ * The values most recently used in a column, newest row first (by id), once each ignoring case,
+ * e.g. ["Evie", "James"] for "who".
+ */
+export function recentColumnValues(rows: Item[], column: string, limit = MAX_RECENT_ASK_VALUES): string[] {
+  const byNewest = [...rows].sort((a, b) => Number(b.id) - Number(a.id))
+  const seen = new Set<string>()
+  const values: string[] = []
+  for (const row of byNewest) {
+    const value = String(row.additionalFields?.[column] ?? '').trim()
+    if (!value || seen.has(value.toLowerCase())) continue
+    seen.add(value.toLowerCase())
+    values.push(value)
+    if (values.length >= limit) break
+  }
+  return values
+}
+
+/** The asked-for values to store with a new entry: those filled in, trimmed, for the asked columns only. */
+export function askedFields(config: WeeklyPlanConfig, values: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(config.askColumns
+    .map(column => [column, (values[column] ?? '').trim()])
+    .filter(([, value]) => value !== ''))
 }
 
 /** Positive integer user ids, once each, in order; anything else is dropped. */
@@ -104,6 +154,8 @@ export function withWeeklyPlanConfig(layoutJson: string | undefined, config: Wee
       .filter(slot => slot.label !== ''),
     weekStartsOn: config.weekStartsOn,
     notifyUserIds: cleanUserIds(config.notifyUserIds),
+    detailColumns: cleanColumns(config.detailColumns),
+    askColumns: cleanColumns(config.askColumns),
   }
   return JSON.stringify(layout)
 }
@@ -256,6 +308,91 @@ export function groupIntoCells<T>(
     else cells.set(key, [row])
   }
   return cells
+}
+
+/** Columns the database fills in itself, so copies of a row leave them out. */
+export const GENERATED_COLUMNS = new Set(['id', 'sr_created', 'sr_updated'])
+
+/** The row's columns to give a copy of it: every column except the generated ones, without empty values. */
+export function copiedFields(columns: string[], values: Record<string, string> | undefined): Record<string, string> {
+  return Object.fromEntries(columns
+    .filter(column => !GENERATED_COLUMNS.has(column))
+    .map(column => [column, values?.[column] ?? ''])
+    .filter(([, value]) => value !== ''))
+}
+
+export type PlannedWeek = { start: Date; count: number }
+
+/** The weeks that have entries (rows the grid would place), newest first, with how many each has. */
+export function plannedWeeks<T>(config: WeeklyPlanConfig, rows: T[], getValue: (row: T, column: string) => unknown): PlannedWeek[] {
+  const weeks = new Map<string, PlannedWeek>()
+  for (const row of rows) {
+    const when = parseWallClock(getValue(row, config.dateColumn))
+    if (!when) continue
+    if (slotIndexFor(config, when, config.slotColumn ? getValue(row, config.slotColumn) : undefined) < 0) continue
+    const start = startOfWeek(when, config.weekStartsOn)
+    const week = weeks.get(dayKey(start))
+    if (week) week.count++
+    else weeks.set(dayKey(start), { start, count: 1 })
+  }
+  return [...weeks.values()].sort((a, b) => b.start.getTime() - a.start.getTime())
+}
+
+/** Whole days from one date to another (local calendar days, so daylight saving does not matter). */
+function daysBetween(from: Date, to: Date): number {
+  return Math.round((Date.UTC(to.getFullYear(), to.getMonth(), to.getDate()) - Date.UTC(from.getFullYear(), from.getMonth(), from.getDate())) / 86_400_000)
+}
+
+/** "YYYY-MM-DD HH:MM:SS" in local time, as placementFields writes dates. */
+function wallClockText(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${dayKey(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+export type WeekCopy = {
+  /** The new rows' column values: each copied row moved to the same weekday and time in the target week. */
+  rows: Record<string, string>[]
+  /** Rows left out because the target week already has the same item in the same cell. */
+  skipped: number
+}
+
+/**
+ * Copies the entries of the week starting at fromWeek into the week starting at toWeek. Each row
+ * keeps its columns (see copiedFields) and its weekday, time and slot. An entry whose cell in the
+ * target week already holds the same item is skipped, so copying twice adds nothing.
+ */
+export function copyWeek(
+  config: WeeklyPlanConfig,
+  rows: Item[],
+  columns: string[],
+  fromWeek: Date,
+  toWeek: Date,
+): WeekCopy {
+  const getValue = (row: Item, column: string) => (column === 'id' ? row.id : row.additionalFields?.[column])
+  const shift = daysBetween(fromWeek, toWeek)
+  const itemKey = (cell: string, row: Item) => `${cell}|${String(getValue(row, config.itemColumn) ?? '')}`
+  const existing = new Set<string>()
+  for (const [cell, cellRows] of groupIntoCells(config, toWeek, rows, getValue)) {
+    for (const row of cellRows) existing.add(itemKey(cell, row))
+  }
+  const copy: WeekCopy = { rows: [], skipped: 0 }
+  if (shift === 0) return copy
+  for (const [, cellRows] of groupIntoCells(config, fromWeek, rows, getValue)) {
+    for (const row of cellRows) {
+      const when = parseWallClock(getValue(row, config.dateColumn))
+      if (!when) continue
+      const moved = new Date(when.getFullYear(), when.getMonth(), when.getDate() + shift, when.getHours(), when.getMinutes(), when.getSeconds())
+      const slotIndex = slotIndexFor(config, moved, config.slotColumn ? getValue(row, config.slotColumn) : undefined)
+      const key = itemKey(cellKey(moved, slotIndex), row)
+      if (existing.has(key)) {
+        copy.skipped++
+        continue
+      }
+      existing.add(key)
+      copy.rows.push({ ...copiedFields(columns, row.additionalFields), [config.dateColumn]: wallClockText(moved) })
+    }
+  }
+  return copy
 }
 
 /** An option in the weekly plan's picker (see utils/rowPicker.ts). */

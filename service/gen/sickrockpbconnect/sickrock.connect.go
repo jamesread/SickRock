@@ -240,6 +240,9 @@ const (
 	// SickRockSetTableRowLabelsProcedure is the fully-qualified name of the SickRock's
 	// SetTableRowLabels RPC.
 	SickRockSetTableRowLabelsProcedure = "/sickrock.SickRock/SetTableRowLabels"
+	// SickRockSetTableDefaultExportViewProcedure is the fully-qualified name of the SickRock's
+	// SetTableDefaultExportView RPC.
+	SickRockSetTableDefaultExportViewProcedure = "/sickrock.SickRock/SetTableDefaultExportView"
 	// SickRockChangeColumnTypeProcedure is the fully-qualified name of the SickRock's ChangeColumnType
 	// RPC.
 	SickRockChangeColumnTypeProcedure = "/sickrock.SickRock/ChangeColumnType"
@@ -271,6 +274,8 @@ const (
 	SickRockGetHomeLayoutProcedure = "/sickrock.SickRock/GetHomeLayout"
 	// SickRockSetHomeLayoutProcedure is the fully-qualified name of the SickRock's SetHomeLayout RPC.
 	SickRockSetHomeLayoutProcedure = "/sickrock.SickRock/SetHomeLayout"
+	// SickRockSetDisplayNameProcedure is the fully-qualified name of the SickRock's SetDisplayName RPC.
+	SickRockSetDisplayNameProcedure = "/sickrock.SickRock/SetDisplayName"
 	// SickRockCreateUserBookmarkProcedure is the fully-qualified name of the SickRock's
 	// CreateUserBookmark RPC.
 	SickRockCreateUserBookmarkProcedure = "/sickrock.SickRock/CreateUserBookmark"
@@ -451,6 +456,7 @@ type SickRockClient interface {
 	SetItemFieldGroups(context.Context, *connect.Request[proto.SetItemFieldGroupsRequest]) (*connect.Response[proto.SetItemFieldGroupsResponse], error)
 	SetColumnDisplaySettings(context.Context, *connect.Request[proto.SetColumnDisplaySettingsRequest]) (*connect.Response[proto.SetColumnDisplaySettingsResponse], error)
 	SetTableRowLabels(context.Context, *connect.Request[proto.SetTableRowLabelsRequest]) (*connect.Response[proto.SetTableRowLabelsResponse], error)
+	SetTableDefaultExportView(context.Context, *connect.Request[proto.SetTableDefaultExportViewRequest]) (*connect.Response[proto.SetTableDefaultExportViewResponse], error)
 	// Column Type Management
 	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
 	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
@@ -469,6 +475,7 @@ type SickRockClient interface {
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
 	GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error)
 	SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error)
+	SetDisplayName(context.Context, *connect.Request[proto.SetDisplayNameRequest]) (*connect.Response[proto.SetDisplayNameResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 	// API Key Management
@@ -502,7 +509,7 @@ type SickRockClient interface {
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
 	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
-	// Rollups: group and sum related rows into a target table, replacing its rows
+	// Rollups: group and sum related rows into a target table, replacing the rows the rollup wrote there
 	ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error)
 	RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error)
 }
@@ -986,6 +993,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("SetTableRowLabels")),
 			connect.WithClientOptions(opts...),
 		),
+		setTableDefaultExportView: connect.NewClient[proto.SetTableDefaultExportViewRequest, proto.SetTableDefaultExportViewResponse](
+			httpClient,
+			baseURL+SickRockSetTableDefaultExportViewProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetTableDefaultExportView")),
+			connect.WithClientOptions(opts...),
+		),
 		changeColumnType: connect.NewClient[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse](
 			httpClient,
 			baseURL+SickRockChangeColumnTypeProcedure,
@@ -1056,6 +1069,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockSetHomeLayoutProcedure,
 			connect.WithSchema(sickRockMethods.ByName("SetHomeLayout")),
+			connect.WithClientOptions(opts...),
+		),
+		setDisplayName: connect.NewClient[proto.SetDisplayNameRequest, proto.SetDisplayNameResponse](
+			httpClient,
+			baseURL+SickRockSetDisplayNameProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetDisplayName")),
 			connect.WithClientOptions(opts...),
 		),
 		createUserBookmark: connect.NewClient[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse](
@@ -1327,6 +1346,7 @@ type sickRockClient struct {
 	setItemFieldGroups                 *connect.Client[proto.SetItemFieldGroupsRequest, proto.SetItemFieldGroupsResponse]
 	setColumnDisplaySettings           *connect.Client[proto.SetColumnDisplaySettingsRequest, proto.SetColumnDisplaySettingsResponse]
 	setTableRowLabels                  *connect.Client[proto.SetTableRowLabelsRequest, proto.SetTableRowLabelsResponse]
+	setTableDefaultExportView          *connect.Client[proto.SetTableDefaultExportViewRequest, proto.SetTableDefaultExportViewResponse]
 	changeColumnType                   *connect.Client[proto.ChangeColumnTypeRequest, proto.ChangeColumnTypeResponse]
 	dropColumn                         *connect.Client[proto.DropColumnRequest, proto.DropColumnResponse]
 	changeColumnName                   *connect.Client[proto.ChangeColumnNameRequest, proto.ChangeColumnNameResponse]
@@ -1339,6 +1359,7 @@ type sickRockClient struct {
 	getUserBookmarks                   *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
 	getHomeLayout                      *connect.Client[proto.GetHomeLayoutRequest, proto.GetHomeLayoutResponse]
 	setHomeLayout                      *connect.Client[proto.SetHomeLayoutRequest, proto.SetHomeLayoutResponse]
+	setDisplayName                     *connect.Client[proto.SetDisplayNameRequest, proto.SetDisplayNameResponse]
 	createUserBookmark                 *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
 	deleteUserBookmark                 *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
 	createAPIKey                       *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
@@ -1762,6 +1783,11 @@ func (c *sickRockClient) SetTableRowLabels(ctx context.Context, req *connect.Req
 	return c.setTableRowLabels.CallUnary(ctx, req)
 }
 
+// SetTableDefaultExportView calls sickrock.SickRock.SetTableDefaultExportView.
+func (c *sickRockClient) SetTableDefaultExportView(ctx context.Context, req *connect.Request[proto.SetTableDefaultExportViewRequest]) (*connect.Response[proto.SetTableDefaultExportViewResponse], error) {
+	return c.setTableDefaultExportView.CallUnary(ctx, req)
+}
+
 // ChangeColumnType calls sickrock.SickRock.ChangeColumnType.
 func (c *sickRockClient) ChangeColumnType(ctx context.Context, req *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error) {
 	return c.changeColumnType.CallUnary(ctx, req)
@@ -1820,6 +1846,11 @@ func (c *sickRockClient) GetHomeLayout(ctx context.Context, req *connect.Request
 // SetHomeLayout calls sickrock.SickRock.SetHomeLayout.
 func (c *sickRockClient) SetHomeLayout(ctx context.Context, req *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error) {
 	return c.setHomeLayout.CallUnary(ctx, req)
+}
+
+// SetDisplayName calls sickrock.SickRock.SetDisplayName.
+func (c *sickRockClient) SetDisplayName(ctx context.Context, req *connect.Request[proto.SetDisplayNameRequest]) (*connect.Response[proto.SetDisplayNameResponse], error) {
+	return c.setDisplayName.CallUnary(ctx, req)
 }
 
 // CreateUserBookmark calls sickrock.SickRock.CreateUserBookmark.
@@ -2070,6 +2101,7 @@ type SickRockHandler interface {
 	SetItemFieldGroups(context.Context, *connect.Request[proto.SetItemFieldGroupsRequest]) (*connect.Response[proto.SetItemFieldGroupsResponse], error)
 	SetColumnDisplaySettings(context.Context, *connect.Request[proto.SetColumnDisplaySettingsRequest]) (*connect.Response[proto.SetColumnDisplaySettingsResponse], error)
 	SetTableRowLabels(context.Context, *connect.Request[proto.SetTableRowLabelsRequest]) (*connect.Response[proto.SetTableRowLabelsResponse], error)
+	SetTableDefaultExportView(context.Context, *connect.Request[proto.SetTableDefaultExportViewRequest]) (*connect.Response[proto.SetTableDefaultExportViewResponse], error)
 	// Column Type Management
 	ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error)
 	DropColumn(context.Context, *connect.Request[proto.DropColumnRequest]) (*connect.Response[proto.DropColumnResponse], error)
@@ -2088,6 +2120,7 @@ type SickRockHandler interface {
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
 	GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error)
 	SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error)
+	SetDisplayName(context.Context, *connect.Request[proto.SetDisplayNameRequest]) (*connect.Response[proto.SetDisplayNameResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 	// API Key Management
@@ -2121,7 +2154,7 @@ type SickRockHandler interface {
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
 	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
-	// Rollups: group and sum related rows into a target table, replacing its rows
+	// Rollups: group and sum related rows into a target table, replacing the rows the rollup wrote there
 	ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error)
 	RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error)
 }
@@ -2601,6 +2634,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("SetTableRowLabels")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockSetTableDefaultExportViewHandler := connect.NewUnaryHandler(
+		SickRockSetTableDefaultExportViewProcedure,
+		svc.SetTableDefaultExportView,
+		connect.WithSchema(sickRockMethods.ByName("SetTableDefaultExportView")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockChangeColumnTypeHandler := connect.NewUnaryHandler(
 		SickRockChangeColumnTypeProcedure,
 		svc.ChangeColumnType,
@@ -2671,6 +2710,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockSetHomeLayoutProcedure,
 		svc.SetHomeLayout,
 		connect.WithSchema(sickRockMethods.ByName("SetHomeLayout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetDisplayNameHandler := connect.NewUnaryHandler(
+		SickRockSetDisplayNameProcedure,
+		svc.SetDisplayName,
+		connect.WithSchema(sickRockMethods.ByName("SetDisplayName")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockCreateUserBookmarkHandler := connect.NewUnaryHandler(
@@ -3017,6 +3062,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockSetColumnDisplaySettingsHandler.ServeHTTP(w, r)
 		case SickRockSetTableRowLabelsProcedure:
 			sickRockSetTableRowLabelsHandler.ServeHTTP(w, r)
+		case SickRockSetTableDefaultExportViewProcedure:
+			sickRockSetTableDefaultExportViewHandler.ServeHTTP(w, r)
 		case SickRockChangeColumnTypeProcedure:
 			sickRockChangeColumnTypeHandler.ServeHTTP(w, r)
 		case SickRockDropColumnProcedure:
@@ -3041,6 +3088,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetHomeLayoutHandler.ServeHTTP(w, r)
 		case SickRockSetHomeLayoutProcedure:
 			sickRockSetHomeLayoutHandler.ServeHTTP(w, r)
+		case SickRockSetDisplayNameProcedure:
+			sickRockSetDisplayNameHandler.ServeHTTP(w, r)
 		case SickRockCreateUserBookmarkProcedure:
 			sickRockCreateUserBookmarkHandler.ServeHTTP(w, r)
 		case SickRockDeleteUserBookmarkProcedure:
@@ -3424,6 +3473,10 @@ func (UnimplementedSickRockHandler) SetTableRowLabels(context.Context, *connect.
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetTableRowLabels is not implemented"))
 }
 
+func (UnimplementedSickRockHandler) SetTableDefaultExportView(context.Context, *connect.Request[proto.SetTableDefaultExportViewRequest]) (*connect.Response[proto.SetTableDefaultExportViewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetTableDefaultExportView is not implemented"))
+}
+
 func (UnimplementedSickRockHandler) ChangeColumnType(context.Context, *connect.Request[proto.ChangeColumnTypeRequest]) (*connect.Response[proto.ChangeColumnTypeResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ChangeColumnType is not implemented"))
 }
@@ -3470,6 +3523,10 @@ func (UnimplementedSickRockHandler) GetHomeLayout(context.Context, *connect.Requ
 
 func (UnimplementedSickRockHandler) SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetHomeLayout is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetDisplayName(context.Context, *connect.Request[proto.SetDisplayNameRequest]) (*connect.Response[proto.SetDisplayNameResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetDisplayName is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error) {

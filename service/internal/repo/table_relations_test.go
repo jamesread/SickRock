@@ -35,7 +35,7 @@ func TestGetForeignKeysFromTableRelations(t *testing.T) {
 			primary_key_column TEXT,
 			default_sort_column TEXT,
 			row_actions TEXT,
-			bulk_entry_json TEXT
+			bulk_entry_json TEXT, default_export_view_id INTEGER
 		);
 		INSERT INTO table_configurations (name, "db", "table", title, ordinal) VALUES
 			('customers', 'main', 'customers', 'Customers', 0),

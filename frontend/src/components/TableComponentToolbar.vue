@@ -26,7 +26,6 @@ defineProps<{
   insertButtonText: string
   tableViews: TableView[]
   selectedViewId: number | null
-  currentView: TableView | null
   multiSelectEnabled?: boolean
   /** Rows a rollup run covers (those the filters leave); undefined for every row. */
   rollupSourceIds?: string[]
@@ -49,7 +48,6 @@ const emit = defineEmits<{
     :show-view-edit="showViewEdit"
     :external-views="tableViews"
     :external-selected-view-id="selectedViewId"
-    :external-current-view="currentView"
     @view-selected="emit('view-selected', $event)"
   />
   <button

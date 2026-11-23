@@ -1,3 +1,5 @@
+import { ruleMatches } from './conditionalFormatting'
+
 export type ConditionalFormatUrlLink = {
   href: string
   label: string
@@ -40,22 +42,6 @@ export type ConditionalFormattingRuleLike = {
   isActive: boolean
 }
 
-function ruleApplies(rule: ConditionalFormattingRuleLike, content: string): boolean {
-  switch (rule.conditionType) {
-    case 'always':
-      return true
-    case 'equals':
-      return content === rule.conditionValue
-    case 'contains':
-      return content.toLowerCase().includes(rule.conditionValue.toLowerCase())
-    case 'greater_than':
-      return Number(content) > Number(rule.conditionValue)
-    case 'less_than':
-      return Number(content) < Number(rule.conditionValue)
-    default:
-      return false
-  }
-}
 
 /** Highest-priority active URL format rule for a cell value, if any. */
 export function urlConditionalFormatLink(
@@ -75,7 +61,7 @@ export function urlConditionalFormatLink(
     )
     .sort((left, right) => right.priority - left.priority)
   for (const rule of columnRules) {
-    if (!ruleApplies(rule, content)) {
+    if (!ruleMatches(rule, content)) {
       continue
     }
     return parseUrlForConditionalFormat(content)

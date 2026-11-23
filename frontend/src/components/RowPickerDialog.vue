@@ -9,7 +9,9 @@ import { computed, defineAsyncComponent, nextTick, ref } from 'vue'
 import Dialog from 'picocrank/vue/components/Dialog.vue'
 import Table from 'picocrank/vue/components/Table.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon, Image01Icon, Search01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Image01Icon } from '@hugeicons/core-free-icons'
+import FormLayout from 'picocrank/vue/components/FormLayout.vue'
+import FormField from 'picocrank/vue/components/FormField.vue'
 import ImageThumb from './ImageThumb.vue'
 import type { DialogApi } from '../utils/dialog'
 import type { Item } from '../gen/sickrock_pb'
@@ -57,6 +59,7 @@ const LIST_PAGE_SIZE = 50
 const NONE_OPTION: RowPickerOption = { value: '', label: 'None', imageId: '' }
 
 const dialogEl = ref<DialogApi | null>(null)
+const searchId = `row-picker-search-${Math.random().toString(36).slice(2)}`
 const searchInput = ref<HTMLInputElement | null>(null)
 const query = ref('')
 const creating = ref(false)
@@ -244,11 +247,14 @@ defineExpose({ open, close })
       />
     </template>
     <template v-else>
-      <div class="row-picker-toolbar">
-        <label class="row-picker-search">
-          <HugeiconsIcon :icon="Search01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span class="visually-hidden">{{ searchPlaceholder }}</span>
+      <!-- Labelled fields: anything the caller asks for alongside the pick (FormFields in the
+           before-search slot, e.g. who a planned meal is for), then the search. -->
+      <FormLayout class="row-picker-fields" @submit.prevent>
+        <slot name="before-search" />
+        <FormField label="Search" :for="searchId">
+          <div class="row-picker-toolbar">
           <input
+            :id="searchId"
             ref="searchInput"
             v-model="query"
             type="text"
@@ -260,12 +266,13 @@ defineExpose({ open, close })
             @keydown.down.prevent="moveActive(1)"
             @keydown.up.prevent="moveActive(-1)"
           />
-        </label>
-        <button v-if="canCreate" type="button" class="button inline-icon good" @click="startCreating">
-          <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
-          <span>{{ createLabel }}</span>
-        </button>
-      </div>
+          <button v-if="canCreate" type="button" class="button inline-icon good" @click="startCreating">
+            <HugeiconsIcon :icon="Add01Icon" width="1em" height="1em" aria-hidden="true" />
+            <span>{{ createLabel }}</span>
+          </button>
+          </div>
+        </FormField>
+      </FormLayout>
       <p class="subtle row-picker-count" aria-live="polite">{{ loading ? 'Loading…' : countText }}</p>
 
       <template v-if="!loading">
@@ -414,15 +421,12 @@ defineExpose({ open, close })
   margin-top: 0.75rem;
 }
 
-.row-picker-search {
-  display: flex;
-  flex: 1 1 16rem;
-  align-items: center;
-  gap: 0.5rem;
+.row-picker-fields {
+  margin-block-end: 0.25rem;
 }
 
-.row-picker-search input {
-  flex: 1;
+.row-picker-toolbar input {
+  flex: 1 1 12rem;
   min-width: 0;
   margin: 0;
 }

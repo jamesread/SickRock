@@ -125,7 +125,7 @@ onMounted(() => {
   >
     <div class="control-panel-container">
       <div class="user-welcome">
-        <h2>Welcome, {{ user?.username }}</h2>
+        <h2>Welcome, {{ authStore.shownName }}</h2>
         <p class="subtle welcome-message">Manage your account settings and preferences</p>
       </div>
 

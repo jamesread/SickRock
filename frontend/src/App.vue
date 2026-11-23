@@ -1016,7 +1016,7 @@ onMounted(async () => {
                 <Header
                     :title="appTitle"
                     :logoUrl="logo"
-                    :username="user?.username"
+                    :username="authStore.shownName"
                     :sidebarEnabled="true"
                     :navigation="navigation"
                     :topBarNavigation="topBarNavigation"

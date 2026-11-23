@@ -85,7 +85,7 @@ func uniqueDbTablePairs(pairs []DbTablePair) map[string]DbTablePair {
 
 const defaultTableKeyColumn = "id"
 
-const tableConfigurationSelectColumns = "name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, create_delegate, row_name, row_name_plural, icon, primary_key_column, default_sort_column, row_actions, bulk_entry_json"
+const tableConfigurationSelectColumns = "name, `db`, `table`, COALESCE(title, name) as title, COALESCE(ordinal, 0) as ordinal, create_button_text, create_delegate, row_name, row_name_plural, icon, primary_key_column, default_sort_column, row_actions, bulk_entry_json, default_export_view_id"
 
 // DisplayRowName returns the singular row label for UI messages (e.g. "Customer created successfully").
 func (tc *TableConfig) DisplayRowName() string {

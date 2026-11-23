@@ -102,6 +102,8 @@ func markdownRuleApplies(rule *repo.ConditionalFormattingRule, fieldValue string
 		return fieldValue == rule.ConditionValue
 	case "contains":
 		return strings.Contains(strings.ToLower(fieldValue), strings.ToLower(rule.ConditionValue))
+	case "starts_with":
+		return strings.HasPrefix(strings.ToLower(strings.TrimLeft(fieldValue, " \t")), strings.ToLower(rule.ConditionValue))
 	case "greater_than", "less_than":
 		return numericRuleApplies(rule, fieldValue)
 	}

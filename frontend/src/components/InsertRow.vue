@@ -19,6 +19,7 @@ import { HugeiconsIcon } from '@hugeicons/vue'
 import { Search01Icon } from '@hugeicons/core-free-icons'
 import { useRowPicker } from '../composables/useRowPicker'
 import { useAuthStore } from '../stores/auth'
+import { defaultExportViewOptions } from '../utils/exportView'
 import {
   pickerLabel,
   recentPicks,
@@ -268,6 +269,43 @@ async function loadReferencedTableData() {
 
 /** Nullable FK columns on built-in tables (used when DB driver omits FK metadata, e.g. SQLite). */
 const KNOWN_NULLABLE_FK_COLUMNS = new Set(['workflow_id', 'dashboard_id', 'table_configuration'])
+
+/**
+ * Columns of built-in tables that hold one of a table's views, by table then column, with the column
+ * naming that table (e.g. a table configuration's default export view is a view of the table it
+ * configures). They are picked from that table's views (utils/exportView.ts).
+ */
+const TABLE_VIEW_FIELDS: Record<string, Record<string, string>> = {
+  table_configurations: { default_export_view_id: 'name' },
+}
+
+function tableViewFieldSource(fieldName: string): string {
+  return TABLE_VIEW_FIELDS[props.tableId]?.[fieldName] ?? ''
+}
+
+// The views of the tables those columns refer to, by table name.
+const viewsByTable = ref<Record<string, Array<{ id: number; viewName: string; isDefault: boolean }>>>({})
+
+function tableViewOptions(fieldName: string) {
+  const table = String(form.value[tableViewFieldSource(fieldName)] ?? '').trim()
+  return defaultExportViewOptions(viewsByTable.value[table] ?? [])
+}
+
+watch(() => Object.values(TABLE_VIEW_FIELDS[props.tableId] ?? {})
+  .map(source => String(form.value[source] ?? '').trim()), async (tables) => {
+  for (const table of tables) {
+    if (!table || viewsByTable.value[table]) continue
+    try {
+      const res = await client.getTableViews({ tableName: table })
+      viewsByTable.value = {
+        ...viewsByTable.value,
+        [table]: (res.views ?? []).map(view => ({ id: view.id, viewName: view.viewName, isDefault: view.isDefault })),
+      }
+    } catch (err) {
+      console.error(`Error loading views of ${table}:`, err)
+    }
+  }
+}, { immediate: true })
 
 const FALLBACK_FK_BY_TABLE: Record<string, Record<string, string>> = {
   table_navigation: {
@@ -613,6 +651,16 @@ function cancel() {
               :aria-label="fieldLabel(f)"
               @update:model-value="value => { form[f.name] = value === null ? '' : booleanToStored(value) }"
             />
+
+            <!-- A view of the table another column names (e.g. a table's default export view). -->
+            <select
+              v-else-if="tableViewFieldSource(f.name)"
+              :id="'field-' + f.name"
+              :value="Number(form[f.name] || 0)"
+              @change="form[f.name] = ($event.target as HTMLSelectElement).value"
+            >
+              <option v-for="option in tableViewOptions(f.name)" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
 
             <!-- User and relation fields: a search box (picocrank Combobox), with Browse… for the full picker. -->
             <Combobox

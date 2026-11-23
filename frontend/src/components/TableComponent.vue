@@ -58,6 +58,7 @@ import { initialTableView, parseViewLayout, tableViewFromProto } from '../utils/
 import { useServerTableViewSettings } from '../composables/useServerTableViewSettings'
 import { useTableAccess } from '../composables/useTableAccess'
 import { rollupSourceIdsFrom } from '../utils/rollups'
+import { conditionalStyles } from '../utils/conditionalFormatting'
 
 const { designModeEnabled } = useDesignMode()
 
@@ -277,7 +278,6 @@ const tableToolbarBindings = computed(() => ({
   insertButtonText: insertButtonText.value,
   tableViews: tableViews.value,
   selectedViewId: selectedViewId.value,
-  currentView: currentView.value,
   multiSelectEnabled: multiSelectEnabled.value,
   rollupSourceIds: rollupSourceIds.value,
 }))
@@ -678,50 +678,8 @@ function applyConditionalFormatting(
   columnName: string,
   cellValue: unknown,
 ): { content: string; styles: Record<string, string> } {
-  const styles: Record<string, string> = {}
   const content = cellValue == null ? '' : String(cellValue)
-  const rules = conditionalFormattingRules.value
-    .filter(rule => rule.columnName === columnName && rule.isActive && rule.formatType !== 'markdown')
-    .sort((left, right) => right.priority - left.priority)
-
-  for (const rule of rules) {
-    let applies = false
-    switch (rule.conditionType) {
-      case 'always':
-        applies = true
-        break
-      case 'equals':
-        applies = content === rule.conditionValue
-        break
-      case 'contains':
-        applies = content.toLowerCase().includes(rule.conditionValue.toLowerCase())
-        break
-      case 'greater_than':
-        applies = Number(content) > Number(rule.conditionValue)
-        break
-      case 'less_than':
-        applies = Number(content) < Number(rule.conditionValue)
-        break
-    }
-
-    if (!applies) continue
-    switch (rule.formatType) {
-      case 'color':
-        styles['background-color'] = rule.formatValue
-        break
-      case 'text_color':
-        styles.color = rule.formatValue
-        break
-      case 'bold':
-        if (rule.formatValue === 'true') styles['font-weight'] = 'bold'
-        break
-      case 'italic':
-        if (rule.formatValue === 'true') styles['font-style'] = 'italic'
-        break
-      case 'url':
-        break
-    }
-  }
+  const styles = conditionalStyles(conditionalFormattingRules.value, () => cellValue, columnName)
   return { content, styles }
 }
 

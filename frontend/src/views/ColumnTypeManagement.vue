@@ -12,6 +12,7 @@ import ConditionalFormattingRules from '../components/ConditionalFormattingRules
 import FieldGroupingEditor from '../components/FieldGroupingEditor.vue'
 import ColumnDisplayEditor from '../components/ColumnDisplayEditor.vue'
 import TablePullThroughSection from '../components/TablePullThroughSection.vue'
+import TableExportSettings from '../components/TableExportSettings.vue'
 import TableRowLabelsEditor from '../components/TableRowLabelsEditor.vue'
 import { useDesignMode } from '../composables/useDesignMode'
 import TableShareSection from '../components/TableShareSection.vue'
@@ -35,6 +36,7 @@ import {
   GridIcon,
   Share08Icon,
   PaintBrushIcon,
+  Download01Icon,
 } from '@hugeicons/core-free-icons'
 
 const iconStrokeWidth = 2.5
@@ -378,6 +380,7 @@ const QUICK_JUMP_SECTIONS = [
   { id: 'table-configuration', label: 'Table configuration', icon: DatabaseSettingIcon },
   { id: 'pull-through', label: 'Pull-through columns', icon: Link01Icon },
   { id: 'row-labels', label: 'Row labels', icon: TextIcon },
+  { id: 'export-settings', label: 'Export', icon: Download01Icon },
   { id: 'column-display', label: 'Column labels & formatting', icon: Edit03Icon },
   { id: 'field-grouping', label: 'Field grouping', icon: GridIcon },
   { id: 'share', label: 'Share', icon: Share08Icon },
@@ -705,6 +708,15 @@ onMounted(async () => {
       :client="client"
       :design-mode-enabled="designModeEnabled"
       @saved="loadColumns"
+    />
+  </div>
+
+  <div id="export-settings" class="quick-jump-anchor">
+    <TableExportSettings
+      v-if="!loading"
+      :table-id="tableId"
+      :client="client"
+      :design-mode-enabled="designModeEnabled"
     />
   </div>
 
