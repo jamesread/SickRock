@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 
-	armhealth "github.com/jamesread/armature-health"
+	armhealth "github.com/jamesread/armature-health/v2"
 
 	"github.com/jamesread/SickRock/internal/pwa"
 )

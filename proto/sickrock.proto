@@ -427,6 +427,17 @@ message SetTableRowLabelsResponse {
   string message = 2;
 }
 
+// The view a table's Export page starts on.
+message SetTableDefaultExportViewRequest {
+  string table_configuration = 1;
+  int32 view_id = 2; // a view of the table, -1 for All Columns, or 0 for the table's default view
+}
+
+message SetTableDefaultExportViewResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 message GetTableStructureResponse {
   repeated Field fields = 1;
   string CreateButtonText = 2;
@@ -452,6 +463,8 @@ message GetTableStructureResponse {
   repeated RowAction row_actions = 14;
   // Bulk entry page settings (table_configurations.bulk_entry_json); unset when bulk entry is off.
   BulkEntryConfig bulk_entry = 15;
+  // The view the Export page starts on: a view id, -1 for All Columns, or 0 for the default view.
+  int32 default_export_view_id = 16;
 }
 
 // BulkEntryConfig configures a table's bulk entry (barcode scanning) page.
@@ -837,6 +850,7 @@ message InitResponse {
   repeated string rbac_permissions = 6;
   bool rbac_is_superuser = 7;
   repeated OAuthProvider oauth_providers = 8;
+  string current_display_name = 9; // the user's display name; empty when unset (show the username)
 }
 
 // Authentication
@@ -880,6 +894,7 @@ message ValidateTokenResponse {
   string initial_route = 4;
   repeated string rbac_permissions = 5;
   bool rbac_is_superuser = 6;
+  string display_name = 7; // empty when unset (show the username)
 }
 
 message ChangePasswordRequest {
@@ -1265,6 +1280,15 @@ message SetHomeLayoutRequest {
 
 message SetHomeLayoutResponse {}
 
+// The caller's own display name, shown in the header instead of their username.
+message SetDisplayNameRequest {
+  string display_name = 1; // trimmed; at most 64 characters, no control characters; empty clears it
+}
+
+message SetDisplayNameResponse {
+  string display_name = 1; // as saved
+}
+
 // API Key Management
 message CreateAPIKeyRequest {
   string name = 1;
@@ -1494,6 +1518,17 @@ message DeleteUserNotificationChannelResponse {
   string message = 2;
 }
 
+// Sends a test notification to one of the caller's own channels (active or not), to check it works.
+message SendTestNotificationRequest {
+  int32 channel_id = 1;
+}
+
+// success is false when delivery failed; message then says why.
+message SendTestNotificationResponse {
+  bool success = 1;
+  string message = 2;
+}
+
 message GetUserNotificationSubscriptionsRequest {}
 
 message GetUserNotificationSubscriptionsResponse {
@@ -1577,7 +1612,8 @@ message ClearTickListStateRequest {
 message ClearTickListStateResponse {}
 
 // Rollup is a configured rollup (system table table_rollups): the detail rows owned by a set of
-// source rows, grouped and summed into a target table whose rows each run replaces.
+// source rows, grouped and summed into a target table; each run replaces the rows the previous run
+// wrote there, keeping rows added by hand.
 message Rollup {
   int64 id = 1;
   string name = 2;
@@ -1726,6 +1762,7 @@ service SickRock {
   rpc SetItemFieldGroups(SetItemFieldGroupsRequest) returns (SetItemFieldGroupsResponse);
   rpc SetColumnDisplaySettings(SetColumnDisplaySettingsRequest) returns (SetColumnDisplaySettingsResponse);
   rpc SetTableRowLabels(SetTableRowLabelsRequest) returns (SetTableRowLabelsResponse);
+  rpc SetTableDefaultExportView(SetTableDefaultExportViewRequest) returns (SetTableDefaultExportViewResponse);
 
   // Column Type Management
   rpc ChangeColumnType(ChangeColumnTypeRequest) returns (ChangeColumnTypeResponse);
@@ -1750,6 +1787,7 @@ service SickRock {
   rpc GetUserBookmarks(GetUserBookmarksRequest) returns (GetUserBookmarksResponse);
   rpc GetHomeLayout(GetHomeLayoutRequest) returns (GetHomeLayoutResponse);
   rpc SetHomeLayout(SetHomeLayoutRequest) returns (SetHomeLayoutResponse);
+  rpc SetDisplayName(SetDisplayNameRequest) returns (SetDisplayNameResponse);
   rpc CreateUserBookmark(CreateUserBookmarkRequest) returns (CreateUserBookmarkResponse);
   rpc DeleteUserBookmark(DeleteUserBookmarkRequest) returns (DeleteUserBookmarkResponse);
 
@@ -1776,6 +1814,7 @@ service SickRock {
   rpc CreateUserNotificationChannel(CreateUserNotificationChannelRequest) returns (CreateUserNotificationChannelResponse);
   rpc UpdateUserNotificationChannel(UpdateUserNotificationChannelRequest) returns (UpdateUserNotificationChannelResponse);
   rpc DeleteUserNotificationChannel(DeleteUserNotificationChannelRequest) returns (DeleteUserNotificationChannelResponse);
+  rpc SendTestNotification(SendTestNotificationRequest) returns (SendTestNotificationResponse);
   rpc GetUserNotificationSubscriptions(GetUserNotificationSubscriptionsRequest) returns (GetUserNotificationSubscriptionsResponse);
   rpc CreateUserNotificationSubscription(CreateUserNotificationSubscriptionRequest) returns (CreateUserNotificationSubscriptionResponse);
   rpc DeleteUserNotificationSubscription(DeleteUserNotificationSubscriptionRequest) returns (DeleteUserNotificationSubscriptionResponse);
@@ -1787,7 +1826,7 @@ service SickRock {
   rpc SetTickListCompletion(SetTickListCompletionRequest) returns (SetTickListCompletionResponse);
   rpc ClearTickListState(ClearTickListStateRequest) returns (ClearTickListStateResponse);
 
-  // Rollups: group and sum related rows into a target table, replacing its rows
+  // Rollups: group and sum related rows into a target table, replacing the rows the rollup wrote there
   rpc ListRollups(ListRollupsRequest) returns (ListRollupsResponse);
   rpc RunRollup(RunRollupRequest) returns (RunRollupResponse);
 }

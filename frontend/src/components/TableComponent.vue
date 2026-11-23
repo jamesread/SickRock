@@ -57,7 +57,8 @@ import { urlConditionalFormatLink } from '../utils/conditionalFormattingUrl'
 import { initialTableView, parseViewLayout, tableViewFromProto } from '../utils/serverTableViews'
 import { useServerTableViewSettings } from '../composables/useServerTableViewSettings'
 import { useTableAccess } from '../composables/useTableAccess'
-import { filteredRowIds } from '../utils/rollups'
+import { rollupSourceIdsFrom } from '../utils/rollups'
+import { conditionalStyles } from '../utils/conditionalFormatting'
 
 const { designModeEnabled } = useDesignMode()
 
@@ -277,17 +278,17 @@ const tableToolbarBindings = computed(() => ({
   insertButtonText: insertButtonText.value,
   tableViews: tableViews.value,
   selectedViewId: selectedViewId.value,
-  currentView: currentView.value,
   multiSelectEnabled: multiSelectEnabled.value,
   rollupSourceIds: rollupSourceIds.value,
 }))
 
-// Rollups run from the toolbar cover the rows the table's filters leave (all rows when unfiltered).
-const rollupSourceIds = computed(() => filteredRowIds(
-  flattenedRows.value as Array<Record<string, unknown>>,
-  tableHeaders.value,
-  tableFilters.value,
-))
+// Rollups run from the toolbar cover the rows the table's filters leave (all rows when unfiltered),
+// as picocrank's Table reports them.
+const rollupSourceIds = ref<string[] | undefined>(undefined)
+
+function onFilteredRows(rows: Array<{ id?: unknown }>, state: { filtersActive: boolean }) {
+  rollupSourceIds.value = rollupSourceIdsFrom(rows, state)
+}
 
 // Server table views remain the source of truth. PicoCrank changes the
 // controlled state below for this component session only; views saved from
@@ -337,8 +338,9 @@ const tableHeaders = computed(() => [
   ...buildTableHeaders(fieldDefs.value, currentView.value),
   {
     key: ACTIONS_COLUMN,
-    // PicoCrank shows the key when the label is empty, so give the column a real heading.
-    label: 'Actions',
+    // Untitled on screen (each row has a ⋮ button); named for screen readers and menus.
+    label: '',
+    ariaLabel: 'Row actions',
     sortable: false,
     filterable: false,
     hideable: false,
@@ -676,50 +678,8 @@ function applyConditionalFormatting(
   columnName: string,
   cellValue: unknown,
 ): { content: string; styles: Record<string, string> } {
-  const styles: Record<string, string> = {}
   const content = cellValue == null ? '' : String(cellValue)
-  const rules = conditionalFormattingRules.value
-    .filter(rule => rule.columnName === columnName && rule.isActive && rule.formatType !== 'markdown')
-    .sort((left, right) => right.priority - left.priority)
-
-  for (const rule of rules) {
-    let applies = false
-    switch (rule.conditionType) {
-      case 'always':
-        applies = true
-        break
-      case 'equals':
-        applies = content === rule.conditionValue
-        break
-      case 'contains':
-        applies = content.toLowerCase().includes(rule.conditionValue.toLowerCase())
-        break
-      case 'greater_than':
-        applies = Number(content) > Number(rule.conditionValue)
-        break
-      case 'less_than':
-        applies = Number(content) < Number(rule.conditionValue)
-        break
-    }
-
-    if (!applies) continue
-    switch (rule.formatType) {
-      case 'color':
-        styles['background-color'] = rule.formatValue
-        break
-      case 'text_color':
-        styles.color = rule.formatValue
-        break
-      case 'bold':
-        if (rule.formatValue === 'true') styles['font-weight'] = 'bold'
-        break
-      case 'italic':
-        if (rule.formatValue === 'true') styles['font-style'] = 'italic'
-        break
-      case 'url':
-        break
-    }
-  }
+  const styles = conditionalStyles(conditionalFormattingRules.value, () => cellValue, columnName)
   return { content, styles }
 }
 
@@ -1256,6 +1216,7 @@ onUnmounted(() => {
           :selectable="multiSelectEnabled"
           :selection-click-mode="multiSelectEnabled ? 'extended' : 'row'"
           @update:filters="onFiltersUpdate"
+          @filtered-rows-change="onFilteredRows"
           @update:column-visibility="onColumnVisibilityUpdate"
           @update:column-order="onColumnOrderUpdate"
           @update:sort-by="sortBy = $event"
@@ -1571,6 +1532,7 @@ onUnmounted(() => {
           :selectable="multiSelectEnabled"
           :selection-click-mode="multiSelectEnabled ? 'extended' : 'row'"
           @update:filters="onFiltersUpdate"
+          @filtered-rows-change="onFilteredRows"
           @update:column-visibility="onColumnVisibilityUpdate"
           @update:column-order="onColumnOrderUpdate"
           @update:sort-by="sortBy = $event"

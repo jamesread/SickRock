@@ -39,6 +39,8 @@ func TestMarkdownRuleApplies(t *testing.T) {
 		{"equals", "abc", "abc", true},
 		{"equals", "abc", "ABC", false},
 		{"contains", "OO", "foobar", true},
+		{"starts_with", "James:", "  james: cooks", true},
+		{"starts_with", "James:", "Ask James: later", false},
 		{"greater_than", "10", "11", true},
 		{"greater_than", "10", "10", false},
 		{"greater_than", "10", "not a number", false},

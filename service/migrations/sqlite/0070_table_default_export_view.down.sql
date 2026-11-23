@@ -1,0 +1,1 @@
+ALTER TABLE table_configurations DROP COLUMN default_export_view_id;

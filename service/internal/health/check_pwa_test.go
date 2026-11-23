@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	armhealth "github.com/jamesread/armature-health"
+	armhealth "github.com/jamesread/armature-health/v2"
 )
 
 func TestPWACheckReportsABrokenFrontendWithStableKeys(t *testing.T) {

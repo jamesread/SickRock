@@ -1,6 +1,7 @@
 <script setup lang="ts">
 // A toolbar button per rollup that starts from this table (system table table_rollups). Running
-// one replaces every row of its target table with grouped and summed detail rows, so it asks first.
+// one replaces the rows it wrote to its target table last time with grouped and summed detail rows
+// (rows added there by hand are kept), so it asks first.
 // With a week (weekly plan views) only the source rows dated in that week are used.
 import { computed, ref, watch } from 'vue'
 import Dialog from 'picocrank/vue/components/Dialog.vue'
@@ -88,7 +89,7 @@ watch(() => props.tableId, load, { immediate: true })
       :key="String(rollup.id)"
       type="button"
       class="button inline-icon neutral"
-      :title="`Replace ${rollup.targetTable} with totals from ${scope}`"
+      :title="`Update ${rollup.targetTable} with totals from ${scope}`"
       @click="open(rollup)"
     >
       <HugeiconsIcon :icon="GitMergeIcon" width="1em" height="1em" aria-hidden="true" />
@@ -109,8 +110,8 @@ watch(() => props.tableId, load, { immediate: true })
         </template>
         <template v-else-if="selected">
           <p>
-            Replaces everything in <strong>{{ selected.targetTable }}</strong> with totals from the
-            {{ selected.detailTable }} of {{ scope }}.
+            Replaces the rows this rollup added to <strong>{{ selected.targetTable }}</strong> with totals
+            from the {{ selected.detailTable }} of {{ scope }}. Rows added there by hand are kept.
           </p>
           <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
         </template>

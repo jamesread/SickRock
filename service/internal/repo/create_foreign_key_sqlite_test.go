@@ -45,7 +45,7 @@ func TestCreateForeignKeySQLite(t *testing.T) {
 			row_name TEXT,
 			row_name_plural TEXT,
 			row_actions TEXT,
-			bulk_entry_json TEXT
+			bulk_entry_json TEXT, default_export_view_id INTEGER
 		)`)
 	if err != nil {
 		t.Fatalf("table_configurations: %v", err)

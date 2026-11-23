@@ -12,6 +12,12 @@ export default defineConfig({
     basicSsl(),
     hugeicons(),
   ],
+  // picocrank ships source (.vue and .js). Pre-bundling it would give a .js import (e.g. its
+  // notification popups composable) a second copy of module state, apart from the copy its .vue
+  // components import, so serve it as is in dev, as the production build does.
+  optimizeDeps: {
+    exclude: ['picocrank'],
+  },
   build: {
     rollupOptions: {
       plugins: [

@@ -19,7 +19,7 @@ func newInventoryTestRepo(t *testing.T) (*Repository, *sqlx.DB) {
 		CREATE TABLE table_configurations (
 			name TEXT PRIMARY KEY, db TEXT, "table" TEXT, title TEXT, ordinal INTEGER DEFAULT 0,
 			create_button_text TEXT, row_name TEXT, row_name_plural TEXT, create_delegate TEXT, icon TEXT,
-			primary_key_column TEXT, default_sort_column TEXT, row_actions TEXT, bulk_entry_json TEXT
+			primary_key_column TEXT, default_sort_column TEXT, row_actions TEXT, bulk_entry_json TEXT, default_export_view_id INTEGER
 		);
 		INSERT INTO table_configurations (name, db, "table") VALUES ('inventory', 'main', 'inventory');
 		CREATE TABLE inventory (

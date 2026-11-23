@@ -8,9 +8,9 @@ package health
 import (
 	"context"
 
-	armhealth "github.com/jamesread/armature-health"
-	"github.com/jamesread/armature-health/checks"
-	"github.com/jamesread/armature-health/errorlog"
+	armhealth "github.com/jamesread/armature-health/v2"
+	"github.com/jamesread/armature-health/v2/checks"
+	"github.com/jamesread/armature-health/v2/errorlog"
 
 	"github.com/jamesread/SickRock/internal/repo"
 )

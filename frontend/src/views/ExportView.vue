@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { initialExportViewId } from '../utils/exportView'
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { createApiClient } from '../stores/api'
-import type { GetTableStructureResponse } from '../gen/sickrock_pb'
+import type { GetTableStructureResponse, Item } from '../gen/sickrock_pb'
+import { exportCellValue, type ReferencedRowsByColumn } from '../utils/exportValues'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
@@ -19,7 +21,8 @@ const client = createApiClient()
 const loading = ref(true)
 const error = ref<string | null>(null)
 const csvText = ref<string>('')
-const items = ref<any[]>([])
+const items = ref<Item[]>([])
+const referencedRows = ref<ReferencedRowsByColumn>(new Map())
 const format = ref<'csv' | 'plaintext' | 'yaml'>('csv')
 const includeHeaders = ref<boolean>(true)
 
@@ -76,76 +79,47 @@ function escapeCsv(value: unknown): string {
 
 function computeCsv() {
   const cols: string[] = [...exportColumns.value]
+  const valueOf = (it: Item, col: string) => exportCellValue(it, col, referencedRows.value)
 
-  const header = cols.map(escapeCsv).join(',')
-  const lines: string[] = []
-  if (includeHeaders.value && cols.length > 0) {
-    lines.push(header)
-  }
-  for (const it of items.value) {
-    const row: string[] = []
-    for (const col of cols) {
-      let value: unknown
-      if (col === 'id') {
-        value = (it as any).id
-      } else if (col === 'sr_created') {
-        const ts = (it as any).srCreated
-        const num = typeof ts === 'bigint' ? Number(ts) : Number(ts)
-        value = Number.isFinite(num) && num > 0 ? new Date(num * 1000).toISOString() : ''
-      } else if ((it as any).additionalFields && (it as any).additionalFields[col] !== undefined) {
-        value = (it as any).additionalFields[col]
-      } else {
-        value = (it as any)[col]
-      }
-      row.push(escapeCsv(value))
-    }
-    lines.push(row.join(','))
-  }
-  const csv = lines.join('\n')
-  if (format.value === 'plaintext') {
-    csvText.value = csv.split('\n').map(l => `- ${l}`).join('\n')
-  } else if (format.value === 'yaml') {
-    // Render YAML list of objects using selected columns
+  if (format.value === 'yaml') {
+    // A YAML list of objects with the chosen columns; values are JSON-quoted strings for safety.
     const yamlLines: string[] = []
-    const makeYamlValue = (v: unknown): string => {
-      // Always stringify to a JSON-quoted string for safety
-      return JSON.stringify(String(v ?? ''))
-    }
     for (const it of items.value) {
-      if (cols.length === 0) continue
-      const firstCol = cols[0]
-      let firstVal: unknown
-      if (firstCol === 'id') firstVal = (it as any).id
-      else if (firstCol === 'sr_created') {
-        const ts = (it as any).srCreated
-        const num = typeof ts === 'bigint' ? Number(ts) : Number(ts)
-        firstVal = Number.isFinite(num) && num > 0 ? new Date(num * 1000).toISOString() : ''
-      } else if ((it as any).additionalFields && (it as any).additionalFields[firstCol] !== undefined) {
-        firstVal = (it as any).additionalFields[firstCol]
-      } else {
-        firstVal = (it as any)[firstCol]
-      }
-      yamlLines.push(`- ${firstCol}: ${makeYamlValue(firstVal)}`)
-      for (let i = 1; i < cols.length; i++) {
-        const col = cols[i]
-        let value: unknown
-        if (col === 'id') value = (it as any).id
-        else if (col === 'sr_created') {
-          const ts = (it as any).srCreated
-          const num = typeof ts === 'bigint' ? Number(ts) : Number(ts)
-          value = Number.isFinite(num) && num > 0 ? new Date(num * 1000).toISOString() : ''
-        } else if ((it as any).additionalFields && (it as any).additionalFields[col] !== undefined) {
-          value = (it as any).additionalFields[col]
-        } else {
-          value = (it as any)[col]
-        }
-        yamlLines.push(`  ${col}: ${makeYamlValue(value)}`)
-      }
+      cols.forEach((col, i) => {
+        yamlLines.push(`${i === 0 ? '- ' : '  '}${col}: ${JSON.stringify(valueOf(it, col))}`)
+      })
     }
     csvText.value = yamlLines.join('\n')
-  } else {
-    csvText.value = csv
+    return
   }
+
+  const lines: string[] = []
+  if (includeHeaders.value && cols.length > 0) {
+    lines.push(cols.map(escapeCsv).join(','))
+  }
+  for (const it of items.value) {
+    lines.push(cols.map(col => escapeCsv(valueOf(it, col))).join(','))
+  }
+  const csv = lines.join('\n')
+  csvText.value = format.value === 'plaintext' ? csv.split('\n').map(l => `- ${l}`).join('\n') : csv
+}
+
+/**
+ * Rows of the tables this table's relation columns refer to, so exports name them (as the table
+ * view does) instead of writing their ids.
+ */
+async function loadReferencedRows(st: GetTableStructureResponse): Promise<ReferencedRowsByColumn> {
+  const own = (st.foreignKeys ?? []).filter(fk => (fk.tableTcName || fk.tableName) === tableId.value)
+  const entries = await Promise.all(own.map(async (fk) => {
+    try {
+      const res = await client.listItems({ tcName: fk.referencedTableTcName || fk.referencedTable })
+      return [fk.columnName, new Map((res.items ?? []).map(row => [String(row.id), row]))] as const
+    } catch {
+      // Unreadable (e.g. no access): the column is exported as ids.
+      return [fk.columnName, new Map<string, Item>()] as const
+    }
+  }))
+  return new Map(entries)
 }
 
 onMounted(async () => {
@@ -170,8 +144,8 @@ onMounted(async () => {
           sortOrder: col.sortOrder
         }))
       }))
-      const defaultView = tableViews.value.find(v => v.isDefault)
-      selectedViewId.value = defaultView ? defaultView.id : (tableViews.value[0]?.id ?? -1)
+      // The table's default export view (table structure page), else its default view.
+      selectedViewId.value = initialExportViewId(tableViews.value, structure.value?.defaultExportViewId)
     } catch (e) {
       selectedViewId.value = -1
     }
@@ -193,8 +167,12 @@ onMounted(async () => {
     }
 
     // Fetch items (unpaginated) with optional filters
-    const list = await client.listItems({ tcName: tableId.value, where })
+    const [list, referenced] = await Promise.all([
+      client.listItems({ tcName: tableId.value, where }),
+      loadReferencedRows(structure.value),
+    ])
     items.value = Array.isArray(list.items) ? list.items : []
+    referencedRows.value = referenced
 
     computeCsv()
   } catch (e: any) {

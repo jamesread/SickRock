@@ -8,6 +8,8 @@ import {
   pathValue,
   relationColumnsUsed,
   tileDetails,
+  tickListProgress,
+  tileImageId,
   tileLabel,
   withTickListConfig,
   type ReferencedRows,
@@ -17,8 +19,8 @@ import {
 const item = (id: string, fields: Record<string, string>) => ({ id, additionalFields: fields }) as unknown as Item
 
 const ingredients = new Map([
-  ['1', item('1', { name: 'Onion', aisle: 'Aisle 2' })],
-  ['2', item('2', { name: 'Beans', aisle: 'Aisle 10' })],
+  ['1', item('1', { name: 'Onion', aisle: 'Aisle 2', picture: '41' })],
+  ['2', item('2', { name: 'Beans', aisle: 'Aisle 10', picture: '0' })],
   ['3', item('3', { name: 'Apples', aisle: 'Aisle 2' })],
 ])
 const refs: ReferencedRows = new Map([['ingredient', ingredients]])
@@ -33,6 +35,8 @@ const shopping: TickListConfig = {
   detailColumns: ['quantity', 'unit'],
   sortColumns: ['ingredient'],
   groupColumn: 'ingredient.aisle',
+  imageColumn: 'ingredient.picture',
+  showProgress: true,
 }
 
 describe('tick list config', () => {
@@ -56,6 +60,12 @@ describe('tick list config', () => {
 
   it('names the relation columns it needs', () => {
     expect(relationColumnsUsed(shopping, ['ingredient', 'shop'])).toEqual(['ingredient'])
+    const imageOnly = { ...defaultTickListConfig(), imageColumn: 'shop.logo' }
+    expect(relationColumnsUsed(imageOnly, ['ingredient', 'shop'])).toEqual(['shop'])
+  })
+
+  it('reads a missing image column as none', () => {
+    expect(parseTickListConfig('{"tickList":{"labelColumn":"name"}}').imageColumn).toBe('')
   })
 })
 
@@ -76,6 +86,34 @@ describe('path values', () => {
     expect(tileDetails(rows[1], shopping, refs)).toBe('550 g')
     expect(tileDetails(rows[2], shopping, refs)).toBe('6')
     expect(tileLabel(rows[3], shopping, refs)).toBe('Candles')
+  })
+})
+
+describe('tile images', () => {
+  it("shows the image column's image, from the row or a referenced row", () => {
+    expect(tileImageId(rows[1], shopping, refs)).toBe('41')
+    const own = { ...defaultTickListConfig(), imageColumn: 'photo' }
+    expect(tileImageId(item('20', { photo: '7' }), own, refs)).toBe('7')
+  })
+
+  it('shows none without a setting, a value or a referenced row', () => {
+    expect(tileImageId(rows[1], defaultTickListConfig(), refs)).toBe('')
+    expect(tileImageId(rows[0], shopping, refs), 'picture 0 is no image').toBe('')
+    expect(tileImageId(rows[2], shopping, refs), 'Apples has no picture').toBe('')
+    expect(tileImageId(rows[3], shopping, refs), 'no ingredient').toBe('')
+  })
+})
+
+describe('progress', () => {
+  it('counts the ticked rows', () => {
+    const ticked = new Set(['1', '3', '4'])
+    expect(tickListProgress(['1', '2', '3', '4'], id => ticked.has(id))).toEqual({ ticked: 3, total: 4, percent: 75, label: '3 of 4 ticked' })
+    expect(tickListProgress([], () => true)).toEqual({ ticked: 0, total: 0, percent: 0, label: '0 of 0 ticked' })
+  })
+
+  it('is off unless turned on', () => {
+    expect(parseTickListConfig('{"tickList":{}}').showProgress).toBe(false)
+    expect(parseTickListConfig('{"tickList":{"showProgress":"yes"}}').showProgress).toBe(false)
   })
 })
 

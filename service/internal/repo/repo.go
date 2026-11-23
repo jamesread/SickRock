@@ -224,7 +224,10 @@ type TableConfig struct {
 	DefaultSortColumn sql.NullString `db:"default_sort_column"`
 	RowActions        sql.NullString `db:"row_actions"`
 	BulkEntry         sql.NullString `db:"bulk_entry_json"`
-	Ordinal           int            `db:"ordinal"`
+	// DefaultExportView is the view the Export page starts on: a view id, AllColumnsViewID, or NULL
+	// for the table's default view.
+	DefaultExportView sql.NullInt64 `db:"default_export_view_id"`
+	Ordinal           int           `db:"ordinal"`
 }
 
 func (r *Repository) ListTableConfigurations(ctx context.Context) ([]string, error) {

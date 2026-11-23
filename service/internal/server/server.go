@@ -15,11 +15,11 @@ import (
 
 	"connectrpc.com/connect"
 	"github.com/expr-lang/expr"
-	armhealth "github.com/jamesread/armature-health"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	"github.com/yuin/goldmark/parser"
-	"github.com/yuin/goldmark/renderer/html"
+	armhealth "github.com/jamesread/armature-health/v2"
+	armlayer "github.com/jamesread/armature-iam/layer"
+	"github.com/yuin/goldmark/v2/extension"
+	"github.com/yuin/goldmark/v2/parser"
+	"github.com/yuin/goldmark/v2/renderer/html"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	"github.com/jamesread/SickRock/internal/buildinfo"
@@ -39,18 +39,20 @@ type SickRockServer struct {
 	images              *images.Store
 	uiUsage             *uiusage.Store
 	notifyLimiter       notifyLimiter
+	testNotifyLimiter   notifyLimiter
 }
 
-// markdownRenderer is a configured goldmark instance for rendering markdown
-var markdownRenderer = goldmark.New(
-	goldmark.WithExtensions(extension.GFM),
-	goldmark.WithParserOptions(
+// markdownParser and markdownRenderer are the configured goldmark parser and HTML renderer for markdown.
+var (
+	markdownParser = parser.New(
+		parser.WithExtensions(extension.NewGFMParser()),
 		parser.WithAutoHeadingID(),
-	),
-	goldmark.WithRendererOptions(
+	)
+	markdownRenderer = html.New(
+		html.WithExtensions(extension.NewGFMHTMLRenderer()),
 		html.WithHardWraps(),
 		html.WithXHTML(),
-	),
+	)
 )
 
 // renderMarkdown converts markdown content to HTML
@@ -59,8 +61,9 @@ func renderMarkdown(content string) string {
 		return ""
 	}
 
+	source := []byte(content)
 	var buf strings.Builder
-	if err := markdownRenderer.Convert([]byte(content), &buf); err != nil {
+	if err := markdownRenderer.Render(&buf, source, markdownParser.Parse(source)); err != nil {
 		log.WithError(err).Error("Failed to render markdown")
 		return content // Return original content if rendering fails
 	}
@@ -72,6 +75,7 @@ func NewSickRockServer(r *repo.Repository, authLayer *iam.AuthLayer) *SickRockSe
 		repo:                r,
 		notificationService: notifications.NewNotificationService(r),
 		auth:                authLayer,
+		testNotifyLimiter:   notifyLimiter{limit: TestNotificationRateLimit, window: TestNotificationRateWindow},
 	}
 }
 
@@ -89,34 +93,37 @@ func safeInt64ToInt32(value int64) int32 {
 func (s *SickRockServer) Init(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (*connect.Response[sickrockpb.InitResponse], error) {
 	dbName := strings.TrimSpace(os.Getenv("DB_NAME"))
 
-	currentUsername, rbacPerms, rbacSuperuser := s.initIdentity(ctx, req)
+	identity := s.initIdentity(ctx, req)
+	currentUsername, rbacPerms, rbacSuperuser := iamUserToProto(identity)
+	currentDisplayName := ""
+	if identity != nil && identity.User != nil {
+		currentDisplayName = s.displayNameOf(ctx, identity.User.ID)
+	}
 
 	res := connect.NewResponse(&sickrockpb.InitResponse{
-		Version:         buildinfo.Version,
-		Commit:          buildinfo.Commit,
-		Date:            buildinfo.Date,
-		DbName:          dbName,
-		CurrentUsername: currentUsername,
-		RbacPermissions: rbacPerms,
-		RbacIsSuperuser: rbacSuperuser,
-		OauthProviders:  loadOAuthProvidersFromEnv(),
+		Version:            buildinfo.Version,
+		Commit:             buildinfo.Commit,
+		Date:               buildinfo.Date,
+		DbName:             dbName,
+		CurrentUsername:    currentUsername,
+		RbacPermissions:    rbacPerms,
+		RbacIsSuperuser:    rbacSuperuser,
+		OauthProviders:     loadOAuthProvidersFromEnv(),
+		CurrentDisplayName: currentDisplayName,
 	})
 	return res, nil
 }
 
-func (s *SickRockServer) initIdentity(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (string, []string, bool) {
+// initIdentity returns who is calling Init (from the auth layer, else the session), or nil.
+func (s *SickRockServer) initIdentity(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) *armlayer.AuthenticatedUser {
 	if au := s.authUser(ctx); au != nil && au.User != nil {
-		return iamUserToProto(au)
+		return au
 	}
-	return s.initIdentityFromSession(ctx, req)
-}
-
-func (s *SickRockServer) initIdentityFromSession(ctx context.Context, req *connect.Request[sickrockpb.InitRequest]) (string, []string, bool) {
 	sessionUser, err := s.resolveSessionUser(ctx, req)
-	if err != nil || sessionUser == nil {
-		return "", nil, false
+	if err != nil {
+		return nil
 	}
-	return iamUserToProto(sessionUser)
+	return sessionUser
 }
 
 func (s *SickRockServer) Ping(ctx context.Context, req *connect.Request[sickrockpb.PingRequest]) (*connect.Response[sickrockpb.PingResponse], error) {
@@ -841,6 +848,7 @@ func (s *SickRockServer) GetTableStructure(ctx context.Context, req *connect.Req
 		ColumnDisplaySettings: columnDisplaySettingsToProto(displayByColumn),
 		RowActions:            rowActionsToProto(tcName, tc.RowActions.String),
 		BulkEntry:             bulkEntryToProto(tcName, tc.BulkEntry.String, colNames),
+		DefaultExportViewId:   int32(tc.DefaultExportView.Int64),
 	}), nil
 }
 
@@ -1161,6 +1169,34 @@ func (s *SickRockServer) SetTableRowLabels(ctx context.Context, req *connect.Req
 		Success: true,
 		Message: "Row labels saved",
 	}), nil
+}
+
+// SetTableDefaultExportView saves the view a table's Export page starts on: one of the table's views,
+// All Columns (-1), or 0 for the table's default view.
+func (s *SickRockServer) SetTableDefaultExportView(ctx context.Context, req *connect.Request[sickrockpb.SetTableDefaultExportViewRequest]) (*connect.Response[sickrockpb.SetTableDefaultExportViewResponse], error) {
+	tcName := strings.TrimSpace(req.Msg.GetTableConfiguration())
+	if tcName == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("table configuration is required"))
+	}
+	if err := s.requireDataTableAccess(ctx, tcName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
+	viewID := int(req.Msg.GetViewId())
+	if viewID > 0 {
+		views, err := s.repo.GetTableViews(ctx, tcName)
+		if err != nil {
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+		if !slices.ContainsFunc(views, func(v repo.TableView) bool { return v.ID == viewID }) {
+			return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("view %d is not a view of %s", viewID, tcName))
+		}
+	} else if viewID != 0 && viewID != repo.AllColumnsViewID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("view id must be a view of the table, -1 for All Columns or 0 for the default view"))
+	}
+	if err := s.repo.SetDefaultExportView(ctx, tcName, viewID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	return connect.NewResponse(&sickrockpb.SetTableDefaultExportViewResponse{Success: true, Message: "Default export view saved"}), nil
 }
 
 func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Request[sickrockpb.AddTableColumnRequest]) (*connect.Response[sickrockpb.GetTableStructureResponse], error) {

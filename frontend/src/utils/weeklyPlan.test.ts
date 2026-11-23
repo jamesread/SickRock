@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest'
 
 import {
   cellKey,
+  copiedFields,
+  askedFields,
+  copyWeek,
+  recentColumnValues,
+  entryDetails,
+  plannedWeeks,
   daysOfWeek,
   dayKey,
   filterPickerOptions,
@@ -19,6 +25,7 @@ import {
   withWeeklyPlanConfig,
   type WeeklyPlanConfig,
 } from './weeklyPlan'
+import type { Item } from '../gen/sickrock_pb'
 
 function mealConfig(overrides: Partial<WeeklyPlanConfig> = {}): WeeklyPlanConfig {
   return { ...defaultWeeklyPlanConfig(), dateColumn: 'datetime', itemColumn: 'recipe', ...overrides }
@@ -185,5 +192,91 @@ describe('notifying users about a week', () => {
     expect(notifyLinkPath('meal plan', 7, week)).toBe('/table/meal%20plan?view=7&week=2026-11-02')
     expect(notifyLinkPath('meals', undefined, week)).toBe('/table/meals?week=2026-11-02')
     expect(weekFromQuery(new URLSearchParams(notifyLinkPath('meals', 7, week).split('?')[1]).get('week'), 1)).toEqual(week)
+  })
+})
+
+describe('copying a week', () => {
+  const plan = (id: string, fields: Record<string, string>) =>
+    ({ id, additionalFields: { sr_created: '2026-11-01 00:00:00', ...fields } }) as unknown as Item
+  const columns = ['id', 'sr_created', 'sr_updated', 'datetime', 'recipe', 'note']
+  const lastWeek = new Date(2026, 10, 16) // Monday 16 Nov
+  const thisWeek = new Date(2026, 10, 23)
+  const rows = [
+    plan('1', { datetime: '2026-11-16 08:00:00', recipe: '4', note: 'James: early' }),
+    plan('2', { datetime: '2026-11-18 18:00:00', recipe: '7', note: '' }),
+    plan('3', { datetime: '2026-11-25 18:00:00', recipe: '7' }), // already planned this week
+    plan('4', { datetime: '2026-11-10 18:00:00', recipe: '9' }),
+  ]
+
+  it('copies every column but the generated ones, leaving out empty values', () => {
+    expect(copiedFields(columns, { id: '1', sr_created: 'x', recipe: '4', note: '' })).toEqual({ recipe: '4' })
+  })
+
+  it('lists the weeks with entries, newest first', () => {
+    expect(plannedWeeks(mealConfig(), rows, (row, column) => row.additionalFields?.[column])
+      .map(week => [dayKey(week.start), week.count]))
+      .toEqual([['2026-11-23', 1], ['2026-11-16', 2], ['2026-11-09', 1]])
+  })
+
+  it('moves each entry to the same weekday and time of the target week', () => {
+    const copy = copyWeek(mealConfig(), rows, columns, lastWeek, thisWeek)
+    // Wednesday dinner (recipe 7) is already planned this week, so only Monday's breakfast is new.
+    expect(copy).toEqual({
+      rows: [{ datetime: '2026-11-23 08:00:00', recipe: '4', note: 'James: early' }],
+      skipped: 1,
+    })
+  })
+
+  it('adds nothing when the week is copied twice', () => {
+    const copy = copyWeek(mealConfig(), rows, columns, lastWeek, thisWeek)
+    const again = copyWeek(mealConfig(), [...rows, ...copy.rows.map((fields, i) => plan(`n${i}`, fields))], columns, lastWeek, thisWeek)
+    expect(again).toEqual({ rows: [], skipped: 2 })
+  })
+
+  it('copies nothing onto the same week', () => {
+    expect(copyWeek(mealConfig(), rows, columns, thisWeek, thisWeek).rows).toEqual([])
+  })
+
+  it('works across a change of daylight saving time', () => {
+    const october = [plan('1', { datetime: '2026-10-19 18:00:00', recipe: '1' })]
+    expect(copyWeek(mealConfig(), october, columns, new Date(2026, 9, 19), new Date(2026, 9, 26)).rows[0].datetime)
+      .toBe('2026-10-26 18:00:00')
+  })
+})
+
+describe('entry details', () => {
+  it('reads and saves the detail columns', () => {
+    const config = parseWeeklyPlanConfig('{"weeklyPlan":{"detailColumns":[" note ","note",3,"","servings"]}}')
+    expect(config.detailColumns).toEqual(['note', 'servings'])
+    expect(parseWeeklyPlanConfig(withWeeklyPlanConfig('', config)).detailColumns).toEqual(['note', 'servings'])
+    expect(parseWeeklyPlanConfig('{"weeklyPlan":{}}').detailColumns).toEqual([])
+  })
+
+  it('shows the details that have a value, in order', () => {
+    const values: Record<string, unknown> = { note: ' James: cooking ', servings: 4, extra: '' }
+    expect(entryDetails(mealConfig({ detailColumns: ['servings', 'extra', 'note', 'missing'] }), column => values[column]))
+      .toEqual(['4', 'James: cooking'])
+  })
+})
+
+describe('asking for columns when adding', () => {
+  const row = (id: string, who: string) => ({ id, additionalFields: { who } }) as unknown as Item
+
+  it('reads and saves the asked columns', () => {
+    const config = parseWeeklyPlanConfig('{"weeklyPlan":{"askColumns":["who"," who",""]}}')
+    expect(config.askColumns).toEqual(['who'])
+    expect(parseWeeklyPlanConfig(withWeeklyPlanConfig('', config)).askColumns).toEqual(['who'])
+  })
+
+  it('offers the newest values first, once each, up to the limit', () => {
+    const rows = [row('2', 'Evie'), row('10', 'james'), row('9', ' James '), row('3', ''), row('4', 'Sam')]
+    expect(recentColumnValues(rows, 'who')).toEqual(['james', 'Sam', 'Evie'])
+    expect(recentColumnValues(rows, 'who', 2)).toEqual(['james', 'Sam'])
+    expect(recentColumnValues(rows, 'missing')).toEqual([])
+  })
+
+  it('stores only the asked columns that were filled in', () => {
+    const config = mealConfig({ askColumns: ['who', 'note'] })
+    expect(askedFields(config, { who: ' Evie ', note: '  ', other: 'x' })).toEqual({ who: 'Evie' })
   })
 })

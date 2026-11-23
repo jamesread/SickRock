@@ -148,7 +148,7 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 	})
 
 	mcpServer.AddTool(mcp.NewTool("sickrock_list_rollups",
-		mcp.WithDescription("List rollups: each gathers the detail rows owned by a table's rows (e.g. the ingredients of planned recipes), groups and sums them, and replaces a target table's rows (e.g. a shopping list) with the result."),
+		mcp.WithDescription("List rollups: each gathers the detail rows owned by a table's rows (e.g. the ingredients of planned recipes), groups and sums them, and replaces the rows it wrote to a target table (e.g. a shopping list) with the result, keeping rows added there by hand."),
 		mcp.WithString("source_table", mcp.Description("Optional table configuration name: only rollups that start from it")),
 	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return authorized(ctx, sickrockpbconnect.SickRockListRollupsProcedure, func() (*mcp.CallToolResult, error) {

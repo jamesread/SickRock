@@ -7,7 +7,9 @@ import {
   Delete01Icon,
   NotificationIcon,
   RefreshIcon,
+  SentIcon,
 } from '@hugeicons/core-free-icons'
+import { showNotificationPopup } from 'picocrank/vue/composables/useNotificationPopups.js'
 import type { createApiClient } from '../stores/api'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
@@ -258,6 +260,38 @@ async function createNotificationChannel() {
   }
 }
 
+// Channels a test notification is being sent to.
+const testingChannelIds = ref(new Set<number>())
+
+/** A failed test is not an emergency: "FAILED" rather than the error popup's "CRITICAL". */
+function showTestFailure(reason: string) {
+  showNotificationPopup({
+    label: 'FAILED:',
+    message: `Test notification: ${reason || 'unknown error'}`,
+    class: 'bad',
+    durationMs: 10000,
+  })
+}
+
+/** Sends a test notification to a channel and says how it went in a notification popup. */
+async function sendTestNotification(channelId: number) {
+  testingChannelIds.value = new Set([...testingChannelIds.value, channelId])
+  try {
+    const response = await client.sendTestNotification({ channelId })
+    if (response.success) {
+      showNotificationPopup({ message: 'Test notification sent. Check that it arrived.', class: 'good' })
+    } else {
+      showTestFailure(response.message)
+    }
+  } catch (e: unknown) {
+    showTestFailure(e instanceof Error ? e.message : '')
+  } finally {
+    const next = new Set(testingChannelIds.value)
+    next.delete(channelId)
+    testingChannelIds.value = next
+  }
+}
+
 async function deleteNotificationChannel(channelId: number) {
   if (
     !confirm(
@@ -492,6 +526,16 @@ onMounted(async () => {
         </template>
         <template #cell-actions="{ row }">
           <div class="actions-cell">
+            <button
+              type="button"
+              class="inline-icon neutral small"
+              aria-label="Send test notification"
+              title="Send test notification"
+              :disabled="testingChannelIds.has(row.id)"
+              @click="sendTestNotification(row.id)"
+            >
+              <HugeiconsIcon :icon="SentIcon" width="1em" height="1em" :strokeWidth="iconStrokeWidth" />
+            </button>
             <button
               type="button"
               class="inline-icon bad small"

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jamesread/SickRock/internal/repo"
-	armhealth "github.com/jamesread/armature-health"
+	armhealth "github.com/jamesread/armature-health/v2"
 )
 
 // CalendarFeedsFailingCheck finds enabled calendar feeds whose last refresh failed.

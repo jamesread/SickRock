@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 
 import { createApiClient } from '../stores/api'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
@@ -13,8 +13,21 @@ import ImageField from './ImageField.vue'
 import BarcodeField from './BarcodeField.vue'
 import { fieldDisplayLabel } from '../utils/fieldColumnDisplay'
 import { toSqlDateTime } from '../utils/dateFormatting'
-import UserRefChip from './UserRefChip.vue'
-import type { Field, IamUser, Item, ItemFieldGroup } from '../gen/sickrock_pb'
+import Combobox from 'picocrank/vue/components/Combobox.vue'
+import RowPickerDialog from './RowPickerDialog.vue'
+import { HugeiconsIcon } from '@hugeicons/vue'
+import { Search01Icon } from '@hugeicons/core-free-icons'
+import { useRowPicker } from '../composables/useRowPicker'
+import { useAuthStore } from '../stores/auth'
+import { defaultExportViewOptions } from '../utils/exportView'
+import {
+  pickerLabel,
+  recentPicks,
+  recentPicksKey,
+  rememberPick,
+  type RowPickerOption,
+} from '../utils/rowPicker'
+import type { Field, Item, ItemFieldGroup } from '../gen/sickrock_pb'
 
 type InsertFieldDef = { name: string; type: string; required: boolean; displayLabel?: string }
 
@@ -81,8 +94,8 @@ const orderedFields = computed(() => {
   return rows
 })
 
-const { users, loading: loadingUsers, loadUsers, displayUserLabel } = useIamUsers()
-const filteredUsers = ref<Record<string, IamUser[]>>({})
+const { users, loading: loadingUsers, loadUsers } = useIamUsers()
+const auth = useAuthStore()
 
 // Foreign key lookup state
 const foreignKeys = ref<Array<{
@@ -100,13 +113,37 @@ const foreignKeys = ref<Array<{
 const referencedTableData = ref<Record<string, any[]>>({})
 const loadingForeignKeys = ref(false)
 const initialApplied = ref(false)
-// Queue for FK values that should apply once FK options are loaded
-const pendingFkInitials = ref<Record<string, string>>({})
 
-// Search state for each foreign key field
-const searchQueries = ref<Record<string, string>>({})
-const filteredData = ref<Record<string, any[]>>({})
-const showDropdowns = ref<Record<string, boolean>>({})
+/** An option of picocrank's Combobox. */
+type ComboboxOption = { value: string; label: string; description?: string }
+
+// The search box options of each relation field (the referenced rows), sorted by name.
+const relationOptions = computed<Record<string, ComboboxOption[]>>(() => Object.fromEntries(
+  Object.entries(referencedTableData.value).map(([fieldName, rows]) => [fieldName, rows
+    .map(row => ({ value: String(row.id), label: pickerLabel(row), description: `#${row.id}` }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { numeric: true }))]),
+))
+// The search box options of user fields.
+const userComboboxOptions = computed<ComboboxOption[]>(() => userOptions.value
+  .map(option => ({ value: option.value, label: option.label })))
+
+// The Browse… dialog, shared by every relation and user field: pickerField is the field it is open for.
+const rowPicker = ref<InstanceType<typeof RowPickerDialog> | null>(null)
+const pickerField = ref('')
+const pickerTable = computed(() => {
+  const fk = foreignKeys.value.find(entry => entry.columnName === pickerField.value)
+  return fk ? (fk.referencedTableTcName || fk.referencedTable) : ''
+})
+const picker = useRowPicker(pickerTable)
+const pickingUser = computed(() => Boolean(pickerField.value) && isUserRefField(pickerField.value))
+const userRecentKey = computed(() => recentPicksKey(auth.user?.username ?? '', 'users'))
+const userRecent = ref<string[]>([])
+const userOptions = computed<RowPickerOption[]>(() => users.value
+  .filter(user => user.id != null)
+  .map(user => ({ value: String(user.id), label: user.username ?? `#${user.id}`, imageId: '' }))
+  .sort((a, b) => a.label.localeCompare(b.label)))
+const pickerFieldDef = computed(() => props.fieldDefs.find(field => field.name === pickerField.value))
+const pickerTitle = computed(() => (pickerFieldDef.value ? `Choose ${fieldLabel(pickerFieldDef.value)}` : 'Choose'))
 
 // Watch for changes to selectedDate prop and update form
 watch(() => props.selectedDate, (newDate) => {
@@ -163,22 +200,6 @@ watch(() => {
     }
   }
 }, { deep: true })
-
-// Format the selected date for display
-const formattedDate = computed(() => {
-  if (!props.selectedDate) return null
-  try {
-    const date = new Date(props.selectedDate)
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  } catch {
-    return null
-  }
-})
 
 // Transport handled by authenticated client
 const client = createApiClient()
@@ -249,6 +270,43 @@ async function loadReferencedTableData() {
 /** Nullable FK columns on built-in tables (used when DB driver omits FK metadata, e.g. SQLite). */
 const KNOWN_NULLABLE_FK_COLUMNS = new Set(['workflow_id', 'dashboard_id', 'table_configuration'])
 
+/**
+ * Columns of built-in tables that hold one of a table's views, by table then column, with the column
+ * naming that table (e.g. a table configuration's default export view is a view of the table it
+ * configures). They are picked from that table's views (utils/exportView.ts).
+ */
+const TABLE_VIEW_FIELDS: Record<string, Record<string, string>> = {
+  table_configurations: { default_export_view_id: 'name' },
+}
+
+function tableViewFieldSource(fieldName: string): string {
+  return TABLE_VIEW_FIELDS[props.tableId]?.[fieldName] ?? ''
+}
+
+// The views of the tables those columns refer to, by table name.
+const viewsByTable = ref<Record<string, Array<{ id: number; viewName: string; isDefault: boolean }>>>({})
+
+function tableViewOptions(fieldName: string) {
+  const table = String(form.value[tableViewFieldSource(fieldName)] ?? '').trim()
+  return defaultExportViewOptions(viewsByTable.value[table] ?? [])
+}
+
+watch(() => Object.values(TABLE_VIEW_FIELDS[props.tableId] ?? {})
+  .map(source => String(form.value[source] ?? '').trim()), async (tables) => {
+  for (const table of tables) {
+    if (!table || viewsByTable.value[table]) continue
+    try {
+      const res = await client.getTableViews({ tableName: table })
+      viewsByTable.value = {
+        ...viewsByTable.value,
+        [table]: (res.views ?? []).map(view => ({ id: view.id, viewName: view.viewName, isDefault: view.isDefault })),
+      }
+    } catch (err) {
+      console.error(`Error loading views of ${table}:`, err)
+    }
+  }
+}, { immediate: true })
+
 const FALLBACK_FK_BY_TABLE: Record<string, Record<string, string>> = {
   table_navigation: {
     workflow_id: 'table_workflows',
@@ -276,39 +334,19 @@ function isUserRefField(fieldName: string): boolean {
   return fieldDef ? isUserRefFieldType(fieldDef.type) : false
 }
 
-function filterUsers(fieldName: string, query: string) {
-  const searchTerm = query.trim().toLowerCase()
-  filteredUsers.value[fieldName] = !searchTerm
-    ? [...users.value]
-    : users.value.filter(user => (user.username ?? '').toLowerCase().includes(searchTerm))
-}
-
-function selectUser(fieldName: string, user: IamUser) {
-  if (user.id == null) return
-  form.value[fieldName] = user.id
-  searchQueries.value[fieldName] = user.username ?? ''
-  showDropdowns.value[fieldName] = false
-}
-
-function clearUserSelection(fieldName: string) {
-  form.value[fieldName] = ''
-  searchQueries.value[fieldName] = ''
-  showDropdowns.value[fieldName] = false
-}
-
-function openUserDropdown(fieldName: string) {
-  showDropdowns.value[fieldName] = true
-  filterUsers(fieldName, searchQueries.value[fieldName] || '')
-}
-
 function getFieldDef(fieldName: string) {
   return props.fieldDefs.find(f => f.name === fieldName)
 }
 
-function canClearForeignKey(fieldName: string): boolean {
-  if (!isForeignKey(fieldName)) return false
-  const fieldDef = getFieldDef(fieldName)
-  return !fieldDef?.required
+/** A relation or user field's value for its search box: null for none (stored as '' or '0'). */
+function choiceValue(fieldName: string): string | null {
+  const value = form.value[fieldName]
+  return value == null || value === '' || String(value) === '0' ? null : String(value)
+}
+
+/** Sets a relation or user field from its search box (null clears it). */
+function setChoice(fieldName: string, value: string | number | null) {
+  form.value[fieldName] = value == null ? '' : String(value)
 }
 
 function isIntegerLikeFieldType(fieldType: string): boolean {
@@ -338,110 +376,44 @@ function shouldSendClearedFieldOnEdit(fieldName: string, value: unknown): boolea
   return hadStoredValue(fieldName)
 }
 
-// Get the foreign key info for a field
-function getForeignKeyInfo(fieldName: string) {
-  return foreignKeys.value.find(fk => fk.columnName === fieldName)
+/** Opens the Browse… dialog for a relation or user field. */
+async function openPicker(fieldName: string, initialQuery = '') {
+  pickerField.value = fieldName
+  await nextTick()
+  rowPicker.value?.open(initialQuery)
+  if (isUserRefField(fieldName)) {
+    userRecent.value = recentPicks(userRecentKey.value)
+    void loadUsers()
+  } else {
+    await picker.load(referencedTableData.value[fieldName])
+  }
 }
 
-// Get display text for a referenced table item
-function getDisplayText(item: any, fkInfo: any): string {
-  // Check if the item has a name field at top level
-  if (item.name) {
-    return `${item.name} (ID: ${item.id})`
-  }
-
-  // Check if the item has a name field in additionalFields
-  if (item.additionalFields && item.additionalFields.name) {
-    return `${item.additionalFields.name} (ID: ${item.id})`
-  }
-
-  // Fallback to other meaningful display fields at top level
-  const displayFields = ['title', 'label', 'description']
-  for (const field of displayFields) {
-    if (item[field]) {
-      return `${item[field]} (ID: ${item.id})`
-    }
-  }
-
-  // Fallback to other meaningful display fields in additionalFields
-  for (const field of displayFields) {
-    if (item.additionalFields && item.additionalFields[field]) {
-      return `${item.additionalFields[field]} (ID: ${item.id})`
-    }
-  }
-
-  // Final fallback to just the ID
-  return `ID: ${item.id}`
-}
-
-// Get the name field from an item (checks both top level and additionalFields)
-function getItemName(item: any): string {
-  if (item.name) {
-    return item.name
-  }
-  if (item.additionalFields && item.additionalFields.name) {
-    return item.additionalFields.name
-  }
-  return ''
-}
-
-// Filter items based on search query
-function filterItems(fieldName: string, query: string) {
-  const allItems = referencedTableData.value[fieldName] || []
-  if (!query.trim()) {
-    filteredData.value[fieldName] = allItems
+function onPickerPick(option: RowPickerOption) {
+  const fieldName = pickerField.value
+  if (!fieldName) return
+  if (isUserRefField(fieldName)) {
+    setChoice(fieldName, option.value || null)
+    if (option.value) userRecent.value = rememberPick(userRecentKey.value, option.value)
     return
   }
-
-  const searchTerm = query.toLowerCase()
-  filteredData.value[fieldName] = allItems.filter(item => {
-    const name = getItemName(item).toLowerCase()
-    return name.includes(searchTerm)
-  })
+  setChoice(fieldName, option.value || null)
+  if (option.value) picker.remember(option.value)
 }
 
-// Handle search input
-function onSearchInput(fieldName: string, query: string) {
-  searchQueries.value[fieldName] = query
-  filterItems(fieldName, query)
-  // Clearing the visible label must clear the stored FK id (search box is not bound to form value)
-  if (!query.trim() && form.value[fieldName] && canClearForeignKey(fieldName)) {
-    form.value[fieldName] = ''
+/** A row created from the dialog is added to the field's options and chosen. */
+async function onPickerCreated(item: Item | undefined) {
+  const fieldName = pickerField.value
+  if (!fieldName) return
+  try {
+    referencedTableData.value = { ...referencedTableData.value, [fieldName]: await picker.reloadRows() }
+  } catch (err) {
+    console.error('Error reloading related rows:', err)
   }
-}
-
-// Handle dropdown toggle
-function toggleDropdown(fieldName: string) {
-  showDropdowns.value[fieldName] = !showDropdowns.value[fieldName]
-  if (showDropdowns.value[fieldName]) {
-    // Initialize filtered data when opening dropdown
-    filterItems(fieldName, searchQueries.value[fieldName] || '')
+  if (item) {
+    setChoice(fieldName, String(item.id))
+    picker.remember(String(item.id))
   }
-}
-
-// Handle item selection
-function selectItem(fieldName: string, item: any) {
-  form.value[fieldName] = item.id
-  searchQueries.value[fieldName] = getItemName(item)
-  showDropdowns.value[fieldName] = false
-}
-
-// Clear selection (set FK to null on save)
-function clearSelection(fieldName: string) {
-  form.value[fieldName] = ''
-  searchQueries.value[fieldName] = ''
-  showDropdowns.value[fieldName] = false
-}
-
-function selectNone(fieldName: string) {
-  clearSelection(fieldName)
-}
-
-// Handle blur with delay
-function handleBlur(fieldName: string) {
-  setTimeout(() => {
-    showDropdowns.value[fieldName] = false
-  }, 200)
 }
 
 // Initialize form with existing data for edit mode
@@ -464,22 +436,6 @@ function initializeFormWithExistingData() {
         initialData[key] = isoToDatetimeLocal(String(value))
       } else {
         initialData[key] = String(value)
-      }
-
-      if (isUserRefField(key)) {
-        searchQueries.value[key] = displayUserLabel(value)
-      }
-
-      // Handle foreign key display text
-      if (isForeignKey(key)) {
-        const list = referencedTableData.value[key] || []
-        const found = list.find((it: any) => String(it.id) === String(value))
-        if (found) {
-          const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
-          searchQueries.value[key] = display ? String(display) : String(value)
-        } else if (!searchQueries.value[key]) {
-          searchQueries.value[key] = String(value)
-        }
       }
     })
   }
@@ -528,18 +484,16 @@ function setDefaultDatetimeValues() {
 // Load foreign keys when component is mounted
 onMounted(() => {
   loadForeignKeys()
-  if (props.fieldDefs.some(field => isUserRefFieldType(field.type))) {
-    void loadUsers()
-  }
   initializeFormWithExistingData()
   setDefaultDatetimeValues()
   // Apply initialValues for create mode
   if (!isEditMode.value && props.initialValues) {
-    // Defer applying FK display names until FK data is loaded
     applyInitialValues()
   }
 })
 
+// Relation fields take their ids straight away: their search boxes show the names once the
+// referenced rows have loaded.
 function applyInitialValues() {
   if (isEditMode.value || !props.initialValues) return
   let appliedAny = false
@@ -547,86 +501,12 @@ function applyInitialValues() {
     // Only set if not already filled by user or prior application
     const current = form.value[k]
     if (current == null || current === '') {
-      if (isForeignKey(k)) {
-        // If FK options for this field aren't loaded yet, queue it
-        const options = referencedTableData.value[k]
-        if (!options || options.length === 0 || loadingForeignKeys.value) {
-          pendingFkInitials.value[k] = String(v)
-        } else {
-          form.value[k] = v
-          appliedAny = true
-        }
-      } else {
-        form.value[k] = v
-        appliedAny = true
-      }
-    }
-    if (isForeignKey(k)) {
-      // Try to find the referenced item to show its name
-      const list = referencedTableData.value[k] || []
-      const found = list.find((it: any) => String(it.id) === String(v))
-      if (found) {
-        const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
-        searchQueries.value[k] = display ? String(display) : String(v)
-      } else if (!searchQueries.value[k]) {
-        searchQueries.value[k] = String(v)
-      }
+      form.value[k] = v
+      appliedAny = true
     }
   }
   if (appliedAny) initialApplied.value = true
 }
-
-// When FK referenced data finishes loading, attempt to apply initial values for FK display
-watch(referencedTableData, () => {
-  if (!initialApplied.value && !isEditMode.value && props.initialValues) {
-    applyInitialValues()
-  }
-
-  // Handle edit mode: ensure FK ids and labels are set once referenced rows are loaded
-  if (isEditMode.value && props.existingItem && props.existingItem.additionalFields) {
-    Object.entries(props.existingItem.additionalFields).forEach(([key, value]) => {
-      if (!isForeignKey(key)) return
-      if (value == null || value === '' || value === '0') return
-      if (!form.value[key]) {
-        form.value[key] = String(value)
-      }
-      if (!searchQueries.value[key]) {
-        const list = referencedTableData.value[key] || []
-        const found = list.find((it: any) => String(it.id) === String(value))
-        if (found) {
-          const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
-          searchQueries.value[key] = display ? String(display) : String(value)
-        } else {
-          searchQueries.value[key] = String(value)
-        }
-      }
-    })
-  }
-
-  // Apply queued FK initials when their options arrive
-  if (!isEditMode.value && Object.keys(pendingFkInitials.value).length > 0) {
-    const queue = { ...pendingFkInitials.value }
-    let applied = false
-    for (const [field, val] of Object.entries(queue)) {
-      const opts = referencedTableData.value[field]
-      if (opts && opts.length) {
-        if (!form.value[field]) {
-          form.value[field] = val
-          applied = true
-        }
-        const found = opts.find((it: any) => String(it.id) === String(val))
-        if (found) {
-          const display = (found.name) ? found.name : (found.additionalFields && (found.additionalFields.name || found.additionalFields.title))
-          searchQueries.value[field] = display ? String(display) : String(val)
-        } else if (!searchQueries.value[field]) {
-          searchQueries.value[field] = String(val)
-        }
-        delete pendingFkInitials.value[field]
-      }
-    }
-    if (applied) initialApplied.value = true
-  }
-})
 
 // Also react to initialValues arriving after mount (race with parent loading)
 watch(() => props.initialValues, (val) => {
@@ -637,6 +517,10 @@ watch(() => props.initialValues, (val) => {
 
 // Re-apply when field definitions are ready (some parents compute these async)
 watch(() => props.fieldDefs, (defs) => {
+  // User fields list the users; parents may pass the field definitions after mount.
+  if (defs?.some(field => isUserRefFieldType(field.type))) {
+    void loadUsers()
+  }
   if ((defs && defs.length) && props.initialValues && !isEditMode.value && !initialApplied.value) {
     applyInitialValues()
   }
@@ -768,129 +652,40 @@ function cancel() {
               @update:model-value="value => { form[f.name] = value === null ? '' : booleanToStored(value) }"
             />
 
-            <!-- User reference picker -->
-            <div v-else-if="isUserRefField(f.name)" class="foreign-key-dropdown user-ref-dropdown">
-              <div v-if="form[f.name]" class="user-ref-selected">
-                <UserRefChip :label="displayUserLabel(form[f.name])" />
-                <button
-                  v-if="!f.required"
-                  type="button"
-                  class="clear-button inline"
-                  title="Clear user"
-                  @click="clearUserSelection(f.name)"
-                >
-                  ×
-                </button>
-              </div>
-              <div class="search-input-container">
-                <input
-                  :id="'field-' + f.name"
-                  v-model="searchQueries[f.name]"
-                  :placeholder="`Search users for ${fieldLabel(f)}...`"
-                  :disabled="loadingUsers"
-                  class="search-input"
-                  @input="filterUsers(f.name, ($event.target as HTMLInputElement).value)"
-                  @focus="openUserDropdown(f.name)"
-                  @blur="handleBlur(f.name)"
-                />
-                <button
-                  type="button"
-                  class="dropdown-toggle"
-                  :class="{ open: showDropdowns[f.name] }"
-                  @click="openUserDropdown(f.name)"
-                >
-                  ▼
-                </button>
-              </div>
-              <div v-if="showDropdowns[f.name]" class="dropdown-results">
-                <div
-                  v-if="!f.required"
-                  class="dropdown-item dropdown-item-none"
-                  :class="{ selected: !form[f.name] }"
-                  @mousedown.prevent="clearUserSelection(f.name)"
-                >
-                  — None —
-                </div>
-                <div
-                  v-if="(filteredUsers[f.name] || []).length === 0"
-                  class="no-results"
-                >
-                  {{ loadingUsers ? 'Loading users…' : 'No users found' }}
-                </div>
-                <div
-                  v-for="user in filteredUsers[f.name] || []"
-                  :key="user.id"
-                  class="dropdown-item"
-                  :class="{ selected: String(form[f.name]) === String(user.id) }"
-                  @mousedown.prevent="selectUser(f.name, user)"
-                >
-                  <span class="tag note">{{ user.username }}</span>
-                </div>
-              </div>
-            </div>
+            <!-- A view of the table another column names (e.g. a table's default export view). -->
+            <select
+              v-else-if="tableViewFieldSource(f.name)"
+              :id="'field-' + f.name"
+              :value="Number(form[f.name] || 0)"
+              @change="form[f.name] = ($event.target as HTMLSelectElement).value"
+            >
+              <option v-for="option in tableViewOptions(f.name)" :key="option.value" :value="option.value">{{ option.label }}</option>
+            </select>
 
-            <!-- Foreign key searchable dropdown -->
-            <div v-else-if="isForeignKey(f.name)" class="foreign-key-dropdown">
-              <div class="search-input-container">
-                <input
-                  :id="'field-' + f.name"
-                  v-model="searchQueries[f.name]"
-                  @input="onSearchInput(f.name, ($event.target as HTMLInputElement).value)"
-                  @focus="toggleDropdown(f.name)"
-                  @blur="handleBlur(f.name)"
-                  :placeholder="`Search ${fieldLabel(f)}...`"
-                  :disabled="loadingForeignKeys"
-                  class="search-input"
-                />
+            <!-- User and relation fields: a search box (picocrank Combobox), with Browse… for the full picker. -->
+            <Combobox
+              v-else-if="isUserRefField(f.name) || isForeignKey(f.name)"
+              :id="'field-' + f.name"
+              :model-value="choiceValue(f.name)"
+              :options="isUserRefField(f.name) ? userComboboxOptions : (relationOptions[f.name] ?? [])"
+              :placeholder="isUserRefField(f.name) ? `Search users for ${fieldLabel(f)}…` : `Search ${fieldLabel(f)}…`"
+              :loading="isUserRefField(f.name) ? loadingUsers : loadingForeignKeys"
+              :clearable="!f.required"
+              @update:model-value="(value: string | number | null) => setChoice(f.name, value)"
+              @more="(query: string) => openPicker(f.name, query)"
+            >
+              <template #actions="{ query }">
                 <button
-                  v-if="form[f.name] || searchQueries[f.name]"
-                  @click="clearSelection(f.name)"
                   type="button"
-                  class="clear-button"
-                  title="Clear selection"
+                  class="neutral inline-icon"
+                  :aria-label="`Browse ${fieldLabel(f)}`"
+                  @click="openPicker(f.name, choiceValue(f.name) ? '' : query)"
                 >
-                  ×
+                  <HugeiconsIcon :icon="Search01Icon" width="1em" height="1em" aria-hidden="true" />
+                  <span>Browse…</span>
                 </button>
-                <button
-                  @click="toggleDropdown(f.name)"
-                  type="button"
-                  class="dropdown-toggle"
-                  :class="{ 'open': showDropdowns[f.name] }"
-                >
-                  ▼
-                </button>
-              </div>
-
-              <!-- Dropdown results -->
-              <div
-                v-if="showDropdowns[f.name]"
-                class="dropdown-results"
-              >
-                <div
-                  v-if="canClearForeignKey(f.name)"
-                  @mousedown.prevent="selectNone(f.name)"
-                  class="dropdown-item dropdown-item-none"
-                  :class="{ selected: !form[f.name] }"
-                >
-                  — None —
-                </div>
-                <div
-                  v-if="(filteredData[f.name] || []).length === 0"
-                  class="no-results"
-                >
-                  {{ searchQueries[f.name] ? 'No results found' : 'No items available' }}
-                </div>
-                <div
-                  v-for="item in filteredData[f.name] || []"
-                  :key="item.id"
-                  @click="selectItem(f.name, item)"
-                  class="dropdown-item"
-                  :class="{ 'selected': String(form[f.name]) === String(item.id) }"
-                >
-                  {{ getDisplayText(item, getForeignKeyInfo(f.name)) }}
-                </div>
-              </div>
-            </div>
+              </template>
+            </Combobox>
 
             <!-- Regular text input -->
             <input
@@ -952,227 +747,31 @@ function cancel() {
       </template>
     </FormLayout>
     <NotificationBlock v-if="error" type="error" :message="error" />
+    <!-- Browse… for relation and user fields; outside the form, as it can hold a create form of its own. -->
+    <RowPickerDialog
+      ref="rowPicker"
+      :title="pickerTitle"
+      :options="pickingUser ? userOptions : picker.options.value"
+      :layout="pickingUser ? 'list' : picker.layout.value"
+      :selected-value="pickerField ? String(form[pickerField] ?? '') : ''"
+      :allow-none="Boolean(pickerFieldDef && !pickerFieldDef.required)"
+      :recent-values="pickingUser ? userRecent : picker.recent.value"
+      :loading="pickingUser ? loadingUsers : picker.loading.value"
+      :create-label="pickingUser ? '' : picker.createLabel.value"
+      :create-table-id="pickingUser ? '' : pickerTable"
+      :create-field-defs="picker.settings.value.fieldDefs"
+      @pick="onPickerPick"
+      @created="onPickerCreated"
+    />
   </div>
 </template>
 
 
 
 <style scoped>
-.selected-date-info {
-  background: #e3f2fd;
-  border: 1px solid #2196f3;
-  border-radius: 4px;
-  padding: 1rem;
-  margin-bottom: 1rem;
-}
-
-.selected-date-info h3 {
-  margin: 0 0 0.5rem 0;
-  color: #1976d2;
-  font-size: 1.1rem;
-}
-
-.date-note {
-  margin: 0;
-  font-size: 0.9rem;
-  color: #666;
-  font-style: italic;
-}
-
 .field-group-heading {
   grid-column: 1 / -1;
   margin: 0.75rem 0 0;
   font-size: 1rem;
 }
-
-.user-ref-selected {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.user-ref-dropdown .clear-button.inline {
-  position: static;
-  transform: none;
-  width: auto;
-  height: auto;
-  padding: 0.15rem 0.45rem;
-}
-
-/* Foreign key searchable dropdown styling */
-.foreign-key-dropdown {
-  position: relative;
-  width: 100%;
-}
-
-.search-input-container {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-input {
-  padding: 0.5rem 2.5rem 0.5rem 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  background-color: white;
-  width: 100%;
-  box-sizing: border-box;
-  cursor: text;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-.search-input:hover {
-  border-color: #999;
-}
-
-.search-input:disabled {
-  background-color: #f5f5f5;
-  color: #666;
-  cursor: not-allowed;
-}
-
-.clear-button {
-  position: absolute;
-  right: 2rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  color: #999;
-  cursor: pointer;
-  padding: 0;
-  width: 1.5rem;
-  height: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-}
-
-.clear-button:hover {
-  background-color: #f0f0f0;
-  color: #666;
-}
-
-.dropdown-toggle {
-  position: absolute;
-  right: 0.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  font-size: 0.8rem;
-  color: #666;
-  cursor: pointer;
-  padding: 0;
-  width: 1.5rem;
-  height: 1.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform 0.2s;
-}
-
-.dropdown-toggle.open {
-  transform: translateY(-50%) rotate(180deg);
-}
-
-.dropdown-toggle:hover {
-  color: #333;
-}
-
-.dropdown-results {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  background: white;
-  border: 1px solid #ddd;
-  border-top: none;
-  border-radius: 0 0 4px 4px;
-  max-height: 200px;
-  overflow-y: auto;
-  z-index: 1000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.dropdown-item {
-  padding: 0.5rem;
-  cursor: pointer;
-  border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.2s;
-}
-
-.dropdown-item:hover {
-  background-color: #f8f9fa;
-}
-
-.dropdown-item.selected {
-  background-color: #e3f2fd;
-  color: #1976d2;
-}
-
-.dropdown-item:last-child {
-  border-bottom: none;
-}
-
-.no-results {
-  padding: 0.5rem;
-  color: #666;
-  font-style: italic;
-  text-align: center;
-}
-
-/* Select dropdown styling (fallback) */
-select {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 1rem;
-  background-color: white;
-  width: 100%;
-  box-sizing: border-box;
-  cursor: pointer;
-}
-
-select:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
-}
-
-select:hover {
-  border-color: #999;
-}
-
-select:disabled {
-  background-color: #f5f5f5;
-  color: #666;
-  cursor: not-allowed;
-}
-
-.readonly-field {
-  background-color: #f5f5f5;
-  color: #666;
-  cursor: not-allowed;
-}
-
-.field-help {
-  display: block;
-  margin-top: 0.25rem;
-  color: #666;
-  font-size: 0.85rem;
-  font-style: italic;
-}
-
-
 </style>

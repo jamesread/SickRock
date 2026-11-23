@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"connectrpc.com/connect"
-	armhealth "github.com/jamesread/armature-health"
-	"github.com/jamesread/armature-health/store"
+	armhealth "github.com/jamesread/armature-health/v2"
+	"github.com/jamesread/armature-health/v2/store"
 
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 )
@@ -82,7 +83,7 @@ func (s *SickRockServer) AcknowledgeHealthIssue(ctx context.Context, req *connec
 	if err != nil {
 		return nil, err
 	}
-	if err := s.health.Acknowledge(ctx, req.Msg.GetId(), req.Msg.GetAcknowledged(), int64(userID)); err != nil {
+	if err := s.health.Acknowledge(ctx, req.Msg.GetId(), req.Msg.GetAcknowledged(), strconv.Itoa(userID)); err != nil {
 		return nil, healthAcknowledgeError(err)
 	}
 	return connect.NewResponse(&sickrockpb.AcknowledgeHealthIssueResponse{}), nil
@@ -147,7 +148,15 @@ func healthIssueToProto(issue armhealth.IssueView) *sickrockpb.HealthIssue {
 		FirstSeenUnix:      issue.FirstSeen,
 		LastSeenUnix:       issue.LastSeen,
 		Occurrences:        toInt32(issue.Occurrences),
-		ResolvedAtUnix:     issue.ResolvedAt.Int64,
-		AcknowledgedAtUnix: issue.AcknowledgedAt.Int64,
+		ResolvedAtUnix:     derefInt64(issue.ResolvedAt),
+		AcknowledgedAtUnix: derefInt64(issue.AcknowledgedAt),
 	}
+}
+
+// derefInt64 returns *p, or 0 when p is nil.
+func derefInt64(p *int64) int64 {
+	if p == nil {
+		return 0
+	}
+	return *p
 }

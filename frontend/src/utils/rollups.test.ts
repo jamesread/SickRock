@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allRowsRollupRequest, filteredRowIds, rollupResultText, weekRollupRequest } from './rollups'
+import { allRowsRollupRequest, rollupResultText, rollupSourceIdsFrom, weekRollupRequest } from './rollups'
 
 describe('rollup requests', () => {
   it('covers a week with an exclusive end', () => {
@@ -23,21 +23,16 @@ describe('rollup requests', () => {
   })
 })
 
-describe('filteredRowIds', () => {
-  const rows = [
-    { id: 1, cook: 'sam', serves: 2 },
-    { id: 2, cook: 'alex', serves: 4 },
-    { id: 3, cook: 'sam', serves: 6 },
-  ]
-  const headers = [{ key: 'cook' }, { key: 'serves' }]
+describe('rollupSourceIdsFrom', () => {
+  const rows = [{ id: 1 }, { id: 3 }]
 
   it('is undefined without active filters', () => {
-    expect(filteredRowIds(rows, headers, {})).toBeUndefined()
-    expect(filteredRowIds(rows, headers, { cook: { type: 'text', operator: 'contains', value: '' } })).toBeUndefined()
+    expect(rollupSourceIdsFrom(rows, { filtersActive: false })).toBeUndefined()
   })
 
-  it('lists the rows the filters leave', () => {
-    expect(filteredRowIds(rows, headers, { cook: { type: 'text', operator: 'equals', value: 'sam' } })).toEqual(['1', '3'])
+  it('lists the ids of the rows the filters leave', () => {
+    expect(rollupSourceIdsFrom(rows, { filtersActive: true })).toEqual(['1', '3'])
+    expect(rollupSourceIdsFrom([], { filtersActive: true })).toEqual([])
   })
 })
 

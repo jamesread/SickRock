@@ -188,6 +188,7 @@ func (s *SickRockServer) ValidateToken(ctx context.Context, req *connect.Request
 		InitialRoute:    s.getInitialRoute(ctx, user.ID),
 		RbacPermissions: rbacPerms,
 		RbacIsSuperuser: rbacSuperuser,
+		DisplayName:     s.displayNameOf(ctx, user.ID),
 	}), nil
 }
 

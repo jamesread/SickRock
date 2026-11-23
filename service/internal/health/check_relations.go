@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/jamesread/SickRock/internal/repo"
-	armhealth "github.com/jamesread/armature-health"
+	armhealth "github.com/jamesread/armature-health/v2"
 )
 
 // RelationsDanglingCheck finds relations whose tables or columns no longer exist, which break

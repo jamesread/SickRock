@@ -15,6 +15,7 @@ import ViewsButton from './ViewsButton.vue'
 import ReadOnlyExportDialog from './ReadOnlyExportDialog.vue'
 import { useTableViewManager } from '../composables/useTableViewManager'
 import { useRbac } from '../composables/useRbac'
+import { conditionalStyles } from '../utils/conditionalFormatting'
 
 const props = defineProps<{
   tableId?: string
@@ -61,7 +62,6 @@ const exportDefaultTitle = computed(() => {
 
 const externalTableViews = computed(() => viewManager?.tableViews.value ?? [])
 const externalSelectedViewId = computed(() => viewManager?.selectedViewId.value ?? null)
-const externalCurrentView = computed(() => viewManager?.currentView.value ?? null)
 
 const router = useRouter()
 const route = useRoute()
@@ -152,38 +152,11 @@ async function loadConditionalFormattingRules() {
   }
 }
 
-function ruleConditionMatches(rule: ConditionalFormattingRule, cellValue: unknown): boolean {
-  const content = cellValue == null ? '' : String(cellValue)
 
-  switch (rule.conditionType) {
-    case 'always':
-      return true
-    case 'equals':
-      return content === rule.conditionValue
-    case 'contains':
-      return content.toLowerCase().includes(rule.conditionValue.toLowerCase())
-    case 'greater_than':
-      return Number(content) > Number(rule.conditionValue)
-    case 'less_than':
-      return Number(content) < Number(rule.conditionValue)
-    default:
-      return false
-  }
-}
-
-/** Highest-priority matching background-color rule for calendar events (picocrank `color` prop). */
+/** Background colour from the table's matching colour rules (picocrank `color` prop); the highest priority wins. */
 function getItemEventColor(item: Item): string | undefined {
-  const applicableRules = conditionalFormattingRules.value
-    .filter(rule => rule.isActive && rule.formatType === 'color')
-    .sort((a, b) => b.priority - a.priority)
-
-  let color: string | undefined
-  for (const rule of applicableRules) {
-    if (ruleConditionMatches(rule, getItemValue(item, rule.columnName))) {
-      color = rule.formatValue
-    }
-  }
-  return color
+  const rules = conditionalFormattingRules.value.filter(rule => rule.formatType === 'color')
+  return conditionalStyles(rules, column => getItemValue(item, column))['background-color']
 }
 
 // Check if table has icon field
@@ -967,7 +940,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <Section :title="sectionTitle" :icon="Calendar03Icon" :padding="false" class="calendar-section">
+  <Section :title="sectionTitle" :icon="Calendar03Icon" :padding="false" fill class="calendar-section">
     <template #toolbar>
       <ViewsButton
         v-if="!readOnly && effectiveTableId && viewManager"
@@ -978,7 +951,6 @@ onMounted(() => {
         show-structure-link
         :external-views="externalTableViews"
         :external-selected-view-id="externalSelectedViewId"
-        :external-current-view="externalCurrentView"
         @view-selected="(id: number) => viewManager?.selectView(id)"
       />
       <button
@@ -1147,21 +1119,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* Layout only — calendar chrome/borders come from picocrank. */
+/* Layout only — calendar chrome/borders come from picocrank (Section fill lays out its body). */
 .calendar-section {
-  display: flex;
-  flex-direction: column;
   height: 100%;
-  min-height: 0;
-}
-
-.calendar-section :deep(.section-content),
-.calendar-section :deep(.section-body) {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .calendar-content {
@@ -1169,11 +1129,6 @@ onMounted(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
-}
-
-.calendar-section :deep([role='toolbar'] > .calendar-toolbar-nav) {
-  flex: 0 0 auto;
-  width: fit-content;
 }
 
 .date-picker-input {

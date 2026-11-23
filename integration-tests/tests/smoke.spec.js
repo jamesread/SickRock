@@ -95,7 +95,7 @@ describe('SickRock smoke', function () {
 
     await table.findElement(By.css('button[aria-label="Row actions"]')).click()
     const rowMenu = await driver.wait(
-      until.elementLocated(By.css('.table-row-context-menu[role="menu"]')),
+      until.elementLocated(By.css('nav.context-menu[role="menu"][aria-label="Row actions"]')),
       5000,
     )
     assert.match(await rowMenu.getText(), /View[\s\S]*Delete/)

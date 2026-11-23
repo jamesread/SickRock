@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	armhealth "github.com/jamesread/armature-health"
-	"github.com/jamesread/armature-health/errorlog"
+	armhealth "github.com/jamesread/armature-health/v2"
+	"github.com/jamesread/armature-health/v2/errorlog"
 	"github.com/jmoiron/sqlx"
 
 	"github.com/jamesread/SickRock/internal/repo"

@@ -30,7 +30,8 @@ var ErrInvalidRollup = errors.New("invalid rollup")
 const rollupLinkBatch = 500
 
 // Rollup gathers the detail rows owned by a set of source rows, groups them by GroupColumns, sums
-// SumColumns, and replaces every row of TargetTable with one row per group. For example: the
+// SumColumns, and replaces the rows it wrote to TargetTable last time with one row per group (rows
+// added to TargetTable any other way are kept). For example: the
 // ingredients (detail) of the recipes linked from a week's meal plan rows (source), summed per
 // ingredient and unit into a shopping list (target).
 type Rollup struct {
@@ -369,9 +370,10 @@ func mapLookupFold(m map[string]string, key string) (string, bool) {
 	return "", false
 }
 
-// RunRollup replaces every row of the rollup's target table with the grouped and summed detail rows
-// of the source rows matching filter, in one transaction. Each source row counts once, so an owner
-// linked from two source rows contributes its details twice. The target's tick list state is cleared.
+// RunRollup replaces the rows the rollup wrote to its target table last time with the grouped and
+// summed detail rows of the source rows matching filter, in one transaction. Each source row counts
+// once, so an owner linked from two source rows contributes its details twice. The replaced rows' tick
+// list state is cleared; other rows of the target, and their ticks, are kept.
 func (r *Repository) RunRollup(ctx context.Context, ru *Rollup, filter RollupSourceFilter) (RollupResult, error) {
 	if ru == nil {
 		return RollupResult{}, ErrRollupNotFound
@@ -385,14 +387,26 @@ func (r *Repository) RunRollup(ctx context.Context, ru *Rollup, filter RollupSou
 		return RollupResult{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	res, err := r.runRollupTx(ctx, tx, p, filter)
+	if err := lockRollup(ctx, tx, ru.ID); err != nil {
+		return RollupResult{}, fmt.Errorf("lock rollup: %w", err)
+	}
+	res, err := r.runRollupTx(ctx, tx, ru.ID, p, filter)
 	if err != nil {
 		return RollupResult{}, err
 	}
 	return res, tx.Commit()
 }
 
-func (r *Repository) runRollupTx(ctx context.Context, tx *sqlx.Tx, p *rollupPlan, filter RollupSourceFilter) (RollupResult, error) {
+// lockRollup writes first in the run's transaction, so it holds the write lock before reading.
+// SQLite cannot wait for a writer (busy_timeout) once a transaction has read: upgrading then fails
+// at once with SQLITE_BUSY while another connection writes (e.g. an audit log entry). On MySQL it
+// locks the rollup's row, so two runs of one rollup take turns.
+func lockRollup(ctx context.Context, tx *sqlx.Tx, rollupID int64) error {
+	_, err := tx.ExecContext(ctx, `UPDATE rollups SET rows_tracked = rows_tracked WHERE id = ?`, rollupID)
+	return err
+}
+
+func (r *Repository) runRollupTx(ctx context.Context, tx *sqlx.Tx, rollupID int64, p *rollupPlan, filter RollupSourceFilter) (RollupResult, error) {
 	var res RollupResult
 	owners, err := p.sourceOwners(ctx, tx, filter, &res)
 	if err != nil {
@@ -402,11 +416,8 @@ func (r *Repository) runRollupTx(ctx context.Context, tx *sqlx.Tx, p *rollupPlan
 	if err != nil {
 		return res, fmt.Errorf("read detail rows: %w", err)
 	}
-	if err = r.replaceTargetRows(ctx, tx, p, groups); err != nil {
+	if err = r.replaceTargetRows(ctx, tx, rollupID, p, groups); err != nil {
 		return res, fmt.Errorf("write target rows: %w", err)
-	}
-	if _, err = tx.ExecContext(ctx, `DELETE FROM tick_list_state WHERE tc_name = ?`, p.target.tc.Name); err != nil {
-		return res, fmt.Errorf("clear tick list state: %w", err)
 	}
 	res.RowsWritten = len(groups)
 	return res, nil
@@ -578,15 +589,69 @@ func (g *rollupGroup) add(i int, raw string, times int) bool {
 	return true
 }
 
-// replaceTargetRows deletes every target row and inserts one row per group.
-func (r *Repository) replaceTargetRows(ctx context.Context, tx *sqlx.Tx, p *rollupPlan, groups []*rollupGroup) error {
-	if _, err := tx.ExecContext(ctx, "DELETE FROM "+p.target.ref); err != nil {
+// replaceTargetRows deletes the target rows the rollup wrote last time (and their tick state), and
+// writes one row per group, recording them for next time. Rows added to the target any other way
+// are kept. A rollup that ran before rows were recorded (rollups.rows_tracked 0) replaces every
+// target row once, as it used to.
+func (r *Repository) replaceTargetRows(ctx context.Context, tx *sqlx.Tx, rollupID int64, p *rollupPlan, groups []*rollupGroup) error {
+	target := p.target.tc.Name
+	if err := r.deletePreviousRollupRows(ctx, tx, rollupID, p); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM rollup_rows WHERE rollup_id = ?`, rollupID); err != nil {
 		return err
 	}
 	for _, g := range groups {
 		insertColumns, placeholders, args := itemInsertColumns(p.target.columns, p.targetValues(g), r.sqlCurrentTimestampExpr())
 		query := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", p.target.ref, strings.Join(insertColumns, ", "), strings.Join(placeholders, ", "))
-		if _, err := tx.ExecContext(ctx, query, args...); err != nil {
+		inserted, err := tx.ExecContext(ctx, query, args...)
+		if err != nil {
+			return err
+		}
+		id, err := inserted.LastInsertId()
+		if err != nil {
+			return fmt.Errorf("new row id: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO rollup_rows (rollup_id, target_table, row_id) VALUES (?, ?, ?)`,
+			rollupID, target, strconv.FormatInt(id, 10)); err != nil {
+			return err
+		}
+	}
+	_, err := tx.ExecContext(ctx, `UPDATE rollups SET rows_tracked = 1 WHERE id = ? AND rows_tracked = 0`, rollupID)
+	return err
+}
+
+// deletePreviousRollupRows deletes the target rows the rollup recorded for this target table (all of
+// them, for a rollup that has not recorded any yet), with their tick list state.
+func (r *Repository) deletePreviousRollupRows(ctx context.Context, tx *sqlx.Tx, rollupID int64, p *rollupPlan) error {
+	target := p.target.tc.Name
+	tracked := true
+	if err := tx.GetContext(ctx, &tracked, `SELECT rows_tracked FROM rollups WHERE id = ?`, rollupID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	if !tracked {
+		if _, err := tx.ExecContext(ctx, "DELETE FROM "+p.target.ref); err != nil {
+			return err
+		}
+		_, err := tx.ExecContext(ctx, `DELETE FROM tick_list_state WHERE tc_name = ?`, target)
+		return err
+	}
+	var ids []string
+	if err := tx.SelectContext(ctx, &ids, `SELECT row_id FROM rollup_rows WHERE rollup_id = ? AND target_table = ?`, rollupID, target); err != nil {
+		return err
+	}
+	for start := 0; start < len(ids); start += rollupLinkBatch {
+		batch := ids[start:min(start+rollupLinkBatch, len(ids))]
+		marks := strings.TrimSuffix(strings.Repeat("?,", len(batch)), ",")
+		args := make([]any, len(batch))
+		for i, id := range batch {
+			args[i] = id
+		}
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf("DELETE FROM %s WHERE `%s` IN (%s)", p.target.ref, p.target.pk, marks), args...); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, fmt.Sprintf(`DELETE FROM tick_list_state WHERE tc_name = ? AND item_id IN (%s)`, marks),
+			append([]any{target}, args...)...); err != nil {
 			return err
 		}
 	}

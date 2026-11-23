@@ -4841,8 +4841,8 @@
         "tags": [
           "sickrock.SickRock"
         ],
-        "summary": "Rollups: group and sum related rows into a target table, replacing its rows",
-        "description": "Rollups: group and sum related rows into a target table, replacing its rows",
+        "summary": "Rollups: group and sum related rows into a target table, replacing the rows the rollup wrote there",
+        "description": "Rollups: group and sum related rows into a target table, replacing the rows the rollup wrote there",
         "operationId": "sickrock.SickRock.ListRollups",
         "parameters": [
           {
@@ -5767,6 +5767,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/SendTestNotification": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SendTestNotification",
+        "operationId": "sickrock.SickRock.SendTestNotification",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SendTestNotificationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SendTestNotificationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/SetColumnDisplaySettings": {
       "post": {
         "tags": [
@@ -5818,6 +5876,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.SetColumnDisplaySettingsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetDisplayName": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetDisplayName",
+        "operationId": "sickrock.SickRock.SetDisplayName",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetDisplayNameRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetDisplayNameResponse"
                 }
               }
             }
@@ -6050,6 +6166,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/sickrock.SetItemPageLayoutResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sickrock.SickRock/SetTableDefaultExportView": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetTableDefaultExportView",
+        "operationId": "sickrock.SickRock.SetTableDefaultExportView",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetTableDefaultExportViewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetTableDefaultExportViewResponse"
                 }
               }
             }
@@ -9657,6 +9831,12 @@
             "title": "bulk_entry",
             "description": "Bulk entry page settings (table_configurations.bulk_entry_json); unset when bulk entry is off.",
             "$ref": "#/components/schemas/sickrock.BulkEntryConfig"
+          },
+          "defaultExportViewId": {
+            "type": "integer",
+            "title": "default_export_view_id",
+            "format": "int32",
+            "description": "The view the Export page starts on: a view id, -1 for All Columns, or 0 for the default view."
           }
         },
         "title": "GetTableStructureResponse",
@@ -10215,6 +10395,11 @@
               "$ref": "#/components/schemas/sickrock.OAuthProvider"
             },
             "title": "oauth_providers"
+          },
+          "currentDisplayName": {
+            "type": "string",
+            "title": "current_display_name",
+            "description": "the user's display name; empty when unset (show the username)"
           }
         },
         "title": "InitResponse",
@@ -11378,7 +11563,7 @@
         },
         "title": "Rollup",
         "additionalProperties": false,
-        "description": "Rollup is a configured rollup (system table table_rollups): the detail rows owned by a set of\n source rows, grouped and summed into a target table whose rows each run replaces."
+        "description": "Rollup is a configured rollup (system table table_rollups): the detail rows owned by a set of\n source rows, grouped and summed into a target table; each run replaces the rows the previous run\n wrote there, keeping rows added by hand."
       },
       "sickrock.RowAction": {
         "type": "object",
@@ -11674,6 +11859,35 @@
         "title": "SaveRssCalendarFeedResponse",
         "additionalProperties": false
       },
+      "sickrock.SendTestNotificationRequest": {
+        "type": "object",
+        "properties": {
+          "channelId": {
+            "type": "integer",
+            "title": "channel_id",
+            "format": "int32"
+          }
+        },
+        "title": "SendTestNotificationRequest",
+        "additionalProperties": false,
+        "description": "Sends a test notification to one of the caller's own channels (active or not), to check it works."
+      },
+      "sickrock.SendTestNotificationResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SendTestNotificationResponse",
+        "additionalProperties": false,
+        "description": "success is false when delivery failed; message then says why."
+      },
       "sickrock.SetColumnDisplaySettingsRequest": {
         "type": "object",
         "properties": {
@@ -11705,6 +11919,31 @@
           }
         },
         "title": "SetColumnDisplaySettingsResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetDisplayNameRequest": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "title": "display_name",
+            "description": "trimmed; at most 64 characters, no control characters; empty clears it"
+          }
+        },
+        "title": "SetDisplayNameRequest",
+        "additionalProperties": false,
+        "description": "The caller's own display name, shown in the header instead of their username."
+      },
+      "sickrock.SetDisplayNameResponse": {
+        "type": "object",
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "title": "display_name",
+            "description": "as saved"
+          }
+        },
+        "title": "SetDisplayNameResponse",
         "additionalProperties": false
       },
       "sickrock.SetGroupTableRoleGrantsRequest": {
@@ -11818,6 +12057,39 @@
           }
         },
         "title": "SetItemPageLayoutResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetTableDefaultExportViewRequest": {
+        "type": "object",
+        "properties": {
+          "tableConfiguration": {
+            "type": "string",
+            "title": "table_configuration"
+          },
+          "viewId": {
+            "type": "integer",
+            "title": "view_id",
+            "format": "int32",
+            "description": "a view of the table, -1 for All Columns, or 0 for the table's default view"
+          }
+        },
+        "title": "SetTableDefaultExportViewRequest",
+        "additionalProperties": false,
+        "description": "The view a table's Export page starts on."
+      },
+      "sickrock.SetTableDefaultExportViewResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "success"
+          },
+          "message": {
+            "type": "string",
+            "title": "message"
+          }
+        },
+        "title": "SetTableDefaultExportViewResponse",
         "additionalProperties": false
       },
       "sickrock.SetTableRowLabelsRequest": {
@@ -12745,6 +13017,11 @@
           "rbacIsSuperuser": {
             "type": "boolean",
             "title": "rbac_is_superuser"
+          },
+          "displayName": {
+            "type": "string",
+            "title": "display_name",
+            "description": "empty when unset (show the username)"
           }
         },
         "title": "ValidateTokenResponse",

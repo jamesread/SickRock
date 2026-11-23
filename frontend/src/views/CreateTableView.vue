@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { VIEW_TYPE_OPTIONS, type ViewType } from '../utils/viewTypes'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -39,7 +40,6 @@ const client = createApiClient()
 const { designModeEnabled } = useDesignMode()
 
 const viewName = ref('')
-type ViewType = 'table' | 'calendar' | 'ticklist' | 'weeklyplan' | 'cards'
 const viewType = ref<ViewType>('table')
 // The view's layout_json as loaded, so saving here keeps settings made elsewhere (filters, grouping).
 const existingLayoutJson = ref('')
@@ -439,11 +439,7 @@ async function deleteTableView() {
           v-model="viewType"
           class="view-type-select"
         >
-          <option value="table">Table</option>
-          <option value="calendar">Calendar</option>
-          <option value="ticklist">Tick List</option>
-          <option value="weeklyplan">Weekly Plan</option>
-          <option value="cards">Cards</option>
+          <option v-for="option in VIEW_TYPE_OPTIONS" :key="option.value" :value="option.value">{{ option.label }}</option>
         </select>
         <small class="view-type-help">
           <span v-if="viewType === 'table'">Table view displays data in rows and columns with sorting and filtering.</span>

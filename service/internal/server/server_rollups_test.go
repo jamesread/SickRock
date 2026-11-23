@@ -59,7 +59,11 @@ func TestRunRollup(t *testing.T) {
 	assert.Equal(t, int64(2), res.GetSourceRows())
 	assert.Equal(t, int64(1), res.GetRowsWritten())
 	assert.Equal(t, 1, count(`SELECT COUNT(*) FROM list WHERE item = 'Rice' AND qty = 1`))
-	assert.Equal(t, 0, count(`SELECT COUNT(*) FROM list WHERE item = 'Stale'`), "the target's old rows are replaced")
+	assert.Equal(t, 1, count(`SELECT COUNT(*) FROM list WHERE item = 'Stale'`), "rows the rollup did not write are kept")
+
+	_, err = runRollup(admin, srv, &sickrockpb.RunRollupRequest{RollupId: 1, DateColumn: "day", From: "2026-11-23", To: "2026-11-30"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, count(`SELECT COUNT(*) FROM list WHERE item = 'Rice'`), "the rollup's own row is replaced, not added again")
 }
 
 func TestRunRollupRefuses(t *testing.T) {

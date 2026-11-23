@@ -127,30 +127,95 @@ func TestRunRollupWeek(t *testing.T) {
 	}
 }
 
-func TestRunRollupReplacesTarget(t *testing.T) {
+func TestRunRollupReplacesOnlyItsOwnRows(t *testing.T) {
 	r, db := newRollupTestRepo(t)
 	ctx := t.Context()
-	if _, err := db.ExecContext(ctx, `INSERT INTO shopping_list (item) VALUES ('Old')`); err != nil {
+	// A row added by hand, and ticked: neither run may touch it.
+	if _, err := db.ExecContext(ctx, `INSERT INTO shopping_list (item, meals) VALUES ('Toilet roll', 0)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := r.SetTickListCompletion(ctx, "shopping_list", "1", true); err != nil {
 		t.Fatal(err)
 	}
-	for range 2 {
-		if _, err := r.RunRollup(ctx, shoppingRollup(), week()); err != nil {
-			t.Fatalf("RunRollup: %v", err)
-		}
+	if _, err := r.RunRollup(ctx, shoppingRollup(), week()); err != nil {
+		t.Fatalf("RunRollup: %v", err)
 	}
+	// Tick one of the rolled-up rows; the next run replaces it, so its tick goes too.
+	var beansID string
+	if err := db.GetContext(ctx, &beansID, `SELECT id FROM shopping_list WHERE item = 'Beans'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SetTickListCompletion(ctx, "shopping_list", beansID, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RunRollup(ctx, shoppingRollup(), week()); err != nil {
+		t.Fatalf("second RunRollup: %v", err)
+	}
+
 	rows := shoppingRows(t, db)
-	if _, ok := rows["Old/"]; ok || len(rows) != 5 {
-		t.Errorf("rows = %v; want the 5 rolled-up rows only", rows)
+	if _, ok := rows["Toilet roll/"]; !ok || len(rows) != 6 {
+		t.Errorf("rows = %v; want the hand-added row and the 5 rolled-up rows", rows)
 	}
 	if q := rows["Beans/tin"].Quantity; q == nil || *q != 2 {
 		t.Errorf("beans after a second run = %v; want 2, not added again", q)
 	}
 	state, err := r.GetTickListState(ctx, "shopping_list")
-	if err != nil || len(state) != 0 {
-		t.Errorf("tick state = %v, %v; want cleared", state, err)
+	if err != nil || len(state) != 1 || !state["1"] {
+		t.Errorf("tick state = %v, %v; want only the hand-added row ticked", state, err)
+	}
+	var recorded int
+	if err := db.GetContext(ctx, &recorded, `SELECT COUNT(*) FROM rollup_rows WHERE rollup_id = 1`); err != nil || recorded != 5 {
+		t.Errorf("recorded rows = %d, %v; want the 5 rows of the last run", recorded, err)
+	}
+}
+
+func TestRunRollupReplacesEverythingOnceForLegacyRollups(t *testing.T) {
+	r, db := newRollupTestRepo(t)
+	ctx := t.Context()
+	// A rollup from before rows were recorded: its earlier rows are indistinguishable from others.
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO rollups (id, name, source_table, detail_table, detail_link_column, target_table, rows_tracked)
+			VALUES (1, 'Shopping list', 'meal_plan', 'recipe_ingredients', 'recipe', 'shopping_list', 0);
+		INSERT INTO shopping_list (item, meals) VALUES ('From an old run', 0);`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RunRollup(ctx, shoppingRollup(), week()); err != nil {
+		t.Fatalf("RunRollup: %v", err)
+	}
+	if rows := shoppingRows(t, db); len(rows) != 5 {
+		t.Errorf("rows = %v; want the old rows replaced", rows)
+	}
+	var tracked bool
+	if err := db.GetContext(ctx, &tracked, `SELECT rows_tracked FROM rollups WHERE id = 1`); err != nil || !tracked {
+		t.Errorf("rows_tracked = %v, %v; want it on after the run", tracked, err)
+	}
+
+	// From now on, rows added by hand stay.
+	if _, err := db.ExecContext(ctx, `INSERT INTO shopping_list (item, meals) VALUES ('Milk', 0)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RunRollup(ctx, shoppingRollup(), week()); err != nil {
+		t.Fatalf("second RunRollup: %v", err)
+	}
+	if _, ok := shoppingRows(t, db)["Milk/"]; !ok {
+		t.Error("the hand-added row was replaced")
+	}
+}
+
+func TestRunRollupIgnoresRowsRecordedForAnotherTarget(t *testing.T) {
+	r, db := newRollupTestRepo(t)
+	ctx := t.Context()
+	// Row 1 was written to a previous target table; it is a different row in shopping_list.
+	if _, err := db.ExecContext(ctx, `
+		INSERT INTO shopping_list (item, meals) VALUES ('Mine', 0);
+		INSERT INTO rollup_rows (rollup_id, target_table, row_id) VALUES (1, 'old_target', '1');`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.RunRollup(ctx, shoppingRollup(), week()); err != nil {
+		t.Fatalf("RunRollup: %v", err)
+	}
+	if _, ok := shoppingRows(t, db)["Mine/"]; !ok {
+		t.Error("a row recorded for another target table was deleted")
 	}
 }
 

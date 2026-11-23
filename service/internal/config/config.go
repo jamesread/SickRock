@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/knadh/koanf/parsers/yaml"
-	"github.com/knadh/koanf/providers/env"
+	"github.com/knadh/koanf/providers/env/v2"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 	log "github.com/sirupsen/logrus"
@@ -41,8 +41,11 @@ func Load() (*Config, error) {
 
 	k := koanf.New(".")
 
-	if err := k.Load(env.Provider(envPrefix, ".", func(s string) string {
-		return strings.ToLower(strings.TrimPrefix(s, envPrefix))
+	if err := k.Load(env.Provider(".", env.Opt{
+		Prefix: envPrefix,
+		TransformFunc: func(key, value string) (string, any) {
+			return strings.ToLower(strings.TrimPrefix(key, envPrefix)), value
+		},
 	}), nil); err != nil {
 		return nil, fmt.Errorf("loading env config: %w", err)
 	}

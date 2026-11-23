@@ -37,11 +37,14 @@ const (
 	NotifyStatusFailed        = "failed"
 )
 
-// notifyLimiter counts recent notifications per sender, in memory.
+// notifyLimiter counts recent notifications per sender, in memory: at most limit in each window
+// (NotifyRateLimit per NotifyRateWindow when unset).
 type notifyLimiter struct {
-	sent map[int][]time.Time
-	now  func() time.Time
-	mu   sync.Mutex
+	sent   map[int][]time.Time
+	now    func() time.Time
+	limit  int
+	window time.Duration
+	mu     sync.Mutex
 }
 
 // allow records n notifications by sender and reports whether they fit in the rate limit.
@@ -52,8 +55,12 @@ func (l *notifyLimiter) allow(sender, n int) bool {
 	if l.sent == nil {
 		l.sent = map[int][]time.Time{}
 	}
-	recent := l.prune(sender, now().Add(-NotifyRateWindow))
-	if len(recent)+n > NotifyRateLimit {
+	limit, window := l.limit, l.window
+	if limit <= 0 {
+		limit, window = NotifyRateLimit, NotifyRateWindow
+	}
+	recent := l.prune(sender, now().Add(-window))
+	if len(recent)+n > limit {
 		l.sent[sender] = recent
 		return false
 	}

@@ -2,12 +2,17 @@
 // Quick add (utils/quickAdd.ts): an inline row under a related rows panel for entering child rows
 // one after another, e.g. a recipe's ingredients. Enter adds the row, clears the inputs and goes
 // back to the first one. Relation columns are typed by name, picked from the referenced table's
-// rows; with createMissing, a name that matches no row creates it.
+// rows, or chosen with Browse… (RowPickerDialog); with createMissing, a name that matches no row
+// creates it.
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Search01Icon } from '@hugeicons/core-free-icons'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
+import { showNotificationPopup } from 'picocrank/vue/composables/useNotificationPopups.js'
 import { createApiClient } from '../stores/api'
+import RowPickerDialog from './RowPickerDialog.vue'
+import { useRowPicker } from '../composables/useRowPicker'
+import type { RowPickerOption } from '../utils/rowPicker'
 import type { ForeignKey, Item } from '../gen/sickrock_pb'
 import {
   matchReferencedRow,
@@ -15,6 +20,8 @@ import {
   quickAddColumns,
   quickAddInputType,
   quickAddValue,
+  hasQuickAddValue,
+  referenceText,
   type QuickAddConfig,
   type QuickAddField,
 } from '../utils/quickAdd'
@@ -38,14 +45,31 @@ const client = createApiClient()
 const fields = ref<QuickAddField[]>([])
 const foreignKeys = ref<ForeignKey[]>([])
 const references = ref<Record<string, Reference>>({})
-const values = ref<Record<string, string | boolean>>({})
+const values = ref<Record<string, string | number | boolean>>({})
 const saving = ref(false)
 const errorMessage = ref('')
-const lastAdded = ref('')
 const formEl = ref<HTMLFormElement | null>(null)
 const uid = Math.random().toString(36).slice(2)
 
 const columns = computed(() => quickAddColumns(props.config, fields.value, props.linkColumn))
+
+// Browse…: the picker dialog for one relation column at a time.
+const rowPicker = ref<InstanceType<typeof RowPickerDialog> | null>(null)
+const pickerColumn = ref('')
+// Rows created from the dialog since the last add, so the panel reloads relation names after it.
+let createdFromPicker = false
+const pickerTable = computed(() => references.value[pickerColumn.value]?.table ?? '')
+const picker = useRowPicker(pickerTable)
+const pickerTitle = computed(() => {
+  const field = columns.value.find(entry => entry.name === pickerColumn.value)
+  return field ? `Choose ${labelOf(field).toLowerCase()}` : 'Choose'
+})
+// The row the typed text already picks, marked in the dialog.
+const pickerSelected = computed(() => {
+  const ref = referenceOf(pickerColumn.value)
+  const typed = String(values.value[pickerColumn.value] ?? '')
+  return ref ? String(matchReferencedRow(ref.rows, typed)?.id ?? '') : ''
+})
 
 function referenceOf(column: string): Reference | undefined {
   return references.value[column]
@@ -92,6 +116,49 @@ function clearValues() {
   values.value = Object.fromEntries(columns.value.map(field => [field.name, quickAddInputType(field.type) === 'checkbox' ? false : '']))
 }
 
+/** Opens Browse… for a relation column, searching for what has been typed in it. */
+async function openPicker(column: string) {
+  const ref = referenceOf(column)
+  if (!ref) return
+  pickerColumn.value = column
+  const typed = String(values.value[column] ?? '').trim()
+  await nextTick()
+  rowPicker.value?.open(matchReferencedRow(ref.rows, typed) ? '' : typed)
+  await picker.load(ref.rows)
+}
+
+/** Fills the column with the chosen row and moves on to the next input. */
+function choose(column: string, rowId: string) {
+  const ref = referenceOf(column)
+  const row = ref?.rows.find(entry => String(entry.id) === rowId)
+  if (!ref || !row) return
+  values.value[column] = referenceText(ref.rows, row)
+  picker.remember(rowId)
+  nextTick(() => {
+    const inputs = [...(formEl.value?.querySelectorAll<HTMLInputElement>('input') ?? [])]
+    const current = inputs.findIndex(input => input.dataset.column === column)
+    ;(inputs[current + 1] ?? formEl.value?.querySelector<HTMLButtonElement>('button[type="submit"]'))?.focus()
+  })
+}
+
+function onPickerPick(option: RowPickerOption) {
+  choose(pickerColumn.value, option.value)
+}
+
+/** A row created from the dialog joins the column's rows and is chosen. */
+async function onPickerCreated(item: Item | undefined) {
+  const column = pickerColumn.value
+  const ref = referenceOf(column)
+  if (!ref || !item) return
+  try {
+    ref.rows = await picker.reloadRows()
+  } catch {
+    ref.rows = [...ref.rows, item]
+  }
+  createdFromPicker = true
+  choose(column, String(item.id))
+}
+
 function focusFirst() {
   nextTick(() => formEl.value?.querySelector<HTMLInputElement>('input')?.focus())
 }
@@ -112,11 +179,7 @@ async function resolveReference(column: string, typed: string): Promise<{ id: st
 
 async function add() {
   if (saving.value) return
-  const hasValue = columns.value.some(field => {
-    const value = values.value[field.name]
-    return typeof value === 'string' ? value.trim() !== '' : value === true
-  })
-  if (!hasValue) return
+  if (!columns.value.some(field => hasQuickAddValue(values.value[field.name]))) return
   saving.value = true
   errorMessage.value = ''
   try {
@@ -134,12 +197,16 @@ async function add() {
       }
       const value = quickAddValue(field.type, raw ?? '')
       if (value !== '') additionalFields[field.name] = value
-      if (typeof raw === 'string') label ||= raw.trim()
+      if (typeof raw !== 'boolean') label ||= String(raw ?? '').trim()
     }
     await client.createItem({ pageId: props.tableName, additionalFields })
-    lastAdded.value = created.length > 0 ? `Added ${label} (new: ${created.join(', ')})` : `Added ${label}`
+    showNotificationPopup({
+      message: created.length > 0 ? `Added ${label} (new: ${created.join(', ')})` : `Added ${label}`,
+      class: 'good',
+    })
     clearValues()
-    emit('added', created.length > 0)
+    emit('added', created.length > 0 || createdFromPicker)
+    createdFromPicker = false
     focusFirst()
   } catch (e: unknown) {
     errorMessage.value = e instanceof Error ? e.message : 'Could not add the row.'
@@ -155,19 +222,33 @@ onMounted(load)
 </script>
 
 <template>
+  <div>
   <form ref="formEl" class="quick-add-row padding" :aria-label="`Quick add to ${tableName}`" @submit.prevent="add">
     <div class="quick-add-fields">
       <label v-for="field in columns" :key="field.name" class="quick-add-field">
         <span class="quick-add-label">{{ labelOf(field) }}</span>
         <template v-if="referenceOf(field.name)">
-          <input
-            v-model="values[field.name] as string"
-            type="text"
-            :list="`quick-add-${uid}-${field.name}`"
-            autocomplete="off"
-            :disabled="saving"
-            placeholder="Type a name"
-          />
+          <span class="quick-add-reference">
+            <input
+              v-model="values[field.name] as string"
+              type="text"
+              :list="`quick-add-${uid}-${field.name}`"
+              :data-column="field.name"
+              autocomplete="off"
+              :disabled="saving"
+              placeholder="Type a name"
+            />
+            <button
+              type="button"
+              class="neutral inline-icon"
+              :aria-label="`Browse ${labelOf(field).toLowerCase()}`"
+              title="Browse…"
+              :disabled="saving"
+              @click="openPicker(field.name)"
+            >
+              <HugeiconsIcon :icon="Search01Icon" width="1em" height="1em" aria-hidden="true" />
+            </button>
+          </span>
           <datalist :id="`quick-add-${uid}-${field.name}`">
             <option v-for="row in referenceOf(field.name)!.rows" :key="String(row.id)" :value="rowName(row)" />
           </datalist>
@@ -176,6 +257,7 @@ onMounted(load)
         </template>
         <input
           v-else-if="quickAddInputType(field.type) === 'checkbox'"
+          :data-column="field.name"
           v-model="values[field.name] as boolean"
           type="checkbox"
           :disabled="saving"
@@ -183,6 +265,7 @@ onMounted(load)
         <input
           v-else
           v-model="values[field.name] as string"
+          :data-column="field.name"
           :type="quickAddInputType(field.type)"
           :step="quickAddInputType(field.type) === 'number' ? 'any' : undefined"
           :disabled="saving"
@@ -193,9 +276,24 @@ onMounted(load)
         <span>{{ saving ? 'Adding…' : 'Add' }}</span>
       </button>
     </div>
-    <small v-if="lastAdded && !errorMessage" class="subtle" role="status">{{ lastAdded }}. Press Enter to add the next.</small>
     <NotificationBlock v-if="errorMessage" type="error" :message="errorMessage" />
   </form>
+  <!-- Outside the form: the dialog can hold a create form of its own. -->
+  <RowPickerDialog
+    ref="rowPicker"
+    :title="pickerTitle"
+    :options="picker.options.value"
+    :layout="picker.layout.value"
+    :selected-value="pickerSelected"
+    :recent-values="picker.recent.value"
+    :loading="picker.loading.value"
+    :create-label="picker.createLabel.value"
+    :create-table-id="pickerTable"
+    :create-field-defs="picker.settings.value.fieldDefs"
+    @pick="onPickerPick"
+    @created="onPickerCreated"
+  />
+  </div>
 </template>
 
 <style scoped>
@@ -222,6 +320,21 @@ onMounted(load)
 .quick-add-label {
   font-size: 0.85em;
   font-weight: 600;
+}
+
+.quick-add-reference {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.quick-add-reference input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.quick-add-reference button {
+  flex: none;
+  margin: 0;
 }
 
 .quick-add-hint {

@@ -30,6 +30,12 @@ const itemColumns = computed(() => props.fields
     const name = columnChoiceLabel(field.name, field.displayLabel)
     return { name: field.name, label: target ? `${name} → ${target}` : name }
   }))
+const detailChoices = computed(() => props.fields
+  .filter(field => !['id', 'sr_created', 'sr_updated', config.value.dateColumn, config.value.itemColumn].includes(field.name))
+  .map(field => ({ value: field.name, label: columnChoiceLabel(field.name, field.displayLabel) })))
+// Asked for when adding: plain columns only (a relation would need its own picker).
+const askChoices = computed(() => detailChoices.value
+  .filter(choice => choice.value !== config.value.slotColumn && !props.foreignKeys.some(fk => fk.columnName === choice.value)))
 const problems = computed(() => weeklyPlanConfigProblems(config.value))
 
 function update(patch: Partial<WeeklyPlanConfig>) {
@@ -90,6 +96,28 @@ function addSlot() {
         <option v-for="field in itemColumns" :key="field.name" :value="field.name">{{ field.label }}</option>
       </select>
       <small>The column that fills a slot. A relation (→) lets you pick rows from the other table, and shows their image.</small>
+    </div>
+
+    <span id="wp-details-label">Details</span>
+    <div>
+      <CheckGroup
+        :model-value="config.detailColumns"
+        :options="detailChoices"
+        aria-labelledby="wp-details-label"
+        @update:model-value="(columns: string[]) => update({ detailColumns: columns })"
+      />
+      <small>Shown under each entry, e.g. a note such as "James: cooking". Conditional formatting rules on the table style the entries too (e.g. notes starting with "James:" in blue).</small>
+    </div>
+
+    <span id="wp-ask-label">Ask when adding</span>
+    <div>
+      <CheckGroup
+        :model-value="config.askColumns"
+        :options="askChoices"
+        aria-labelledby="wp-ask-label"
+        @update:model-value="(columns: string[]) => update({ askColumns: columns })"
+      />
+      <small>Filled in as you add an entry, e.g. who a meal is for. The values used most recently in that column are offered as one-click choices.</small>
     </div>
 
     <label for="wp-slot-column">Slot column</label>

@@ -20,11 +20,6 @@ async function handleLogout() {
   router.push('/login')
 }
 
-// Filter out any null/undefined links so picocrank's isActive(link) never receives undefined (avoids "reading 'path' of undefined")
-function onlyValidLinks(link: unknown) {
-  return link != null && typeof link === 'object'
-}
-
 onMounted(() => {
   nextTick(() => {
   if (localNavigation.value) {
@@ -130,12 +125,12 @@ onMounted(() => {
   >
     <div class="control-panel-container">
       <div class="user-welcome">
-        <h2>Welcome, {{ user?.username }}</h2>
+        <h2>Welcome, {{ authStore.shownName }}</h2>
         <p class="subtle welcome-message">Manage your account settings and preferences</p>
       </div>
 
       <Navigation ref="localNavigation">
-        <NavigationGrid :filter="onlyValidLinks" />
+        <NavigationGrid />
       </Navigation>
 
       <div class="logout-section">

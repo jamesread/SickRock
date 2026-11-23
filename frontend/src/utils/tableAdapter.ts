@@ -36,9 +36,8 @@ export type TableValueComparator = (
 ) => number
 
 /**
- * PicoCrank's header shape plus the comparator used by the SickRock adapter.
- * PicoCrank currently ignores unknown header properties, so `comparator` can
- * be consumed by the table integration without changing its header input.
+ * The PicoCrank Table header SickRock builds for a field column, with the
+ * `comparator` PicoCrank sorts by (natural order for text and numbers).
  */
 export interface SickRockTableHeader {
   key: string

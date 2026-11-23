@@ -1,11 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import ContextMenu from 'picocrank/vue/components/ContextMenu.vue'
+import { showNotificationPopup } from 'picocrank/vue/composables/useNotificationPopups.js'
+import { useTableAccess } from '../composables/useTableAccess'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
 import { createApiClient } from '../stores/api'
 import ViewsButton from './ViewsButton.vue'
+import ImageThumb from './ImageThumb.vue'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Cancel01Icon, CheckListIcon, CheckmarkSquare03Icon } from '@hugeicons/core-free-icons'
+import { Cancel01Icon, CheckListIcon, CheckmarkSquare03Icon, Delete02Icon, Download01Icon, Image01Icon, LinkSquare02Icon } from '@hugeicons/core-free-icons'
 import { useDesignMode } from '../composables/useDesignMode'
 import type { Item as ApiItem } from '../gen/sickrock_pb'
 import {
@@ -14,6 +19,8 @@ import {
   parseTickListConfig,
   relationColumnsUsed,
   tileDetails,
+  tickListProgress,
+  tileImageId,
   tileLabel,
   type ReferencedRows,
   type TickListConfig,
@@ -36,9 +43,54 @@ const items = ref<Item[]>([])
 // The view's label, details, sort and grouping settings (layout_json "tickList").
 const config = ref<TickListConfig>(parseTickListConfig(''))
 const referencedRows = ref<ReferencedRows>(new Map())
+const progress = computed(() => tickListProgress(items.value, isCompleted))
 const groups = computed(() => groupTickListRows(items.value as unknown as ApiItem[], config.value, referencedRows.value))
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+const router = useRouter()
+const { access } = useTableAccess(computed(() => props.tableId))
+
+// The right-click menu of a tile (picocrank ContextMenu): open the row, or delete it.
+const itemMenuOpen = ref(false)
+const itemMenuX = ref(0)
+const itemMenuY = ref(0)
+const menuItem = ref<Item | null>(null)
+const itemMenuItems = computed(() => [
+  { id: 'open', label: 'Open', icon: LinkSquare02Icon },
+  ...(access.value.canDelete ? [{ id: 'delete', label: 'Delete', icon: Delete02Icon, danger: true }] : []),
+])
+
+function openItemMenu(item: Item, event: MouseEvent) {
+  event.preventDefault()
+  menuItem.value = item
+  itemMenuX.value = event.clientX
+  itemMenuY.value = event.clientY
+  itemMenuOpen.value = true
+}
+
+async function onItemMenuSelect(choice: { id?: string }) {
+  const item = menuItem.value
+  if (!item) return
+  if (choice.id === 'open') {
+    await router.push(`/table/${props.tableId}/${String(item.id)}`)
+  } else if (choice.id === 'delete') {
+    await deleteItem(item)
+  }
+}
+
+/** Deletes a row after confirming, and drops its tile and tick. */
+async function deleteItem(item: Item) {
+  if (!window.confirm(`Delete "${itemLabel(item)}"?`)) return
+  const id = String(item.id)
+  try {
+    await client.deleteItem({ pageId: props.tableId, id })
+    items.value = items.value.filter(entry => String(entry.id) !== id)
+    completionState.value.delete(id)
+  } catch (e) {
+    showNotificationPopup({ message: `Could not delete: ${e instanceof Error ? e.message : String(e)}`, class: 'bad' })
+  }
+}
 
 // Server-side completion state (shared across clients)
 const completionState = ref<Map<string, boolean>>(new Map())
@@ -179,6 +231,10 @@ function itemLabel(item: Item): string {
   return tileLabel(item as unknown as ApiItem, config.value, referencedRows.value)
 }
 
+function itemImageId(item: Item): string {
+  return tileImageId(item as unknown as ApiItem, config.value, referencedRows.value)
+}
+
 function itemDetails(item: Item): string {
   return tileDetails(item as unknown as ApiItem, config.value, referencedRows.value)
 }
@@ -252,6 +308,10 @@ onMounted(() => {
         <HugeiconsIcon :icon="Cancel01Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Clear Ticks</span>
       </button>
+      <router-link :to="`/table/${props.tableId}/export`" class="button inline-icon neutral">
+        <HugeiconsIcon :icon="Download01Icon" width="1em" height="1em" aria-hidden="true" />
+        <span>Export</span>
+      </router-link>
       <router-link
         v-if="designModeEnabled"
         :to="`/table/${props.tableId}/column-types`"
@@ -266,6 +326,10 @@ onMounted(() => {
     <div v-if="loading" class="loading">Loading...</div>
     <NotificationBlock v-else-if="error" type="error" :message="error" />
     <div v-else>
+      <div v-if="config.showProgress && items.length > 0" class="ticklist-progress">
+        <progress :value="progress.ticked" :max="progress.total" :aria-label="progress.label" />
+        <span>{{ progress.label }}</span>
+      </div>
       <template v-for="group in groups" :key="group.label">
       <h3 v-if="group.label" class="ticklist-group-heading">{{ group.label }}</h3>
       <div class="ticklist-container">
@@ -275,6 +339,7 @@ onMounted(() => {
           class="ticklist-item"
           :class="{ completed: isCompleted(item) }"
           @click="toggleCompleted(item)"
+          @contextmenu="openItemMenu(item, $event)"
         >
           <div class="ticklist-checkbox">
             <HugeiconsIcon
@@ -283,6 +348,13 @@ onMounted(() => {
               class="checkmark-icon"
             />
             <div v-else class="checkbox-empty"></div>
+          </div>
+          <!-- A placeholder when the row has no image keeps the tiles' text in line. -->
+          <div v-if="config.imageColumn" class="ticklist-image">
+            <ImageThumb v-if="itemImageId(item)" :image-id="itemImageId(item)" :alt="itemLabel(item)" size="tile" />
+            <span v-else class="ticklist-image-none" aria-hidden="true">
+              <HugeiconsIcon :icon="Image01Icon" width="1.5rem" height="1.5rem" />
+            </span>
           </div>
           <div class="ticklist-content">
             <div class="ticklist-title">{{ itemLabel(item) }}</div>
@@ -297,6 +369,14 @@ onMounted(() => {
         </div>
       </div>
     </div>
+    <ContextMenu
+      v-model:open="itemMenuOpen"
+      aria-label="Item actions"
+      :items="itemMenuItems"
+      :client-x="itemMenuX"
+      :client-y="itemMenuY"
+      @select="onItemMenuSelect"
+    />
   </Section>
 </template>
 
@@ -342,6 +422,17 @@ onMounted(() => {
   color: #6c757d;
 }
 
+.ticklist-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75em;
+  padding: 16px 20px 0;
+}
+
+.ticklist-progress progress {
+  flex: 1;
+}
+
 .ticklist-group-heading {
   margin: 0;
   padding: 16px 20px 0;
@@ -378,6 +469,26 @@ onMounted(() => {
 
 .ticklist-item:hover .checkbox-empty {
   border-color: #007bff;
+}
+
+.ticklist-image {
+  flex: 0 0 4rem;
+  width: 4rem;
+}
+
+.ticklist-image-none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  opacity: 0.6;
+}
+
+.ticklist-item.completed .ticklist-image {
+  filter: grayscale(1);
 }
 
 .ticklist-content {

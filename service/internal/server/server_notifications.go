@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 	sickrockpb "github.com/jamesread/SickRock/gen/proto"
 	repo "github.com/jamesread/SickRock/internal/repo"
+	log "github.com/sirupsen/logrus"
 )
 
 // GetNotificationEvents retrieves all available notification events
@@ -201,6 +203,42 @@ func (s *SickRockServer) DeleteUserNotificationChannel(ctx context.Context, req 
 		Success: true,
 		Message: "Notification channel deleted successfully",
 	}), nil
+}
+
+// Limits on test notifications (SendTestNotification): each user may send this many per window.
+const (
+	TestNotificationRateLimit  = 10
+	TestNotificationRateWindow = time.Hour
+	testNotificationTimeout    = 15 * time.Second
+)
+
+// SendTestNotification sends a test message to one of the caller's own channels. A delivery failure
+// is reported in the response (success false, with the reason), not as an error.
+func (s *SickRockServer) SendTestNotification(ctx context.Context, req *connect.Request[sickrockpb.SendTestNotificationRequest]) (*connect.Response[sickrockpb.SendTestNotificationResponse], error) {
+	userID, err := s.getUserIDFromContext(ctx)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, err)
+	}
+	channelID := int(req.Msg.GetChannelId())
+	if channelID <= 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("channel ID is required"))
+	}
+	channel, err := s.ownedUserNotificationChannel(ctx, userID, channelID)
+	if err != nil {
+		return nil, err
+	}
+	if !s.testNotifyLimiter.allow(userID, 1) {
+		return nil, connect.NewError(connect.CodeResourceExhausted,
+			fmt.Errorf("at most %d test notifications an hour; try again later", TestNotificationRateLimit))
+	}
+
+	sendCtx, cancel := context.WithTimeout(ctx, testNotificationTimeout)
+	defer cancel()
+	if err := s.notificationService.SendTest(sendCtx, *channel); err != nil {
+		log.WithFields(log.Fields{"channelId": channelID, "userId": userID}).WithError(err).Warn("Test notification failed")
+		return connect.NewResponse(&sickrockpb.SendTestNotificationResponse{Success: false, Message: err.Error()}), nil
+	}
+	return connect.NewResponse(&sickrockpb.SendTestNotificationResponse{Success: true, Message: "Test notification sent"}), nil
 }
 
 // GetUserNotificationSubscriptions retrieves all notification subscriptions for the authenticated user

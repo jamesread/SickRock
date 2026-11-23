@@ -26,7 +26,6 @@ defineProps<{
   insertButtonText: string
   tableViews: TableView[]
   selectedViewId: number | null
-  currentView: TableView | null
   multiSelectEnabled?: boolean
   /** Rows a rollup run covers (those the filters leave); undefined for every row. */
   rollupSourceIds?: string[]
@@ -49,7 +48,6 @@ const emit = defineEmits<{
     :show-view-edit="showViewEdit"
     :external-views="tableViews"
     :external-selected-view-id="selectedViewId"
-    :external-current-view="currentView"
     @view-selected="emit('view-selected', $event)"
   />
   <button
@@ -87,7 +85,8 @@ const emit = defineEmits<{
     <span>Bulk entry</span>
   </router-link>
   <RollupButtons :table-id="tableId" :source-ids="rollupSourceIds" />
-  <div v-if="showInsert" class="insert-button-group">
+  <!-- picocrank .toolbar-split: together beside the title, separate items in the overflow menu. -->
+  <div v-if="showInsert" class="insert-button-group toolbar-split">
     <!-- Wide screens show "Create <row>"; narrow screens fall back to the compact quick-add button. -->
     <router-link
       :to="insertRoute"
@@ -128,15 +127,4 @@ const emit = defineEmits<{
  * Wide/narrow swap of "Create <row>" and Quick Add uses picocrank's .hide-narrow and
  * .show-narrow (!important), so menu layout rules cannot unhide either.
  */
-</style>
-
-<!--
-  Unscoped: the overflow menu is picocrank's element. (In a scoped block, ":global(x) y"
-  compiles to just "x", which would unwrap the whole menu.)
--->
-<style>
-/* In the overflow menu, Create and Quick Add are separate full-width items. */
-[role="toolbar"].toolbar-overflow-menu .insert-button-group {
-  display: contents;
-}
 </style>
