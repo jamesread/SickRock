@@ -41,7 +41,7 @@ func TestAddColumnSQLType(t *testing.T) {
 		{FieldSpec{Type: "user_ref"}, true, "BIGINT", ""},
 		{FieldSpec{Type: "string"}, true, "TEXT", ""},
 		{FieldSpec{Type: "tinyint"}, true, "TINYINT(1)", ""},
-		{FieldSpec{Type: "tinyint"}, false, "INTEGER", ""},
+		{FieldSpec{Type: "tinyint"}, false, "BOOLEAN", ""},
 		{FieldSpec{Type: "datetime"}, true, "DATETIME", ""},
 		{FieldSpec{Type: "datetime", DefaultToCurrentTimestamp: true}, true, "DATETIME", " DEFAULT CURRENT_TIMESTAMP"},
 		{FieldSpec{Type: "datetime", DefaultToCurrentTimestamp: true}, false, "DATETIME", " DEFAULT (datetime('now'))"},

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import Calendar, {
   type CalendarEvent,
   type CalendarEventMoveRequest
 } from 'picocrank/vue/components/Calendar.vue'
 import Section from 'picocrank/vue/components/Section.vue'
+import Dialog from 'picocrank/vue/components/Dialog.vue'
+import type { DialogApi } from '../utils/dialog'
 import { Calendar03Icon, Link04Icon } from '@hugeicons/core-free-icons'
 import { HugeiconsIcon } from '@hugeicons/vue'
 import { createApiClient } from '../stores/api'
@@ -62,6 +64,7 @@ const externalSelectedViewId = computed(() => viewManager?.selectedViewId.value 
 const externalCurrentView = computed(() => viewManager?.currentView.value ?? null)
 
 const router = useRouter()
+const route = useRoute()
 
 type Item = Record<string, unknown>
 
@@ -85,13 +88,15 @@ const contextMenu = ref<{ visible: boolean; x: number; y: number; item: Item | n
 })
 const deleting = ref(false)
 
-// Day menu state
-const dayMenu = ref<{ visible: boolean; x: number; y: number; date: Date | null }>({
-  visible: false,
-  x: 0,
-  y: 0,
-  date: null
-})
+// Day menu: clicking a day offers to show only that day (the calendar's own day view) or to quick add.
+const dayMenuDate = ref<Date | null>(null)
+const dayMenuDialog = ref<DialogApi | null>(null)
+const dayMenuTitle = computed(() => dayMenuDate.value?.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) ?? '')
+
+// The calendar's view (picocrank: month, week or day) and the day it is anchored on.
+type CalendarViewMode = 'month' | 'week' | 'day'
+const calendarViewMode = ref<CalendarViewMode>('month')
+const calendarFocusDate = ref<Date | null>(null)
 
 // Quick add state (`endDate` set when creating from a multi-day range selection)
 const quickAdd = ref<{
@@ -330,8 +335,14 @@ const calendarEvents = computed<CalendarEvent[]>(() => {
       color: getItemEventColor(item),
       _originalItem: item // Keep reference to original item for callbacks
     }
-  })
+  }).sort((a, b) => eventSortTime(a) - eventSortTime(b))
 })
+
+/** Events are listed in each day (and the day view) in time order; undated ones go last. */
+function eventSortTime(event: CalendarEvent): number {
+  const when = event.startDate ?? event.date
+  return when ? when.getTime() : Number.MAX_SAFE_INTEGER
+}
 
 const upcomingVisibleEventsCount = computed(() => {
   const now = new Date()
@@ -521,13 +532,8 @@ function handleDateClick(date: Date) {
   if (props.readOnly) {
     return
   }
-  // Show day menu dialog
-  dayMenu.value = {
-    visible: true,
-    x: window.innerWidth / 2,
-    y: window.innerHeight / 2,
-    date: date
-  }
+  dayMenuDate.value = date
+  dayMenuDialog.value?.show()
 }
 
 /** Picocrank: drag across days then release; same-day selection also emits `date-click`. */
@@ -649,6 +655,7 @@ async function handleEventMoveRequest(payload: CalendarEventMoveRequest) {
 function handleMonthChange(month: number, year: number) {
   currentMonth.value = month
   currentYear.value = year
+  updateDatePicker(month, year)
 }
 
 function handleEventContextMenu(event: CalendarEvent, mouseEvent: MouseEvent) {
@@ -832,7 +839,17 @@ function goToToday() {
   updateDatePicker(newMonth, newYear)
 }
 
+/** Moves the shown week or day by a step (7 or 1 days); returns false in month view. */
+function stepFocus(direction: 1 | -1): boolean {
+  if (calendarViewMode.value === 'month' || !calendarFocusDate.value) return false
+  const next = new Date(calendarFocusDate.value)
+  next.setDate(next.getDate() + direction * (calendarViewMode.value === 'week' ? 7 : 1))
+  calendarFocusDate.value = next
+  return true
+}
+
 function prevMonth() {
+  if (stepFocus(-1)) return
   const newMonth = currentMonth.value === 0 ? 11 : currentMonth.value - 1
   const newYear = currentMonth.value === 0 ? currentYear.value - 1 : currentYear.value
 
@@ -843,6 +860,7 @@ function prevMonth() {
 }
 
 function nextMonth() {
+  if (stepFocus(1)) return
   const newMonth = currentMonth.value === 11 ? 0 : currentMonth.value + 1
   const newYear = currentMonth.value === 11 ? currentYear.value + 1 : currentYear.value
 
@@ -859,6 +877,8 @@ function goToSelectedDate() {
 
   currentMonth.value = month - 1 // Convert from 1-indexed to 0-indexed
   currentYear.value = year
+  calendarViewMode.value = 'month'
+  calendarFocusDate.value = null
 }
 
 function updateDatePicker(month: number, year: number) {
@@ -874,27 +894,27 @@ function hideContextMenu() {
 
 // Day menu functions
 function hideDayMenu() {
-  dayMenu.value.visible = false
-  dayMenu.value.date = null
+  dayMenuDialog.value?.close()
+  dayMenuDate.value = null
 }
 
-function goToDayView() {
-  if (!dayMenu.value.date) return
+/** Switches the calendar to its own day view (as its "Show only this day"). */
+function showDay(date: Date) {
+  calendarFocusDate.value = new Date(date)
+  calendarViewMode.value = 'day'
+}
 
-  // Format date as YYYY-MM-DD for the route
-  const year = dayMenu.value.date.getFullYear()
-  const month = String(dayMenu.value.date.getMonth() + 1).padStart(2, '0')
-  const day = String(dayMenu.value.date.getDate()).padStart(2, '0')
-  const dateStr = `${year}-${month}-${day}`
-
+function showDayFromMenu() {
+  if (!dayMenuDate.value) return
+  const date = dayMenuDate.value
   hideDayMenu()
-  router.push(`/table/${props.tableId}/day/${dateStr}`)
+  showDay(date)
 }
 
 function openQuickAddFromMenu() {
-  if (!dayMenu.value.date) return
+  if (!dayMenuDate.value) return
 
-  const date = dayMenu.value.date
+  const date = dayMenuDate.value
   hideDayMenu()
   showQuickAdd(date)
 }
@@ -927,7 +947,23 @@ async function deleteItem() {
   }
 }
 
-onMounted(load)
+/** Opens the day view for ?day=YYYY-MM-DD (old /table/{tc}/day/{date} links redirect here). */
+function showDayFromQuery() {
+  const day = route.query.day
+  const m = typeof day === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(day) : null
+  if (!m) return
+  const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+  if (Number.isNaN(date.getTime())) return
+  currentMonth.value = date.getMonth()
+  currentYear.value = date.getFullYear()
+  updateDatePicker(date.getMonth(), date.getFullYear())
+  showDay(date)
+}
+
+onMounted(() => {
+  showDayFromQuery()
+  return load()
+})
 </script>
 
 <template>
@@ -981,6 +1017,8 @@ onMounted(load)
         :event-drag-enabled="calendarEventDragEnabled"
         :get-event-date-range="getEventDateRange"
         :format-event-time="formatEventTime"
+        v-model:view-mode="calendarViewMode"
+        v-model:focus-date="calendarFocusDate"
         @event-click="handleEventClick"
         @date-click="handleDateClick"
         @date-range-select="handleDateRangeSelect"
@@ -1036,37 +1074,14 @@ onMounted(load)
       @click="hideContextMenu"
     ></div>
 
-    <!-- Day Menu Modal -->
-    <div
-      v-if="dayMenu.visible"
-      class="day-menu-modal"
-      @click.stop
-    >
-      <div class="day-menu-content">
-        <h3 v-if="dayMenu.date">
-          {{ dayMenu.date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) }}
-        </h3>
-        <p class="day-menu-subtitle">Choose an action</p>
-        <div class="day-menu-actions">
-          <button @click="goToDayView" class="button good">
-            View Day
-          </button>
-          <button @click="openQuickAddFromMenu" class="button neutral">
-            Quick Add
-          </button>
-          <button @click="hideDayMenu" class="button neutral">
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Backdrop to close day menu -->
-    <div
-      v-if="dayMenu.visible"
-      class="day-menu-backdrop"
-      @click="hideDayMenu"
-    ></div>
+    <!-- Day menu -->
+    <Dialog ref="dayMenuDialog" :title="dayMenuTitle" size="small" @close="dayMenuDate = null">
+      <p class="subtle">Show only this day in the calendar, or quickly add an item on it.</p>
+      <template #actions>
+        <button type="button" class="good" @click="showDayFromMenu">Show only this day</button>
+        <button type="button" class="neutral" @click="openQuickAddFromMenu">Quick add</button>
+      </template>
+    </Dialog>
 
     <!-- Backdrop to close quick add -->
     <div
@@ -1243,8 +1258,7 @@ onMounted(load)
 }
 
 .context-menu-backdrop,
-.quick-add-backdrop,
-.day-menu-backdrop {
+.quick-add-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -1255,13 +1269,11 @@ onMounted(load)
   background: transparent;
 }
 
-.quick-add-backdrop,
-.day-menu-backdrop {
+.quick-add-backdrop {
   background: var(--backdrop-color, rgba(0, 0, 0, 0.5));
 }
 
-.quick-add-modal,
-.day-menu-modal {
+.quick-add-modal {
   position: fixed;
   top: 50%;
   left: 50%;
@@ -1277,35 +1289,23 @@ onMounted(load)
   max-width: 500px;
 }
 
-.day-menu-modal {
-  max-width: 400px;
-}
 
-.quick-add-content,
-.day-menu-content {
+.quick-add-content {
   padding: 1.5rem;
 }
 
-.quick-add-content h3,
-.day-menu-content h3 {
+.quick-add-content h3 {
   margin: 0 0 0.5rem 0;
   color: var(--text-color, #333);
 }
 
-.day-menu-content h3 {
-  font-size: 1.2rem;
-}
 
-.quick-add-date,
-.day-menu-subtitle {
+.quick-add-date {
   margin: 0 0 1rem 0;
   color: var(--muted-text-color, #666);
   font-size: 0.9rem;
 }
 
-.day-menu-subtitle {
-  margin-bottom: 1.5rem;
-}
 
 .quick-add-form {
   display: flex;
@@ -1335,9 +1335,4 @@ onMounted(load)
   flex-wrap: wrap;
 }
 
-.day-menu-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
 </style>

@@ -16,6 +16,7 @@ const (
 	PermissionDeviceCodeClaim   = systemroles.PermissionDeviceCodeClaim
 	PermissionAuditView         = systemroles.PermissionAuditView
 	PermissionNotificationsSend = systemroles.PermissionNotificationsSend
+	PermissionRollupRun         = systemroles.PermissionRollupRun
 	RoleViewer                  = systemroles.RoleViewer
 )
 

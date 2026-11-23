@@ -27,6 +27,7 @@ import (
 	"github.com/jamesread/SickRock/internal/images"
 	"github.com/jamesread/SickRock/internal/notifications"
 	repo "github.com/jamesread/SickRock/internal/repo"
+	"github.com/jamesread/SickRock/internal/uiusage"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -36,6 +37,7 @@ type SickRockServer struct {
 	auth                *iam.AuthLayer
 	health              *armhealth.Service
 	images              *images.Store
+	uiUsage             *uiusage.Store
 	notifyLimiter       notifyLimiter
 }
 
@@ -945,6 +947,7 @@ func (s *SickRockServer) tableForeignKeysToProto(ctx context.Context, tc *repo.T
 			PullThroughFields:     pullThroughFieldsToProto(fk.PullThroughFields),
 			AbsorbIntoItem:        fk.AbsorbIntoItem,
 			AbsorbType:            fk.AbsorbType,
+			QuickAddJson:          fk.QuickAddJSON,
 		})
 	}
 	return pbForeignKeys
@@ -1182,6 +1185,11 @@ func (s *SickRockServer) AddTableColumn(ctx context.Context, req *connect.Reques
 	if err := s.saveNewColumnSemantic(ctx, req.Msg.GetPageId(), f.GetName(), f.GetType()); err != nil {
 		return nil, err
 	}
+	if req.Msg.GetUseForBulkEntry() && f.GetType() == repo.SemanticTypeBarcode {
+		if err := s.repo.SetBulkEntryScanColumn(ctx, req.Msg.GetPageId(), f.GetName()); err != nil {
+			return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("set bulk entry scan column: %w", err))
+		}
+	}
 	return s.GetTableStructure(ctx, &connect.Request[sickrockpb.GetTableStructureRequest]{Msg: &sickrockpb.GetTableStructureRequest{PageId: req.Msg.GetPageId()}})
 }
 
@@ -1204,6 +1212,10 @@ func columnSemanticForType(fieldType string) string {
 		return repo.SemanticTypeUserRef
 	case fieldType == repo.SemanticTypeImage:
 		return repo.SemanticTypeImage
+	case fieldType == repo.SemanticTypeIcon:
+		return repo.SemanticTypeIcon
+	case fieldType == repo.SemanticTypeBarcode:
+		return repo.SemanticTypeBarcode
 	case repo.IsDatetimeTypeName(fieldType):
 		return repo.SemanticTypeDatetime
 	}
@@ -1514,6 +1526,7 @@ func (s *SickRockServer) GetForeignKeys(ctx context.Context, req *connect.Reques
 			DisplayName:      fk.DisplayName,
 			AbsorbIntoItem:   fk.AbsorbIntoItem,
 			AbsorbType:       fk.AbsorbType,
+			QuickAddJson:     fk.QuickAddJSON,
 		})
 	}
 
@@ -1534,6 +1547,11 @@ func (s *SickRockServer) applyRelationAbsorb(ctx context.Context, constraintName
 func (s *SickRockServer) saveTableRelationUpdate(ctx context.Context, constraintName string, msg *sickrockpb.UpdateTableRelationRequest) error {
 	if err := s.applyRelationAbsorb(ctx, constraintName, msg); err != nil {
 		return err
+	}
+	if msg.QuickAddJson != nil {
+		if err := s.repo.SetTableRelationQuickAdd(ctx, constraintName, msg.GetQuickAddJson()); err != nil {
+			return err
+		}
 	}
 	pullThrough := pullThroughFieldsFromProto(msg.GetPullThroughFields())
 	if err := s.repo.UpdateTableRelation(ctx, constraintName, msg.GetDisplayName(), pullThrough); err != nil {

@@ -807,7 +807,9 @@ func addColumnSQLType(field FieldSpec, isMySQL bool) (typ, defaultClause string)
 		if isMySQL {
 			return "TINYINT(1)", ""
 		}
-		return "INTEGER", ""
+		// BOOLEAN (numeric affinity) rather than INTEGER, so the column is reported as a yes/no
+		// column and edited as one.
+		return "BOOLEAN", ""
 	case "datetime":
 		// Declare DATETIME on SQLite too so the column is reported as a datetime.
 		// ISO-8601 values are not integer literals, so SQLite still stores them as text.
@@ -1122,12 +1124,18 @@ func additionalFieldUpdates(columns []FieldSpec, additionalFields map[string]str
 
 // updateClearsToNull reports whether an empty or "0" value should be stored as NULL instead: for
 // nullable columns, and always for the navigation workflow_id/dashboard_id FKs (explicit names for
-// reliable clears from the UI).
+// reliable clears from the UI). On a yes/no column "0" means no, so only an empty value clears it.
 func updateClearsToNull(col *FieldSpec, fieldName, fieldValue string) bool {
-	if fieldValue != "" && fieldValue != "0" {
+	if fieldValue != "" && (fieldValue != "0" || IsBooleanTypeName(col.Type)) {
 		return false
 	}
 	return fieldName == "workflow_id" || fieldName == "dashboard_id" || !col.Required
+}
+
+// IsBooleanTypeName reports whether a column type holds a yes/no value (TINYINT, BOOL, BOOLEAN).
+func IsBooleanTypeName(typeName string) bool {
+	t := strings.ToLower(strings.TrimSpace(typeName))
+	return strings.HasPrefix(t, "tinyint") || t == "bool" || t == "boolean"
 }
 
 func (r *Repository) DeleteItemInTable(ctx context.Context, table string, id string) (bool, error) {
@@ -1491,6 +1499,7 @@ var systemTableConfigs = []systemTableConfig{
 	{name: "table_read_only_exports", title: "Read-only calendar exports", table: "read_only_calendar_exports", ordinal: 5, createButtonText: "Add Export", rowName: "Calendar export"},
 	{name: "table_rss_calendar_feeds", title: "Calendar feeds", table: "rss_calendar_feeds", ordinal: 7, createDelegate: "/admin/rss-calendar-feeds/new", createButtonText: "Add feed", rowName: "Calendar feed"},
 	{name: "table_images", title: "Images", table: "images", ordinal: 11, createButtonText: "Add image", rowName: "Image"},
+	{name: RollupsTableConfiguration, title: "Rollups", table: "rollups", ordinal: 12, createButtonText: "Add rollup", rowName: "Rollup"},
 	{name: "table_logs", title: "Audit logs", table: "audit_logs", ordinal: 6, createButtonText: "Insert Row", rowName: "Audit log entry"},
 }
 
@@ -1856,6 +1865,7 @@ type ForeignKey struct {
 	ReferencedSchema  string                     `db:"referenced_schema"`
 	OnDeleteAction    string                     `db:"on_delete_action"`
 	AbsorbType        string                     `db:"-"`
+	QuickAddJSON      string                     `db:"-"`
 	ConstraintName    string                     `db:"constraint_name"`
 	OnUpdateAction    string                     `db:"on_update_action"`
 	ReferencedColumn  string                     `db:"referenced_column"`

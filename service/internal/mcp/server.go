@@ -147,6 +147,29 @@ func NewHandler(srv *srvpkg.SickRockServer) http.Handler {
 		})
 	})
 
+	mcpServer.AddTool(mcp.NewTool("sickrock_list_rollups",
+		mcp.WithDescription("List rollups: each gathers the detail rows owned by a table's rows (e.g. the ingredients of planned recipes), groups and sums them, and replaces a target table's rows (e.g. a shopping list) with the result."),
+		mcp.WithString("source_table", mcp.Description("Optional table configuration name: only rollups that start from it")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return authorized(ctx, sickrockpbconnect.SickRockListRollupsProcedure, func() (*mcp.CallToolResult, error) {
+			return handleListRollups(ctx, srv, req)
+		})
+	})
+
+	mcpServer.AddTool(mcp.NewTool("sickrock_run_rollup",
+		mcp.WithDescription("Run a rollup from sickrock_list_rollups. This DELETES every row of its target table and writes the new totals."),
+		mcp.WithNumber("rollup_id", mcp.Required(), mcp.Description("Rollup id")),
+		mcp.WithString("date_column", mcp.Description("Optional source column to filter by date, e.g. datetime")),
+		mcp.WithString("from", mcp.Description("Start of the date range, YYYY-MM-DD (inclusive)")),
+		mcp.WithString("to", mcp.Description("End of the date range, YYYY-MM-DD (exclusive)")),
+		mcp.WithString("where", mcp.Description("Optional JSON object of exact-match filters on source columns")),
+		mcp.WithString("source_ids", mcp.Description("Optional comma-separated primary keys: only these source rows are used")),
+	), func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return authorized(ctx, sickrockpbconnect.SickRockRunRollupProcedure, func() (*mcp.CallToolResult, error) {
+			return handleRunRollup(ctx, srv, req)
+		})
+	})
+
 	return server.NewStreamableHTTPServer(
 		mcpServer,
 		server.WithEndpointPath("/mcp"),
@@ -453,4 +476,60 @@ func notifyRecipientIDs(recipients string, users []*sickrockpb.NotifiableUser) (
 		}
 	}
 	return ids, unknown
+}
+
+func handleListRollups(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	res, err := srv.ListRollups(ctx, connect.NewRequest(&sickrockpb.ListRollupsRequest{SourceTable: req.GetString("source_table", "")}))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return jsonResult(res.Msg.GetRollups())
+}
+
+func handleRunRollup(ctx context.Context, srv *srvpkg.SickRockServer, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	id, err := req.RequireInt("rollup_id")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	where, errResult := rollupWhere(req.GetString("where", ""))
+	if errResult != nil {
+		return errResult, nil
+	}
+	ids := splitIDs(req.GetString("source_ids", ""))
+	res, err := srv.RunRollup(ctx, connect.NewRequest(&sickrockpb.RunRollupRequest{
+		RollupId:         int64(id),
+		DateColumn:       req.GetString("date_column", ""),
+		From:             req.GetString("from", ""),
+		To:               req.GetString("to", ""),
+		Where:            where,
+		SourceIds:        ids,
+		LimitToSourceIds: len(ids) > 0,
+	}))
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	return jsonResult(res.Msg)
+}
+
+// rollupWhere decodes the where argument of sickrock_run_rollup, or returns the tool error result to send.
+func rollupWhere(raw string) (map[string]string, *mcp.CallToolResult) {
+	where := map[string]string{}
+	if strings.TrimSpace(raw) == "" {
+		return where, nil
+	}
+	if err := json.Unmarshal([]byte(raw), &where); err != nil {
+		return nil, mcp.NewToolResultError("where must be a JSON object of strings: " + err.Error())
+	}
+	return where, nil
+}
+
+// splitIDs splits comma-separated ids, dropping blanks.
+func splitIDs(raw string) []string {
+	var ids []string
+	for id := range strings.SplitSeq(raw, ",") {
+		if id = strings.TrimSpace(id); id != "" {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }

@@ -18,6 +18,8 @@ const (
 	PermissionAuditView       = "audit.view"
 	// PermissionNotificationsSend lets a user notify users who share a group with them.
 	PermissionNotificationsSend = "notifications.send"
+	// PermissionRollupRun lets a user run rollups, which replace the rows of their target table.
+	PermissionRollupRun = "rollup.run"
 
 	RoleViewer  = "viewer"
 	RoleAuditor = "auditor"

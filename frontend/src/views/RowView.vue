@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import { ref, shallowRef, onMounted, onUnmounted, computed, inject, provide, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -22,6 +23,8 @@ import Tabs from 'picocrank/vue/components/Tabs.vue'
 import RelatedRelationPanel, { type RelatedTableEntry } from './RelatedRelationPanel.vue'
 import DangerZone from 'picocrank/vue/components/DangerZone.vue'
 import FormField from 'picocrank/vue/components/FormField.vue'
+import CheckGroup from 'picocrank/vue/components/CheckGroup.vue'
+import { defaultQuickAddConfig, parseQuickAddConfig, quickAddCandidateColumns, serializeQuickAddConfig } from '../utils/quickAdd'
 import Dialog from 'picocrank/vue/components/Dialog.vue'
 import type { DialogApi } from '../utils/dialog'
 import type { createApiClient } from '../stores/api'
@@ -35,6 +38,7 @@ import {
   isImageFieldType,
   isUserRefColumn as columnIsUserRef,
   isUserRefFieldType,
+  YES_NO_OPTIONS,
 } from '../utils/fieldTypes'
 import { appTitle, formatDocumentTitle } from '../appTitle'
 import { rowEditActionLabel, rowNamePluralLabel, tableListLinkLabel } from '../utils/rowInsertLabel'
@@ -152,6 +156,7 @@ const foreignKeys = ref<Array<{
   pullThroughFields: RelationPullThroughField[]
   absorbIntoItem: boolean
   absorbType: string
+  quickAddJson: string
 }>>([])
 const relatedChildStructures = ref<Record<string, GetTableStructureResponse>>({})
 const relatedPullThroughExtraFields = ref<Record<string, Field[]>>({})
@@ -161,6 +166,12 @@ const managingConstraintName = ref('')
 const relationDisplayNameDraft = ref('')
 const relationAbsorbDraft = ref(false)
 const relationAbsorbTypeDraft = ref('first_row')
+const relationQuickAddDraft = ref(defaultQuickAddConfig())
+// Related table columns the quick add row can offer (all but the link back to this row).
+const relationQuickAddOptions = computed(() => quickAddCandidateColumns(
+  relationChildFields.value,
+  managingRelationFk.value?.columnName ?? '',
+).map(field => ({ value: field.name, label: field.displayLabel?.trim() || field.name })))
 const relationPullThroughDraft = ref<Array<{ fkColumn: string; field: string }>>([])
 const relationCalculatedDraft = ref<CalculatedColumnSpec[]>([])
 const relationChildForeignKeys = ref<ForeignKey[]>([])
@@ -448,6 +459,7 @@ async function loadTableStructure() {
       pullThroughFields: (fk.pullThroughFields ?? []).map(pt => ({ ...pt })),
       absorbIntoItem: fk.absorbIntoItem,
       absorbType: fk.absorbType,
+      quickAddJson: fk.quickAddJson,
     }))
     if (response.fields?.some(field => isUserRefColumn(field.name))) {
       void loadUsers()
@@ -486,13 +498,14 @@ async function loadFkReferencedItems() {
   fkReferencedItems.value = data
 }
 
-// Load related rows based on foreign key relationships (bidirectional)
-async function loadRelatedRows() {
+// Load related rows based on foreign key relationships (bidirectional). A quiet reload (after a
+// panel changed its rows) keeps the panels on screen, so a quick add row keeps its focus.
+async function loadRelatedRows(options: { quiet?: boolean } = {}) {
   if (!item.value || foreignKeys.value.length === 0) {
     return
   }
 
-  loadingRelated.value = true
+  loadingRelated.value = !options.quiet
   try {
     const relatedData: Record<string, any[]> = {}
 
@@ -895,6 +908,7 @@ const relatedTables = computed(() => {
     pullThroughExtraFields?: Field[]
     absorbIntoItem: boolean
     absorbType: string
+    quickAddJson: string
   }> = []
 
   for (const [key, rows] of Object.entries(relatedRows.value)) {
@@ -934,6 +948,7 @@ const relatedTables = computed(() => {
       pullThroughExtraFields: relatedPullThroughExtraFields.value[key],
       absorbIntoItem: !!fk.absorbIntoItem,
       absorbType: fk.absorbType || '',
+      quickAddJson: fk.quickAddJson || '',
     })
   }
 
@@ -1198,6 +1213,7 @@ function openManageRelation(constraintName: string, displayName?: string) {
   const fk = foreignKeys.value.find(entry => entry.constraintName === constraintName)
   relationAbsorbDraft.value = !!fk?.absorbIntoItem
   relationAbsorbTypeDraft.value = fk?.absorbType || 'first_row'
+  relationQuickAddDraft.value = parseQuickAddConfig(fk?.quickAddJson)
   const columns = fk?.pullThroughFields ?? []
   relationPullThroughDraft.value = columns
     .filter(pt => !pt.expr?.trim())
@@ -1221,6 +1237,7 @@ function closeManageRelation() {
   relationDisplayNameDraft.value = ''
   relationAbsorbDraft.value = false
   relationAbsorbTypeDraft.value = 'first_row'
+  relationQuickAddDraft.value = defaultQuickAddConfig()
   relationPullThroughDraft.value = []
   relationCalculatedDraft.value = []
   relationChildForeignKeys.value = []
@@ -1258,6 +1275,7 @@ async function saveRelationDisplayName() {
       pullThroughFields,
       absorbIntoItem: relationAbsorbDraft.value,
       absorbType: relationAbsorbDraft.value ? relationAbsorbTypeDraft.value : '',
+      quickAddJson: serializeQuickAddConfig(relationQuickAddDraft.value),
     })
     if (!res.success) {
       throw new Error(res.message || 'Failed to update relation')
@@ -1502,7 +1520,7 @@ function cancelDelete() {
             :related-row-name="relatedTableRowNames[relatedEntry(block.constraintName)!.tableName] ?? ''"
             :icon="relatedTableIcons[relatedEntry(block.constraintName)!.tableName]"
             :can-edit-relation="tableAccess.canEdit"
-            @rows-updated="loadRelatedRows"
+            @rows-updated="loadRelatedRows({ quiet: true })"
             @row-deleted="(id) => onRelatedRowDeleted(relatedEntry(block.constraintName)!, id)"
             @manage-relation="openManageRelation"
           />
@@ -1540,7 +1558,7 @@ function cancelDelete() {
                   :related-row-name="relatedTableRowNames[relatedEntry(tab.constraintName)!.tableName] ?? ''"
                   :can-edit-relation="tableAccess.canEdit"
                   embed-in-tabs
-                  @rows-updated="loadRelatedRows"
+                  @rows-updated="loadRelatedRows({ quiet: true })"
                   @row-deleted="(id) => onRelatedRowDeleted(relatedEntry(tab.constraintName)!, id)"
                   @manage-relation="openManageRelation"
                 />
@@ -1565,7 +1583,7 @@ function cancelDelete() {
           :related-row-name="relatedTableRowNames[table.tableName] ?? ''"
           :icon="relatedTableIcons[table.tableName]"
           :can-edit-relation="tableAccess.canEdit"
-          @rows-updated="loadRelatedRows"
+          @rows-updated="loadRelatedRows({ quiet: true })"
           @row-deleted="(id) => onRelatedRowDeleted(table, id)"
           @manage-relation="openManageRelation"
         />
@@ -1655,12 +1673,13 @@ function cancelDelete() {
       <p class="muted">
         Show the related row inside this item's main section, as if its fields were part of the item, instead of as a separate section.
       </p>
-      <FormField label="Absorb into item" for="relation-absorb" :disabled="savingRelation">
-        <input
-          id="relation-absorb"
+      <FormField label="Absorb into item" component-has-label :disabled="savingRelation">
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
           v-model="relationAbsorbDraft"
-          type="checkbox"
           :disabled="savingRelation"
+          aria-label="Absorb into item"
         />
       </FormField>
       <FormField label="Absorb type" for="relation-absorb-type" :disabled="savingRelation || !relationAbsorbDraft">
@@ -1671,6 +1690,38 @@ function cancelDelete() {
         >
           <option value="first_row">First row</option>
         </select>
+      </FormField>
+      <h3 class="relation-dialog-subheading">Quick add</h3>
+      <p class="muted">
+        Add a row under the related list for typing in related rows one after another (for example, a recipe's ingredients), without leaving this page.
+      </p>
+      <FormField label="Quick add" component-has-label :disabled="savingRelation">
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
+          v-model="relationQuickAddDraft.enabled"
+          :disabled="savingRelation"
+          aria-label="Quick add"
+        />
+      </FormField>
+      <FormField label="Columns" component-has-label :disabled="savingRelation || !relationQuickAddDraft.enabled">
+        <CheckGroup
+          v-model="relationQuickAddDraft.columns"
+          :options="relationQuickAddOptions"
+          aria-label="Quick add columns"
+          :disabled="savingRelation || !relationQuickAddDraft.enabled"
+        />
+        <small class="muted">In the order you tick them. None ticked shows every column.</small>
+      </FormField>
+      <FormField label="Create missing" component-has-label :disabled="savingRelation || !relationQuickAddDraft.enabled">
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
+          v-model="relationQuickAddDraft.createMissing"
+          :disabled="savingRelation || !relationQuickAddDraft.enabled"
+          aria-label="Create missing"
+        />
+        <small class="muted">Typing a name that matches no row in a linked table (e.g. a new ingredient) creates that row.</small>
       </FormField>
       <h3 class="relation-dialog-subheading">Pull-through columns</h3>
       <p class="muted">
@@ -1910,9 +1961,5 @@ function cancelDelete() {
   outline: none;
 }
 
-.edit-checkbox {
-  width: 1.25rem;
-  height: 1.25rem;
-}
 
 </style>

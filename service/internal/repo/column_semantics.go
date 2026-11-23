@@ -11,6 +11,8 @@ const (
 	SemanticTypeDatetime = "datetime"
 	// SemanticTypeIcon marks a column holding a Hugeicons icon name; the frontend edits it with an icon picker.
 	SemanticTypeIcon = "icon"
+	// SemanticTypeBarcode marks a text column holding a barcode; the frontend can fill it by scanning.
+	SemanticTypeBarcode = "barcode"
 )
 
 func IsDatetimeTypeName(typeName string) bool {

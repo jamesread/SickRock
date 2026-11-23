@@ -5,6 +5,7 @@ import {
   fieldHasValueAffixes,
   formatFieldDisplayValue,
   interpolateFieldTemplate,
+  columnChoiceLabel,
 } from './fieldColumnDisplay'
 import type { Field } from '../gen/sickrock_pb'
 
@@ -83,5 +84,14 @@ describe('fieldColumnDisplay', () => {
     expect(
       formatFieldDisplayValue('amount', '50', field, row, [], {}),
     ).toBe('GBP\u00A050')
+  })
+})
+
+describe('columnChoiceLabel', () => {
+  it('shows the label beside the column name, or just the name', () => {
+    expect(columnChoiceLabel('barcode', 'EAN code')).toBe('EAN code (barcode)')
+    expect(columnChoiceLabel('barcode', '  ')).toBe('barcode')
+    expect(columnChoiceLabel('barcode', undefined)).toBe('barcode')
+    expect(columnChoiceLabel('name', 'name')).toBe('name')
   })
 })

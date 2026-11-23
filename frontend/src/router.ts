@@ -37,11 +37,11 @@ const Dashboard = () => import('./views/Dashboard.vue')
 const WorkflowView = () => import('./views/WorkflowView.vue')
 const HealthView = () => import('./views/HealthView.vue')
 const UserPreferences = () => import('./views/UserPreferences.vue')
+const UserUiUsage = () => import('./views/UserUiUsage.vue')
 const UserControlPanel = () => import('./views/UserControlPanel.vue')
 const UserBookmarks = () => import('./views/UserBookmarks.vue')
 const UserAPIKeys = () => import('./views/UserAPIKeys.vue')
 const UserNotifications = () => import('./views/UserNotifications.vue')
-const DayView = () => import('./views/DayView.vue')
 const IamHub = () => import('./views/iam/IamHub.vue')
 const IamUsers = () => import('./views/iam/IamUsers.vue')
 const IamUserDetails = () => import('./views/iam/IamUserDetails.vue')
@@ -173,6 +173,12 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/user-ui-usage',
+      name: 'user-ui-usage',
+      component: UserUiUsage,
+      meta: { requiresAuth: true }
+    },
+    {
       path: '/user-bookmarks',
       name: 'user-bookmarks',
       component: UserBookmarks,
@@ -209,21 +215,9 @@ const router = createRouter({
       },
     },
     {
+      // Old day page: the calendar now has its own day view.
       path: '/table/:tableName/day/:date',
-      name: 'day-view',
-      component: DayView,
-      props: true,
-      meta: {
-        requiresAuth: true,
-        breadcrumbs: (route: any) => {
-          const date = new Date(String(route.params.date))
-          const formattedDate = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-          return [
-            { name: String(route.params.tableName), href: { name: 'table', params: { tableName: route.params.tableName } } },
-            { name: formattedDate },
-          ]
-        },
-      },
+      redirect: to => ({ name: 'table', params: { tableName: to.params.tableName }, query: { day: String(to.params.date) } }),
     },
     {
       path: '/table/:tableName/:rowId',

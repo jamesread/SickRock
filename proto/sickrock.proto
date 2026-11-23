@@ -490,7 +490,11 @@ message SetItemPageLayoutResponse {
 
 message AddTableColumnRequest {
   string page_id = 1;
+  // field.type is a storage type (string, int64, tinyint, datetime) or a column semantic stored on
+  // one (user_ref, image, icon, barcode).
   Field field = 2;
+  // For a barcode column: make it the table's bulk entry scan column (turning bulk entry on).
+  bool use_for_bulk_entry = 3;
 }
 
 // Table Views
@@ -643,6 +647,9 @@ message ForeignKey {
   repeated RelationPullThroughField pull_through_fields = 12;
   bool absorb_into_item = 13; // Show related rows inside the item view instead of their own section
   string absorb_type = 14; // "first_row" when absorb_into_item is set
+  // Quick add settings for the related rows panel (table_relations.quick_add_json), e.g.
+  // {"enabled":true,"columns":["ingredient","quantity","unit"],"createMissing":true}; empty when unset.
+  string quick_add_json = 15;
 }
 
 message RelationPullThroughField {
@@ -659,6 +666,8 @@ message UpdateTableRelationRequest {
   // Absorb settings change only when absorb_into_item is sent (other editors leave them alone).
   optional bool absorb_into_item = 4;
   optional string absorb_type = 5; // "first_row" (default)
+  // Quick add settings change only when sent; an empty string clears them.
+  optional string quick_add_json = 6;
 }
 
 message UpdateTableRelationResponse {
@@ -1200,6 +1209,62 @@ message UserBookmark {
   string title = 5; // navigation name from table_navigation
 }
 
+// UI usage tracking (opt-in, per user): navigation through routes, the sidebar and the header,
+// appended to the user's own JSONL file on the server for offline analysis.
+message UIUsageEvent {
+  string kind = 1;          // "route", "sidebar" or "header"
+  string from_path = 2;     // the route the user was on
+  string to_path = 3;       // the route navigated to, or the clicked link's path
+  string label = 4;         // the clicked link or button's label
+  int64 timestamp_ms = 5;   // when it happened (client clock, Unix milliseconds)
+  string session_id = 6;   // random per page load, to follow one tab's path
+  string app_version = 7;   // the app version the client loaded
+}
+
+message RecordUIUsageRequest {
+  repeated UIUsageEvent events = 1;
+}
+
+message RecordUIUsageResponse {
+  int32 accepted = 1;
+  // false when the user has not opted in; the client then stops tracking.
+  bool tracking_enabled = 2;
+}
+
+message GetUIUsageSettingsRequest {}
+
+message GetUIUsageSettingsResponse {
+  bool tracking_enabled = 1;
+  int32 line_count = 2;
+  int32 max_lines = 3;
+}
+
+message SetUIUsageTrackingRequest {
+  bool enabled = 1;
+}
+
+message SetUIUsageTrackingResponse {
+  bool tracking_enabled = 1;
+}
+
+message ClearUIUsageLogRequest {}
+
+message ClearUIUsageLogResponse {}
+
+// Home page layout: each user's own order and visibility of home sections and the bookmarks shown
+// as quick access buttons, as a JSON object the frontend reads (utils/homeLayout.ts).
+message GetHomeLayoutRequest {}
+
+message GetHomeLayoutResponse {
+  string layout_json = 1; // empty for the default layout
+}
+
+message SetHomeLayoutRequest {
+  string layout_json = 1; // empty resets to the default layout
+}
+
+message SetHomeLayoutResponse {}
+
 // API Key Management
 message CreateAPIKeyRequest {
   string name = 1;
@@ -1511,6 +1576,52 @@ message ClearTickListStateRequest {
 
 message ClearTickListStateResponse {}
 
+// Rollup is a configured rollup (system table table_rollups): the detail rows owned by a set of
+// source rows, grouped and summed into a target table whose rows each run replaces.
+message Rollup {
+  int64 id = 1;
+  string name = 2;
+  string source_table = 3;
+  string detail_table = 4;
+  string target_table = 5;
+}
+
+message ListRollupsRequest {
+  // When set, only rollups that start from this table configuration.
+  string source_table = 1;
+}
+
+message ListRollupsResponse {
+  repeated Rollup rollups = 1;
+}
+
+// RunRollupRequest runs a rollup over the source rows matching every filter. Tables and the
+// rollup's columns come from its stored definition; the filters only narrow its source rows.
+message RunRollupRequest {
+  int64 rollup_id = 1;
+  // Source column whose value must lie in [from, to); empty for no date range.
+  string date_column = 2;
+  // Wall-clock bounds "YYYY-MM-DD" or "YYYY-MM-DD HH:MM:SS"; empty for an open end.
+  string from = 3;
+  string to = 4;
+  // Exact-match filters on source columns.
+  map<string, string> where = 5;
+  // With limit_to_source_ids, only source rows whose primary key is listed (e.g. the rows a table's
+  // filters leave); an empty list then matches nothing.
+  repeated string source_ids = 6;
+  bool limit_to_source_ids = 7;
+}
+
+message RunRollupResponse {
+  // Table configuration whose rows were replaced.
+  string target_table = 1;
+  int64 rows_written = 2;
+  int64 source_rows = 3;
+  int64 detail_rows = 4;
+  // Values that could not be summed (not numbers).
+  repeated string skipped = 5;
+}
+
 service SickRock {
   rpc Init(InitRequest) returns (InitResponse);
   rpc Ping(PingRequest) returns (PingResponse);
@@ -1637,6 +1748,8 @@ service SickRock {
 
   // User Bookmarks
   rpc GetUserBookmarks(GetUserBookmarksRequest) returns (GetUserBookmarksResponse);
+  rpc GetHomeLayout(GetHomeLayoutRequest) returns (GetHomeLayoutResponse);
+  rpc SetHomeLayout(SetHomeLayoutRequest) returns (SetHomeLayoutResponse);
   rpc CreateUserBookmark(CreateUserBookmarkRequest) returns (CreateUserBookmarkResponse);
   rpc DeleteUserBookmark(DeleteUserBookmarkRequest) returns (DeleteUserBookmarkResponse);
 
@@ -1644,6 +1757,10 @@ service SickRock {
   rpc CreateAPIKey(CreateAPIKeyRequest) returns (CreateAPIKeyResponse);
   rpc GetAPIKeys(GetAPIKeysRequest) returns (GetAPIKeysResponse);
   rpc UpdateAPIKey(UpdateAPIKeyRequest) returns (UpdateAPIKeyResponse);
+  rpc GetUIUsageSettings(GetUIUsageSettingsRequest) returns (GetUIUsageSettingsResponse);
+  rpc SetUIUsageTracking(SetUIUsageTrackingRequest) returns (SetUIUsageTrackingResponse);
+  rpc RecordUIUsage(RecordUIUsageRequest) returns (RecordUIUsageResponse);
+  rpc ClearUIUsageLog(ClearUIUsageLogRequest) returns (ClearUIUsageLogResponse);
   rpc DeleteAPIKey(DeleteAPIKeyRequest) returns (DeleteAPIKeyResponse);
   rpc DeactivateAPIKey(DeactivateAPIKeyRequest) returns (DeactivateAPIKeyResponse);
 
@@ -1669,4 +1786,8 @@ service SickRock {
   rpc GetTickListState(GetTickListStateRequest) returns (GetTickListStateResponse);
   rpc SetTickListCompletion(SetTickListCompletionRequest) returns (SetTickListCompletionResponse);
   rpc ClearTickListState(ClearTickListStateRequest) returns (ClearTickListStateResponse);
+
+  // Rollups: group and sum related rows into a target table, replacing its rows
+  rpc ListRollups(ListRollupsRequest) returns (ListRollupsResponse);
+  rpc RunRollup(RunRollupRequest) returns (RunRollupResponse);
 }

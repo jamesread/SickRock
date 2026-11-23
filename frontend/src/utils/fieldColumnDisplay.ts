@@ -242,3 +242,12 @@ export function formatFieldDisplayValue(
   )
   return applyFieldValueAffixes(core, field, record, resolver)
 }
+
+/**
+ * A column as named in pickers and settings screens: its display label with the column name beside
+ * it, e.g. "EAN code (barcode)", or just the name when it has no label.
+ */
+export function columnChoiceLabel(name: string, displayLabel?: string | null): string {
+  const label = (displayLabel ?? '').trim()
+  return label && label !== name ? `${label} (${name})` : name
+}

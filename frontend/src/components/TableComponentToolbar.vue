@@ -8,6 +8,7 @@ import {
   Settings01Icon,
 } from '@hugeicons/core-free-icons'
 import ViewsButton from './ViewsButton.vue'
+import RollupButtons from './RollupButtons.vue'
 import type { TableView } from '../composables/useTableViewManager'
 
 defineProps<{
@@ -27,6 +28,8 @@ defineProps<{
   selectedViewId: number | null
   currentView: TableView | null
   multiSelectEnabled?: boolean
+  /** Rows a rollup run covers (those the filters leave); undefined for every row. */
+  rollupSourceIds?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -83,6 +86,7 @@ const emit = defineEmits<{
     <HugeiconsIcon :icon="BarCode01Icon" width="1em" height="1em" aria-hidden="true" />
     <span>Bulk entry</span>
   </router-link>
+  <RollupButtons :table-id="tableId" :source-ids="rollupSourceIds" />
   <div v-if="showInsert" class="insert-button-group">
     <!-- Wide screens show "Create <row>"; narrow screens fall back to the compact quick-add button. -->
     <router-link

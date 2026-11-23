@@ -16,6 +16,7 @@ import ImageThumb from './ImageThumb.vue'
 import RowPickerDialog from './RowPickerDialog.vue'
 import ContextMenu from './ContextMenu.vue'
 import NotifyUsersDialog from './NotifyUsersDialog.vue'
+import RollupButtons from './RollupButtons.vue'
 import { useAuthStore } from '../stores/auth'
 import type { ForeignKey, Item } from '../gen/sickrock_pb'
 import { getItemNameFieldValue } from '../utils/itemViewSectionTitle'
@@ -69,6 +70,7 @@ const referencedCreateLabel = ref('')
 // Extra fields on the picker's tiles: the detail columns of the referenced table's Cards view.
 const referencedDetailColumns = ref<string[]>([])
 const referencedFieldTypes = ref<Record<string, string>>({})
+const referencedFieldLabels = ref<Record<string, string>>({})
 const loading = ref(true)
 const busy = ref(false)
 const error = ref<string | null>(null)
@@ -98,7 +100,7 @@ const pickerOptions = computed<WeeklyPlanPickerOption[]>(() => referencedRows.va
     value: String(row.id),
     label: referencedLabel(row),
     imageId: referencedImageId(row),
-    details: cardDetails(row, referencedDetailColumns.value, referencedFieldTypes.value),
+    details: cardDetails(row, referencedDetailColumns.value, referencedFieldTypes.value, referencedFieldLabels.value),
   }))
   .sort((a, b) => a.label.localeCompare(b.label)))
 const pickerTitle = computed(() => {
@@ -177,6 +179,7 @@ async function loadReferencedTable() {
   const cards = cardsView ? parseCardsConfig(cardsView.layoutJson) : null
   referencedDetailColumns.value = cards?.detailColumns ?? []
   referencedFieldTypes.value = Object.fromEntries((refStructure.fields ?? []).map(field => [field.name, field.type]))
+  referencedFieldLabels.value = Object.fromEntries((refStructure.fields ?? []).map(field => [field.name, field.displayLabel ?? '']))
   referencedImageColumn.value = cards?.imageColumn
     || (refStructure.fields?.find(f => isImageFieldType(f.type))?.name ?? '')
   referencedRows.value = refItems.items ?? []
@@ -362,6 +365,13 @@ onMounted(load)
         <HugeiconsIcon :icon="Notification03Icon" width="1em" height="1em" aria-hidden="true" />
         <span>Notify…</span>
       </button>
+      <RollupButtons
+        v-if="problems.length === 0"
+        :table-id="tableId"
+        :date-column="config.dateColumn"
+        :week-start="weekStart"
+        :scope-label="weekLabel"
+      />
     </template>
 
     <p v-if="loading" class="padding">Loading…</p>

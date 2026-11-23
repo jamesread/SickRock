@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
+import { YES_NO_OPTIONS } from '../utils/fieldTypes'
 import { ref, watch, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -254,44 +256,47 @@ async function submit() {
 
       <FormField
         label="Create table in database"
-        for="create-table-in-database"
+        component-has-label
         description="Untick when adding a configuration for a table that already exists (e.g. from Database Browser)"
         :disabled="loading"
       >
-        <input
-          id="create-table-in-database"
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
           v-model="createTableInDatabase"
-          type="checkbox"
           :disabled="loading"
+          aria-label="Create table in database"
         />
       </FormField>
 
       <FormField
         label="Create table configuration entry"
-        for="create-configuration"
+        component-has-label
         :description="createConfigurationDescription"
         :disabled="loading || !createTableInDatabase"
       >
-        <input
-          id="create-configuration"
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
           v-model="createConfiguration"
-          type="checkbox"
           :disabled="loading || !createTableInDatabase"
+          aria-label="Create table configuration entry"
         />
       </FormField>
 
       <FormField
         v-if="createConfiguration"
         label="Create navigation entry"
-        for="create-navigation-entry"
+        component-has-label
         description="Adds a link in the main navigation menu for this table configuration"
         :disabled="loading"
       >
-        <input
-          id="create-navigation-entry"
+        <RadioGroup
+          variant="boolean"
+          :options="YES_NO_OPTIONS"
           v-model="createNavigationEntry"
-          type="checkbox"
           :disabled="loading"
+          aria-label="Create navigation entry"
         />
       </FormField>
 

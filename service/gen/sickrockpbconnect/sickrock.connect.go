@@ -267,6 +267,10 @@ const (
 	// SickRockGetUserBookmarksProcedure is the fully-qualified name of the SickRock's GetUserBookmarks
 	// RPC.
 	SickRockGetUserBookmarksProcedure = "/sickrock.SickRock/GetUserBookmarks"
+	// SickRockGetHomeLayoutProcedure is the fully-qualified name of the SickRock's GetHomeLayout RPC.
+	SickRockGetHomeLayoutProcedure = "/sickrock.SickRock/GetHomeLayout"
+	// SickRockSetHomeLayoutProcedure is the fully-qualified name of the SickRock's SetHomeLayout RPC.
+	SickRockSetHomeLayoutProcedure = "/sickrock.SickRock/SetHomeLayout"
 	// SickRockCreateUserBookmarkProcedure is the fully-qualified name of the SickRock's
 	// CreateUserBookmark RPC.
 	SickRockCreateUserBookmarkProcedure = "/sickrock.SickRock/CreateUserBookmark"
@@ -279,6 +283,17 @@ const (
 	SickRockGetAPIKeysProcedure = "/sickrock.SickRock/GetAPIKeys"
 	// SickRockUpdateAPIKeyProcedure is the fully-qualified name of the SickRock's UpdateAPIKey RPC.
 	SickRockUpdateAPIKeyProcedure = "/sickrock.SickRock/UpdateAPIKey"
+	// SickRockGetUIUsageSettingsProcedure is the fully-qualified name of the SickRock's
+	// GetUIUsageSettings RPC.
+	SickRockGetUIUsageSettingsProcedure = "/sickrock.SickRock/GetUIUsageSettings"
+	// SickRockSetUIUsageTrackingProcedure is the fully-qualified name of the SickRock's
+	// SetUIUsageTracking RPC.
+	SickRockSetUIUsageTrackingProcedure = "/sickrock.SickRock/SetUIUsageTracking"
+	// SickRockRecordUIUsageProcedure is the fully-qualified name of the SickRock's RecordUIUsage RPC.
+	SickRockRecordUIUsageProcedure = "/sickrock.SickRock/RecordUIUsage"
+	// SickRockClearUIUsageLogProcedure is the fully-qualified name of the SickRock's ClearUIUsageLog
+	// RPC.
+	SickRockClearUIUsageLogProcedure = "/sickrock.SickRock/ClearUIUsageLog"
 	// SickRockDeleteAPIKeyProcedure is the fully-qualified name of the SickRock's DeleteAPIKey RPC.
 	SickRockDeleteAPIKeyProcedure = "/sickrock.SickRock/DeleteAPIKey"
 	// SickRockDeactivateAPIKeyProcedure is the fully-qualified name of the SickRock's DeactivateAPIKey
@@ -334,6 +349,10 @@ const (
 	// SickRockClearTickListStateProcedure is the fully-qualified name of the SickRock's
 	// ClearTickListState RPC.
 	SickRockClearTickListStateProcedure = "/sickrock.SickRock/ClearTickListState"
+	// SickRockListRollupsProcedure is the fully-qualified name of the SickRock's ListRollups RPC.
+	SickRockListRollupsProcedure = "/sickrock.SickRock/ListRollups"
+	// SickRockRunRollupProcedure is the fully-qualified name of the SickRock's RunRollup RPC.
+	SickRockRunRollupProcedure = "/sickrock.SickRock/RunRollup"
 )
 
 // SickRockClient is a client for the sickrock.SickRock service.
@@ -445,12 +464,18 @@ type SickRockClient interface {
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 	// User Bookmarks
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
+	GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error)
+	SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 	// API Key Management
 	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
 	UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error)
+	GetUIUsageSettings(context.Context, *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error)
+	SetUIUsageTracking(context.Context, *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error)
+	RecordUIUsage(context.Context, *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error)
+	ClearUIUsageLog(context.Context, *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 	// Conditional Formatting Rules
@@ -473,6 +498,9 @@ type SickRockClient interface {
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
 	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
+	// Rollups: group and sum related rows into a target table, replacing its rows
+	ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error)
+	RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error)
 }
 
 // NewSickRockClient constructs a client for the sickrock.SickRock service. By default, it uses the
@@ -1014,6 +1042,18 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("GetUserBookmarks")),
 			connect.WithClientOptions(opts...),
 		),
+		getHomeLayout: connect.NewClient[proto.GetHomeLayoutRequest, proto.GetHomeLayoutResponse](
+			httpClient,
+			baseURL+SickRockGetHomeLayoutProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetHomeLayout")),
+			connect.WithClientOptions(opts...),
+		),
+		setHomeLayout: connect.NewClient[proto.SetHomeLayoutRequest, proto.SetHomeLayoutResponse](
+			httpClient,
+			baseURL+SickRockSetHomeLayoutProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetHomeLayout")),
+			connect.WithClientOptions(opts...),
+		),
 		createUserBookmark: connect.NewClient[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse](
 			httpClient,
 			baseURL+SickRockCreateUserBookmarkProcedure,
@@ -1042,6 +1082,30 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			httpClient,
 			baseURL+SickRockUpdateAPIKeyProcedure,
 			connect.WithSchema(sickRockMethods.ByName("UpdateAPIKey")),
+			connect.WithClientOptions(opts...),
+		),
+		getUIUsageSettings: connect.NewClient[proto.GetUIUsageSettingsRequest, proto.GetUIUsageSettingsResponse](
+			httpClient,
+			baseURL+SickRockGetUIUsageSettingsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("GetUIUsageSettings")),
+			connect.WithClientOptions(opts...),
+		),
+		setUIUsageTracking: connect.NewClient[proto.SetUIUsageTrackingRequest, proto.SetUIUsageTrackingResponse](
+			httpClient,
+			baseURL+SickRockSetUIUsageTrackingProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetUIUsageTracking")),
+			connect.WithClientOptions(opts...),
+		),
+		recordUIUsage: connect.NewClient[proto.RecordUIUsageRequest, proto.RecordUIUsageResponse](
+			httpClient,
+			baseURL+SickRockRecordUIUsageProcedure,
+			connect.WithSchema(sickRockMethods.ByName("RecordUIUsage")),
+			connect.WithClientOptions(opts...),
+		),
+		clearUIUsageLog: connect.NewClient[proto.ClearUIUsageLogRequest, proto.ClearUIUsageLogResponse](
+			httpClient,
+			baseURL+SickRockClearUIUsageLogProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ClearUIUsageLog")),
 			connect.WithClientOptions(opts...),
 		),
 		deleteAPIKey: connect.NewClient[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse](
@@ -1158,6 +1222,18 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("ClearTickListState")),
 			connect.WithClientOptions(opts...),
 		),
+		listRollups: connect.NewClient[proto.ListRollupsRequest, proto.ListRollupsResponse](
+			httpClient,
+			baseURL+SickRockListRollupsProcedure,
+			connect.WithSchema(sickRockMethods.ByName("ListRollups")),
+			connect.WithClientOptions(opts...),
+		),
+		runRollup: connect.NewClient[proto.RunRollupRequest, proto.RunRollupResponse](
+			httpClient,
+			baseURL+SickRockRunRollupProcedure,
+			connect.WithSchema(sickRockMethods.ByName("RunRollup")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -1251,11 +1327,17 @@ type sickRockClient struct {
 	createDashboardComponentRule       *connect.Client[proto.CreateDashboardComponentRuleRequest, proto.CreateDashboardComponentRuleResponse]
 	getSystemInfo                      *connect.Client[proto.GetSystemInfoRequest, proto.GetSystemInfoResponse]
 	getUserBookmarks                   *connect.Client[proto.GetUserBookmarksRequest, proto.GetUserBookmarksResponse]
+	getHomeLayout                      *connect.Client[proto.GetHomeLayoutRequest, proto.GetHomeLayoutResponse]
+	setHomeLayout                      *connect.Client[proto.SetHomeLayoutRequest, proto.SetHomeLayoutResponse]
 	createUserBookmark                 *connect.Client[proto.CreateUserBookmarkRequest, proto.CreateUserBookmarkResponse]
 	deleteUserBookmark                 *connect.Client[proto.DeleteUserBookmarkRequest, proto.DeleteUserBookmarkResponse]
 	createAPIKey                       *connect.Client[proto.CreateAPIKeyRequest, proto.CreateAPIKeyResponse]
 	getAPIKeys                         *connect.Client[proto.GetAPIKeysRequest, proto.GetAPIKeysResponse]
 	updateAPIKey                       *connect.Client[proto.UpdateAPIKeyRequest, proto.UpdateAPIKeyResponse]
+	getUIUsageSettings                 *connect.Client[proto.GetUIUsageSettingsRequest, proto.GetUIUsageSettingsResponse]
+	setUIUsageTracking                 *connect.Client[proto.SetUIUsageTrackingRequest, proto.SetUIUsageTrackingResponse]
+	recordUIUsage                      *connect.Client[proto.RecordUIUsageRequest, proto.RecordUIUsageResponse]
+	clearUIUsageLog                    *connect.Client[proto.ClearUIUsageLogRequest, proto.ClearUIUsageLogResponse]
 	deleteAPIKey                       *connect.Client[proto.DeleteAPIKeyRequest, proto.DeleteAPIKeyResponse]
 	deactivateAPIKey                   *connect.Client[proto.DeactivateAPIKeyRequest, proto.DeactivateAPIKeyResponse]
 	getConditionalFormattingRules      *connect.Client[proto.GetConditionalFormattingRulesRequest, proto.GetConditionalFormattingRulesResponse]
@@ -1275,6 +1357,8 @@ type sickRockClient struct {
 	getTickListState                   *connect.Client[proto.GetTickListStateRequest, proto.GetTickListStateResponse]
 	setTickListCompletion              *connect.Client[proto.SetTickListCompletionRequest, proto.SetTickListCompletionResponse]
 	clearTickListState                 *connect.Client[proto.ClearTickListStateRequest, proto.ClearTickListStateResponse]
+	listRollups                        *connect.Client[proto.ListRollupsRequest, proto.ListRollupsResponse]
+	runRollup                          *connect.Client[proto.RunRollupRequest, proto.RunRollupResponse]
 }
 
 // Init calls sickrock.SickRock.Init.
@@ -1717,6 +1801,16 @@ func (c *sickRockClient) GetUserBookmarks(ctx context.Context, req *connect.Requ
 	return c.getUserBookmarks.CallUnary(ctx, req)
 }
 
+// GetHomeLayout calls sickrock.SickRock.GetHomeLayout.
+func (c *sickRockClient) GetHomeLayout(ctx context.Context, req *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error) {
+	return c.getHomeLayout.CallUnary(ctx, req)
+}
+
+// SetHomeLayout calls sickrock.SickRock.SetHomeLayout.
+func (c *sickRockClient) SetHomeLayout(ctx context.Context, req *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error) {
+	return c.setHomeLayout.CallUnary(ctx, req)
+}
+
 // CreateUserBookmark calls sickrock.SickRock.CreateUserBookmark.
 func (c *sickRockClient) CreateUserBookmark(ctx context.Context, req *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error) {
 	return c.createUserBookmark.CallUnary(ctx, req)
@@ -1740,6 +1834,26 @@ func (c *sickRockClient) GetAPIKeys(ctx context.Context, req *connect.Request[pr
 // UpdateAPIKey calls sickrock.SickRock.UpdateAPIKey.
 func (c *sickRockClient) UpdateAPIKey(ctx context.Context, req *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error) {
 	return c.updateAPIKey.CallUnary(ctx, req)
+}
+
+// GetUIUsageSettings calls sickrock.SickRock.GetUIUsageSettings.
+func (c *sickRockClient) GetUIUsageSettings(ctx context.Context, req *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error) {
+	return c.getUIUsageSettings.CallUnary(ctx, req)
+}
+
+// SetUIUsageTracking calls sickrock.SickRock.SetUIUsageTracking.
+func (c *sickRockClient) SetUIUsageTracking(ctx context.Context, req *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error) {
+	return c.setUIUsageTracking.CallUnary(ctx, req)
+}
+
+// RecordUIUsage calls sickrock.SickRock.RecordUIUsage.
+func (c *sickRockClient) RecordUIUsage(ctx context.Context, req *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error) {
+	return c.recordUIUsage.CallUnary(ctx, req)
+}
+
+// ClearUIUsageLog calls sickrock.SickRock.ClearUIUsageLog.
+func (c *sickRockClient) ClearUIUsageLog(ctx context.Context, req *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error) {
+	return c.clearUIUsageLog.CallUnary(ctx, req)
 }
 
 // DeleteAPIKey calls sickrock.SickRock.DeleteAPIKey.
@@ -1835,6 +1949,16 @@ func (c *sickRockClient) SetTickListCompletion(ctx context.Context, req *connect
 // ClearTickListState calls sickrock.SickRock.ClearTickListState.
 func (c *sickRockClient) ClearTickListState(ctx context.Context, req *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error) {
 	return c.clearTickListState.CallUnary(ctx, req)
+}
+
+// ListRollups calls sickrock.SickRock.ListRollups.
+func (c *sickRockClient) ListRollups(ctx context.Context, req *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error) {
+	return c.listRollups.CallUnary(ctx, req)
+}
+
+// RunRollup calls sickrock.SickRock.RunRollup.
+func (c *sickRockClient) RunRollup(ctx context.Context, req *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error) {
+	return c.runRollup.CallUnary(ctx, req)
 }
 
 // SickRockHandler is an implementation of the sickrock.SickRock service.
@@ -1946,12 +2070,18 @@ type SickRockHandler interface {
 	GetSystemInfo(context.Context, *connect.Request[proto.GetSystemInfoRequest]) (*connect.Response[proto.GetSystemInfoResponse], error)
 	// User Bookmarks
 	GetUserBookmarks(context.Context, *connect.Request[proto.GetUserBookmarksRequest]) (*connect.Response[proto.GetUserBookmarksResponse], error)
+	GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error)
+	SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error)
 	CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error)
 	DeleteUserBookmark(context.Context, *connect.Request[proto.DeleteUserBookmarkRequest]) (*connect.Response[proto.DeleteUserBookmarkResponse], error)
 	// API Key Management
 	CreateAPIKey(context.Context, *connect.Request[proto.CreateAPIKeyRequest]) (*connect.Response[proto.CreateAPIKeyResponse], error)
 	GetAPIKeys(context.Context, *connect.Request[proto.GetAPIKeysRequest]) (*connect.Response[proto.GetAPIKeysResponse], error)
 	UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error)
+	GetUIUsageSettings(context.Context, *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error)
+	SetUIUsageTracking(context.Context, *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error)
+	RecordUIUsage(context.Context, *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error)
+	ClearUIUsageLog(context.Context, *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error)
 	DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error)
 	DeactivateAPIKey(context.Context, *connect.Request[proto.DeactivateAPIKeyRequest]) (*connect.Response[proto.DeactivateAPIKeyResponse], error)
 	// Conditional Formatting Rules
@@ -1974,6 +2104,9 @@ type SickRockHandler interface {
 	GetTickListState(context.Context, *connect.Request[proto.GetTickListStateRequest]) (*connect.Response[proto.GetTickListStateResponse], error)
 	SetTickListCompletion(context.Context, *connect.Request[proto.SetTickListCompletionRequest]) (*connect.Response[proto.SetTickListCompletionResponse], error)
 	ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error)
+	// Rollups: group and sum related rows into a target table, replacing its rows
+	ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error)
+	RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error)
 }
 
 // NewSickRockHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -2511,6 +2644,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		connect.WithSchema(sickRockMethods.ByName("GetUserBookmarks")),
 		connect.WithHandlerOptions(opts...),
 	)
+	sickRockGetHomeLayoutHandler := connect.NewUnaryHandler(
+		SickRockGetHomeLayoutProcedure,
+		svc.GetHomeLayout,
+		connect.WithSchema(sickRockMethods.ByName("GetHomeLayout")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetHomeLayoutHandler := connect.NewUnaryHandler(
+		SickRockSetHomeLayoutProcedure,
+		svc.SetHomeLayout,
+		connect.WithSchema(sickRockMethods.ByName("SetHomeLayout")),
+		connect.WithHandlerOptions(opts...),
+	)
 	sickRockCreateUserBookmarkHandler := connect.NewUnaryHandler(
 		SickRockCreateUserBookmarkProcedure,
 		svc.CreateUserBookmark,
@@ -2539,6 +2684,30 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockUpdateAPIKeyProcedure,
 		svc.UpdateAPIKey,
 		connect.WithSchema(sickRockMethods.ByName("UpdateAPIKey")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockGetUIUsageSettingsHandler := connect.NewUnaryHandler(
+		SickRockGetUIUsageSettingsProcedure,
+		svc.GetUIUsageSettings,
+		connect.WithSchema(sickRockMethods.ByName("GetUIUsageSettings")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetUIUsageTrackingHandler := connect.NewUnaryHandler(
+		SickRockSetUIUsageTrackingProcedure,
+		svc.SetUIUsageTracking,
+		connect.WithSchema(sickRockMethods.ByName("SetUIUsageTracking")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockRecordUIUsageHandler := connect.NewUnaryHandler(
+		SickRockRecordUIUsageProcedure,
+		svc.RecordUIUsage,
+		connect.WithSchema(sickRockMethods.ByName("RecordUIUsage")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockClearUIUsageLogHandler := connect.NewUnaryHandler(
+		SickRockClearUIUsageLogProcedure,
+		svc.ClearUIUsageLog,
+		connect.WithSchema(sickRockMethods.ByName("ClearUIUsageLog")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockDeleteAPIKeyHandler := connect.NewUnaryHandler(
@@ -2653,6 +2822,18 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockClearTickListStateProcedure,
 		svc.ClearTickListState,
 		connect.WithSchema(sickRockMethods.ByName("ClearTickListState")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockListRollupsHandler := connect.NewUnaryHandler(
+		SickRockListRollupsProcedure,
+		svc.ListRollups,
+		connect.WithSchema(sickRockMethods.ByName("ListRollups")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockRunRollupHandler := connect.NewUnaryHandler(
+		SickRockRunRollupProcedure,
+		svc.RunRollup,
+		connect.WithSchema(sickRockMethods.ByName("RunRollup")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/sickrock.SickRock/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2833,6 +3014,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetSystemInfoHandler.ServeHTTP(w, r)
 		case SickRockGetUserBookmarksProcedure:
 			sickRockGetUserBookmarksHandler.ServeHTTP(w, r)
+		case SickRockGetHomeLayoutProcedure:
+			sickRockGetHomeLayoutHandler.ServeHTTP(w, r)
+		case SickRockSetHomeLayoutProcedure:
+			sickRockSetHomeLayoutHandler.ServeHTTP(w, r)
 		case SickRockCreateUserBookmarkProcedure:
 			sickRockCreateUserBookmarkHandler.ServeHTTP(w, r)
 		case SickRockDeleteUserBookmarkProcedure:
@@ -2843,6 +3028,14 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockGetAPIKeysHandler.ServeHTTP(w, r)
 		case SickRockUpdateAPIKeyProcedure:
 			sickRockUpdateAPIKeyHandler.ServeHTTP(w, r)
+		case SickRockGetUIUsageSettingsProcedure:
+			sickRockGetUIUsageSettingsHandler.ServeHTTP(w, r)
+		case SickRockSetUIUsageTrackingProcedure:
+			sickRockSetUIUsageTrackingHandler.ServeHTTP(w, r)
+		case SickRockRecordUIUsageProcedure:
+			sickRockRecordUIUsageHandler.ServeHTTP(w, r)
+		case SickRockClearUIUsageLogProcedure:
+			sickRockClearUIUsageLogHandler.ServeHTTP(w, r)
 		case SickRockDeleteAPIKeyProcedure:
 			sickRockDeleteAPIKeyHandler.ServeHTTP(w, r)
 		case SickRockDeactivateAPIKeyProcedure:
@@ -2881,6 +3074,10 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockSetTickListCompletionHandler.ServeHTTP(w, r)
 		case SickRockClearTickListStateProcedure:
 			sickRockClearTickListStateHandler.ServeHTTP(w, r)
+		case SickRockListRollupsProcedure:
+			sickRockListRollupsHandler.ServeHTTP(w, r)
+		case SickRockRunRollupProcedure:
+			sickRockRunRollupHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -3242,6 +3439,14 @@ func (UnimplementedSickRockHandler) GetUserBookmarks(context.Context, *connect.R
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUserBookmarks is not implemented"))
 }
 
+func (UnimplementedSickRockHandler) GetHomeLayout(context.Context, *connect.Request[proto.GetHomeLayoutRequest]) (*connect.Response[proto.GetHomeLayoutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetHomeLayout is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetHomeLayout(context.Context, *connect.Request[proto.SetHomeLayoutRequest]) (*connect.Response[proto.SetHomeLayoutResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetHomeLayout is not implemented"))
+}
+
 func (UnimplementedSickRockHandler) CreateUserBookmark(context.Context, *connect.Request[proto.CreateUserBookmarkRequest]) (*connect.Response[proto.CreateUserBookmarkResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.CreateUserBookmark is not implemented"))
 }
@@ -3260,6 +3465,22 @@ func (UnimplementedSickRockHandler) GetAPIKeys(context.Context, *connect.Request
 
 func (UnimplementedSickRockHandler) UpdateAPIKey(context.Context, *connect.Request[proto.UpdateAPIKeyRequest]) (*connect.Response[proto.UpdateAPIKeyResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.UpdateAPIKey is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) GetUIUsageSettings(context.Context, *connect.Request[proto.GetUIUsageSettingsRequest]) (*connect.Response[proto.GetUIUsageSettingsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.GetUIUsageSettings is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetUIUsageTracking(context.Context, *connect.Request[proto.SetUIUsageTrackingRequest]) (*connect.Response[proto.SetUIUsageTrackingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetUIUsageTracking is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) RecordUIUsage(context.Context, *connect.Request[proto.RecordUIUsageRequest]) (*connect.Response[proto.RecordUIUsageResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.RecordUIUsage is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ClearUIUsageLog(context.Context, *connect.Request[proto.ClearUIUsageLogRequest]) (*connect.Response[proto.ClearUIUsageLogResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ClearUIUsageLog is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) DeleteAPIKey(context.Context, *connect.Request[proto.DeleteAPIKeyRequest]) (*connect.Response[proto.DeleteAPIKeyResponse], error) {
@@ -3336,4 +3557,12 @@ func (UnimplementedSickRockHandler) SetTickListCompletion(context.Context, *conn
 
 func (UnimplementedSickRockHandler) ClearTickListState(context.Context, *connect.Request[proto.ClearTickListStateRequest]) (*connect.Response[proto.ClearTickListStateResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ClearTickListState is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) ListRollups(context.Context, *connect.Request[proto.ListRollupsRequest]) (*connect.Response[proto.ListRollupsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.ListRollups is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) RunRollup(context.Context, *connect.Request[proto.RunRollupRequest]) (*connect.Response[proto.RunRollupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.RunRollup is not implemented"))
 }

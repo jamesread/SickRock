@@ -120,7 +120,7 @@ onMounted(async () => {
   <div v-if="loading">Loading...</div>
   <template v-else>
     <CalendarComponent v-if="currentViewType === 'calendar'" :table-id="tableId" :view-name="currentViewName" :view-id="viewManager.selectedViewId.value ?? undefined" @view-changed="handleViewChanged" />
-    <TickListComponent v-else-if="currentViewType === 'ticklist'" :table-id="tableId" @view-changed="handleViewChanged" />
+    <TickListComponent v-else-if="currentViewType === 'ticklist'" :table-id="tableId" :view-id="viewManager.selectedViewId.value ?? undefined" @view-changed="handleViewChanged" />
     <WeeklyPlanComponent
       v-else-if="currentViewType === WEEKLY_PLAN_VIEW_TYPE"
       :table-id="tableId"

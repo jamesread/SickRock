@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { columnChoiceLabel } from '../utils/fieldColumnDisplay'
 import { ref, computed, onMounted, watch } from 'vue'
 import Section from 'picocrank/vue/components/Section.vue'
 import NotificationBlock from 'picocrank/vue/components/NotificationBlock.vue'
@@ -15,16 +16,23 @@ type EditorGroup = {
 const props = withDefaults(defineProps<{
   tableId: string
   columnNames: string[]
+  /** Display labels by column name (Column labels & formatting); shown beside the names. */
+  columnLabels?: Record<string, string>
   client: ReturnType<typeof createApiClient>
   /** When true, omit Section wrapper (for dialogs). */
   embedded?: boolean
 }>(), {
   embedded: false,
+  columnLabels: () => ({}),
 })
 
 const emit = defineEmits<{
   saved: []
 }>()
+
+function columnLabel(name: string): string {
+  return columnChoiceLabel(name, props.columnLabels[name])
+}
 
 const loading = ref(true)
 const saving = ref(false)
@@ -247,7 +255,7 @@ async function resetGroups() {
                 :key="`${group.key}-${col}`"
                 class="assigned-column-row"
               >
-                <code class="assigned-column-name">{{ col }}</code>
+                <code class="assigned-column-name">{{ columnLabel(col) }}</code>
                 <div class="order-controls" role="group" :aria-label="`Reorder ${col}`">
                   <button
                     type="button"
@@ -290,7 +298,7 @@ async function resetGroups() {
               }"
             >
               <option value="">Choose column…</option>
-              <option v-for="col in unassignedColumns" :key="col" :value="col">{{ col }}</option>
+              <option v-for="col in unassignedColumns" :key="col" :value="col">{{ columnLabel(col) }}</option>
             </select>
           </div>
         </div>
@@ -303,7 +311,7 @@ async function resetGroups() {
               v-for="col in unassignedColumns"
               :key="col"
               class="column-chip pool"
-            >{{ col }}</span>
+            >{{ columnLabel(col) }}</span>
           </div>
         </div>
       </div>

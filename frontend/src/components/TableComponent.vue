@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import RadioGroup from 'picocrank/vue/components/RadioGroup.vue'
 import type { IconData } from '../utils/hugeicons'
 import { computed, inject, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import Table from 'picocrank/vue/components/Table.vue'
@@ -37,7 +38,7 @@ import {
   fieldDefsForInsertForm,
 } from '../utils/insertRowViewFields'
 import { useIamUsers } from '../composables/useIamUsers'
-import { hasImageValue, isImageFieldType, isUserRefColumn as columnIsUserRef, isUserRefFieldType } from '../utils/fieldTypes'
+import { hasImageValue, isImageFieldType, isUserRefColumn as columnIsUserRef, isUserRefFieldType, YES_NO_OPTIONS } from '../utils/fieldTypes'
 import InsertRow from './InsertRow.vue'
 import RowActionsDropdown from './RowActionsDropdown.vue'
 import TableComponentToolbar from './TableComponentToolbar.vue'
@@ -56,6 +57,7 @@ import { urlConditionalFormatLink } from '../utils/conditionalFormattingUrl'
 import { initialTableView, parseViewLayout, tableViewFromProto } from '../utils/serverTableViews'
 import { useServerTableViewSettings } from '../composables/useServerTableViewSettings'
 import { useTableAccess } from '../composables/useTableAccess'
+import { filteredRowIds } from '../utils/rollups'
 
 const { designModeEnabled } = useDesignMode()
 
@@ -277,7 +279,15 @@ const tableToolbarBindings = computed(() => ({
   selectedViewId: selectedViewId.value,
   currentView: currentView.value,
   multiSelectEnabled: multiSelectEnabled.value,
+  rollupSourceIds: rollupSourceIds.value,
 }))
+
+// Rollups run from the toolbar cover the rows the table's filters leave (all rows when unfiltered).
+const rollupSourceIds = computed(() => filteredRowIds(
+  flattenedRows.value as Array<Record<string, unknown>>,
+  tableHeaders.value,
+  tableFilters.value,
+))
 
 // Server table views remain the source of truth. PicoCrank changes the
 // controlled state below for this component session only; views saved from
@@ -1161,6 +1171,9 @@ onMounted(async () => {
   }
 })
 
+// Lets a parent refresh the names shown for relation columns, e.g. after a referenced row was created.
+defineExpose({ reloadForeignKeys: loadForeignKeys })
+
 onUnmounted(() => {
   window.removeEventListener('open-quick-add', handleOpenQuickAdd)
   window.removeEventListener('save-current-edit', handleSaveCurrentEdit)
@@ -1265,14 +1278,15 @@ onUnmounted(() => {
 
             <template v-else-if="isEditingRow(row, header.key)">
               <div class="inline-edit" data-row-click-ignore>
-                <input
+                <RadioGroup
                   v-if="isTinyintColumn(header.key)"
-                  type="checkbox"
-                  :checked="getBooleanValue(sourceItemForRow(row), header.key)"
+                  variant="boolean"
+                  :options="YES_NO_OPTIONS"
+                  :model-value="getBooleanValue(sourceItemForRow(row), header.key)"
                   :disabled="saving"
-                  class="edit-checkbox"
-                  @change="event => {
-                    editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+                  :aria-label="header.label"
+                  @update:model-value="value => {
+                    editingValue = value ? '1' : '0'
                     saveEditRow(row)
                   }"
                 />
@@ -1436,6 +1450,8 @@ onUnmounted(() => {
           🗑️ Delete Selected ({{ selectedKeys.length }})
         </button>
       </div>
+      <!-- Under the table, inside its section (e.g. a related rows panel's quick add row). -->
+      <slot name="footer" />
     </div>
 
     <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
@@ -1577,14 +1593,15 @@ onUnmounted(() => {
 
             <template v-else-if="isEditingRow(row, header.key)">
               <div class="inline-edit" data-row-click-ignore>
-                <input
+                <RadioGroup
                   v-if="isTinyintColumn(header.key)"
-                  type="checkbox"
-                  :checked="getBooleanValue(sourceItemForRow(row), header.key)"
+                  variant="boolean"
+                  :options="YES_NO_OPTIONS"
+                  :model-value="getBooleanValue(sourceItemForRow(row), header.key)"
                   :disabled="saving"
-                  class="edit-checkbox"
-                  @change="event => {
-                    editingValue = (event.target as HTMLInputElement).checked ? '1' : '0'
+                  :aria-label="header.label"
+                  @update:model-value="value => {
+                    editingValue = value ? '1' : '0'
                     saveEditRow(row)
                   }"
                 />
@@ -1748,6 +1765,8 @@ onUnmounted(() => {
           🗑️ Delete Selected ({{ selectedKeys.length }})
         </button>
       </div>
+      <!-- Under the table, inside its section (e.g. a related rows panel's quick add row). -->
+      <slot name="footer" />
     </div>
 
     <Dialog v-model:open="showDeleteConfirm" title="Confirm Delete" size="small">
@@ -1872,15 +1891,7 @@ onUnmounted(() => {
 }
 
 .edit-input:disabled,
-.edit-checkbox:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
 
-.edit-checkbox {
-  cursor: pointer;
-  transform: scale(1.2);
-}
 
 .boolean-display {
   display: flex;

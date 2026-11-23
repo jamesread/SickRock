@@ -3,9 +3,10 @@
 import { computed } from 'vue'
 import { isImageFieldType } from '../utils/fieldTypes'
 import { CARD_SIZES, MAX_CARD_DETAILS, type CardsConfig } from '../utils/cardsView'
+import { columnChoiceLabel } from '../utils/fieldColumnDisplay'
 
 const props = defineProps<{
-  fields: Array<{ name: string; type: string }>
+  fields: Array<{ name: string; type: string; displayLabel?: string }>
 }>()
 
 const config = defineModel<CardsConfig>({ required: true })
@@ -36,7 +37,7 @@ function detailDisabled(name: string): boolean {
     <div>
       <select id="cards-image-column" :value="config.imageColumn" @change="update({ imageColumn: ($event.target as HTMLSelectElement).value })">
         <option value="">None</option>
-        <option v-for="field in imageColumns" :key="field.name" :value="field.name">{{ field.name }}</option>
+        <option v-for="field in imageColumns" :key="field.name" :value="field.name">{{ columnChoiceLabel(field.name, field.displayLabel) }}</option>
       </select>
       <small v-if="imageColumns.length === 0">This table has no image columns yet. Add one with type Image to show pictures on the cards.</small>
       <small v-else>Shown across the top of each card.</small>
@@ -46,7 +47,7 @@ function detailDisabled(name: string): boolean {
     <div>
       <select id="cards-title-column" :value="config.titleColumn" @change="update({ titleColumn: ($event.target as HTMLSelectElement).value })">
         <option value="">Automatic (name, title or id)</option>
-        <option v-for="field in otherColumns" :key="field.name" :value="field.name">{{ field.name }}</option>
+        <option v-for="field in otherColumns" :key="field.name" :value="field.name">{{ columnChoiceLabel(field.name, field.displayLabel) }}</option>
       </select>
     </div>
 
@@ -60,7 +61,7 @@ function detailDisabled(name: string): boolean {
             :disabled="detailDisabled(field.name)"
             @change="toggleDetail(field.name, ($event.target as HTMLInputElement).checked)"
           />
-          <span>{{ field.name }}</span>
+          <span>{{ columnChoiceLabel(field.name, field.displayLabel) }}</span>
         </label>
       </div>
       <small>Up to {{ MAX_CARD_DETAILS }} columns shown under the title, in the order you tick them.</small>

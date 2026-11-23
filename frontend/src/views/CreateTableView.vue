@@ -12,6 +12,8 @@ import { tableListLinkLabel } from '../utils/rowInsertLabel'
 import TablePullThroughSection from '../components/TablePullThroughSection.vue'
 import WeeklyPlanSettings from '../components/WeeklyPlanSettings.vue'
 import CardsSettings from '../components/CardsSettings.vue'
+import TickListSettings from '../components/TickListSettings.vue'
+import { parseTickListConfig, withTickListConfig } from '../utils/tickList'
 import { parseCardsConfig, suggestedCardsConfig, withCardsConfig } from '../utils/cardsView'
 import {
   defaultWeeklyPlanConfig,
@@ -43,6 +45,7 @@ const viewType = ref<ViewType>('table')
 const existingLayoutJson = ref('')
 const weeklyPlanConfig = ref(defaultWeeklyPlanConfig())
 const cardsConfig = ref(parseCardsConfig(''))
+const tickListConfig = ref(parseTickListConfig(''))
 const structureFields = ref<Array<{ name: string; type: string }>>([])
 type CatalogColumn = { name: string; type: string; synthetic: boolean; label: string }
 
@@ -117,16 +120,16 @@ function onDragEnd() {
 }
 
 function buildColumnCatalog(
-  fields: Array<{ name: string; type: string }>,
+  fields: Array<{ name: string; type: string; displayLabel?: string }>,
   foreignKeys: ForeignKey[],
 ): CatalogColumn[] {
+  const displayByName = columnDisplaySettingsByName(columnDisplaySettings.value)
   const physical: CatalogColumn[] = fields.map(field => ({
     name: field.name,
     type: field.type,
     synthetic: false,
-    label: field.name,
+    label: displayByName.get(field.name)?.displayLabel?.trim() || field.displayLabel?.trim() || field.name,
   }))
-  const displayByName = columnDisplaySettingsByName(columnDisplaySettings.value)
   const syntheticNames = syntheticColumnNamesForSourceTable(tableId, foreignKeys)
   const synthetic: CatalogColumn[] = syntheticNames.map(name => {
     const customLabel = displayByName.get(name)?.displayLabel?.trim()
@@ -239,6 +242,7 @@ async function loadExistingView() {
       existingLayoutJson.value = view.layoutJson ?? ''
       weeklyPlanConfig.value = parseWeeklyPlanConfig(view.layoutJson)
       cardsConfig.value = parseCardsConfig(view.layoutJson)
+      tickListConfig.value = parseTickListConfig(view.layoutJson)
       selectedColumns.value = selectedColumnsFromView(
         availableColumns.value,
         view.columns,
@@ -295,6 +299,7 @@ async function saveTableView() {
   let layoutJson = existingLayoutJson.value
   if (viewType.value === 'weeklyplan') layoutJson = withWeeklyPlanConfig(layoutJson, weeklyPlanConfig.value)
   if (viewType.value === 'cards') layoutJson = withCardsConfig(layoutJson, cardsConfig.value)
+  if (viewType.value === 'ticklist') layoutJson = withTickListConfig(layoutJson, tickListConfig.value)
 
   loading.value = true
   error.value = null
@@ -455,6 +460,12 @@ async function deleteTableView() {
           :foreign-keys="structureForeignKeys"
         />
         <CardsSettings v-if="viewType === 'cards'" v-model="cardsConfig" :fields="structureFields" />
+        <TickListSettings
+          v-if="viewType === 'ticklist'"
+          v-model="tickListConfig"
+          :fields="structureFields"
+          :foreign-keys="structureForeignKeys"
+        />
 
         <div v-if="viewType === 'table'">
           <label>Column Configuration</label>
@@ -500,7 +511,8 @@ async function deleteTableView() {
                   <code class="synthetic-key">{{ column.name }}</code>
                 </template>
                 <template v-else>
-                  {{ column.name }}
+                  {{ columnListLabel(column.name) }}
+                  <code v-if="columnListLabel(column.name) !== column.name" class="synthetic-key">{{ column.name }}</code>
                 </template>
                 <span class="column-type">({{ columnTypeHint(column.name) }})</span>
               </label>
