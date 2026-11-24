@@ -1432,6 +1432,21 @@ func (s *SickRockServer) SetUserDefaultTableView(ctx context.Context, req *conne
 	return connect.NewResponse(&sickrockpb.SetUserDefaultTableViewResponse{}), nil
 }
 
+// SetTableDefaultView sets the view a table opens on for everyone without a default of their own.
+func (s *SickRockServer) SetTableDefaultView(ctx context.Context, req *connect.Request[sickrockpb.SetTableDefaultViewRequest]) (*connect.Response[sickrockpb.SetTableDefaultViewResponse], error) {
+	tableName := strings.TrimSpace(req.Msg.GetTableName())
+	if tableName == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("table_name is required"))
+	}
+	if err := s.requireDataTableAccess(ctx, tableName, repo.ResourceActionEdit); err != nil {
+		return nil, err
+	}
+	if err := s.repo.SetTableDefaultView(ctx, tableName, int(req.Msg.GetViewId())); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, err)
+	}
+	return connect.NewResponse(&sickrockpb.SetTableDefaultViewResponse{}), nil
+}
+
 func (s *SickRockServer) userDefaultTableViewAccess(ctx context.Context, tableName string) (string, int, error) {
 	tableName = strings.TrimSpace(tableName)
 	if tableName == "" {

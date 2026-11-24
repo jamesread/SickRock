@@ -6231,6 +6231,64 @@
         }
       }
     },
+    "/api/sickrock.SickRock/SetTableDefaultView": {
+      "post": {
+        "tags": [
+          "sickrock.SickRock"
+        ],
+        "summary": "SetTableDefaultView",
+        "operationId": "sickrock.SickRock.SetTableDefaultView",
+        "parameters": [
+          {
+            "name": "Connect-Protocol-Version",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/connect-protocol-version"
+            }
+          },
+          {
+            "name": "Connect-Timeout-Ms",
+            "in": "header",
+            "schema": {
+              "$ref": "#/components/schemas/connect-timeout-header"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/sickrock.SetTableDefaultViewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "default": {
+            "description": "Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/connect.error"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/sickrock.SetTableDefaultViewResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sickrock.SickRock/SetTableRowLabels": {
       "post": {
         "tags": [
@@ -12090,6 +12148,29 @@
           }
         },
         "title": "SetTableDefaultExportViewResponse",
+        "additionalProperties": false
+      },
+      "sickrock.SetTableDefaultViewRequest": {
+        "type": "object",
+        "properties": {
+          "tableName": {
+            "type": "string",
+            "title": "table_name"
+          },
+          "viewId": {
+            "type": "integer",
+            "title": "view_id",
+            "format": "int32",
+            "description": "one of the table's views, or 0 for none (the first view is used)"
+          }
+        },
+        "title": "SetTableDefaultViewRequest",
+        "additionalProperties": false,
+        "description": "SetTableDefaultViewRequest sets the view a table opens on for everyone without a default of their\n own (table_views.is_default). Needs edit access to the table."
+      },
+      "sickrock.SetTableDefaultViewResponse": {
+        "type": "object",
+        "title": "SetTableDefaultViewResponse",
         "additionalProperties": false
       },
       "sickrock.SetTableRowLabelsRequest": {

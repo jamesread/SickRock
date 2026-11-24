@@ -3,8 +3,12 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTableViewManager, type TableView } from '../composables/useTableViewManager'
 import { HugeiconsIcon } from '@hugeicons/vue'
-import { Add01Icon, Edit03Icon, Settings01Icon } from '@hugeicons/core-free-icons'
+import { Add01Icon, Edit03Icon, Settings01Icon, StarIcon } from '@hugeicons/core-free-icons'
 import Dialog from 'picocrank/vue/components/Dialog.vue'
+import ContextMenu from 'picocrank/vue/components/ContextMenu.vue'
+import { showNotificationPopup } from 'picocrank/vue/composables/useNotificationPopups.js'
+import { createApiClient } from '../stores/api'
+import { useTableAccess } from '../composables/useTableAccess'
 import type { DialogApi } from '../utils/dialog'
 import { useDesignMode } from '../composables/useDesignMode'
 import { viewTypeLabel } from '../utils/viewTypes'
@@ -74,9 +78,80 @@ const selectedViewId = computed({
 const dialogRef = ref<DialogApi | null>(null)
 
 function openViewsDialog() {
+  loadDefaults()
   nextTick(() => {
     dialogRef.value?.show()
   })
+}
+
+// Defaults: the caller's own (table_view_user_defaults) and the table's, for everyone (is_default).
+// Read fresh when the dialog opens, so the tags are right after a change from elsewhere.
+const client = createApiClient()
+const { access } = useTableAccess(computed(() => props.tableId))
+const myDefaultId = ref(0)
+const tableDefaultId = ref(0)
+const defaultMenuOpen = ref(false)
+const defaultMenuX = ref(0)
+const defaultMenuY = ref(0)
+const defaultMenuView = ref<TableView | null>(null)
+
+async function loadDefaults() {
+  try {
+    const res = await client.getTableViews({ tableName: props.tableId })
+    myDefaultId.value = res.userDefaultViewId ?? 0
+    tableDefaultId.value = res.views.find(view => view.isDefault)?.id ?? 0
+  } catch (error) {
+    console.warn('Could not load default views:', error)
+  }
+}
+
+/** "Default" marks the view everyone opens on; with none set, the built-in All Columns. */
+function isTableDefault(view: TableView): boolean {
+  return view.id === -1 ? tableDefaultId.value === 0 : view.id === tableDefaultId.value
+}
+
+const defaultMenuItems = computed(() => {
+  const view = defaultMenuView.value
+  if (!view) return []
+  const mine = view.id === myDefaultId.value
+  const everyone = view.id === tableDefaultId.value
+  return [
+    mine
+      ? { id: 'mine-clear', label: 'Stop opening on this view' }
+      : { id: 'mine', label: 'Open on this view (just me)' },
+    ...(access.value.canEdit
+      ? [everyone
+          ? { id: 'everyone-clear', label: 'Remove as default for everyone' }
+          : { id: 'everyone', label: 'Make default for everyone' }]
+      : []),
+  ]
+})
+
+function openDefaultMenu(view: TableView, event: MouseEvent) {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  defaultMenuView.value = view
+  defaultMenuX.value = rect.left
+  defaultMenuY.value = rect.bottom
+  defaultMenuOpen.value = true
+}
+
+async function onDefaultMenuSelect(item: { id?: string }) {
+  const view = defaultMenuView.value
+  if (!view) return
+  try {
+    if (item.id === 'mine' || item.id === 'mine-clear') {
+      const viewId = item.id === 'mine' ? view.id : 0
+      await client.setUserDefaultTableView({ tableName: props.tableId, viewId })
+      showNotificationPopup({ message: viewId ? `This table now opens on ${view.viewName} for you` : 'Your default view is cleared', class: 'good' })
+    } else if (item.id === 'everyone' || item.id === 'everyone-clear') {
+      const viewId = item.id === 'everyone' ? view.id : 0
+      await client.setTableDefaultView({ tableName: props.tableId, viewId })
+      showNotificationPopup({ message: viewId ? `${view.viewName} is now the default view` : 'The default view is cleared', class: 'good' })
+    }
+    await loadDefaults()
+  } catch (error) {
+    showNotificationPopup({ message: `Could not change the default view: ${error instanceof Error ? error.message : String(error)}`, class: 'bad' })
+  }
 }
 
 function closeViewsDialog() {
@@ -144,7 +219,7 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
           <tr>
             <th scope="col">View</th>
             <th scope="col">Type</th>
-            <th v-if="allowViewEdit" scope="col" class="views-picker-actions"><span class="visually-hidden">Actions</span></th>
+            <th scope="col" class="views-picker-actions"><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody>
@@ -159,12 +234,26 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
           >
             <td>
               <span class="views-picker-name">{{ view.viewName }}</span>
-              <span v-if="view.isDefault" class="tag note">Default</span>
+              <span v-if="isTableDefault(view)" class="tag note" title="Everyone opens the table on this view, unless they chose their own">Default</span>
+              <span v-if="view.id > 0 && view.id === myDefaultId" class="tag good" title="You open the table on this view">Yours</span>
             </td>
             <td class="views-picker-type subtle">{{ viewTypeLabel(view.viewType) }}</td>
-            <td v-if="allowViewEdit" class="views-picker-actions">
+            <td class="views-picker-actions">
               <button
                 v-if="isEditableView(view)"
+                type="button"
+                class="button inline-icon neutral small"
+                :aria-label="`Default view options for ${view.viewName}`"
+                title="Open the table on this view"
+                aria-haspopup="menu"
+                @click.stop="openDefaultMenu(view, $event)"
+                @keydown.enter.stop
+              >
+                <HugeiconsIcon :icon="StarIcon" width="1em" height="1em" aria-hidden="true" />
+                <span>Default…</span>
+              </button>
+              <button
+                v-if="allowViewEdit && isEditableView(view)"
                 type="button"
                 class="button inline-icon neutral small design-only"
                 :aria-label="`Edit view ${view.viewName}`"
@@ -180,6 +269,15 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
         </tbody>
       </table>
     </div>
+
+    <ContextMenu
+      v-model:open="defaultMenuOpen"
+      aria-label="Default view"
+      :items="defaultMenuItems"
+      :client-x="defaultMenuX"
+      :client-y="defaultMenuY"
+      @select="onDefaultMenuSelect"
+    />
 
     <template v-if="hasFooterActions" #actions>
       <button
@@ -233,6 +331,10 @@ const dialogTitle = computed(() => (allowStructureLink.value ? 'Table options' :
 
 .views-picker-actions .button {
   margin: 0;
+}
+
+.views-picker-actions .button + .button {
+  margin-inline-start: 0.35rem;
 }
 
 .visually-hidden {
