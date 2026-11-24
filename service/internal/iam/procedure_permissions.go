@@ -40,6 +40,7 @@ var writeProcedures = map[string]bool{
 	sickrockpbconnect.SickRockSetColumnDisplaySettingsProcedure:           true,
 	sickrockpbconnect.SickRockSetTableRowLabelsProcedure:                  true,
 	sickrockpbconnect.SickRockSetTableDefaultExportViewProcedure:          true,
+	sickrockpbconnect.SickRockSetTableDefaultViewProcedure:                true,
 	sickrockpbconnect.SickRockChangeColumnTypeProcedure:                   true,
 	sickrockpbconnect.SickRockDropColumnProcedure:                         true,
 	sickrockpbconnect.SickRockChangeColumnNameProcedure:                   true,

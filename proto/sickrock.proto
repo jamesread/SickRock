@@ -635,6 +635,15 @@ message SetUserDefaultTableViewRequest {
 
 message SetUserDefaultTableViewResponse {}
 
+// SetTableDefaultViewRequest sets the view a table opens on for everyone without a default of their
+// own (table_views.is_default). Needs edit access to the table.
+message SetTableDefaultViewRequest {
+  string table_name = 1;
+  int32 view_id = 2; // one of the table's views, or 0 for none (the first view is used)
+}
+
+message SetTableDefaultViewResponse {}
+
 message DeleteTableViewRequest {
   int32 view_id = 1;
 }
@@ -1746,6 +1755,7 @@ service SickRock {
   rpc GetTableViews(GetTableViewsRequest) returns (GetTableViewsResponse);
   rpc DeleteTableView(DeleteTableViewRequest) returns (DeleteTableViewResponse);
   rpc SetUserDefaultTableView(SetUserDefaultTableViewRequest) returns (SetUserDefaultTableViewResponse);
+  rpc SetTableDefaultView(SetTableDefaultViewRequest) returns (SetTableDefaultViewResponse);
 
   // Health checks (admins only)
   rpc ListHealthIssues(ListHealthIssuesRequest) returns (ListHealthIssuesResponse);

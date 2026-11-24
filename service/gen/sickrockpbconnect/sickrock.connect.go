@@ -205,6 +205,9 @@ const (
 	// SickRockSetUserDefaultTableViewProcedure is the fully-qualified name of the SickRock's
 	// SetUserDefaultTableView RPC.
 	SickRockSetUserDefaultTableViewProcedure = "/sickrock.SickRock/SetUserDefaultTableView"
+	// SickRockSetTableDefaultViewProcedure is the fully-qualified name of the SickRock's
+	// SetTableDefaultView RPC.
+	SickRockSetTableDefaultViewProcedure = "/sickrock.SickRock/SetTableDefaultView"
 	// SickRockListHealthIssuesProcedure is the fully-qualified name of the SickRock's ListHealthIssues
 	// RPC.
 	SickRockListHealthIssuesProcedure = "/sickrock.SickRock/ListHealthIssues"
@@ -442,6 +445,7 @@ type SickRockClient interface {
 	GetTableViews(context.Context, *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error)
 	DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error)
 	SetUserDefaultTableView(context.Context, *connect.Request[proto.SetUserDefaultTableViewRequest]) (*connect.Response[proto.SetUserDefaultTableViewResponse], error)
+	SetTableDefaultView(context.Context, *connect.Request[proto.SetTableDefaultViewRequest]) (*connect.Response[proto.SetTableDefaultViewResponse], error)
 	// Health checks (admins only)
 	ListHealthIssues(context.Context, *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error)
 	GetHealthSummary(context.Context, *connect.Request[proto.GetHealthSummaryRequest]) (*connect.Response[proto.GetHealthSummaryResponse], error)
@@ -921,6 +925,12 @@ func NewSickRockClient(httpClient connect.HTTPClient, baseURL string, opts ...co
 			connect.WithSchema(sickRockMethods.ByName("SetUserDefaultTableView")),
 			connect.WithClientOptions(opts...),
 		),
+		setTableDefaultView: connect.NewClient[proto.SetTableDefaultViewRequest, proto.SetTableDefaultViewResponse](
+			httpClient,
+			baseURL+SickRockSetTableDefaultViewProcedure,
+			connect.WithSchema(sickRockMethods.ByName("SetTableDefaultView")),
+			connect.WithClientOptions(opts...),
+		),
 		listHealthIssues: connect.NewClient[proto.ListHealthIssuesRequest, proto.ListHealthIssuesResponse](
 			httpClient,
 			baseURL+SickRockListHealthIssuesProcedure,
@@ -1334,6 +1344,7 @@ type sickRockClient struct {
 	getTableViews                      *connect.Client[proto.GetTableViewsRequest, proto.GetTableViewsResponse]
 	deleteTableView                    *connect.Client[proto.DeleteTableViewRequest, proto.DeleteTableViewResponse]
 	setUserDefaultTableView            *connect.Client[proto.SetUserDefaultTableViewRequest, proto.SetUserDefaultTableViewResponse]
+	setTableDefaultView                *connect.Client[proto.SetTableDefaultViewRequest, proto.SetTableDefaultViewResponse]
 	listHealthIssues                   *connect.Client[proto.ListHealthIssuesRequest, proto.ListHealthIssuesResponse]
 	getHealthSummary                   *connect.Client[proto.GetHealthSummaryRequest, proto.GetHealthSummaryResponse]
 	runHealthChecks                    *connect.Client[proto.RunHealthChecksRequest, proto.RunHealthChecksResponse]
@@ -1723,6 +1734,11 @@ func (c *sickRockClient) SetUserDefaultTableView(ctx context.Context, req *conne
 	return c.setUserDefaultTableView.CallUnary(ctx, req)
 }
 
+// SetTableDefaultView calls sickrock.SickRock.SetTableDefaultView.
+func (c *sickRockClient) SetTableDefaultView(ctx context.Context, req *connect.Request[proto.SetTableDefaultViewRequest]) (*connect.Response[proto.SetTableDefaultViewResponse], error) {
+	return c.setTableDefaultView.CallUnary(ctx, req)
+}
+
 // ListHealthIssues calls sickrock.SickRock.ListHealthIssues.
 func (c *sickRockClient) ListHealthIssues(ctx context.Context, req *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error) {
 	return c.listHealthIssues.CallUnary(ctx, req)
@@ -2087,6 +2103,7 @@ type SickRockHandler interface {
 	GetTableViews(context.Context, *connect.Request[proto.GetTableViewsRequest]) (*connect.Response[proto.GetTableViewsResponse], error)
 	DeleteTableView(context.Context, *connect.Request[proto.DeleteTableViewRequest]) (*connect.Response[proto.DeleteTableViewResponse], error)
 	SetUserDefaultTableView(context.Context, *connect.Request[proto.SetUserDefaultTableViewRequest]) (*connect.Response[proto.SetUserDefaultTableViewResponse], error)
+	SetTableDefaultView(context.Context, *connect.Request[proto.SetTableDefaultViewRequest]) (*connect.Response[proto.SetTableDefaultViewResponse], error)
 	// Health checks (admins only)
 	ListHealthIssues(context.Context, *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error)
 	GetHealthSummary(context.Context, *connect.Request[proto.GetHealthSummaryRequest]) (*connect.Response[proto.GetHealthSummaryResponse], error)
@@ -2560,6 +2577,12 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 		SickRockSetUserDefaultTableViewProcedure,
 		svc.SetUserDefaultTableView,
 		connect.WithSchema(sickRockMethods.ByName("SetUserDefaultTableView")),
+		connect.WithHandlerOptions(opts...),
+	)
+	sickRockSetTableDefaultViewHandler := connect.NewUnaryHandler(
+		SickRockSetTableDefaultViewProcedure,
+		svc.SetTableDefaultView,
+		connect.WithSchema(sickRockMethods.ByName("SetTableDefaultView")),
 		connect.WithHandlerOptions(opts...),
 	)
 	sickRockListHealthIssuesHandler := connect.NewUnaryHandler(
@@ -3038,6 +3061,8 @@ func NewSickRockHandler(svc SickRockHandler, opts ...connect.HandlerOption) (str
 			sickRockDeleteTableViewHandler.ServeHTTP(w, r)
 		case SickRockSetUserDefaultTableViewProcedure:
 			sickRockSetUserDefaultTableViewHandler.ServeHTTP(w, r)
+		case SickRockSetTableDefaultViewProcedure:
+			sickRockSetTableDefaultViewHandler.ServeHTTP(w, r)
 		case SickRockListHealthIssuesProcedure:
 			sickRockListHealthIssuesHandler.ServeHTTP(w, r)
 		case SickRockGetHealthSummaryProcedure:
@@ -3423,6 +3448,10 @@ func (UnimplementedSickRockHandler) DeleteTableView(context.Context, *connect.Re
 
 func (UnimplementedSickRockHandler) SetUserDefaultTableView(context.Context, *connect.Request[proto.SetUserDefaultTableViewRequest]) (*connect.Response[proto.SetUserDefaultTableViewResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetUserDefaultTableView is not implemented"))
+}
+
+func (UnimplementedSickRockHandler) SetTableDefaultView(context.Context, *connect.Request[proto.SetTableDefaultViewRequest]) (*connect.Response[proto.SetTableDefaultViewResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("sickrock.SickRock.SetTableDefaultView is not implemented"))
 }
 
 func (UnimplementedSickRockHandler) ListHealthIssues(context.Context, *connect.Request[proto.ListHealthIssuesRequest]) (*connect.Response[proto.ListHealthIssuesResponse], error) {
